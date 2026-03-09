@@ -1,0 +1,424 @@
+"use client";
+
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { TextInput } from "@/components/TextInput";
+import { ImageUpload } from "@/components/ImageUpload";
+import { CommandSelect } from "@/components/CommandSelect";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import {
+  GenerateFormState,
+  DEFAULT_POSITION,
+  DEFAULT_FONT,
+  DEFAULT_COLOR,
+  DEFAULT_SIZE,
+  DEFAULT_OUTPUT,
+  OUTPUT_CONFIG,
+  OutputFormat,
+} from "@/types";
+
+// throttle関数
+function throttle<T extends (...args: unknown[]) => void>(
+  func: T,
+  limit: number
+): T {
+  let inThrottle = false;
+  return ((...args: unknown[]) => {
+    if (!inThrottle) {
+      func(...args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  }) as T;
+}
+
+// 出力形式の表示名
+const OUTPUT_LABELS: Record<OutputFormat, string> = {
+  mastodon: "AVIF",
+  misskey: "AVIF",
+  none: "JPEG",
+};
+
+interface ResultInfo {
+  fileSize: number;
+  format: string;
+  width: number;
+  height: number;
+}
+
+const initialState: GenerateFormState = {
+  text: "",
+  position: DEFAULT_POSITION,
+  font: DEFAULT_FONT,
+  color: DEFAULT_COLOR,
+  size: DEFAULT_SIZE,
+  output: DEFAULT_OUTPUT,
+  imageFile: null,
+  imagePreview: null,
+};
+
+export default function CreatePage() {
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [formState, setFormState] = useState<GenerateFormState>(initialState);
+  const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [resultExtension, setResultExtension] = useState<string>("jpg");
+  const [resultInfo, setResultInfo] = useState<ResultInfo | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingTime, setLoadingTime] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [hasGenerated, setHasGenerated] = useState(false);
+  const [lastGeneratedState, setLastGeneratedState] =
+    useState<GenerateFormState | null>(null);
+  const [stickyOffset, setStickyOffset] = useState<number | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const stickyRef = useRef<HTMLDivElement>(null);
+
+  // 認証チェック
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("/api/auth/session");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.user) {
+            setIsAuthenticated(true);
+          } else {
+            setIsAuthenticated(false);
+            router.push("/");
+          }
+        } else {
+          setIsAuthenticated(false);
+          router.push("/");
+        }
+      } catch {
+        setIsAuthenticated(false);
+        router.push("/");
+      }
+    };
+    checkAuth();
+  }, [router]);
+
+  // ローディング中の経過時間を更新
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingTime(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setLoadingTime((prev) => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
+  // スクロール監視：元のボタンの位置に応じてStickyボタンを移動（throttle適用）
+  useEffect(() => {
+    const updateStickyPosition = () => {
+      if (!buttonRef.current || !stickyRef.current) return;
+
+      const buttonRect = buttonRef.current.getBoundingClientRect();
+      const stickyRect = stickyRef.current.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+
+      // 元のボタンが画面内に入ってきた場合
+      if (buttonRect.top < viewportHeight) {
+        // Stickyバーの上端が元のボタンの上端と揃う位置
+        const offset = viewportHeight - buttonRect.top - stickyRect.height;
+        setStickyOffset(Math.max(0, offset));
+      } else {
+        setStickyOffset(null);
+      }
+    };
+
+    // スクロールイベントを16ms（約60fps）でthrottle
+    const throttledUpdate = throttle(updateStickyPosition, 16);
+
+    window.addEventListener("scroll", throttledUpdate);
+    window.addEventListener("resize", throttledUpdate);
+    updateStickyPosition();
+
+    return () => {
+      window.removeEventListener("scroll", throttledUpdate);
+      window.removeEventListener("resize", throttledUpdate);
+    };
+  }, []);
+
+  // BlobURLのクリーンアップ
+  useEffect(() => {
+    return () => {
+      if (resultUrl) {
+        URL.revokeObjectURL(resultUrl);
+      }
+    };
+  }, [resultUrl]);
+
+  const handleImageSelect = useCallback((file: File, preview: string) => {
+    setFormState((prev) => ({
+      ...prev,
+      imageFile: file,
+      imagePreview: preview,
+    }));
+    // 新しい画像がアップロードされたら生成結果をクリア
+    setHasGenerated(false);
+    setResultUrl(null);
+    setError(null);
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setFormState(initialState);
+    setHasGenerated(false);
+    setLastGeneratedState(null);
+    setResultInfo(null);
+    if (resultUrl) {
+      URL.revokeObjectURL(resultUrl);
+      setResultUrl(null);
+    }
+    setError(null);
+  }, [resultUrl]);
+
+  const handleGenerate = async () => {
+    if (!formState.imageFile) {
+      setError("画像を選択してください");
+      return;
+    }
+
+    const trimmedText = formState.text.trim();
+    if (!trimmedText) {
+      setError("テキストを入力してください");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("image", formState.imageFile);
+      formData.append("text", formState.text);
+      formData.append("position", formState.position);
+      formData.append("font", formState.font);
+      formData.append("color", formState.color);
+      formData.append("size", formState.size);
+      formData.append("output", formState.output);
+
+      const response = await fetch("/api/v1/generate", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "画像の生成に失敗しました");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+
+      // 以前のBlobURLを破棄
+      if (resultUrl) {
+        URL.revokeObjectURL(resultUrl);
+      }
+
+      // 拡張子を設定
+      const config = OUTPUT_CONFIG[formState.output];
+      const extension = config?.format === "avif" ? "avif" : "jpg";
+      setResultExtension(extension);
+
+      // 画像サイズを取得してから結果情報を保存
+      const img = new Image();
+      img.src = url;
+      await new Promise<void>((resolve) => {
+        img.onload = () => resolve();
+      });
+
+      setResultInfo({
+        fileSize: blob.size,
+        format: OUTPUT_LABELS[formState.output],
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+      });
+
+      setResultUrl(url);
+      setHasGenerated(true);
+      setLastGeneratedState({ ...formState });
+
+      // 生成完了後にページ最上部にスクロール
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "エラーが発生しました");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDownload = () => {
+    if (!resultUrl) return;
+
+    const link = document.createElement("a");
+    link.href = resultUrl;
+    link.download = `movapic-${Date.now()}.${resultExtension}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const canGenerate = formState.text.length > 0 && formState.imageFile !== null;
+
+  // 生成後に設定が変更されたかどうか
+  const hasChangedSinceGeneration = useMemo(() => {
+    if (!hasGenerated || !lastGeneratedState) return true;
+    return (
+      formState.text !== lastGeneratedState.text ||
+      formState.position !== lastGeneratedState.position ||
+      formState.font !== lastGeneratedState.font ||
+      formState.color !== lastGeneratedState.color ||
+      formState.size !== lastGeneratedState.size ||
+      formState.output !== lastGeneratedState.output
+    );
+  }, [formState, lastGeneratedState, hasGenerated]);
+
+  // ローディング中のボタンテキスト
+  const loadingText = useMemo(() => {
+    if (!isLoading) return "";
+    if (loadingTime === 0) return "生成中...";
+    return `生成中... ${loadingTime}秒`;
+  }, [isLoading, loadingTime]);
+
+  // 認証チェック中
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">読み込み中...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <main className="container mx-auto max-w-md px-4 py-8">
+        <h1 className="mb-6 text-center text-xl font-bold">
+          写真に文字を合成するやつ
+        </h1>
+
+        <div className="space-y-6">
+          {/* 画像エリア: 生成結果があればそれを表示、なければアップロードエリア */}
+          <ImageUpload
+            imageFile={formState.imageFile}
+            imagePreview={formState.imagePreview}
+            resultUrl={resultUrl}
+            hasGenerated={hasGenerated}
+            resultInfo={resultInfo}
+            onImageSelect={handleImageSelect}
+            onReset={handleReset}
+            onDownload={handleDownload}
+            disabled={isLoading}
+          />
+
+          {/* エラー表示 */}
+          {error && (
+            <div className="rounded-lg bg-destructive/10 p-4 text-center text-destructive">
+              {error}
+            </div>
+          )}
+
+          {/* テキスト入力 */}
+          <TextInput
+            value={formState.text}
+            onChange={(text) => setFormState((prev) => ({ ...prev, text }))}
+            disabled={isLoading}
+          />
+
+          {/* コマンド選択 */}
+          <CommandSelect
+            position={formState.position}
+            font={formState.font}
+            color={formState.color}
+            size={formState.size}
+            output={formState.output}
+            onPositionChange={(position) =>
+              setFormState((prev) => ({ ...prev, position }))
+            }
+            onFontChange={(font) =>
+              setFormState((prev) => ({ ...prev, font }))
+            }
+            onColorChange={(color) =>
+              setFormState((prev) => ({ ...prev, color }))
+            }
+            onSizeChange={(size) =>
+              setFormState((prev) => ({ ...prev, size }))
+            }
+            onOutputChange={(output) =>
+              setFormState((prev) => ({ ...prev, output }))
+            }
+            disabled={isLoading}
+          />
+
+          {/* 生成ボタン */}
+          <Button
+            ref={buttonRef}
+            onClick={handleGenerate}
+            disabled={
+              !canGenerate ||
+              isLoading ||
+              (hasGenerated && !hasChangedSinceGeneration)
+            }
+            className="w-full"
+            size="lg"
+          >
+            {isLoading
+              ? loadingText
+              : hasGenerated
+                ? "画像を再生成"
+                : "画像を生成"}
+          </Button>
+        </div>
+
+        {/* フッター */}
+        <footer className="mt-12 pt-8 border-t border-gray-200 text-center">
+          <Link
+            href="/license"
+            className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+          >
+            フォントライセンス
+          </Link>
+        </footer>
+      </main>
+
+      {/* Sticky生成ボタン */}
+      <div
+        ref={stickyRef}
+        className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t p-4 transition-transform duration-200"
+        style={{
+          transform:
+            stickyOffset !== null
+              ? `translateY(${stickyOffset}px)`
+              : "translateY(0)",
+        }}
+      >
+        <div className="container mx-auto max-w-md">
+          <Button
+            onClick={handleGenerate}
+            disabled={
+              !canGenerate ||
+              isLoading ||
+              (hasGenerated && !hasChangedSinceGeneration)
+            }
+            className="w-full"
+            size="lg"
+          >
+            {isLoading
+              ? loadingText
+              : hasGenerated
+                ? "画像を再生成"
+                : "画像を生成"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

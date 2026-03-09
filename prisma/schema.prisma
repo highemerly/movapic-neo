@@ -1,0 +1,74 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// インスタンス（Mastodon/Misskeyサーバー）
+// 動的クライアント登録のため、client_id/secretはDBに保存しない
+model Instance {
+  id        String   @id @default(uuid())
+  domain    String   @unique @db.VarChar(511)
+  type      String   @db.VarChar(20) // "mastodon" | "misskey"
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@map("instances")
+}
+
+// ユーザー
+model User {
+  id           String    @id @default(uuid())
+  instanceId   String    @map("instance_id")
+  remoteId     String    @map("remote_id") @db.VarChar(255)
+  username     String    @db.VarChar(255)
+  displayName  String?   @map("display_name") @db.VarChar(255)
+  avatarUrl    String?   @map("avatar_url") @db.Text
+  emailPrefix  String    @unique @map("email_prefix") @db.VarChar(32)
+  accessToken  String    @map("access_token") @db.Text
+  refreshToken String?   @map("refresh_token") @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  lastLoginAt  DateTime? @map("last_login_at")
+
+  instance Instance @relation(fields: [instanceId], references: [id])
+  images   Image[]
+
+  @@unique([instanceId, remoteId])
+  @@unique([instanceId, username])
+  @@map("users")
+}
+
+// 画像
+model Image {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  storageKey   String   @unique @map("storage_key") @db.VarChar(500)
+  filename     String   @db.VarChar(255)
+  mimeType     String   @map("mime_type") @db.VarChar(100)
+  fileSize     Int      @map("file_size")
+  width        Int
+  height       Int
+  overlayText  String   @map("overlay_text") @db.Text
+  position     String   @db.VarChar(20)
+  font         String   @db.VarChar(50)
+  color        String   @db.VarChar(20)
+  size         String   @db.VarChar(20)
+  outputFormat String   @map("output_format") @db.VarChar(20)
+  source       String   @default("web") @db.VarChar(20) // "web" | "email"
+  isPublic     Boolean  @default(true) @map("is_public")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([isPublic, createdAt])
+  @@map("images")
+}

@@ -1,0 +1,23 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3012:3000"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+
+  db:
+    restart: always
+    image: postgres:17.5
+    hostname: db
+    container_name: movapic-db
+    ports:
+      - 15433:5432
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "K9cz8szGv14d"
+    volumes:
+      - ./data/postgres17:/var/lib/postgresql/data

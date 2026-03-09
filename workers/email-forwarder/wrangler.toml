@@ -1,0 +1,9 @@
+name = "movapic-email-forwarder"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[vars]
+API_URL = "https://pic.handon.club"
+
+# INTERNAL_API_KEY はシークレットとして設定
+# wrangler secret put INTERNAL_API_KEY
