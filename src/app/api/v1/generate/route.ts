@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "crypto";
-import sharp from "sharp";
 import { processImage } from "@/lib/imageProcessor";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
-import { getCurrentUser } from "@/lib/auth/session";
-import { uploadImage, generateStorageKey, getExtensionFromMimeType } from "@/lib/storage/r2";
-import prisma from "@/lib/db";
 import {
   Position,
   FontFamily,
@@ -164,47 +159,6 @@ export async function POST(request: NextRequest) {
       }),
       PROCESS_TIMEOUT_MS
     );
-
-    // 認証ユーザーの場合はR2に保存
-    const user = await getCurrentUser();
-    if (user) {
-      try {
-        const imageId = randomUUID();
-        const extension = getExtensionFromMimeType(result.contentType);
-        const storageKey = generateStorageKey(imageId, extension);
-
-        // R2にアップロード
-        await uploadImage(result.buffer, storageKey, result.contentType);
-
-        // 画像メタデータを取得
-        const metadata = await sharp(result.buffer).metadata();
-
-        // DBに保存
-        await prisma.image.create({
-          data: {
-            id: imageId,
-            userId: user.id,
-            storageKey,
-            filename: `movapic-${imageId}.${extension}`,
-            mimeType: result.contentType,
-            fileSize: result.buffer.length,
-            width: metadata.width || 0,
-            height: metadata.height || 0,
-            overlayText: text,
-            position,
-            font,
-            color,
-            size,
-            outputFormat: output,
-            source: "web",
-            isPublic: true,
-          },
-        });
-      } catch (storageError) {
-        // ストレージエラーはログに記録するが、画像は返す
-        console.error("Failed to save image to storage:", storageError);
-      }
-    }
 
     // 画像を返す（Content-Lengthヘッダーを含む）
     return new NextResponse(new Uint8Array(result.buffer), {

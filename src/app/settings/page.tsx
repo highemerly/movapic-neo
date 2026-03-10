@@ -15,15 +15,15 @@ export default async function SettingsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold">設定</h1>
+      <div className="mb-6">
         <Link
           href="/dashboard"
           className="text-sm text-muted-foreground hover:underline"
         >
-          ダッシュボードに戻る
+          ← ダッシュボードに戻る
         </Link>
       </div>
+      <h1 className="text-2xl font-bold mb-8">設定</h1>
 
       {/* アカウント情報 */}
       <section className="bg-muted rounded-lg p-6 mb-6">
@@ -42,7 +42,7 @@ export default async function SettingsPage() {
 
       {/* メール投稿設定 */}
       <section className="bg-muted rounded-lg p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4">メール投稿</h2>
+        <h2 className="text-lg font-semibold mb-4">メール投稿＜準備中＞</h2>
         <div className="space-y-4">
           <div>
             <dt className="text-sm font-medium text-muted-foreground">投稿用メールアドレス</dt>
@@ -53,7 +53,7 @@ export default async function SettingsPage() {
             </dd>
           </div>
           <div className="text-sm text-muted-foreground">
-            <p className="mb-2">このアドレスに画像を添付してメールを送信すると、画像が生成されます。</p>
+            <p className="mb-2">このアドレスに画像を添付してメールを送信すると、画像が生成されるようになります（いまはされません）。</p>
             <p className="mb-2 font-medium">メールの形式:</p>
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li>
@@ -97,7 +97,7 @@ export default async function SettingsPage() {
             <dt className="text-sm font-medium text-muted-foreground">公開ギャラリーURL</dt>
             <dd className="mt-1">
               <code className="bg-background px-2 py-1 rounded text-sm">
-                {process.env.NEXT_PUBLIC_APP_URL}/@{user.username}
+                {process.env.NEXT_PUBLIC_APP_URL}/{user.username}
               </code>
             </dd>
           </div>

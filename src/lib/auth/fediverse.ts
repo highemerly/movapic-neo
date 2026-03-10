@@ -141,7 +141,7 @@ export async function registerMastodonApp(
     body: JSON.stringify({
       client_name: "movapic",
       redirect_uris: redirectUri,
-      scopes: "read",
+      scopes: "read write:statuses write:media",
       website: process.env.NEXT_PUBLIC_APP_URL,
     }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT),
@@ -172,7 +172,7 @@ export function getMastodonAuthorizationUrl(
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "read",
+    scope: "read write:statuses write:media",
     state,
   });
 
@@ -305,7 +305,7 @@ export function getMisskeyAuthorizationUrl(
   const params = new URLSearchParams({
     name: "movapic",
     callback: callbackUrl,
-    permission: "read:account",
+    permission: "read:account,write:notes,drive:write",
   });
 
   return `https://${server}/miauth/${sessionId}?${params.toString()}`;

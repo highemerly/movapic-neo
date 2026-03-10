@@ -19,9 +19,9 @@ function getAllowedServers(): string[] | undefined {
 export default async function HomePage() {
   const user = await getCurrentUser();
 
-  // ログイン済みの場合は/createにリダイレクト
+  // ログイン済みの場合は/dashboardにリダイレクト
   if (user) {
-    redirect("/create");
+    redirect("/dashboard");
   }
 
   const allowedServers = getAllowedServers();
@@ -73,10 +73,7 @@ export default async function HomePage() {
       <main className="container mx-auto max-w-2xl px-4 py-12">
         {/* ヘッダー */}
         <div className="text-center mb-12">
-          <h1 className="text-3xl font-bold mb-4">movapic</h1>
-          <p className="text-muted-foreground mb-8">
-            写真に文字を合成するやつ
-          </p>
+          <h1 className="text-3xl font-bold mb-8">写真に文字を合成するやつ（仮）</h1>
 
           {/* ログインボタン */}
           <div className="max-w-xs mx-auto">
@@ -94,7 +91,7 @@ export default async function HomePage() {
               {featuredImages.map((image) => (
                 <Link
                   key={image.id}
-                  href={`/${image.user.username}`}
+                  href={`/${image.user.username}/status/${image.id}`}
                   className="block"
                 >
                   <div className="bg-muted rounded-lg overflow-hidden aspect-square">

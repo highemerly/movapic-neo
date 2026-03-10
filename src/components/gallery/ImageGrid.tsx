@@ -12,11 +12,12 @@ interface ImageGridProps {
     createdAt: string;
   }>;
   publicUrl: string;
+  username?: string;
   showDelete?: boolean;
   onDelete?: (id: string) => void;
 }
 
-export function ImageGrid({ images, publicUrl, showDelete, onDelete }: ImageGridProps) {
+export function ImageGrid({ images, publicUrl, username, showDelete, onDelete }: ImageGridProps) {
   if (images.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -32,6 +33,7 @@ export function ImageGrid({ images, publicUrl, showDelete, onDelete }: ImageGrid
           key={image.id}
           image={image}
           publicUrl={publicUrl}
+          username={username}
           showDelete={showDelete}
           onDelete={onDelete}
         />

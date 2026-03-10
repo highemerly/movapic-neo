@@ -45,7 +45,7 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
         },
         body: JSON.stringify({
           server: targetServer,
-          callbackUrl: "/create",
+          callbackUrl: "/dashboard",
         }),
       });
 

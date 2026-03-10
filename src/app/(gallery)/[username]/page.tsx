@@ -84,12 +84,13 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
           createdAt: img.createdAt.toISOString(),
         }))}
         publicUrl={publicUrl}
+        username={cleanUsername}
       />
 
       {/* フッター */}
       <div className="mt-8 text-center">
         <Link href="/" className="text-sm text-muted-foreground hover:underline">
-          movapicで画像を作成する
+          新しい画像を投稿
         </Link>
       </div>
     </div>

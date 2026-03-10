@@ -15,9 +15,10 @@ interface Image {
 interface DashboardClientProps {
   initialImages: Image[];
   publicUrl: string;
+  username: string;
 }
 
-export function DashboardClient({ initialImages, publicUrl }: DashboardClientProps) {
+export function DashboardClient({ initialImages, publicUrl, username }: DashboardClientProps) {
   const [images, setImages] = useState(initialImages);
 
   const handleDelete = async (id: string) => {
@@ -41,6 +42,7 @@ export function DashboardClient({ initialImages, publicUrl }: DashboardClientPro
     <ImageGrid
       images={images}
       publicUrl={publicUrl}
+      username={username}
       showDelete
       onDelete={handleDelete}
     />

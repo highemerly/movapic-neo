@@ -25,9 +25,12 @@ interface ImageUploadProps {
   resultUrl: string | null;
   hasGenerated: boolean;
   resultInfo: ResultInfo | null;
+  instanceDomain?: string;
+  isPosting?: boolean;
   onImageSelect: (file: File, preview: string) => void;
   onReset: () => void;
   onDownload: () => void;
+  onPost?: () => void;
   disabled?: boolean;
 }
 
@@ -43,9 +46,12 @@ export function ImageUpload({
   resultUrl,
   hasGenerated,
   resultInfo,
+  instanceDomain,
+  isPosting,
   onImageSelect,
   onReset,
   onDownload,
+  onPost,
   disabled,
 }: ImageUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -160,7 +166,7 @@ export function ImageUpload({
             </div>
           )}
 
-          {/* 生成後はダウンロードボタンと画像変更ボタンを表示 */}
+          {/* 生成後は投稿ボタンと画像変更ボタンを表示 */}
           {hasGenerated ? (
             <div className="space-y-2">
               {/* 生成結果の情報表示 */}
@@ -170,19 +176,30 @@ export function ImageUpload({
                 </p>
               )}
               <div className="flex gap-2">
-                <Button
-                  type="button"
-                  onClick={onDownload}
-                  disabled={disabled}
-                  className="flex-1"
-                >
-                  ダウンロード
-                </Button>
+                {instanceDomain && onPost ? (
+                  <Button
+                    type="button"
+                    onClick={onPost}
+                    disabled={disabled || isPosting}
+                    className="flex-1"
+                  >
+                    {isPosting ? "投稿中..." : `${instanceDomain} に投稿`}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={onDownload}
+                    disabled={disabled}
+                    className="flex-1"
+                  >
+                    ダウンロード
+                  </Button>
+                )}
                 <Button
                   type="button"
                   variant="outline"
                   onClick={onReset}
-                  disabled={disabled}
+                  disabled={disabled || isPosting}
                   className="flex-1"
                 >
                   最初からやり直す

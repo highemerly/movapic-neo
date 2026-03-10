@@ -47,6 +47,16 @@ interface ResultInfo {
   height: number;
 }
 
+interface UserSession {
+  id: string;
+  username: string;
+  displayName: string | null;
+  instance: {
+    domain: string;
+    type: string;
+  };
+}
+
 const initialState: GenerateFormState = {
   text: "",
   position: DEFAULT_POSITION,
@@ -61,11 +71,15 @@ const initialState: GenerateFormState = {
 export default function CreatePage() {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [user, setUser] = useState<UserSession | null>(null);
   const [formState, setFormState] = useState<GenerateFormState>(initialState);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
+  const [resultMimeType, setResultMimeType] = useState<string>("image/jpeg");
   const [resultExtension, setResultExtension] = useState<string>("jpg");
   const [resultInfo, setResultInfo] = useState<ResultInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
   const [loadingTime, setLoadingTime] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
@@ -84,6 +98,7 @@ export default function CreatePage() {
           const data = await response.json();
           if (data.user) {
             setIsAuthenticated(true);
+            setUser(data.user);
           } else {
             setIsAuthenticated(false);
             router.push("/");
@@ -172,6 +187,8 @@ export default function CreatePage() {
     setHasGenerated(false);
     setLastGeneratedState(null);
     setResultInfo(null);
+    setResultBlob(null);
+    setResultMimeType("image/jpeg");
     if (resultUrl) {
       URL.revokeObjectURL(resultUrl);
       setResultUrl(null);
@@ -222,10 +239,13 @@ export default function CreatePage() {
         URL.revokeObjectURL(resultUrl);
       }
 
-      // 拡張子を設定
+      // 拡張子とMIMEタイプを設定
       const config = OUTPUT_CONFIG[formState.output];
       const extension = config?.format === "avif" ? "avif" : "jpg";
+      const mimeType = config?.format === "avif" ? "image/avif" : "image/jpeg";
       setResultExtension(extension);
+      setResultBlob(blob);
+      setResultMimeType(mimeType);
 
       // 画像サイズを取得してから結果情報を保存
       const img = new Image();
@@ -267,6 +287,47 @@ export default function CreatePage() {
     document.body.removeChild(link);
   };
 
+  const handlePost = async () => {
+    if (!resultBlob || !lastGeneratedState) return;
+
+    setIsPosting(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("image", resultBlob);
+      formData.append("text", lastGeneratedState.text);
+      formData.append("position", lastGeneratedState.position);
+      formData.append("font", lastGeneratedState.font);
+      formData.append("color", lastGeneratedState.color);
+      formData.append("size", lastGeneratedState.size);
+      formData.append("output", lastGeneratedState.output);
+      formData.append("mimeType", resultMimeType);
+
+      const response = await fetch("/api/v1/post", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "投稿に失敗しました");
+      }
+
+      // 投稿成功後、詳細ページにリダイレクト
+      if (data.imagePageUrl) {
+        router.push(data.imagePageUrl.replace(process.env.NEXT_PUBLIC_APP_URL || "", ""));
+      } else {
+        router.push("/dashboard");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "投稿に失敗しました");
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
   const canGenerate = formState.text.length > 0 && formState.imageFile !== null;
 
   // 生成後に設定が変更されたかどうか
@@ -301,6 +362,14 @@ export default function CreatePage() {
   return (
     <div className="min-h-screen bg-background">
       <main className="container mx-auto max-w-md px-4 py-8">
+        <div className="mb-6">
+          <Link
+            href="/dashboard"
+            className="text-sm text-muted-foreground hover:underline"
+          >
+            ← ダッシュボードに戻る
+          </Link>
+        </div>
         <h1 className="mb-6 text-center text-xl font-bold">
           写真に文字を合成するやつ
         </h1>
@@ -313,9 +382,12 @@ export default function CreatePage() {
             resultUrl={resultUrl}
             hasGenerated={hasGenerated}
             resultInfo={resultInfo}
+            instanceDomain={user?.instance.domain}
+            isPosting={isPosting}
             onImageSelect={handleImageSelect}
             onReset={handleReset}
             onDownload={handleDownload}
+            onPost={handlePost}
             disabled={isLoading}
           />
 

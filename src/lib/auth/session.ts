@@ -42,6 +42,11 @@ export type SessionUser = {
   instance: Instance;
 };
 
+// getCurrentUserWithValidationの戻り値の型（accessToken含む）
+export type SessionUserWithToken = SessionUser & {
+  accessToken: string;
+};
+
 /**
  * JWTを作成してCookieに設定
  */
@@ -156,7 +161,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
  * 現在のユーザーを取得（DB検証付き）
  * ユーザーが削除されていないかDBで確認する
  */
-export async function getCurrentUserWithValidation(): Promise<SessionUser | null> {
+export async function getCurrentUserWithValidation(): Promise<SessionUserWithToken | null> {
   const payload = await getSessionPayload();
 
   if (!payload) {
@@ -182,6 +187,7 @@ export async function getCurrentUserWithValidation(): Promise<SessionUser | null
     emailPrefix: user.emailPrefix,
     instanceId: user.instanceId,
     instance: user.instance,
+    accessToken: user.accessToken,
   };
 }
 

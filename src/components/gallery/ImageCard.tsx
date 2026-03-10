@@ -13,13 +13,15 @@ interface ImageCardProps {
     createdAt: string;
   };
   publicUrl: string;
+  username?: string;
   showDelete?: boolean;
   onDelete?: (id: string) => void;
 }
 
-export function ImageCard({ image, publicUrl, showDelete, onDelete }: ImageCardProps) {
+export function ImageCard({ image, publicUrl, username, showDelete, onDelete }: ImageCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const imageUrl = `${publicUrl}/${image.storageKey}`;
+  const detailUrl = username ? `/${username}/status/${image.id}` : imageUrl;
 
   const handleDelete = async () => {
     if (!onDelete) return;
@@ -35,7 +37,7 @@ export function ImageCard({ image, publicUrl, showDelete, onDelete }: ImageCardP
 
   return (
     <div className="group relative bg-muted rounded-lg overflow-hidden">
-      <Link href={imageUrl} target="_blank" rel="noopener noreferrer">
+      <Link href={detailUrl} target={username ? undefined : "_blank"} rel={username ? undefined : "noopener noreferrer"}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrl}

@@ -90,9 +90,11 @@ function TimelineImageCard({
 }) {
   const imageUrl = `${publicUrl}/${image.storageKey}`;
 
+  const detailUrl = `/${image.user.username}/status/${image.id}`;
+
   return (
     <div className="bg-muted rounded-lg overflow-hidden">
-      <Link href={imageUrl} target="_blank" rel="noopener noreferrer">
+      <Link href={detailUrl}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrl}
@@ -102,7 +104,9 @@ function TimelineImageCard({
         />
       </Link>
       <div className="p-3">
-        <p className="text-sm line-clamp-2 mb-2">{image.overlayText}</p>
+        <Link href={detailUrl} className="hover:underline">
+          <p className="text-sm line-clamp-2 mb-2">{image.overlayText}</p>
+        </Link>
         <Link
           href={`/${image.user.username}`}
           className="flex items-center gap-2 hover:opacity-80"
