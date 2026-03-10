@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "画像文字入れサービス",
-  description: "画像に文字を入れて生成するWebアプリ",
+  title: "写真に文字を合成するやつ（仮）",
+  description: "画像に文字を合成してSNSに投稿します",
 };
 
 export default function RootLayout({
