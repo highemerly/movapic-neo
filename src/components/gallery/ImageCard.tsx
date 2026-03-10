@@ -37,7 +37,7 @@ export function ImageCard({ image, publicUrl, username, showDelete, onDelete }: 
 
   return (
     <div className="group relative bg-muted rounded-lg overflow-hidden">
-      <Link href={detailUrl} target={username ? undefined : "_blank"} rel={username ? undefined : "noopener noreferrer"}>
+      <Link href={detailUrl} target={username ? undefined : "_blank"} rel={username ? undefined : "noopener noreferrer"} className="block">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrl}
@@ -45,10 +45,10 @@ export function ImageCard({ image, publicUrl, username, showDelete, onDelete }: 
           className="w-full h-auto aspect-square object-cover transition-transform group-hover:scale-105"
           loading="lazy"
         />
+        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2 pointer-events-none">
+          <p className="text-white text-sm line-clamp-2">{image.overlayText}</p>
+        </div>
       </Link>
-      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
-        <p className="text-white text-sm line-clamp-2">{image.overlayText}</p>
-      </div>
       {showDelete && onDelete && (
         <button
           onClick={handleDelete}
