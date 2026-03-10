@@ -107,22 +107,26 @@ function TimelineImageCard({
         <Link href={detailUrl} className="hover:underline">
           <p className="text-sm line-clamp-2 mb-2">{image.overlayText}</p>
         </Link>
-        <Link
-          href={`/${image.user.username}`}
-          className="flex items-center gap-2 hover:opacity-80"
-        >
+        <div className="flex items-center gap-2">
           {image.user.avatarUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={image.user.avatarUrl}
-              alt={image.user.displayName || image.user.username}
-              className="w-6 h-6 rounded-full"
-            />
+            <Link href={`/${image.user.username}`} className="hover:opacity-80">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={image.user.avatarUrl}
+                alt={image.user.displayName || image.user.username}
+                className="w-6 h-6 rounded-full"
+              />
+            </Link>
           )}
-          <span className="text-sm text-muted-foreground">
-            {image.user.displayName || image.user.username}
-          </span>
-        </Link>
+          <a
+            href={`https://${image.user.instance}/@${image.user.username}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-muted-foreground hover:underline"
+          >
+            @{image.user.username}
+          </a>
+        </div>
       </div>
     </div>
   );

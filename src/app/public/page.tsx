@@ -1,6 +1,7 @@
 import Link from "next/link";
 import prisma from "@/lib/db";
 import { PublicTimelineClient } from "./PublicTimelineClient";
+import { Button } from "@/components/ui/button";
 
 // 動的レンダリングを強制
 export const dynamic = "force-dynamic";
@@ -39,8 +40,8 @@ export default async function PublicTimelinePage() {
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-bold">パブリックタイムライン</h1>
-        <Link href="/" className="text-sm text-muted-foreground hover:underline">
-          画像を作成する
+        <Link href="/">
+          <Button variant="outline" size="sm">新しい画像を投稿</Button>
         </Link>
       </div>
 

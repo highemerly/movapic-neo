@@ -75,12 +75,14 @@ export default async function ImageDetailPage({ params }: PageProps) {
         {/* 投稿者情報 */}
         <div className="flex items-center gap-3 mb-6 p-4 bg-muted rounded-lg">
           {image.user.avatarUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={image.user.avatarUrl}
-              alt={image.user.displayName || image.user.username}
-              className="w-12 h-12 rounded-full"
-            />
+            <Link href={`/${username}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={image.user.avatarUrl}
+                alt={image.user.displayName || image.user.username}
+                className="w-12 h-12 rounded-full hover:opacity-80 transition-opacity"
+              />
+            </Link>
           )}
           <div>
             <Link
@@ -89,9 +91,14 @@ export default async function ImageDetailPage({ params }: PageProps) {
             >
               {image.user.displayName || image.user.username}
             </Link>
-            <p className="text-sm text-muted-foreground">
+            <a
+              href={`https://${image.user.instance.domain}/@${image.user.username}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-sm text-muted-foreground hover:underline"
+            >
               @{image.user.username}@{image.user.instance.domain}
-            </p>
+            </a>
           </div>
         </div>
 

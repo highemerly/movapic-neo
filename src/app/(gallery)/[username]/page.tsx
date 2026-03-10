@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import prisma from "@/lib/db";
 import { ImageGrid } from "@/components/gallery/ImageGrid";
+import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
@@ -57,20 +58,27 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
       {/* ユーザー情報 */}
       <div className="flex items-center gap-4 mb-8">
         {user.avatarUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={user.avatarUrl}
-            alt={user.displayName || user.username}
-            className="w-20 h-20 rounded-full"
-          />
+          <Link href={`/${cleanUsername}`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={user.avatarUrl}
+              alt={user.displayName || user.username}
+              className="w-20 h-20 rounded-full hover:opacity-80 transition-opacity"
+            />
+          </Link>
         )}
         <div>
           <h1 className="text-2xl font-bold">
             {user.displayName || user.username}
           </h1>
-          <p className="text-muted-foreground">
+          <a
+            href={`https://${user.instance.domain}/@${user.username}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-muted-foreground hover:underline"
+          >
             @{user.username}@{user.instance.domain}
-          </p>
+          </a>
           <p className="text-sm text-muted-foreground mt-1">
             {images.length}枚の画像
           </p>
@@ -89,8 +97,8 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
 
       {/* フッター */}
       <div className="mt-8 text-center">
-        <Link href="/" className="text-sm text-muted-foreground hover:underline">
-          新しい画像を投稿
+        <Link href="/">
+          <Button variant="outline">新しい画像を投稿</Button>
         </Link>
       </div>
     </div>
