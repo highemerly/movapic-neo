@@ -64,6 +64,50 @@ const DEFAULT_OPTIONS: ParsedEmailOptions = {
 };
 
 /**
+ * HTMLエンティティをデコード
+ */
+const HTML_ENTITIES: Record<string, string> = {
+  "&lt;": "<",
+  "&gt;": ">",
+  "&amp;": "&",
+  "&quot;": "\"",
+  "&apos;": "'",
+  "&#39;": "'",
+  "&nbsp;": " ",
+  "&copy;": "\u00A9",
+  "&reg;": "\u00AE",
+  "&trade;": "\u2122",
+  "&ndash;": "\u2013",
+  "&mdash;": "\u2014",
+  "&lsquo;": "\u2018",
+  "&rsquo;": "\u2019",
+  "&ldquo;": "\u201C",
+  "&rdquo;": "\u201D",
+  "&hellip;": "\u2026",
+  "&yen;": "\u00A5",
+};
+
+function decodeHtmlEntities(text: string): string {
+  // 名前付きエンティティをデコード
+  let decoded = text;
+  for (const [entity, char] of Object.entries(HTML_ENTITIES)) {
+    decoded = decoded.split(entity).join(char);
+  }
+
+  // 数値エンティティをデコード (&#123; や &#x7B;)
+  decoded = decoded.replace(/&#(\d+);/g, (_, code) => {
+    const num = parseInt(code, 10);
+    return num > 0 && num < 0x10ffff ? String.fromCodePoint(num) : "";
+  });
+  decoded = decoded.replace(/&#x([0-9a-fA-F]+);/g, (_, code) => {
+    const num = parseInt(code, 16);
+    return num > 0 && num < 0x10ffff ? String.fromCodePoint(num) : "";
+  });
+
+  return decoded;
+}
+
+/**
  * 件名からオプションを解析
  */
 function parseSubjectOptions(subject: string): ParsedEmailOptions {
@@ -133,12 +177,13 @@ export async function parseEmail(rawEmail: Buffer): Promise<ParsedEmail> {
   if (parsed.text) {
     text = parsed.text.trim();
   } else if (parsed.html) {
-    // HTMLの場合は簡易的にタグを除去
+    // HTMLの場合はタグを除去してエンティティをデコード
     text = parsed.html
       .replace(/<br\s*\/?>/gi, "\n")
       .replace(/<\/p>/gi, "\n")
       .replace(/<[^>]+>/g, "")
       .trim();
+    text = decodeHtmlEntities(text);
   }
 
   // 140文字に制限
