@@ -3,7 +3,7 @@
  * OAuthセッションデータの暗号化/復号化に使用
  */
 
-import { createCipheriv, createDecipheriv, randomBytes, createHash, timingSafeEqual } from "crypto";
+import { createCipheriv, createDecipheriv, randomBytes, createHash, createHmac, timingSafeEqual } from "crypto";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
@@ -89,19 +89,43 @@ export interface OAuthState {
 }
 
 /**
- * Stateパラメータを生成（Base64URLエンコード）
+ * State署名用のシークレットを取得
+ */
+function getStateSigningSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SECRET is not set");
+  }
+  return secret;
+}
+
+/**
+ * Stateペイロードの署名を生成（HMAC-SHA256）
+ */
+function signStatePayload(payload: string): string {
+  return createHmac("sha256", getStateSigningSecret())
+    .update(payload)
+    .digest("hex");
+}
+
+/**
+ * Stateパラメータを生成（HMAC署名付き）
  */
 export function generateOAuthState(callbackUrl: string = "/dashboard"): string {
-  const state: OAuthState = {
+  const payload: OAuthState = {
     csrf: randomBytes(16).toString("hex"),
     timestamp: Date.now(),
     callbackUrl,
   };
-  return Buffer.from(JSON.stringify(state)).toString("base64url");
+  const payloadStr = JSON.stringify(payload);
+  const signature = signStatePayload(payloadStr);
+
+  const signed = { payload: payloadStr, signature };
+  return Buffer.from(JSON.stringify(signed)).toString("base64url");
 }
 
 /**
- * Stateパラメータを検証して復号
+ * Stateパラメータを検証して復号（署名検証付き）
  * @param state Base64URLエンコードされたstate
  * @param maxAgeMs 有効期限（デフォルト10分）
  */
@@ -110,9 +134,23 @@ export function verifyOAuthState(
   maxAgeMs: number = 10 * 60 * 1000
 ): OAuthState | null {
   try {
-    const decoded = JSON.parse(
+    const { payload, signature } = JSON.parse(
       Buffer.from(state, "base64url").toString("utf8")
-    ) as OAuthState;
+    ) as { payload: string; signature: string };
+
+    // 署名検証（タイミング攻撃対策）
+    const expectedSignature = signStatePayload(payload);
+    const expectedBuf = Buffer.from(expectedSignature);
+    const signatureBuf = Buffer.from(signature);
+
+    if (expectedBuf.length !== signatureBuf.length) {
+      return null;
+    }
+    if (!timingSafeEqual(expectedBuf, signatureBuf)) {
+      return null;
+    }
+
+    const decoded = JSON.parse(payload) as OAuthState;
 
     // タイムスタンプ検証
     if (Date.now() - decoded.timestamp > maxAgeMs) {
