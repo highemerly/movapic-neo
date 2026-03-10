@@ -1,13 +1,12 @@
 # 画像文字入れサービス (movapic-neo)
 
 ## 概要
-画像に文字を入れて生成するWebアプリ。非ログイン機能を先行実装し、後にMastodon/MisskeyのOAuth連携を追加予定。
+画像に文字を入れて生成するWebアプリ。
 
 ## 技術スタック
 - **フレームワーク**: Next.js 16 (App Router)
 - **UI**: Tailwind CSS + shadcn/ui
 - **画像処理**: sharp + skia-canvas + heic-convert（サーバーサイド）
-- **コンテナ**: Docker（ポート: 3012）
 - **言語**: TypeScript
 
 ## 主な機能
@@ -23,7 +22,7 @@
   - 出力形式: Mastodon(AVIF) / Misskey(AVIF) / なし(JPEG)
 
 ### 出力
-- 文字入れ済み画像（JPEG or AVIF形式）
+- 文字入れ済み画像（JPEG or AVIF）
 - 生成後に画像情報を表示（サイズ × 高さ / 形式 / ファイルサイズ）
 - ダウンロードボタンで保存
 
@@ -46,7 +45,6 @@
 - 濃い色（赤、青、茶）→ 白い影
 
 ### 画像の取り扱い
-- サーバーに画像を保存しない（将来のログインユーザー向け機能では保存予定）
 - 生成画像はBlobURLで一時的に表示し、ページ離脱時に破棄
 - 生成後にオプションを変更すると「画像を再生成」ボタンが有効化される
 - 「最初からやり直す」ボタンで画像・テキスト・オプション全てをリセット
@@ -55,30 +53,6 @@
 - レート制限: 5秒間に1リクエスト（IPアドレス単位）
 - 処理タイムアウト: 30秒（超過時は504エラー）
 - レスポンスにContent-Lengthヘッダーを含む
-
-## ディレクトリ構成（重要なファイル）
-
-```
-src/
-├── app/
-│   ├── page.tsx              # メインページ（フォーム・結果表示）
-│   └── api/v1/generate/
-│       └── route.ts          # 画像生成API
-├── components/
-│   ├── TextInput.tsx         # テキスト入力（140文字制限）
-│   ├── ImageUpload.tsx       # 画像アップロード（D&D対応）
-│   └── CommandSelect.tsx     # コマンド選択（5つのプルダウン）
-├── lib/
-│   ├── imageProcessor.ts     # 画像処理メイン（sharp + skia-canvas使用）
-│   ├── rateLimit.ts          # レート制限（IPアドレス単位）
-│   └── utils.ts              # ユーティリティ関数
-├── types/
-│   └── index.ts              # 型定義・定数・デフォルト値
-fonts/
-├── HuiFont29.ttf             # ふい字フォント（デフォルト）
-├── NotoSansJP-Regular.ttf    # Noto Sans JP
-└── LightNovelPOPv2.otf       # ラノベPOP
-```
 
 ## API
 
@@ -94,28 +68,37 @@ fonts/
   - output: "mastodon" | "misskey" | "none"
 - **レスポンス**: image/jpeg または image/avif（バイナリ）
 - **レスポンスヘッダー**: Content-Type, Content-Length, Content-Disposition, Cache-Control
-- **エラーレスポンス**:
-  - 400: バリデーションエラー
-  - 429: レート制限超過
-  - 504: タイムアウト
-  - 500: その他のエラー
+- **エラーレスポンス**: 400(バリデーション) / 429(レート制限) / 504(タイムアウト) / 500(その他)
 
-## 開発・運用
+### POST /api/v1/email-generate（内部API）
+- Cloudflare Email Workerから転送されたraw emailを処理
+- `X-API-Key`ヘッダーで認証、`X-Email-Prefix`でユーザー特定
+- 件名からオプション解析（例: "上 赤 大"）、本文がテキスト、添付が画像
+- 出力形式はユーザーの連携インスタンス（Mastodon/Misskey）で自動決定
+- 生成画像はR2にアップロード、メタデータはDBに保存（source: "email"）
 
-### 起動
-```bash
-# 開発
-npm run dev
+## メール投稿機能
+- **Cloudflare Email Worker** (`workers/email-forwarder/`): メールを受信しraw dataをAPIへ転送
+- **メールパーサー** (`src/lib/email/parser.ts`): 件名→オプション、本文→テキスト、添付→画像
+- **オプション指定**: 件名にスペース区切りで日本語キーワード
+  - 位置: 上/下/左/右
+  - 色: 白/赤/青/緑/黄/茶/桃/橙
+  - サイズ: 小/中/大
+  - フォント: ふい字/ゴシック/ラノベ
 
-# Docker
-docker-compose up
-```
+## Fediverse認証
+- **対応プラットフォーム**: Mastodon（OAuth 2.0）/ Misskey（MiAuth）
+- **インスタンス検出**: nodeinfo取得で自動判定
+- **セッション**: JWT（7日間有効）、httpOnly Cookie
 
-### ポート
-- 開発: 3000
-- Docker: 3012
+### 認証API
+- **POST /api/auth/fediverse/register**: 認証開始（サーバー名から自動でMastodon/Misskeyを判定し認可URLを返す）
+- **GET /api/auth/fediverse/callback/mastodon**: Mastodon OAuthコールバック
+- **GET /api/auth/fediverse/callback/misskey**: Misskey MiAuthコールバック
+- **POST /api/auth/logout**: ログアウト（Cookie削除）
 
-## 将来の拡張予定
-- Mastodon OAuth / Misskey MiOAuth連携
-- ログインユーザー向け機能（画像保存など）
-- フォントの追加
+### 認証フロー
+1. ユーザーがサーバー名を入力 → `/api/auth/fediverse/register`
+2. Mastodon: 動的クライアント登録 → OAuth認可画面へリダイレクト
+3. Misskey: MiAuthセッション生成 → MiAuth認可画面へリダイレクト
+4. コールバックでトークン取得 → ユーザー作成/更新 → JWTセッション発行
