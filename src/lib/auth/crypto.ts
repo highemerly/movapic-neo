@@ -213,6 +213,58 @@ export function verifyMiAuthSignature(
  * リダイレクトURLを検証し、安全なパスを返す
  * 外部URLや不正なパスの場合はデフォルトにフォールバック
  */
+/**
+ * リクエスト署名を生成（HMAC-SHA256）
+ * Cloudflare Worker等の内部サービスからのリクエスト認証に使用
+ */
+export function generateRequestSignature(
+  timestamp: number,
+  bodyHash: string,
+  secret: string
+): string {
+  const data = `${timestamp}:${bodyHash}`;
+  return createHmac("sha256", secret).update(data).digest("hex");
+}
+
+/**
+ * リクエスト署名を検証（タイミング攻撃対策済み）
+ * @param timestamp リクエスト時刻（ミリ秒）
+ * @param bodyHash リクエストボディのSHA-256ハッシュ
+ * @param signature 検証する署名
+ * @param secret シークレットキー
+ * @param maxAgeMs 許容する時間差（デフォルト5分）
+ */
+export function verifyRequestSignature(
+  timestamp: number,
+  bodyHash: string,
+  signature: string,
+  secret: string,
+  maxAgeMs: number = 5 * 60 * 1000
+): boolean {
+  // タイムスタンプ検証（リプレイ攻撃防止）
+  const now = Date.now();
+  if (Math.abs(now - timestamp) > maxAgeMs) {
+    return false;
+  }
+
+  const expected = generateRequestSignature(timestamp, bodyHash, secret);
+  const expectedBuf = Buffer.from(expected);
+  const signatureBuf = Buffer.from(signature);
+
+  if (expectedBuf.length !== signatureBuf.length) {
+    return false;
+  }
+
+  return timingSafeEqual(expectedBuf, signatureBuf);
+}
+
+/**
+ * ボディのSHA-256ハッシュを計算
+ */
+export function hashRequestBody(body: Buffer | Uint8Array): string {
+  return createHash("sha256").update(body).digest("hex");
+}
+
 export function sanitizeRedirectUrl(
   url: string | null | undefined,
   defaultPath: string = "/dashboard"

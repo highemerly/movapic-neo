@@ -11,6 +11,7 @@ import sharp from "sharp";
 import { parseEmail } from "@/lib/email/parser";
 import { processImage } from "@/lib/imageProcessor";
 import { uploadImage, generateStorageKey, getExtensionFromMimeType } from "@/lib/storage/r2";
+import { verifyRequestSignature, hashRequestBody } from "@/lib/auth/crypto";
 import prisma from "@/lib/db";
 import { MAX_TEXT_LENGTH, MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from "@/types";
 
@@ -28,10 +29,31 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 export async function POST(request: NextRequest) {
   try {
+    // リクエストボディを取得
+    const rawEmail = Buffer.from(await request.arrayBuffer());
+
     // 内部APIキー検証
     const apiKey = request.headers.get("X-API-Key");
     if (apiKey !== process.env.INTERNAL_API_KEY) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // リクエスト署名検証（HMAC-SHA256）
+    const timestamp = request.headers.get("X-Request-Timestamp");
+    const signature = request.headers.get("X-Request-Signature");
+
+    if (!timestamp || !signature) {
+      return NextResponse.json({ error: "Missing signature" }, { status: 401 });
+    }
+
+    const ts = parseInt(timestamp, 10);
+    if (isNaN(ts)) {
+      return NextResponse.json({ error: "Invalid timestamp" }, { status: 401 });
+    }
+
+    const bodyHash = hashRequestBody(rawEmail);
+    if (!verifyRequestSignature(ts, bodyHash, signature, process.env.INTERNAL_API_KEY!)) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
     // emailPrefixを取得
@@ -50,8 +72,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // raw emailを取得してパース
-    const rawEmail = Buffer.from(await request.arrayBuffer());
+    // raw emailをパース
     const parsed = await parseEmail(rawEmail);
 
     // バリデーション
