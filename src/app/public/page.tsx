@@ -33,7 +33,7 @@ export default async function PublicTimelinePage() {
     },
   });
 
-  const publicUrl = process.env.R2_PUBLIC_URL || "";
+  const publicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">

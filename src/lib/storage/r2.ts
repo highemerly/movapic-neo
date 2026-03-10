@@ -57,7 +57,9 @@ export function getPublicUrl(storageKey: string): string {
   if (!publicUrl) {
     throw new Error("R2_PUBLIC_URL is not configured");
   }
-  return `${publicUrl}/${storageKey}`;
+  // 末尾スラッシュを削除して正規化
+  const normalizedUrl = publicUrl.replace(/\/+$/, "");
+  return `${normalizedUrl}/${storageKey}`;
 }
 
 /**

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,8 @@ export default async function DashboardPage() {
       <h1 className="text-2xl font-bold mb-8">ダッシュボード</h1>
 
       {/* ユーザー情報 */}
-      <div className="bg-muted rounded-lg p-6 mb-4">
+      <div className="bg-muted rounded-lg p-6 mb-4 relative">
+        <LogoutButton className="absolute top-4 right-4" />
         <div className="flex items-center gap-4">
           {user.avatarUrl && (
             <Link href={`/${user.username}`}>

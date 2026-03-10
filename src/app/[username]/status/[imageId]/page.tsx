@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import prisma from "@/lib/db";
 import { Button } from "@/components/ui/button";
+import { getCurrentUser } from "@/lib/auth/session";
+import { DeleteButton } from "./DeleteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,9 @@ interface PageProps {
 
 export default async function ImageDetailPage({ params }: PageProps) {
   const { username, imageId } = await params;
+
+  // ログインユーザーを取得
+  const currentUser = await getCurrentUser();
 
   // 画像を取得（ユーザー情報も含む）
   const image = await prisma.image.findUnique({
@@ -37,8 +42,11 @@ export default async function ImageDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const publicUrl = process.env.R2_PUBLIC_URL || "";
+  const publicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
   const imageUrl = `${publicUrl}/${image.storageKey}`;
+
+  // 自分の画像かどうか
+  const isOwner = currentUser?.id === image.userId;
 
   return (
     <div className="min-h-screen bg-background">
@@ -104,6 +112,13 @@ export default async function ImageDetailPage({ params }: PageProps) {
             })}
           </p>
         </div>
+
+        {/* 削除ボタン（自分の画像のみ） */}
+        {isOwner && (
+          <div className="mt-8 pt-6 border-t">
+            <DeleteButton imageId={imageId} username={username} />
+          </div>
+        )}
 
         {/* フッター */}
         <footer className="mt-12 pt-8 border-t text-center">

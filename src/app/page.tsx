@@ -25,7 +25,7 @@ export default async function HomePage() {
   }
 
   const allowedServers = getAllowedServers();
-  const publicUrl = process.env.R2_PUBLIC_URL || "";
+  const publicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
   // フィーチャー画像を取得（ランダムに6件）
   const totalCount = await prisma.image.count({
