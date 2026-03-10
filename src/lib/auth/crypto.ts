@@ -3,7 +3,7 @@
  * OAuthセッションデータの暗号化/復号化に使用
  */
 
-import { createCipheriv, createDecipheriv, randomBytes, createHash } from "crypto";
+import { createCipheriv, createDecipheriv, randomBytes, createHash, timingSafeEqual } from "crypto";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
@@ -152,7 +152,7 @@ export function generateMiAuthSignature(
 }
 
 /**
- * MiAuth署名の検証
+ * MiAuth署名の検証（タイミング攻撃対策済み）
  */
 export function verifyMiAuthSignature(
   server: string,
@@ -161,5 +161,12 @@ export function verifyMiAuthSignature(
   signature: string
 ): boolean {
   const expected = generateMiAuthSignature(server, sessionId, timestamp);
-  return expected === signature;
+  const expectedBuf = Buffer.from(expected);
+  const signatureBuf = Buffer.from(signature);
+
+  if (expectedBuf.length !== signatureBuf.length) {
+    return false;
+  }
+
+  return timingSafeEqual(expectedBuf, signatureBuf);
 }
