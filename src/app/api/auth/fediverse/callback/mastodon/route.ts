@@ -13,6 +13,7 @@ import {
 import {
   decryptOAuthSession,
   verifyOAuthState,
+  sanitizeRedirectUrl,
 } from "@/lib/auth/crypto";
 import { encryptToken } from "@/lib/auth/tokens";
 import { createSession } from "@/lib/auth/session";
@@ -156,8 +157,8 @@ export async function GET(request: NextRequest) {
       instance
     );
 
-    // コールバックURLにリダイレクト
-    const redirectTo = stateData.callbackUrl || "/dashboard";
+    // コールバックURLにリダイレクト（安全なパスのみ許可）
+    const redirectTo = sanitizeRedirectUrl(stateData.callbackUrl);
     return NextResponse.redirect(new URL(redirectTo, baseUrl));
   } catch (error) {
     console.error("OAuth callback error:", error);

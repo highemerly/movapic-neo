@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
 import { checkMisskeySession } from "@/lib/auth/fediverse";
-import { verifyMiAuthSignature } from "@/lib/auth/crypto";
+import { verifyMiAuthSignature, sanitizeRedirectUrl } from "@/lib/auth/crypto";
 import { encryptToken } from "@/lib/auth/tokens";
 import { createSession } from "@/lib/auth/session";
 import prisma from "@/lib/db";
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     const sessionId = searchParams.get("session");
     const timestamp = searchParams.get("ts");
     const signature = searchParams.get("sig");
-    const redirectTo = searchParams.get("redirect") || "/dashboard";
+    const redirectTo = sanitizeRedirectUrl(searchParams.get("redirect"));
 
     // パラメータ検証
     if (!server || !sessionId || !timestamp || !signature) {
