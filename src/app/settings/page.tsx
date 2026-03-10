@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/session";
+import { RegenerateEmailButton } from "./RegenerateEmailButton";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +87,7 @@ export default async function SettingsPage() {
               </div>
             </div>
           </div>
+          <RegenerateEmailButton emailDomain={emailDomain} />
         </div>
       </section>
 
