@@ -79,7 +79,7 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
 
       {/* 画像一覧 */}
       <ImageGrid
-        images={images.map((img) => ({
+        images={images.map((img: typeof images[number]) => ({
           ...img,
           createdAt: img.createdAt.toISOString(),
         }))}

@@ -45,7 +45,7 @@ export default async function PublicTimelinePage() {
       </div>
 
       <PublicTimelineClient
-        initialImages={images.map((img) => ({
+        initialImages={images.map((img: (typeof images)[number]) => ({
           id: img.id,
           storageKey: img.storageKey,
           width: img.width,

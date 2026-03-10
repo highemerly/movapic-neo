@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     const shuffled = images.sort(() => Math.random() - 0.5);
 
     return NextResponse.json({
-      images: shuffled.map((img) => ({
+      images: shuffled.map((img: (typeof shuffled)[number]) => ({
         id: img.id,
         storageKey: img.storageKey,
         width: img.width,

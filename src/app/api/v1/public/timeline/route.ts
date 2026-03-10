@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     const nextCursor = hasMore ? result[result.length - 1]?.id : null;
 
     return NextResponse.json({
-      images: result.map((img) => ({
+      images: result.map((img: (typeof result)[number]) => ({
         id: img.id,
         storageKey: img.storageKey,
         width: img.width,

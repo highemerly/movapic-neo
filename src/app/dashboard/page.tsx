@@ -102,7 +102,7 @@ export default async function DashboardPage() {
       <div>
         <h2 className="text-lg font-semibold mb-4">あなたの画像</h2>
         <DashboardClient
-          initialImages={images.map((img) => ({
+          initialImages={images.map((img: (typeof images)[number]) => ({
             ...img,
             createdAt: img.createdAt.toISOString(),
           }))}
