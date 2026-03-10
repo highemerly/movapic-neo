@@ -4,6 +4,7 @@ import prisma from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth/session";
 import { DeleteButton } from "./DeleteButton";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,7 @@ export default async function ImageDetailPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      <SiteHeader />
       <main className="container mx-auto max-w-2xl px-4 py-8">
         {/* ヘッダー */}
         <div className="mb-6">
@@ -130,7 +132,7 @@ export default async function ImageDetailPage({ params }: PageProps) {
         {/* フッター */}
         <footer className="mt-12 pt-8 border-t text-center">
           <Link href="/">
-            <Button variant="outline">写真に文字を合成するやつ（仮）</Button>
+            <Button variant="outline">新しい画像を投稿</Button>
           </Link>
         </footer>
       </main>

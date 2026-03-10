@@ -3,6 +3,7 @@ import Link from "next/link";
 import prisma from "@/lib/db";
 import { ImageGrid } from "@/components/gallery/ImageGrid";
 import { Button } from "@/components/ui/button";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,9 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
   const publicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
+    <>
+      <SiteHeader />
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
       {/* ユーザー情報 */}
       <div className="flex items-center gap-4 mb-8">
         {user.avatarUrl && (
@@ -102,5 +105,6 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
         </Link>
       </div>
     </div>
+    </>
   );
 }

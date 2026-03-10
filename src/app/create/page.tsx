@@ -7,6 +7,7 @@ import { ImageUpload } from "@/components/ImageUpload";
 import { CommandSelect } from "@/components/CommandSelect";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 import {
   GenerateFormState,
   DEFAULT_POSITION,
@@ -361,17 +362,10 @@ export default function CreatePage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SiteHeader />
       <main className="container mx-auto max-w-md px-4 py-8">
-        <div className="mb-6">
-          <Link
-            href="/dashboard"
-            className="text-sm text-muted-foreground hover:underline"
-          >
-            ← ダッシュボードに戻る
-          </Link>
-        </div>
         <h1 className="mb-6 text-center text-xl font-bold">
-          写真に文字を合成するやつ
+          画像を投稿
         </h1>
 
         <div className="space-y-6">

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/session";
 import { RegenerateEmailButton } from "./RegenerateEmailButton";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -15,16 +15,10 @@ export default async function SettingsPage() {
   const emailDomain = "pic.handon.club";
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <div className="mb-6">
-        <Link
-          href="/dashboard"
-          className="text-sm text-muted-foreground hover:underline"
-        >
-          ← ダッシュボードに戻る
-        </Link>
-      </div>
-      <h1 className="text-2xl font-bold mb-8">設定</h1>
+    <>
+      <SiteHeader />
+      <div className="container mx-auto px-4 py-8 max-w-2xl">
+        <h1 className="text-2xl font-bold mb-8">設定</h1>
 
       {/* アカウント情報 */}
       <section className="bg-muted rounded-lg p-6 mb-6">
@@ -109,5 +103,6 @@ export default async function SettingsPage() {
         </div>
       </section>
     </div>
+    </>
   );
 }

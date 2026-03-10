@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/auth/LogoutButton";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +15,9 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <h1 className="text-2xl font-bold mb-8">ダッシュボード</h1>
+    <>
+      <SiteHeader />
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
 
       {/* ユーザー情報 */}
       <div className="bg-muted rounded-lg p-6 mb-4 relative">
@@ -51,7 +53,7 @@ export default async function DashboardPage() {
       <div className="flex flex-col sm:flex-row gap-4">
         <Link href="/create" className="flex-1">
           <Button className="w-full" size="lg">
-            画像を作成
+            画像を投稿！
           </Button>
         </Link>
         <div className="flex gap-4">
@@ -68,5 +70,6 @@ export default async function DashboardPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }
