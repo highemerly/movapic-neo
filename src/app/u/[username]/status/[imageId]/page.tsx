@@ -4,6 +4,7 @@ import prisma from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth/session";
 import { DeleteButton } from "./DeleteButton";
+import { ImageNavigation } from "./ImageNavigation";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,30 @@ export default async function ImageDetailPage({ params }: PageProps) {
   if (image.user.username !== username) {
     notFound();
   }
+
+  // 前後の画像を取得（同じユーザーの公開画像のみ）
+  const [prevImage, nextImage] = await Promise.all([
+    // 前の画像（古い方向）
+    prisma.image.findFirst({
+      where: {
+        userId: image.userId,
+        isPublic: true,
+        createdAt: { lt: image.createdAt },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, overlayText: true },
+    }),
+    // 次の画像（新しい方向）
+    prisma.image.findFirst({
+      where: {
+        userId: image.userId,
+        isPublic: true,
+        createdAt: { gt: image.createdAt },
+      },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, overlayText: true },
+    }),
+  ]);
 
   const publicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
   const imageUrl = `${publicUrl}/${image.storageKey}`;
@@ -129,6 +154,15 @@ export default async function ImageDetailPage({ params }: PageProps) {
             <DeleteButton imageId={imageId} username={username} />
           </div>
         )}
+
+        {/* 前後の画像ナビゲーション */}
+        <div className="mt-8">
+          <ImageNavigation
+            username={username}
+            prevImage={prevImage}
+            nextImage={nextImage}
+          />
+        </div>
 
         {/* フッター */}
         <footer className="mt-12 pt-8 border-t text-center">
