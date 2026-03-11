@@ -131,7 +131,7 @@ export default async function ImageDetailPage({ params }: PageProps) {
 
         {/* フッター */}
         <footer className="mt-12 pt-8 border-t text-center">
-          <Link href="/">
+          <Link href="/create">
             <Button variant="outline">新しい画像を投稿</Button>
           </Link>
         </footer>

@@ -100,7 +100,7 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
 
       {/* フッター */}
       <div className="mt-8 text-center">
-        <Link href="/">
+        <Link href="/create">
           <Button variant="outline">新しい画像を投稿</Button>
         </Link>
       </div>
