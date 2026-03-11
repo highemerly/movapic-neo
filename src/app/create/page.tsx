@@ -222,10 +222,16 @@ export default function CreatePage() {
       formData.append("size", formState.size);
       formData.append("output", formState.output);
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35000);
+
       const response = await fetch("/api/v1/generate", {
         method: "POST",
         body: formData,
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -271,7 +277,11 @@ export default function CreatePage() {
       document.documentElement.scrollTop = 0;
       document.body.scrollTop = 0;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "エラーが発生しました");
+      if (err instanceof Error && err.name === "AbortError") {
+        setError("リクエストがタイムアウトしました。画像サイズを小さくして再試行してください");
+      } else {
+        setError(err instanceof Error ? err.message : "エラーが発生しました");
+      }
     } finally {
       setIsLoading(false);
     }

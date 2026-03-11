@@ -1,6 +1,5 @@
 import sharp from "sharp";
 import path from "path";
-import heicConvert from "heic-convert";
 import { Canvas, FontLibrary, CanvasRenderingContext2D } from "skia-canvas";
 import {
   Position,
@@ -40,23 +39,25 @@ interface ProcessImageParams {
   isHEIC?: boolean;
 }
 
+/**
+ * HEICバッファをJPEGバッファに変換
+ */
+async function convertHEICtoJPEG(heicBuffer: Buffer): Promise<Buffer> {
+  const heicConvert = (await import("heic-convert")).default;
+  const outputBuffer = await heicConvert({
+    buffer: heicBuffer,
+    format: "JPEG",
+    quality: 0.92,
+  });
+  return Buffer.from(outputBuffer);
+}
+
 interface ProcessImageResult {
   buffer: Buffer;
   contentType: string;
   extension: string;
 }
 
-/**
- * HEICバッファをJPEGバッファに変換
- */
-async function convertHEICtoJPEG(heicBuffer: Buffer): Promise<Buffer> {
-  const outputBuffer = await heicConvert({
-    buffer: heicBuffer,
-    format: "JPEG",
-    quality: 0.95,
-  });
-  return Buffer.from(outputBuffer);
-}
 
 /**
  * 画像サイズに基づいてフォントサイズを計算

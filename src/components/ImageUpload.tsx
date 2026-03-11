@@ -81,10 +81,9 @@ export function ImageUpload({
       }
       setError(null);
 
-      // HEICの場合はプレビューが表示できない可能性があるが、サーバー側で処理するので問題ない
+      // HEICの場合はプレビューなしでサーバー側で変換
       const isHEIC = isHEICFile(file);
       if (isHEIC) {
-        // HEICファイルはプレビューなしで送信
         onImageSelect(file, "");
       } else {
         const reader = new FileReader();
