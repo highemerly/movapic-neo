@@ -42,7 +42,7 @@ export default async function PublicTimelinePage() {
       <SiteHeader />
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold">パブリックタイムライン</h1>
+          <h1 className="text-2xl font-bold">タイムライン</h1>
           <Link href="/create">
             <Button variant="outline" size="sm">新しい画像を投稿</Button>
           </Link>

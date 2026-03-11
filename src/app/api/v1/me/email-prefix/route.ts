@@ -16,8 +16,8 @@ export async function POST() {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
 
-    // 新しいemailPrefixを生成
-    const newEmailPrefix = nanoid(16);
+    // 新しいemailPrefixを生成（24文字）
+    const newEmailPrefix = nanoid(24);
 
     // DBを更新
     await prisma.user.update({

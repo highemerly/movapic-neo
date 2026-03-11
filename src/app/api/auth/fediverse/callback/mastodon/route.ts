@@ -137,7 +137,7 @@ export async function GET(request: NextRequest) {
           username: account.username,
           displayName: account.displayName,
           avatarUrl: account.avatarUrl,
-          emailPrefix: nanoid(16),
+          emailPrefix: nanoid(24),
           accessToken: encryptedToken,
           lastLoginAt: new Date(),
         },

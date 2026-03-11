@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
-import { RegenerateEmailButton } from "./RegenerateEmailButton";
+import { EmailAddressDisplay } from "./EmailAddressDisplay";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 
 export const dynamic = "force-dynamic";
@@ -39,14 +39,7 @@ export default async function SettingsPage() {
       <section className="bg-muted rounded-lg p-6 mb-6">
         <h2 className="text-lg font-semibold mb-4">メール投稿＜準備中＞</h2>
         <div className="space-y-4">
-          <div>
-            <dt className="text-sm font-medium text-muted-foreground">投稿用メールアドレス</dt>
-            <dd className="mt-1">
-              <code className="bg-background px-2 py-1 rounded text-sm">
-                {user.emailPrefix}@{emailDomain}
-              </code>
-            </dd>
-          </div>
+          <EmailAddressDisplay emailPrefix={user.emailPrefix} emailDomain={emailDomain} />
           <div className="text-sm text-muted-foreground">
             <p className="mb-2">このアドレスに画像を添付してメールを送信すると、画像が生成されるようになります（いまはされません）。</p>
             <p className="mb-2 font-medium">メールの形式:</p>
@@ -81,7 +74,6 @@ export default async function SettingsPage() {
               </div>
             </div>
           </div>
-          <RegenerateEmailButton emailDomain={emailDomain} />
         </div>
       </section>
 
