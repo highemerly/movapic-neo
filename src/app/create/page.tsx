@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { TextInput } from "@/components/TextInput";
 import { ImageUpload } from "@/components/ImageUpload";
-import { CommandSelect } from "@/components/CommandSelect";
-import { Button } from "@/components/ui/button";
+import { OptionsAccordion } from "@/components/OptionsAccordion";
+import { ActionButtons, Visibility } from "@/components/ActionButtons";
 import Link from "next/link";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import {
@@ -18,21 +18,6 @@ import {
   OUTPUT_CONFIG,
   OutputFormat,
 } from "@/types";
-
-// throttle関数
-function throttle<T extends (...args: unknown[]) => void>(
-  func: T,
-  limit: number
-): T {
-  let inThrottle = false;
-  return ((...args: unknown[]) => {
-    if (!inThrottle) {
-      func(...args);
-      inThrottle = true;
-      setTimeout(() => (inThrottle = false), limit);
-    }
-  }) as T;
-}
 
 // 出力形式の表示名
 const OUTPUT_LABELS: Record<OutputFormat, string> = {
@@ -77,7 +62,6 @@ export default function CreatePage() {
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultMimeType, setResultMimeType] = useState<string>("image/jpeg");
-  const [resultExtension, setResultExtension] = useState<string>("jpg");
   const [resultInfo, setResultInfo] = useState<ResultInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
@@ -86,9 +70,7 @@ export default function CreatePage() {
   const [hasGenerated, setHasGenerated] = useState(false);
   const [lastGeneratedState, setLastGeneratedState] =
     useState<GenerateFormState | null>(null);
-  const [stickyOffset, setStickyOffset] = useState<number | null>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const stickyRef = useRef<HTMLDivElement>(null);
+  const [visibility, setVisibility] = useState<Visibility>("public");
 
   // 認証チェック
   useEffect(() => {
@@ -129,38 +111,6 @@ export default function CreatePage() {
 
     return () => clearInterval(interval);
   }, [isLoading]);
-
-  // スクロール監視：元のボタンの位置に応じてStickyボタンを移動（throttle適用）
-  useEffect(() => {
-    const updateStickyPosition = () => {
-      if (!buttonRef.current || !stickyRef.current) return;
-
-      const buttonRect = buttonRef.current.getBoundingClientRect();
-      const stickyRect = stickyRef.current.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-
-      // 元のボタンが画面内に入ってきた場合
-      if (buttonRect.top < viewportHeight) {
-        // Stickyバーの上端が元のボタンの上端と揃う位置
-        const offset = viewportHeight - buttonRect.top - stickyRect.height;
-        setStickyOffset(Math.max(0, offset));
-      } else {
-        setStickyOffset(null);
-      }
-    };
-
-    // スクロールイベントを16ms（約60fps）でthrottle
-    const throttledUpdate = throttle(updateStickyPosition, 16);
-
-    window.addEventListener("scroll", throttledUpdate);
-    window.addEventListener("resize", throttledUpdate);
-    updateStickyPosition();
-
-    return () => {
-      window.removeEventListener("scroll", throttledUpdate);
-      window.removeEventListener("resize", throttledUpdate);
-    };
-  }, []);
 
   // BlobURLのクリーンアップ
   useEffect(() => {
@@ -248,9 +198,7 @@ export default function CreatePage() {
 
       // 拡張子とMIMEタイプを設定
       const config = OUTPUT_CONFIG[formState.output];
-      const extension = config?.format === "avif" ? "avif" : "jpg";
       const mimeType = config?.format === "avif" ? "image/avif" : "image/jpeg";
-      setResultExtension(extension);
       setResultBlob(blob);
       setResultMimeType(mimeType);
 
@@ -287,17 +235,6 @@ export default function CreatePage() {
     }
   };
 
-  const handleDownload = () => {
-    if (!resultUrl) return;
-
-    const link = document.createElement("a");
-    link.href = resultUrl;
-    link.download = `movapic-${Date.now()}.${resultExtension}`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   const handlePost = async () => {
     if (!resultBlob || !lastGeneratedState) return;
 
@@ -314,6 +251,7 @@ export default function CreatePage() {
       formData.append("size", lastGeneratedState.size);
       formData.append("output", lastGeneratedState.output);
       formData.append("mimeType", resultMimeType);
+      formData.append("visibility", visibility);
 
       const response = await fetch("/api/v1/post", {
         method: "POST",
@@ -339,11 +277,11 @@ export default function CreatePage() {
     }
   };
 
-  const canGenerate = formState.text.length > 0 && formState.imageFile !== null;
+  const canGenerate = formState.text.trim().length > 0 && formState.imageFile !== null;
 
   // 生成後に設定が変更されたかどうか
   const hasChangedSinceGeneration = useMemo(() => {
-    if (!hasGenerated || !lastGeneratedState) return true;
+    if (!hasGenerated || !lastGeneratedState) return false;
     return (
       formState.text !== lastGeneratedState.text ||
       formState.position !== lastGeneratedState.position ||
@@ -375,24 +313,21 @@ export default function CreatePage() {
       <SiteHeader />
       <main className="container mx-auto max-w-md px-4 py-8">
         <h1 className="mb-6 text-center text-xl font-bold">
-          画像を投稿
+          画像を作成
         </h1>
 
         <div className="space-y-6">
-          {/* 画像エリア: 生成結果があればそれを表示、なければアップロードエリア */}
+          {/* 画像エリア */}
           <ImageUpload
             imageFile={formState.imageFile}
             imagePreview={formState.imagePreview}
             resultUrl={resultUrl}
             hasGenerated={hasGenerated}
             resultInfo={resultInfo}
-            instanceDomain={user?.instance.domain}
-            isPosting={isPosting}
+            isLoading={isLoading}
             onImageSelect={handleImageSelect}
             onReset={handleReset}
-            onDownload={handleDownload}
-            onPost={handlePost}
-            disabled={isLoading}
+            disabled={isLoading || isPosting}
           />
 
           {/* エラー表示 */}
@@ -406,11 +341,27 @@ export default function CreatePage() {
           <TextInput
             value={formState.text}
             onChange={(text) => setFormState((prev) => ({ ...prev, text }))}
-            disabled={isLoading}
+            disabled={isLoading || isPosting}
           />
 
-          {/* コマンド選択 */}
-          <CommandSelect
+          {/* アクションボタン（生成・投稿） */}
+          <ActionButtons
+            instanceDomain={user?.instance.domain}
+            instanceType={user?.instance.type}
+            canGenerate={canGenerate}
+            canPost={hasGenerated && !hasChangedSinceGeneration}
+            canRegenerate={hasGenerated && hasChangedSinceGeneration}
+            isLoading={isLoading}
+            isPosting={isPosting}
+            loadingText={loadingText}
+            visibility={visibility}
+            onVisibilityChange={setVisibility}
+            onGenerate={handleGenerate}
+            onPost={handlePost}
+          />
+
+          {/* オプション設定（アコーディオン） */}
+          <OptionsAccordion
             position={formState.position}
             font={formState.font}
             color={formState.color}
@@ -431,27 +382,8 @@ export default function CreatePage() {
             onOutputChange={(output) =>
               setFormState((prev) => ({ ...prev, output }))
             }
-            disabled={isLoading}
+            disabled={isLoading || isPosting}
           />
-
-          {/* 生成ボタン */}
-          <Button
-            ref={buttonRef}
-            onClick={handleGenerate}
-            disabled={
-              !canGenerate ||
-              isLoading ||
-              (hasGenerated && !hasChangedSinceGeneration)
-            }
-            className="w-full"
-            size="lg"
-          >
-            {isLoading
-              ? loadingText
-              : hasGenerated
-                ? "画像を再生成"
-                : "画像を生成"}
-          </Button>
         </div>
 
         {/* フッター */}
@@ -464,37 +396,6 @@ export default function CreatePage() {
           </Link>
         </footer>
       </main>
-
-      {/* Sticky生成ボタン */}
-      <div
-        ref={stickyRef}
-        className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur border-t p-4 transition-transform duration-200"
-        style={{
-          transform:
-            stickyOffset !== null
-              ? `translateY(${stickyOffset}px)`
-              : "translateY(0)",
-        }}
-      >
-        <div className="container mx-auto max-w-md">
-          <Button
-            onClick={handleGenerate}
-            disabled={
-              !canGenerate ||
-              isLoading ||
-              (hasGenerated && !hasChangedSinceGeneration)
-            }
-            className="w-full"
-            size="lg"
-          >
-            {isLoading
-              ? loadingText
-              : hasGenerated
-                ? "画像を再生成"
-                : "画像を生成"}
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

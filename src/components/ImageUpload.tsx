@@ -1,8 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { X, Loader2 } from "lucide-react";
 import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from "@/types";
 
 interface ResultInfo {
@@ -25,12 +24,9 @@ interface ImageUploadProps {
   resultUrl: string | null;
   hasGenerated: boolean;
   resultInfo: ResultInfo | null;
-  instanceDomain?: string;
-  isPosting?: boolean;
+  isLoading?: boolean;
   onImageSelect: (file: File, preview: string) => void;
   onReset: () => void;
-  onDownload: () => void;
-  onPost?: () => void;
   disabled?: boolean;
 }
 
@@ -46,12 +42,9 @@ export function ImageUpload({
   resultUrl,
   hasGenerated,
   resultInfo,
-  instanceDomain,
-  isPosting,
+  isLoading,
   onImageSelect,
   onReset,
-  onDownload,
-  onPost,
   disabled,
 }: ImageUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -136,7 +129,6 @@ export function ImageUpload({
 
   return (
     <div className="space-y-2">
-      <Label>画像</Label>
       <input
         ref={inputRef}
         type="file"
@@ -148,73 +140,67 @@ export function ImageUpload({
 
       {/* 画像がある場合（プレビューまたは生成結果） */}
       {imageFile ? (
-        <div className="space-y-2">
+        <div className="relative">
           {displayUrl ? (
-            <div className="relative overflow-hidden rounded-lg border">
+            <div className="relative overflow-hidden rounded-lg border bg-muted">
               <img
                 src={displayUrl}
                 alt={hasGenerated ? "生成された画像" : "プレビュー"}
-                className="w-full object-contain"
+                className={`w-full object-contain transition-opacity ${isLoading ? "opacity-50" : ""}`}
               />
+              {/* 生成中オーバーレイ */}
+              {isLoading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="mt-2 text-sm font-medium text-foreground">生成中...</p>
+                </div>
+              )}
+              {/* 右上の×ボタン */}
+              {!isLoading && (
+                <button
+                  type="button"
+                  onClick={onReset}
+                  disabled={disabled}
+                  className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors disabled:opacity-50"
+                  aria-label="画像を削除してやり直す"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+              {/* 画像情報オーバーレイ（下部） */}
+              {hasGenerated && resultInfo && !isLoading && (
+                <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-3 py-1.5 text-center">
+                  <p className="text-xs text-white">
+                    {resultInfo.width} × {resultInfo.height} / {resultInfo.format} / {formatFileSize(resultInfo.fileSize)}
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="flex h-32 items-center justify-center rounded-lg border bg-muted">
-              <p className="text-sm text-muted-foreground">
-                {imageFile.name}（プレビュー不可）
-              </p>
-            </div>
-          )}
-
-          {/* 生成後は投稿ボタンと画像変更ボタンを表示 */}
-          {hasGenerated ? (
-            <div className="space-y-2">
-              {/* 生成結果の情報表示 */}
-              {resultInfo && (
-                <p className="text-center text-xs text-muted-foreground">
-                  {resultInfo.width} × {resultInfo.height} / {resultInfo.format} / {formatFileSize(resultInfo.fileSize)}
+            <div className="relative flex h-48 items-center justify-center rounded-lg border bg-muted">
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="mt-2 text-sm font-medium text-foreground">生成中...</p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {imageFile.name}（プレビュー不可）
                 </p>
               )}
-              <div className="flex gap-2">
-                {instanceDomain && onPost ? (
-                  <Button
-                    type="button"
-                    onClick={onPost}
-                    disabled={disabled || isPosting}
-                    className="flex-1"
-                  >
-                    {isPosting ? "投稿中..." : `${instanceDomain} に投稿`}
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={onDownload}
-                    disabled={disabled}
-                    className="flex-1"
-                  >
-                    ダウンロード
-                  </Button>
-                )}
-                <Button
+              {/* 右上の×ボタン */}
+              {!isLoading && (
+                <button
                   type="button"
-                  variant="outline"
                   onClick={onReset}
-                  disabled={disabled || isPosting}
-                  className="flex-1"
+                  disabled={disabled}
+                  className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 hover:bg-black/70 text-white transition-colors disabled:opacity-50"
+                  aria-label="画像を削除してやり直す"
                 >
-                  最初からやり直す
-                </Button>
-              </div>
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
-          ) : (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onReset}
-              disabled={disabled}
-              className="w-full"
-            >
-              画像を削除
-            </Button>
           )}
         </div>
       ) : (
@@ -224,14 +210,14 @@ export function ImageUpload({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`flex h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
+          className={`flex h-48 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
             isDragging
               ? "border-primary bg-primary/5"
               : "border-muted-foreground/25 hover:border-primary/50"
           } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
         >
           <p className="text-sm text-muted-foreground">
-            クリックまたはドラッグ&ドロップで画像を選択
+            画像をアップロードしてください
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             JPEG, PNG, WebP, HEIC, AVIF（最大25MB）
