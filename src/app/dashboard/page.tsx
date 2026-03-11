@@ -24,7 +24,7 @@ export default async function DashboardPage() {
         <LogoutButton className="absolute top-4 right-4" />
         <div className="flex items-center gap-4">
           {user.avatarUrl && (
-            <Link href={`/${user.username}`}>
+            <Link href={`/u/${user.username}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={user.avatarUrl}

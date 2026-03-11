@@ -91,7 +91,7 @@ export default async function HomePage() {
               {featuredImages.map((image) => (
                 <Link
                   key={image.id}
-                  href={`/${image.user.username}/status/${image.id}`}
+                  href={`/u/${image.user.username}/status/${image.id}`}
                   className="block"
                 >
                   <div className="bg-muted rounded-lg overflow-hidden aspect-square">

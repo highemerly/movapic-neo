@@ -55,7 +55,7 @@ export default async function ImageDetailPage({ params }: PageProps) {
       <main className="container mx-auto max-w-2xl px-4 py-8">
         {/* ヘッダー */}
         <div className="mb-6">
-          <Link href={`/${username}`}>
+          <Link href={`/u/${username}`}>
             <Button variant="ghost" size="sm">
               ← {image.user.displayName || username} のギャラリーに戻る
             </Button>
@@ -77,7 +77,7 @@ export default async function ImageDetailPage({ params }: PageProps) {
         {/* 投稿者情報 */}
         <div className="flex items-center gap-3 mb-6 p-4 bg-muted rounded-lg">
           {image.user.avatarUrl && (
-            <Link href={`/${username}`}>
+            <Link href={`/u/${username}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={image.user.avatarUrl}
@@ -88,7 +88,7 @@ export default async function ImageDetailPage({ params }: PageProps) {
           )}
           <div>
             <Link
-              href={`/${username}`}
+              href={`/u/${username}`}
               className="font-semibold hover:underline"
             >
               {image.user.displayName || image.user.username}

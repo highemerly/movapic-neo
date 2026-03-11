@@ -61,7 +61,7 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
       {/* ユーザー情報 */}
       <div className="flex items-center gap-4 mb-8">
         {user.avatarUrl && (
-          <Link href={`/${cleanUsername}`}>
+          <Link href={`/u/${cleanUsername}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={user.avatarUrl}

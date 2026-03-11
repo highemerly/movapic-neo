@@ -30,7 +30,7 @@ export function DeleteButton({ imageId, username }: DeleteButtonProps) {
       }
 
       // 削除成功後、ユーザーのギャラリーにリダイレクト
-      router.push(`/${username}`);
+      router.push(`/u/${username}`);
       router.refresh();
     } catch (error) {
       alert(error instanceof Error ? error.message : "削除に失敗しました");

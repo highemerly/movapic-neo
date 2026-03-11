@@ -21,7 +21,7 @@ interface ImageCardProps {
 export function ImageCard({ image, publicUrl, username, showDelete, onDelete }: ImageCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const imageUrl = `${publicUrl}/${image.storageKey}`;
-  const detailUrl = username ? `/${username}/status/${image.id}` : imageUrl;
+  const detailUrl = username ? `/u/${username}/status/${image.id}` : imageUrl;
 
   const handleDelete = async () => {
     if (!onDelete) return;

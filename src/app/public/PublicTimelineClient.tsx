@@ -90,7 +90,7 @@ function TimelineImageCard({
 }) {
   const imageUrl = `${publicUrl}/${image.storageKey}`;
 
-  const detailUrl = `/${image.user.username}/status/${image.id}`;
+  const detailUrl = `/u/${image.user.username}/status/${image.id}`;
 
   return (
     <div className="bg-muted rounded-lg overflow-hidden">
@@ -109,7 +109,7 @@ function TimelineImageCard({
         </Link>
         <div className="flex items-center gap-2">
           {image.user.avatarUrl && (
-            <Link href={`/${image.user.username}`} className="hover:opacity-80">
+            <Link href={`/u/${image.user.username}`} className="hover:opacity-80">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={image.user.avatarUrl}

@@ -93,7 +93,7 @@ export default async function SettingsPage() {
             <dt className="text-sm font-medium text-muted-foreground">公開ギャラリーURL</dt>
             <dd className="mt-1">
               <code className="bg-background px-2 py-1 rounded text-sm">
-                {process.env.NEXT_PUBLIC_APP_URL}/{user.username}
+                {process.env.NEXT_PUBLIC_APP_URL}/u/{user.username}
               </code>
             </dd>
           </div>
