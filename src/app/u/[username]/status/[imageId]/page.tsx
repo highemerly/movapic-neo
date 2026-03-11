@@ -112,12 +112,13 @@ export default async function ImageDetailPage({ params }: PageProps) {
         {/* メタ情報 */}
         <div className="text-sm text-muted-foreground">
           <p>
-            {new Date(image.createdAt).toLocaleDateString("ja-JP", {
+            {new Date(image.createdAt).toLocaleString("ja-JP", {
               year: "numeric",
               month: "long",
               day: "numeric",
               hour: "2-digit",
               minute: "2-digit",
+              timeZone: "Asia/Tokyo",
             })}
           </p>
         </div>
