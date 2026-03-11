@@ -3,6 +3,16 @@
 ## 概要
 画像に文字を入れて生成するWebアプリ。
 
+## ページ名称
+- `/` → **トップページ**
+- `/dashboard` → **ダッシュボード**
+- `/create` → **投稿ページ**
+- `/settings` → **設定ページ**
+- `/u/[username]` → **ユーザーページ**
+- `/u/[username]/status/[imageId]` → **画像ページ**
+- `/public` → **公開タイムライン**
+- `/license` → **ライセンスページ**
+
 ## 技術スタック
 - **フレームワーク**: Next.js 16 (App Router)
 - **UI**: Tailwind CSS + shadcn/ui
