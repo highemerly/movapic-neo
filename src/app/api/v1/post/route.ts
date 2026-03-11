@@ -9,7 +9,7 @@ import sharp from "sharp";
 import { getCurrentUserWithValidation } from "@/lib/auth/session";
 import { decryptToken } from "@/lib/auth/tokens";
 import { uploadImage, generateStorageKey, getExtensionFromMimeType } from "@/lib/storage/r2";
-import { postToMastodon, postToMisskey } from "@/lib/fediverse/post";
+import { postToMastodon, postToMisskey, MastodonVisibility, MisskeyVisibility } from "@/lib/fediverse/post";
 import prisma from "@/lib/db";
 import {
   Position,
@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
     const size = formData.get("size") as Size | null;
     const output = formData.get("output") as OutputFormat | null;
     const mimeType = formData.get("mimeType") as string | null;
+    const visibility = formData.get("visibility") as string | null;
 
     // バリデーション
     if (!imageBlob || !text || !position || !font || !color || !size || !output || !mimeType) {
@@ -97,6 +98,8 @@ export async function POST(request: NextRequest) {
     // Fediverseに投稿
     let postResult;
     if (user.instance.type === "mastodon") {
+      // MastodonのvisibilityはUIと同じ（public, unlisted）
+      const mastodonVisibility: MastodonVisibility = visibility === "unlisted" ? "unlisted" : "public";
       postResult = await postToMastodon(
         user.instance.domain,
         accessToken,
@@ -104,9 +107,12 @@ export async function POST(request: NextRequest) {
         mimeType,
         filename,
         text,
-        imagePageUrl
+        imagePageUrl,
+        mastodonVisibility
       );
     } else if (user.instance.type === "misskey") {
+      // Misskeyではunlistedがhomeに相当
+      const misskeyVisibility: MisskeyVisibility = visibility === "unlisted" ? "home" : "public";
       postResult = await postToMisskey(
         user.instance.domain,
         accessToken,
@@ -114,7 +120,8 @@ export async function POST(request: NextRequest) {
         mimeType,
         filename,
         text,
-        imagePageUrl
+        imagePageUrl,
+        misskeyVisibility
       );
     } else {
       return NextResponse.json(

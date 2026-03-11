@@ -45,6 +45,9 @@ async function uploadMastodonMedia(
   return data.id;
 }
 
+// Mastodonの公開範囲
+export type MastodonVisibility = "public" | "unlisted" | "private" | "direct";
+
 /**
  * Mastodonにステータスを投稿
  */
@@ -55,7 +58,8 @@ export async function postToMastodon(
   mimeType: string,
   filename: string,
   statusText: string,
-  imageUrl: string
+  imageUrl: string,
+  visibility: MastodonVisibility = "public"
 ): Promise<PostResult> {
   try {
     // メディアをアップロード
@@ -78,7 +82,7 @@ export async function postToMastodon(
       body: JSON.stringify({
         status: `${statusText}\n\n${imageUrl}`,
         media_ids: [mediaId],
-        visibility: "public",
+        visibility,
       }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT),
     });
@@ -135,6 +139,9 @@ async function uploadMisskeyFile(
   return data.id;
 }
 
+// Misskeyの公開範囲
+export type MisskeyVisibility = "public" | "home" | "followers" | "specified";
+
 /**
  * Misskeyにノートを投稿
  */
@@ -145,7 +152,8 @@ export async function postToMisskey(
   mimeType: string,
   filename: string,
   statusText: string,
-  imageUrl: string
+  imageUrl: string,
+  visibility: MisskeyVisibility = "public"
 ): Promise<PostResult> {
   try {
     // ファイルをアップロード
@@ -168,7 +176,7 @@ export async function postToMisskey(
         i: accessToken,
         text: `${statusText}\n\n${imageUrl}`,
         fileIds: [fileId],
-        visibility: "public",
+        visibility,
       }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT),
     });
