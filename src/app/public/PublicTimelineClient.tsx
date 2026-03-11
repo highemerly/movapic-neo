@@ -10,6 +10,7 @@ interface TimelineImage {
   width: number;
   height: number;
   overlayText: string;
+  position: string;
   createdAt: string;
   user: {
     username: string;
@@ -17,6 +18,22 @@ interface TimelineImage {
     avatarUrl: string | null;
     instance: string;
   };
+}
+
+// 文字位置に応じたobject-positionを返す
+function getObjectPosition(position: string): string {
+  switch (position) {
+    case "top":
+      return "object-top";
+    case "bottom":
+      return "object-bottom";
+    case "left":
+      return "object-left";
+    case "right":
+      return "object-right";
+    default:
+      return "object-center";
+  }
 }
 
 interface PublicTimelineClientProps {
@@ -64,7 +81,7 @@ export function PublicTimelineClient({
 
   return (
     <div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {images.map((image) => (
           <TimelineImageCard key={image.id} image={image} publicUrl={publicUrl} />
         ))}
@@ -93,41 +110,28 @@ function TimelineImageCard({
   const detailUrl = `/u/${image.user.username}/status/${image.id}`;
 
   return (
-    <div className="bg-muted rounded-lg overflow-hidden">
-      <Link href={detailUrl}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={imageUrl}
-          alt={image.overlayText}
-          className="w-full h-auto aspect-square object-cover hover:opacity-90 transition-opacity"
-          loading="lazy"
-        />
-      </Link>
-      <div className="p-3">
-        <Link href={detailUrl} className="hover:underline">
-          <p className="text-sm line-clamp-2 mb-2">{image.overlayText}</p>
-        </Link>
-        <div className="flex items-center gap-2">
-          {image.user.avatarUrl && (
-            <Link href={`/u/${image.user.username}`} className="hover:opacity-80">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={image.user.avatarUrl}
-                alt={image.user.displayName || image.user.username}
-                className="w-6 h-6 rounded-full"
-              />
-            </Link>
-          )}
-          <a
-            href={`https://${image.user.instance}/@${image.user.username}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-muted-foreground hover:underline"
-          >
-            @{image.user.username}
-          </a>
-        </div>
+    <Link href={detailUrl} className="block relative rounded-lg overflow-hidden group">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={imageUrl}
+        alt={image.overlayText}
+        className={`w-full h-auto aspect-[4/3] object-cover group-hover:opacity-90 transition-opacity ${getObjectPosition(image.position)}`}
+        loading="lazy"
+      />
+      {/* 投稿者オーバーレイ */}
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 pt-6 flex items-center gap-2">
+        {image.user.avatarUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={image.user.avatarUrl}
+            alt={image.user.displayName || image.user.username}
+            className="w-6 h-6 rounded-full"
+          />
+        )}
+        <span className="text-sm text-white truncate">
+          {image.user.displayName || image.user.username}
+        </span>
       </div>
-    </div>
+    </Link>
   );
 }

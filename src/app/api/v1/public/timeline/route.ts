@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
         width: true,
         height: true,
         overlayText: true,
+        position: true,
         createdAt: true,
         user: {
           select: {
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
         width: img.width,
         height: img.height,
         overlayText: img.overlayText,
+        position: img.position,
         createdAt: img.createdAt.toISOString(),
         user: {
           username: img.user.username,

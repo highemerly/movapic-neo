@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     // 画像の詳細ページURL
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-    const imagePageUrl = `${appUrl}/${user.username}/status/${imageId}`;
+    const imagePageUrl = `${appUrl}/u/${user.username}/status/${imageId}`;
 
     // アクセストークンを復号化
     const accessToken = decryptToken(user.accessToken);
