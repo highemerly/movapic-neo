@@ -217,7 +217,7 @@ export function ImageUpload({
           } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
         >
           <p className="text-sm text-muted-foreground">
-            画像をアップロードしてください
+            タップして画像を選択してください
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             JPEG, PNG, WebP, HEIC, AVIF（最大25MB）

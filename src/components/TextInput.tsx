@@ -30,7 +30,7 @@ export function TextInput({ value, onChange, disabled }: TextInputProps) {
         id="text-input"
         value={value}
         onChange={handleChange}
-        placeholder="画像に入れるテキストを入力してください"
+        placeholder="テキストを入力してください"
         disabled={disabled}
         className="min-h-[100px] resize-none"
       />

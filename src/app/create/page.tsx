@@ -312,10 +312,6 @@ export default function CreatePage() {
     <div className="min-h-screen bg-background">
       <SiteHeader />
       <main className="container mx-auto max-w-md px-4 py-8">
-        <h1 className="mb-6 text-center text-xl font-bold">
-          画像を作成
-        </h1>
-
         <div className="space-y-6">
           {/* 画像エリア */}
           <ImageUpload
