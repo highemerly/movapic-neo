@@ -22,6 +22,7 @@ import {
   generateMiAuthSignature,
   type OAuthSessionData,
 } from "@/lib/auth/crypto";
+import { ErrorCodes, errorResponse, handleUnknownError } from "@/lib/errors";
 
 const OAUTH_SESSION_COOKIE = "oauth_session";
 const OAUTH_STATE_COOKIE = "oauth_state";
@@ -42,9 +43,10 @@ export async function POST(request: NextRequest) {
     const { server, callbackUrl } = body;
 
     if (!server || typeof server !== "string") {
-      return NextResponse.json(
-        { error: "サーバー名を入力してください" },
-        { status: 400 }
+      return errorResponse(
+        ErrorCodes.VALIDATION_REQUIRED,
+        "サーバー名を入力してください",
+        400
       );
     }
 
@@ -54,9 +56,10 @@ export async function POST(request: NextRequest) {
     // 許可サーバーチェック
     const allowedServers = getAllowedServers();
     if (allowedServers && !allowedServers.includes(normalizedServer)) {
-      return NextResponse.json(
-        { error: "このサーバーは現在サポートされていません" },
-        { status: 403 }
+      return errorResponse(
+        ErrorCodes.SERVER_NOT_ALLOWED,
+        "このサーバーは現在サポートされていません",
+        403
       );
     }
 
@@ -114,6 +117,7 @@ export async function POST(request: NextRequest) {
       );
 
       return NextResponse.json({
+        success: true,
         url: authorizationUrl,
         platform: "mastodon",
         server: normalizedServer,
@@ -142,19 +146,20 @@ export async function POST(request: NextRequest) {
       );
 
       return NextResponse.json({
+        success: true,
         url: authorizationUrl,
         platform: "misskey",
         server: normalizedServer,
       });
     }
 
-    return NextResponse.json(
-      { error: "サポートされていないインスタンスです" },
-      { status: 400 }
+    return errorResponse(
+      ErrorCodes.VALIDATION_INVALID,
+      "サポートされていないインスタンスです",
+      400,
+      { suggestion: "MastodonまたはMisskeyのサーバーを指定してください" }
     );
   } catch (error) {
-    console.error("Failed to initiate OAuth:", error);
-    const message = error instanceof Error ? error.message : "認証の開始に失敗しました";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleUnknownError(error);
   }
 }

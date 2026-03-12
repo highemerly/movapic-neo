@@ -13,6 +13,7 @@ import {
   STROKE_COLORS,
   OUTPUT_CONFIG,
 } from "@/types";
+import { ImageProcessError } from "@/lib/errors";
 
 // フォントを登録
 const fontsDir = path.join(process.cwd(), "fonts");
@@ -356,7 +357,7 @@ export async function processImage({
     const isJpeg = magic === 'ffd8';
     if (!isJpeg) {
       console.error(`[imageProcessor] rid=${rid} SHARP_FAILED (non-JPEG):`, sharpError);
-      throw sharpError; // JPEG以外はそのままエラー
+      throw new ImageProcessError("画像の読み込みに失敗しました", "rotate", rid);
     }
     console.log(`[imageProcessor] rid=${rid} SHARP_FAILED (JPEG), trying jpeg-js fallback. Error: ${sharpError instanceof Error ? sharpError.message : sharpError}`);
     try {
@@ -374,7 +375,7 @@ export async function processImage({
       usedFallback = true;
     } catch (jpegError) {
       console.error(`[imageProcessor] rid=${rid} JPEG_JS_FALLBACK_FAILED:`, jpegError);
-      throw sharpError; // フォールバックも失敗したら元のエラーを投げる
+      throw new ImageProcessError("画像の読み込みに失敗しました", "rotate", rid);
     }
   }
   if (usedFallback) {
@@ -395,39 +396,57 @@ export async function processImage({
 
   // Canvasでテキストオーバーレイを生成
   const textOverlayStart = Date.now();
-  const textOverlay = await createTextOverlay(
-    width,
-    height,
-    text,
-    position,
-    fontSize,
-    font,
-    textColor,
-    strokeColor
-  );
+  let textOverlay: Buffer;
+  try {
+    textOverlay = await createTextOverlay(
+      width,
+      height,
+      text,
+      position,
+      fontSize,
+      font,
+      textColor,
+      strokeColor
+    );
+  } catch (error) {
+    console.error(`[imageProcessor] rid=${rid} TEXT_OVERLAY_FAILED:`, error);
+    throw new ImageProcessError("テキスト描画に失敗しました", "overlay", rid);
+  }
   const textOverlayTime = Date.now() - textOverlayStart;
 
   console.log(`[imageProcessor] rid=${rid} TEXT_OVERLAY: ${textOverlayTime}ms, fontSize=${fontSize}`);
 
   // 画像にテキストを合成してJPEGで一時出力
   const compositeStart = Date.now();
-  const composited = await rotatedImage
-    .composite([
-      {
-        input: textOverlay,
-        top: 0,
-        left: 0,
-      },
-    ])
-    .jpeg({ quality: 90 })
-    .toBuffer();
+  let composited: Buffer;
+  try {
+    composited = await rotatedImage
+      .composite([
+        {
+          input: textOverlay,
+          top: 0,
+          left: 0,
+        },
+      ])
+      .jpeg({ quality: 90 })
+      .toBuffer();
+  } catch (error) {
+    console.error(`[imageProcessor] rid=${rid} COMPOSITE_FAILED:`, error);
+    throw new ImageProcessError("画像の合成に失敗しました", "composite", rid);
+  }
   const compositeTime = Date.now() - compositeStart;
 
   console.log(`[imageProcessor] rid=${rid} COMPOSITE: ${compositeTime}ms, jpegSize=${Math.round(composited.length / 1024)}KB`);
 
   // 出力形式に応じて変換
   const outputStart = Date.now();
-  const result = await applyOutputFormat(composited, output);
+  let result: ProcessImageResult;
+  try {
+    result = await applyOutputFormat(composited, output);
+  } catch (error) {
+    console.error(`[imageProcessor] rid=${rid} OUTPUT_FORMAT_FAILED:`, error);
+    throw new ImageProcessError("出力形式の変換に失敗しました", "convert", rid);
+  }
   const outputTime = Date.now() - outputStart;
 
   const totalTime = Date.now() - startTime;

@@ -11,6 +11,13 @@ import {
   MAX_FILE_SIZE,
   ALLOWED_FILE_TYPES,
 } from "@/types";
+import {
+  ErrorCodes,
+  ImageProcessError,
+  errorResponse,
+  handleImageProcessError,
+  handleUnknownError,
+} from "@/lib/errors";
 
 const VALID_POSITIONS: Position[] = ["top", "right", "left", "bottom"];
 const VALID_FONTS: FontFamily[] = ["hui-font", "noto-sans-jp", "light-novel-pop"];
@@ -33,33 +40,34 @@ const PROCESS_TIMEOUT_MS = 21000;
 /**
  * タイムアウト付きでPromiseを実行する
  */
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+function withTimeout<T>(promise: Promise<T>, ms: number, requestId: string): Promise<T> {
   return Promise.race([
     promise,
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("処理がタイムアウトしました")), ms)
+      setTimeout(() => reject(new ImageProcessError("タイムアウト", "composite", requestId)), ms)
     ),
   ]);
 }
 
 export async function POST(request: NextRequest) {
+  const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+
   // レート制限チェック
   const clientIp = getClientIp(request);
   const rateLimit = checkRateLimit(clientIp);
 
   if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { error: `リクエストが多すぎます。${rateLimit.retryAfter}秒後に再試行してください` },
+    return errorResponse(
+      ErrorCodes.RATE_LIMIT,
+      "リクエストが多すぎます",
+      429,
       {
-        status: 429,
-        headers: {
-          "Retry-After": String(rateLimit.retryAfter),
-        },
+        suggestion: `${rateLimit.retryAfter}秒後に再試行してください`,
+        requestId,
+        headers: { "Retry-After": String(rateLimit.retryAfter) },
       }
     );
   }
-
-  const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
   try {
     const formData = await request.formData();
@@ -75,7 +83,12 @@ export async function POST(request: NextRequest) {
 
     // バリデーション
     if (!image) {
-      return NextResponse.json({ error: "画像は必須です" }, { status: 400 });
+      return errorResponse(
+        ErrorCodes.VALIDATION_REQUIRED,
+        "画像は必須です",
+        400,
+        { requestId }
+      );
     }
 
     // HEICファイルはMIMEタイプが空や不正な場合があるので、拡張子でもチェック
@@ -84,65 +97,86 @@ export async function POST(request: NextRequest) {
     const isValidType = ALLOWED_FILE_TYPES.includes(image.type) || isHEICFile;
 
     if (!isValidType) {
-      return NextResponse.json(
-        { error: "JPEG、PNG、WebP、HEIC、AVIF形式のみ対応しています" },
-        { status: 400 }
+      return errorResponse(
+        ErrorCodes.VALIDATION_FILE_TYPE,
+        "JPEG、PNG、WebP、HEIC、AVIF形式のみ対応しています",
+        400,
+        { requestId }
       );
     }
 
     if (image.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: "ファイルサイズは25MB以下にしてください" },
-        { status: 400 }
+      return errorResponse(
+        ErrorCodes.VALIDATION_FILE_TOO_LARGE,
+        "ファイルサイズは25MB以下にしてください",
+        400,
+        {
+          suggestion: "画像を圧縮してください",
+          requestId,
+        }
       );
     }
 
     if (!text || text.trim().length === 0) {
-      return NextResponse.json(
-        { error: "テキストを入力してください" },
-        { status: 400 }
+      return errorResponse(
+        ErrorCodes.VALIDATION_REQUIRED,
+        "テキストを入力してください",
+        400,
+        { requestId }
       );
     }
 
     if (text.length > MAX_TEXT_LENGTH) {
-      return NextResponse.json(
-        { error: `テキストは${MAX_TEXT_LENGTH}文字以下にしてください` },
-        { status: 400 }
+      return errorResponse(
+        ErrorCodes.VALIDATION_TOO_LONG,
+        `テキストは${MAX_TEXT_LENGTH}文字以下にしてください`,
+        400,
+        { requestId }
       );
     }
 
     if (!position || !VALID_POSITIONS.includes(position)) {
-      return NextResponse.json(
-        { error: "無効な位置が指定されています" },
-        { status: 400 }
+      return errorResponse(
+        ErrorCodes.VALIDATION_INVALID,
+        "無効な位置が指定されています",
+        400,
+        { requestId }
       );
     }
 
     if (!font || !VALID_FONTS.includes(font)) {
-      return NextResponse.json(
-        { error: "無効なフォントが指定されています" },
-        { status: 400 }
+      return errorResponse(
+        ErrorCodes.VALIDATION_INVALID,
+        "無効なフォントが指定されています",
+        400,
+        { requestId }
       );
     }
 
     if (!color || !VALID_COLORS.includes(color)) {
-      return NextResponse.json(
-        { error: "無効なカラーが指定されています" },
-        { status: 400 }
+      return errorResponse(
+        ErrorCodes.VALIDATION_INVALID,
+        "無効なカラーが指定されています",
+        400,
+        { requestId }
       );
     }
 
     if (!size || !VALID_SIZES.includes(size)) {
-      return NextResponse.json(
-        { error: "無効なサイズが指定されています" },
-        { status: 400 }
+      return errorResponse(
+        ErrorCodes.VALIDATION_INVALID,
+        "無効なサイズが指定されています",
+        400,
+        { requestId }
       );
     }
 
     if (!output || !VALID_OUTPUT_FORMATS.includes(output)) {
-      return NextResponse.json(
-        { error: "無効な出力形式が指定されています" },
-        { status: 400 }
+      return errorResponse(
+        ErrorCodes.VALIDATION_INVALID,
+        "無効な出力形式が指定されています",
+        400,
+        { requestId }
       );
     }
 
@@ -164,7 +198,8 @@ export async function POST(request: NextRequest) {
         output,
         requestId,
       }),
-      PROCESS_TIMEOUT_MS
+      PROCESS_TIMEOUT_MS,
+      requestId
     );
 
     // 画像を返す（Content-Lengthヘッダーを含む）
@@ -179,20 +214,12 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    // タイムアウトエラーの場合は専用メッセージを返す
-    if (error instanceof Error && error.message === "処理がタイムアウトしました") {
-      console.error(`[generate] rid=${requestId} TIMEOUT: exceeded ${PROCESS_TIMEOUT_MS}ms`);
-      return NextResponse.json(
-        { error: "画像の処理に時間がかかりすぎました。画像サイズを小さくして再試行してください" },
-        { status: 504 }
-      );
+    // 画像処理エラー（ステージ別）
+    if (error instanceof ImageProcessError) {
+      console.error(`[generate] rid=${requestId} IMAGE_PROCESS_ERROR: stage=${error.stage}, message=${error.message}`);
+      return handleImageProcessError(error);
     }
 
-    console.error(`[generate] rid=${requestId} ERROR:`, error);
-
-    return NextResponse.json(
-      { error: "画像の生成に失敗しました" },
-      { status: 500 }
-    );
+    return handleUnknownError(error, requestId);
   }
 }

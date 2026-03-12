@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import prisma from "@/lib/db";
+import { ErrorCodes, errorResponse, handleUnknownError } from "@/lib/errors";
 
 export async function GET(
   request: NextRequest,
@@ -24,9 +25,10 @@ export async function GET(
     });
 
     if (!image) {
-      return NextResponse.json(
-        { error: "画像が見つかりません" },
-        { status: 404 }
+      return errorResponse(
+        ErrorCodes.NOT_FOUND,
+        "画像が見つかりません",
+        404
       );
     }
 
@@ -60,6 +62,7 @@ export async function GET(
     });
 
     return NextResponse.json({
+      success: true,
       favoriteCount: image.favoriteCount,
       isFavorited,
       recentFavoriters: recentFavoriters.map((f) => ({
@@ -68,11 +71,7 @@ export async function GET(
       })),
     });
   } catch (error) {
-    console.error("Failed to get favorite status:", error);
-    return NextResponse.json(
-      { error: "お気に入り状態の取得に失敗しました" },
-      { status: 500 }
-    );
+    return handleUnknownError(error);
   }
 }
 
@@ -84,7 +83,12 @@ export async function POST(
     const currentUser = await getCurrentUser();
 
     if (!currentUser) {
-      return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+      return errorResponse(
+        ErrorCodes.AUTH_REQUIRED,
+        "認証が必要です",
+        401,
+        { suggestion: "ログインしてください" }
+      );
     }
 
     const { id: imageId } = await params;
@@ -95,9 +99,10 @@ export async function POST(
     });
 
     if (!image) {
-      return NextResponse.json(
-        { error: "画像が見つかりません" },
-        { status: 404 }
+      return errorResponse(
+        ErrorCodes.NOT_FOUND,
+        "画像が見つかりません",
+        404
       );
     }
 
@@ -112,9 +117,10 @@ export async function POST(
     });
 
     if (existingFavorite) {
-      return NextResponse.json(
-        { error: "既にお気に入り登録済みです" },
-        { status: 409 }
+      return errorResponse(
+        ErrorCodes.CONFLICT,
+        "既にお気に入り登録済みです",
+        409
       );
     }
 
@@ -142,11 +148,7 @@ export async function POST(
       isFavorited: true,
     });
   } catch (error) {
-    console.error("Failed to add favorite:", error);
-    return NextResponse.json(
-      { error: "お気に入り登録に失敗しました" },
-      { status: 500 }
-    );
+    return handleUnknownError(error);
   }
 }
 
@@ -158,7 +160,12 @@ export async function DELETE(
     const currentUser = await getCurrentUser();
 
     if (!currentUser) {
-      return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+      return errorResponse(
+        ErrorCodes.AUTH_REQUIRED,
+        "認証が必要です",
+        401,
+        { suggestion: "ログインしてください" }
+      );
     }
 
     const { id: imageId } = await params;
@@ -174,9 +181,10 @@ export async function DELETE(
     });
 
     if (!favorite) {
-      return NextResponse.json(
-        { error: "お気に入り登録されていません" },
-        { status: 404 }
+      return errorResponse(
+        ErrorCodes.NOT_FOUND,
+        "お気に入り登録されていません",
+        404
       );
     }
 
@@ -206,10 +214,6 @@ export async function DELETE(
       isFavorited: false,
     });
   } catch (error) {
-    console.error("Failed to remove favorite:", error);
-    return NextResponse.json(
-      { error: "お気に入り解除に失敗しました" },
-      { status: 500 }
-    );
+    return handleUnknownError(error);
   }
 }

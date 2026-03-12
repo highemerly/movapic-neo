@@ -18,6 +18,7 @@ import {
   OUTPUT_CONFIG,
   OutputFormat,
 } from "@/types";
+import { parseApiError, formatErrorMessage, type ParsedApiError } from "@/lib/errors";
 
 // 出力形式の表示名
 const OUTPUT_LABELS: Record<OutputFormat, string> = {
@@ -66,7 +67,7 @@ export default function CreatePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [loadingTime, setLoadingTime] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ParsedApiError | null>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
   const [lastGeneratedState, setLastGeneratedState] =
     useState<GenerateFormState | null>(null);
@@ -149,13 +150,13 @@ export default function CreatePage() {
 
   const handleGenerate = async () => {
     if (!formState.imageFile) {
-      setError("画像を選択してください");
+      setError({ message: "画像を選択してください" });
       return;
     }
 
     const trimmedText = formState.text.trim();
     if (!trimmedText) {
-      setError("テキストを入力してください");
+      setError({ message: "テキストを入力してください" });
       return;
     }
 
@@ -184,16 +185,9 @@ export default function CreatePage() {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        // 504 Gateway Timeout の場合
-        if (response.status === 504) {
-          throw new Error("サーバーでの処理がタイムアウトしました。画像サイズを小さくして再試行してください");
-        }
-        try {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "画像の生成に失敗しました");
-        } catch {
-          throw new Error("画像の生成に失敗しました");
-        }
+        const parsedError = await parseApiError(response);
+        setError(parsedError);
+        return;
       }
 
       const blob = await response.blob();
@@ -234,9 +228,12 @@ export default function CreatePage() {
       document.body.scrollTop = 0;
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
-        setError("リクエストがタイムアウトしました。画像サイズを小さくして再試行してください");
+        setError({
+          message: "リクエストがタイムアウトしました",
+          suggestion: "画像サイズを小さくして再試行してください",
+        });
       } else {
-        setError(err instanceof Error ? err.message : "エラーが発生しました");
+        setError({ message: "エラーが発生しました" });
       }
     } finally {
       setIsLoading(false);
@@ -266,11 +263,13 @@ export default function CreatePage() {
         body: formData,
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || "投稿に失敗しました");
+        const parsedError = await parseApiError(response);
+        setError(parsedError);
+        return;
       }
+
+      const data = await response.json();
 
       // 投稿成功後、詳細ページにリダイレクト
       if (data.imagePageUrl) {
@@ -278,8 +277,8 @@ export default function CreatePage() {
       } else {
         router.push("/dashboard");
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "投稿に失敗しました");
+    } catch {
+      setError({ message: "投稿に失敗しました" });
     } finally {
       setIsPosting(false);
     }
@@ -336,8 +335,15 @@ export default function CreatePage() {
 
           {/* エラー表示 */}
           {error && (
-            <div className="rounded-lg bg-destructive/10 p-4 text-center text-destructive">
-              {error}
+            <div className="rounded-lg bg-destructive/10 p-4 text-center">
+              <p className="text-destructive">
+                {formatErrorMessage(error)}
+              </p>
+              {error.supportInfo && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {error.supportInfo}
+                </p>
+              )}
             </div>
           )}
 
