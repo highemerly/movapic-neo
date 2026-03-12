@@ -68,24 +68,24 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
             <img
               src={user.avatarUrl}
               alt={user.displayName || user.username}
-              className="w-20 h-20 rounded-full hover:opacity-80 transition-opacity"
+              className="w-16 h-16 rounded-full hover:opacity-80 transition-opacity"
             />
           </Link>
         )}
         <div>
-          <h1 className="text-2xl font-bold">
+          <h1 className="text-xl font-bold">
             {user.displayName || user.username}
           </h1>
           <a
             href={`https://${user.instance.domain}/@${user.username}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-muted-foreground hover:underline"
+            className="text-sm text-muted-foreground hover:underline"
           >
             @{user.username}@{user.instance.domain}
           </a>
-          <p className="text-sm text-muted-foreground mt-1">
-            {images.length}枚の画像
+          <p className="text-xs text-muted-foreground mt-1">
+            {user.createdAt.toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}に登録 · {images.length}枚の画像
           </p>
         </div>
       </div>
