@@ -5,6 +5,7 @@ interface ThumbnailImageProps {
   alt: string;
   position?: string;
   className?: string;
+  loading?: "lazy" | "eager";
 }
 
 // 文字位置に応じたobject-positionとtransform-originを返す
@@ -29,6 +30,7 @@ export function ThumbnailImage({
   alt,
   position = "top",
   className = "",
+  loading = "lazy",
 }: ThumbnailImageProps) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -36,7 +38,7 @@ export function ThumbnailImage({
       src={src}
       alt={alt}
       className={`w-full h-auto aspect-square object-cover scale-[1.15] ${getPositionClasses(position)} ${className}`}
-      loading="lazy"
+      loading={loading}
     />
   );
 }

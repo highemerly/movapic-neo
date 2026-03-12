@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import prisma from "@/lib/db";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { Button } from "@/components/ui/button";
+import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
 
 export const dynamic = "force-dynamic";
 
@@ -70,10 +71,10 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="container mx-auto max-w-2xl px-4 py-12">
+      <main className="container mx-auto max-w-2xl px-4 py-6">
         {/* ヘッダー */}
-        <div className="text-center mb-12">
-          <h1 className="text-3xl font-bold mb-8">写真に文字を合成するやつ（仮）</h1>
+        <div className="text-center mb-6">
+          <h1 className="text-xl font-bold mb-4">写真に文字を合成するやつ（仮）</h1>
 
           {/* ログインボタン */}
           <div className="max-w-xs mx-auto">
@@ -83,8 +84,8 @@ export default async function HomePage() {
 
         {/* フィーチャー画像 */}
         {featuredImages.length > 0 && (
-          <div className="mt-16">
-            <h2 className="text-lg font-semibold text-center mb-6">
+          <div className="mt-6">
+            <h2 className="text-sm font-semibold text-center mb-4 text-muted-foreground">
               みんなの作品
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -92,17 +93,14 @@ export default async function HomePage() {
                 <Link
                   key={image.id}
                   href={`/u/${image.user.username}/status/${image.id}`}
-                  className="block"
+                  className="block bg-muted rounded-lg overflow-hidden"
                 >
-                  <div className="bg-muted rounded-lg overflow-hidden aspect-square">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`${publicUrl}/${image.storageKey}`}
-                      alt={image.overlayText}
-                      className="w-full h-full object-cover hover:opacity-90 transition-opacity"
-                      loading="lazy"
-                    />
-                  </div>
+                  <ThumbnailImage
+                    src={`${publicUrl}/${image.storageKey}`}
+                    alt={image.overlayText}
+                    loading="eager"
+                    className="hover:opacity-90 transition-opacity"
+                  />
                 </Link>
               ))}
             </div>
@@ -115,10 +113,18 @@ export default async function HomePage() {
         )}
 
         {/* フッター */}
-        <footer className="mt-16 pt-8 border-t text-center text-sm text-muted-foreground">
+        <footer className="mt-16 pt-8 border-t text-center text-sm text-muted-foreground flex justify-center gap-4">
           <Link href="/license" className="hover:underline">
             フォントライセンス
           </Link>
+          <a
+            href="https://handon.club/@highemerly"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:underline"
+          >
+            問い合わせ先
+          </a>
         </footer>
       </main>
     </div>
