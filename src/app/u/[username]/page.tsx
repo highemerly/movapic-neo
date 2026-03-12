@@ -50,6 +50,7 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
       height: true,
       overlayText: true,
       position: true,
+      favoriteCount: true,
       createdAt: true,
     },
   });

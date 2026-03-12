@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
 import { FavoriteOverlay } from "@/components/favorite/FavoriteOverlay";
 
-interface TimelineImage {
+interface FavoriteImage {
   id: string;
   storageKey: string;
   width: number;
@@ -14,6 +14,7 @@ interface TimelineImage {
   position: string;
   favoriteCount: number;
   createdAt: string;
+  favoritedAt: string;
   user: {
     username: string;
     displayName: string | null;
@@ -22,20 +23,20 @@ interface TimelineImage {
   };
 }
 
-interface PublicTimelineClientProps {
-  initialImages: TimelineImage[];
+interface FavoritesClientProps {
+  initialImages: FavoriteImage[];
   publicUrl: string;
+  initialCursor: string | null;
 }
 
-export function PublicTimelineClient({
+export function FavoritesClient({
   initialImages,
   publicUrl,
-}: PublicTimelineClientProps) {
+  initialCursor,
+}: FavoritesClientProps) {
   const [images, setImages] = useState(initialImages);
   const [isLoading, setIsLoading] = useState(false);
-  const [nextCursor, setNextCursor] = useState<string | null>(
-    initialImages.length >= 20 ? initialImages[initialImages.length - 1]?.id : null
-  );
+  const [nextCursor, setNextCursor] = useState<string | null>(initialCursor);
   const loaderRef = useRef<HTMLDivElement>(null);
 
   const loadMore = useCallback(async () => {
@@ -44,7 +45,7 @@ export function PublicTimelineClient({
     setIsLoading(true);
     try {
       const response = await fetch(
-        `/api/v1/public/timeline?cursor=${nextCursor}&limit=20`
+        `/api/v1/favorites?cursor=${nextCursor}&limit=20`
       );
       if (!response.ok) throw new Error("Failed to load more");
 
@@ -78,7 +79,7 @@ export function PublicTimelineClient({
   if (images.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
-        まだ画像が投稿されていません
+        まだお気に入りに登録した画像がありません
       </div>
     );
   }
@@ -87,7 +88,11 @@ export function PublicTimelineClient({
     <div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1">
         {images.map((image) => (
-          <TimelineImageCard key={image.id} image={image} publicUrl={publicUrl} />
+          <FavoriteImageCard
+            key={image.id}
+            image={image}
+            publicUrl={publicUrl}
+          />
         ))}
       </div>
 
@@ -97,26 +102,30 @@ export function PublicTimelineClient({
           <span className="text-muted-foreground">読み込み中...</span>
         )}
         {!nextCursor && images.length > 0 && (
-          <span className="text-muted-foreground text-sm">すべての画像を表示しました</span>
+          <span className="text-muted-foreground text-sm">
+            すべてのお気に入りを表示しました
+          </span>
         )}
       </div>
     </div>
   );
 }
 
-function TimelineImageCard({
+function FavoriteImageCard({
   image,
   publicUrl,
 }: {
-  image: TimelineImage;
+  image: FavoriteImage;
   publicUrl: string;
 }) {
   const imageUrl = `${publicUrl}/${image.storageKey}`;
-
   const detailUrl = `/u/${image.user.username}/status/${image.id}`;
 
   return (
-    <Link href={detailUrl} className="block relative rounded-lg overflow-hidden group">
+    <Link
+      href={detailUrl}
+      className="block relative rounded-lg overflow-hidden group"
+    >
       <ThumbnailImage
         src={imageUrl}
         alt={image.overlayText}

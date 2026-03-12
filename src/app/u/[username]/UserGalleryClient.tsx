@@ -10,6 +10,7 @@ interface GalleryImage {
   height: number;
   overlayText: string;
   position: string;
+  favoriteCount: number;
   createdAt: string;
 }
 

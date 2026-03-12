@@ -11,6 +11,7 @@
 - `/u/[username]` → **ユーザーページ**
 - `/u/[username]/status/[imageId]` → **画像ページ**
 - `/public` → **公開タイムライン**
+- `/favorite` → **お気に入りページ**（ログインユーザーのみ）
 - `/license` → **ライセンスページ**
 
 ## 技術スタック
@@ -102,6 +103,20 @@
 - 件名からオプション解析（例: "上 赤 大"）、本文がテキスト、添付が画像
 - 出力形式はユーザーの連携インスタンス（Mastodon/Misskey）で自動決定
 - 生成画像はR2にアップロード、メタデータはDBに保存（source: "email"）
+
+### GET/POST/DELETE /api/v1/images/[id]/favorite
+- **GET**: お気に入り状態取得（認証不要）
+  - レスポンス: `{ favoriteCount, isFavorited, recentFavoriters[] }`
+- **POST**: お気に入り登録（認証必須）
+  - レスポンス: `{ success, favoriteCount, isFavorited: true }`
+- **DELETE**: お気に入り解除（認証必須）
+  - レスポンス: `{ success, favoriteCount, isFavorited: false }`
+
+### GET /api/v1/favorites
+- **認証**: 必須
+- **パラメータ**: cursor, limit
+- **レスポンス**: `{ images[], nextCursor, hasMore }`
+- 自分がお気に入り登録した画像一覧を最新順で取得
 
 ## メール投稿機能
 - **Cloudflare Email Worker** (`workers/email-forwarder/`): メールを受信しraw dataをAPIへ転送

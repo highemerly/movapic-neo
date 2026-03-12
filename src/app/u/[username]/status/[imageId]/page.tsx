@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { DeleteButton } from "./DeleteButton";
 import { ImageNavigation } from "./ImageNavigation";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { FavoriteButton } from "@/components/favorite/FavoriteButton";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,35 @@ export default async function ImageDetailPage({ params }: PageProps) {
   if (image.user.username !== username) {
     notFound();
   }
+
+  // お気に入り状態を取得
+  const [isFavorited, recentFavoriters] = await Promise.all([
+    currentUser
+      ? prisma.favorite
+          .findUnique({
+            where: {
+              userId_imageId: {
+                userId: currentUser.id,
+                imageId: image.id,
+              },
+            },
+          })
+          .then((f) => !!f)
+      : Promise.resolve(false),
+    prisma.favorite.findMany({
+      where: { imageId: image.id },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: {
+        user: {
+          select: {
+            username: true,
+            displayName: true,
+          },
+        },
+      },
+    }),
+  ]);
 
   // 前後の画像を取得（同じユーザーの公開画像のみ）
   const [prevImage, nextImage] = await Promise.all([
@@ -146,6 +176,20 @@ export default async function ImageDetailPage({ params }: PageProps) {
               timeZone: "Asia/Tokyo",
             })}
           </p>
+        </div>
+
+        {/* お気に入りボタン */}
+        <div className="mt-4">
+          <FavoriteButton
+            imageId={imageId}
+            initialCount={image.favoriteCount}
+            initialIsFavorited={isFavorited}
+            recentFavoriters={recentFavoriters.map((f) => ({
+              username: f.user.username,
+              displayName: f.user.displayName,
+            }))}
+            isLoggedIn={!!currentUser}
+          />
         </div>
 
         {/* 削除ボタン（自分の画像のみ） */}

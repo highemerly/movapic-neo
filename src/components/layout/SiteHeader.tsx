@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Menu, ImagePlus, Images, Globe, Settings } from "lucide-react";
+import { Menu, ImagePlus, Images, Globe, Settings, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -47,6 +47,14 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
                   <Link href={`/u/${user.username}`} className="flex items-center gap-2 cursor-pointer">
                     <Images className="h-4 w-4" />
                     自分の投稿を確認
+                  </Link>
+                </DropdownMenuItem>
+              )}
+              {user && (
+                <DropdownMenuItem asChild>
+                  <Link href="/favorite" className="flex items-center gap-2 cursor-pointer">
+                    <Heart className="h-4 w-4" />
+                    お気に入り
                   </Link>
                 </DropdownMenuItem>
               )}

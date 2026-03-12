@@ -21,6 +21,7 @@ export default async function PublicTimelinePage() {
       height: true,
       overlayText: true,
       position: true,
+      favoriteCount: true,
       createdAt: true,
       user: {
         select: {
@@ -53,6 +54,7 @@ export default async function PublicTimelinePage() {
             height: img.height,
             overlayText: img.overlayText,
             position: img.position,
+            favoriteCount: img.favoriteCount,
             createdAt: img.createdAt.toISOString(),
             user: {
               username: img.user.username,

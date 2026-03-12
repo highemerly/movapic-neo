@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ThumbnailImage } from "./ThumbnailImage";
+import { FavoriteOverlay } from "@/components/favorite/FavoriteOverlay";
 
 interface ImageCardProps {
   image: {
@@ -12,6 +13,7 @@ interface ImageCardProps {
     height: number;
     overlayText: string;
     position: string;
+    favoriteCount?: number;
     createdAt: string;
   };
   publicUrl: string;
@@ -56,6 +58,10 @@ export function ImageCard({ image, publicUrl, username, showDelete, onDelete }: 
         >
           {isDeleting ? "..." : "×"}
         </button>
+      )}
+      {/* お気に入り数オーバーレイ */}
+      {image.favoriteCount !== undefined && (
+        <FavoriteOverlay count={image.favoriteCount} />
       )}
     </div>
   );

@@ -55,6 +55,8 @@ export async function GET(
         width: true,
         height: true,
         overlayText: true,
+        position: true,
+        favoriteCount: true,
         createdAt: true,
       },
     });

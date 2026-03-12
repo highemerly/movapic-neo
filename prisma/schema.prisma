@@ -38,8 +38,9 @@ model User {
   updatedAt    DateTime  @updatedAt @map("updated_at")
   lastLoginAt  DateTime? @map("last_login_at")
 
-  instance Instance @relation(fields: [instanceId], references: [id])
-  images   Image[]
+  instance  Instance   @relation(fields: [instanceId], references: [id])
+  images    Image[]
+  favorites Favorite[]
 
   @@unique([instanceId, remoteId])
   @@unique([instanceId, username])
@@ -48,27 +49,45 @@ model User {
 
 // 画像
 model Image {
-  id           String   @id @default(uuid())
-  userId       String   @map("user_id")
-  storageKey   String   @unique @map("storage_key") @db.VarChar(500)
-  filename     String   @db.VarChar(255)
-  mimeType     String   @map("mime_type") @db.VarChar(100)
-  fileSize     Int      @map("file_size")
-  width        Int
-  height       Int
-  overlayText  String   @map("overlay_text") @db.Text
-  position     String   @db.VarChar(20)
-  font         String   @db.VarChar(50)
-  color        String   @db.VarChar(20)
-  size         String   @db.VarChar(20)
-  outputFormat String   @map("output_format") @db.VarChar(20)
-  source       String   @default("web") @db.VarChar(20) // "web" | "email"
-  isPublic     Boolean  @default(true) @map("is_public")
-  createdAt    DateTime @default(now()) @map("created_at")
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  storageKey    String   @unique @map("storage_key") @db.VarChar(500)
+  filename      String   @db.VarChar(255)
+  mimeType      String   @map("mime_type") @db.VarChar(100)
+  fileSize      Int      @map("file_size")
+  width         Int
+  height        Int
+  overlayText   String   @map("overlay_text") @db.Text
+  position      String   @db.VarChar(20)
+  font          String   @db.VarChar(50)
+  color         String   @db.VarChar(20)
+  size          String   @db.VarChar(20)
+  outputFormat  String   @map("output_format") @db.VarChar(20)
+  source        String   @default("web") @db.VarChar(20) // "web" | "email"
+  isPublic      Boolean  @default(true) @map("is_public")
+  favoriteCount Int      @default(0) @map("favorite_count")
+  createdAt     DateTime @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  favorites Favorite[]
 
   @@index([userId, createdAt])
   @@index([isPublic, createdAt])
   @@map("images")
+}
+
+// お気に入り
+model Favorite {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  imageId   String   @map("image_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  image Image @relation(fields: [imageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, imageId])
+  @@index([userId, createdAt])
+  @@index([imageId])
+  @@map("favorites")
 }
