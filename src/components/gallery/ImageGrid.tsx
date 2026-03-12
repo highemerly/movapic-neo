@@ -9,6 +9,7 @@ interface ImageGridProps {
     width: number;
     height: number;
     overlayText: string;
+    position: string;
     createdAt: string;
   }>;
   publicUrl: string;

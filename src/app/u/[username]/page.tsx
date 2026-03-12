@@ -49,6 +49,7 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
       width: true,
       height: true,
       overlayText: true,
+      position: true,
       createdAt: true,
     },
   });

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
 
 interface TimelineImage {
   id: string;
@@ -18,22 +19,6 @@ interface TimelineImage {
     avatarUrl: string | null;
     instance: string;
   };
-}
-
-// 文字位置に応じたobject-positionを返す
-function getObjectPosition(position: string): string {
-  switch (position) {
-    case "top":
-      return "object-top";
-    case "bottom":
-      return "object-bottom";
-    case "left":
-      return "object-left";
-    case "right":
-      return "object-right";
-    default:
-      return "object-center";
-  }
 }
 
 interface PublicTimelineClientProps {
@@ -111,12 +96,11 @@ function TimelineImageCard({
 
   return (
     <Link href={detailUrl} className="block relative rounded-lg overflow-hidden group">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <ThumbnailImage
         src={imageUrl}
         alt={image.overlayText}
-        className={`w-full h-auto aspect-[4/3] object-cover group-hover:opacity-90 transition-opacity ${getObjectPosition(image.position)}`}
-        loading="lazy"
+        position={image.position}
+        className="group-hover:opacity-90 transition-opacity"
       />
       {/* 投稿者オーバーレイ */}
       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 pt-4 flex items-center gap-1.5">

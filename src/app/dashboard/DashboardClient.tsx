@@ -9,6 +9,7 @@ interface Image {
   width: number;
   height: number;
   overlayText: string;
+  position: string;
   createdAt: string;
 }
 

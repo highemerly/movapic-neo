@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ThumbnailImage } from "./ThumbnailImage";
 
 interface ImageCardProps {
   image: {
@@ -10,6 +11,7 @@ interface ImageCardProps {
     width: number;
     height: number;
     overlayText: string;
+    position: string;
     createdAt: string;
   };
   publicUrl: string;
@@ -38,12 +40,11 @@ export function ImageCard({ image, publicUrl, username, showDelete, onDelete }: 
   return (
     <div className="group relative bg-muted rounded-lg overflow-hidden">
       <Link href={detailUrl} target={username ? undefined : "_blank"} rel={username ? undefined : "noopener noreferrer"} className="block">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <ThumbnailImage
           src={imageUrl}
           alt={image.overlayText}
-          className="w-full h-auto aspect-square object-cover group-hover:opacity-90 transition-opacity"
-          loading="lazy"
+          position={image.position}
+          className="group-hover:opacity-90 transition-opacity"
         />
       </Link>
       {showDelete && onDelete && (
