@@ -285,9 +285,11 @@ async function applyOutputFormat(
   }
 
   // AVIF出力
+  // effort: 0-9 (default 4), 低いほど高速だが圧縮率が下がる
+  // 大きな画像のエンコードが遅いため、effort: 2 で高速化
   if (format === "avif") {
-    // 初回出力（quality 80）
-    let result = await image.avif({ quality: 80 }).toBuffer();
+    // 初回出力（quality 80, effort 2で高速化）
+    let result = await image.avif({ quality: 80, effort: 2 }).toBuffer();
 
     // ファイルサイズがmaxFileSizeを超える場合は圧縮
     if (result.length > maxFileSize) {
@@ -298,7 +300,7 @@ async function applyOutputFormat(
             height >= width ? Math.min(height, maxSize) : null,
             { withoutEnlargement: true }
           )
-          .avif({ quality })
+          .avif({ quality, effort: 2 })
           .toBuffer();
 
         if (result.length <= maxFileSize) {
@@ -378,14 +380,14 @@ export async function processImage({
   if (usedFallback) {
     console.log(`[imageProcessor] rid=${rid} FALLBACK_SUCCESS: jpeg-js workaround applied`);
   }
+  const rotateTime = Date.now() - startTime;
   const rotatedImage = sharp(rotatedBuffer);
   const metadata = await rotatedImage.metadata();
 
   const width = metadata.width || 800;
   const height = metadata.height || 600;
-  const sharpReadTime = Date.now() - startTime;
 
-  console.log(`[imageProcessor] rid=${rid} SHARP_READ: ${sharpReadTime}ms, format=${metadata.format}, size=${width}x${height}`);
+  console.log(`[imageProcessor] rid=${rid} ROTATE: ${rotateTime}ms, format=${metadata.format}, size=${width}x${height}`);
 
   const fontSize = calculateFontSize(width, height, position, size);
   const textColor = COLORS[color];
