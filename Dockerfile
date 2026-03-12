@@ -10,8 +10,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 # Rebuild sharp from source with system libvips (HEIC support)
-RUN npm ci
-RUN npm rebuild sharp
+RUN npm ci && npm rebuild sharp
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -35,8 +34,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # libheif alone is NOT enough - need libde265 for HEVC decoding (used by most HEIC files)
 RUN apk add --no-cache vips libheif libde265
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/fonts ./fonts
