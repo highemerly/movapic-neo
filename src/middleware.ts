@@ -28,7 +28,7 @@ export function middleware(request: NextRequest) {
   // Content-Security-Policy
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Next.jsで必要
+    "script-src 'self' 'unsafe-inline'", // Next.js App Routerではunsafe-eval不要
     "style-src 'self' 'unsafe-inline'", // Tailwind等で必要
     "img-src 'self' data: blob: https:", // 画像: 外部アバター等を許可
     "font-src 'self'",
