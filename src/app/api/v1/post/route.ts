@@ -92,6 +92,15 @@ export async function POST(request: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
     const imagePageUrl = `${appUrl}/u/${user.username}/status/${imageId}`;
 
+    // localの場合はFediverseに投稿しない（サービス内保存のみ）
+    if (visibility === "local") {
+      return NextResponse.json({
+        success: true,
+        imageId: image.id,
+        imagePageUrl,
+      });
+    }
+
     // アクセストークンを復号化
     const accessToken = decryptToken(user.accessToken);
 

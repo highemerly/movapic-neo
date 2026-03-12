@@ -3,19 +3,15 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 // 公開範囲の型定義
-export type Visibility = "public" | "unlisted";
+export type Visibility = "public" | "unlisted" | "local";
 
 export const VISIBILITY_LABELS: Record<Visibility, string> = {
   public: "公開",
   unlisted: "非収載",
-};
-
-// 投稿ボタンのラベル
-export const VISIBILITY_POST_LABELS: Record<Visibility, string> = {
-  public: "公開投稿",
-  unlisted: "非収載投稿",
+  local: "なし",
 };
 
 interface ActionButtonsProps {
@@ -66,7 +62,7 @@ export function ActionButtons({
     };
   }, [isDropdownOpen]);
 
-  const visibilities: Visibility[] = ["public", "unlisted"];
+  const visibilities: Visibility[] = ["public", "unlisted", "local"];
 
   // 生成ボタンのラベルとdisabled状態
   const generateButtonLabel = isLoading
@@ -81,20 +77,21 @@ export function ActionButtons({
   const postDisabled = !canPost || isLoading || isPosting;
 
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="space-y-2">
+      <div className="grid grid-cols-[4fr_6fr] gap-2">
       {/* 生成ボタン */}
       <Button
         onClick={onGenerate}
         disabled={generateDisabled}
         variant={generateDisabled ? "outline" : "default"}
-        className={generateDisabled ? "text-muted-foreground" : ""}
+        className={`h-14 ${generateDisabled ? "text-muted-foreground" : ""}`}
         size="lg"
       >
         {generateButtonLabel}
       </Button>
 
       {/* 投稿ボタン（ドロップダウン付き） */}
-      <div className="relative" ref={dropdownRef}>
+      <div className="relative h-14" ref={dropdownRef}>
         <div className="flex h-full">
           {/* メイン投稿ボタン */}
           <Button
@@ -104,10 +101,19 @@ export function ActionButtons({
             className={`flex-1 rounded-r-none h-full ${postDisabled ? "text-muted-foreground" : ""}`}
             size="lg"
           >
-            <span className="flex flex-col items-center leading-tight">
-              <span className={`text-xs ${postDisabled ? "" : "opacity-80"}`}>{instanceDomain || "未ログイン"}</span>
-              <span>に{VISIBILITY_POST_LABELS[visibility]}</span>
-            </span>
+            {visibility === "local" ? (
+              <span>投稿</span>
+            ) : (
+              <span className="flex flex-col items-center leading-tight">
+                <span>投稿</span>
+                <span className={`text-xs ${postDisabled ? "" : "opacity-80"}`}>
+                  ＋{instanceDomain || "未ログイン"}にも
+                </span>
+                <span className={`text-xs ${postDisabled ? "" : "opacity-80"}`}>
+                  同時投稿（{VISIBILITY_LABELS[visibility]}）
+                </span>
+              </span>
+            )}
           </Button>
 
           {/* ドロップダウントリガー */}
@@ -160,6 +166,10 @@ export function ActionButtons({
           </div>
         )}
       </div>
+      </div>
+      <p className="text-xs text-muted-foreground text-center">
+        すべての投稿は<Link href="/public" className="underline hover:text-foreground">公開タイムライン</Link>に表示されます
+      </p>
     </div>
   );
 }

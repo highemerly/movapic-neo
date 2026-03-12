@@ -80,6 +80,18 @@
 - **レスポンスヘッダー**: Content-Type, Content-Length, Content-Disposition, Cache-Control
 - **エラーレスポンス**: 400(バリデーション) / 429(レート制限) / 504(タイムアウト) / 500(その他)
 
+### POST /api/v1/post
+- **Content-Type**: multipart/form-data
+- **認証**: 必須（JWTセッション）
+- **パラメータ**:
+  - image: Blob（生成済み画像）
+  - text: string
+  - position / font / color / size / output: 生成オプション
+  - mimeType: string
+  - visibility: "public" | "unlisted" | "local"
+- **処理**: R2アップロード → DB保存 → Fediverse投稿（localの場合はスキップ）
+- **レスポンス**: `{ success, imageId, imagePageUrl, postUrl? }`
+
 ### POST /api/v1/email-generate（内部API）
 - Cloudflare Email Workerから転送されたraw emailを処理
 - `X-API-Key`ヘッダーで認証、`X-Email-Prefix`でユーザー特定
@@ -95,6 +107,18 @@
   - 色: 白/赤/青/緑/黄/茶/桃/橙
   - サイズ: 小/中/大
   - フォント: ふい字/ゴシック/ラノベ
+
+## 公開範囲（Visibility）
+投稿時に選択可能な公開範囲：
+
+| 値 | 表示名 | Fediverse投稿 | サービス保存 | 公開TL表示 |
+|----|--------|---------------|--------------|------------|
+| `public` | 公開 | 公開投稿 | ✅ | ✅ |
+| `unlisted` | 非収載 | 非収載投稿（Misskey: home） | ✅ | ✅ |
+| `local` | このサービスのみ | ❌ | ✅ | ✅ |
+
+- Mastodon: `public` / `unlisted` をそのまま使用
+- Misskey: `unlisted` → `home` に変換（Misskeyの「ホーム」が非収載相当）
 
 ## Fediverse認証
 - **対応プラットフォーム**: Mastodon（OAuth 2.0）/ Misskey（MiAuth）
