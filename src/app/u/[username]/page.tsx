@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
-import { ImageGrid } from "@/components/gallery/ImageGrid";
+import { UserGalleryClient } from "./UserGalleryClient";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +42,7 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
       isPublic: true,
     },
     orderBy: { createdAt: "desc" },
-    take: 50,
+    take: 20,
     select: {
       id: true,
       storageKey: true,
@@ -91,8 +91,8 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
       </div>
 
       {/* 画像一覧 */}
-      <ImageGrid
-        images={images.map((img: typeof images[number]) => ({
+      <UserGalleryClient
+        initialImages={images.map((img: typeof images[number]) => ({
           ...img,
           createdAt: img.createdAt.toISOString(),
         }))}
