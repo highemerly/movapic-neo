@@ -310,7 +310,7 @@ export default function CreatePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      <SiteHeader user={user ? { username: user.username } : null} />
       <main className="container mx-auto max-w-md px-4 py-8">
         <div className="space-y-6">
           {/* 画像エリア */}

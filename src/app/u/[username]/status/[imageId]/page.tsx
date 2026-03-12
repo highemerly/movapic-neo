@@ -76,7 +76,7 @@ export default async function ImageDetailPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
       <main className="container mx-auto max-w-2xl px-4 py-8">
         {/* ヘッダー */}
         <div className="mb-6">
@@ -163,13 +163,6 @@ export default async function ImageDetailPage({ params }: PageProps) {
             nextImage={nextImage}
           />
         </div>
-
-        {/* フッター */}
-        <footer className="mt-12 pt-8 border-t text-center">
-          <Link href="/create">
-            <Button variant="outline">新しい画像を投稿</Button>
-          </Link>
-        </footer>
       </main>
     </div>
   );

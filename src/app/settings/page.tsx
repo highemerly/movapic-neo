@@ -16,7 +16,7 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <SiteHeader />
+      <SiteHeader user={user ? { username: user.username } : null} />
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         <h1 className="text-2xl font-bold mb-8">設定</h1>
 

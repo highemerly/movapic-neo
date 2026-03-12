@@ -16,7 +16,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <SiteHeader />
+      <SiteHeader user={user ? { username: user.username } : null} />
       <div className="container mx-auto px-4 py-8 max-w-6xl">
 
       {/* ユーザー情報 */}

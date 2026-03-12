@@ -1,13 +1,14 @@
-import Link from "next/link";
 import prisma from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth/session";
 import { PublicTimelineClient } from "./PublicTimelineClient";
-import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 
 // 動的レンダリングを強制
 export const dynamic = "force-dynamic";
 
 export default async function PublicTimelinePage() {
+  const currentUser = await getCurrentUser();
+
   // 最新の公開画像を取得
   const images = await prisma.image.findMany({
     where: { isPublic: true },
@@ -40,14 +41,9 @@ export default async function PublicTimelinePage() {
 
   return (
     <>
-      <SiteHeader />
+      <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
       <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold">タイムライン</h1>
-          <Link href="/create">
-            <Button variant="outline" size="sm">新しい画像を投稿</Button>
-          </Link>
-        </div>
+        <h1 className="text-2xl font-bold mb-8">タイムライン</h1>
 
         <PublicTimelineClient
           initialImages={images.map((img: (typeof images)[number]) => ({

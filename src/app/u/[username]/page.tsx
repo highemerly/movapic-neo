@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import prisma from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth/session";
 import { ImageGrid } from "@/components/gallery/ImageGrid";
-import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,7 @@ interface UserGalleryPageProps {
 
 export default async function UserGalleryPage({ params }: UserGalleryPageProps) {
   const { username } = await params;
+  const currentUser = await getCurrentUser();
 
   // @を除去（URLで /@username の形式でアクセスされた場合）
   const cleanUsername = username.startsWith("@") ? username.slice(1) : username;
@@ -56,7 +57,7 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
 
   return (
     <>
-      <SiteHeader />
+      <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
       <div className="container mx-auto px-4 py-8 max-w-6xl">
       {/* ユーザー情報 */}
       <div className="flex items-center gap-4 mb-8">
@@ -97,13 +98,6 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
         publicUrl={publicUrl}
         username={cleanUsername}
       />
-
-      {/* フッター */}
-      <div className="mt-8 text-center">
-        <Link href="/create">
-          <Button variant="outline">新しい画像を投稿</Button>
-        </Link>
-      </div>
     </div>
     </>
   );
