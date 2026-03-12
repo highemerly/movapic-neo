@@ -350,7 +350,8 @@ export async function processImage({
     processableBuffer = await convertHEICtoJPEG(imageBuffer);
   }
 
-  const image = sharp(processableBuffer);
+  // EXIF Orientationに従って自動回転（回転後にOrientationタグは削除される）
+  const image = sharp(processableBuffer).rotate();
   const metadata = await image.metadata();
 
   const width = metadata.width || 800;
