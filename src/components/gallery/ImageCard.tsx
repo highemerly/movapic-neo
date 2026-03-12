@@ -42,12 +42,9 @@ export function ImageCard({ image, publicUrl, username, showDelete, onDelete }: 
         <img
           src={imageUrl}
           alt={image.overlayText}
-          className="w-full h-auto aspect-square object-cover transition-transform group-hover:scale-105"
+          className="w-full h-auto aspect-square object-cover group-hover:opacity-90 transition-opacity"
           loading="lazy"
         />
-        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2 pointer-events-none">
-          <p className="text-white text-sm line-clamp-2">{image.overlayText}</p>
-        </div>
       </Link>
       {showDelete && onDelete && (
         <button

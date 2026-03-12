@@ -81,7 +81,7 @@ export function PublicTimelineClient({
 
   return (
     <div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1">
         {images.map((image) => (
           <TimelineImageCard key={image.id} image={image} publicUrl={publicUrl} />
         ))}
@@ -119,16 +119,16 @@ function TimelineImageCard({
         loading="lazy"
       />
       {/* 投稿者オーバーレイ */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 pt-6 flex items-center gap-2">
+      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 pt-4 flex items-center gap-1.5">
         {image.user.avatarUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={image.user.avatarUrl}
             alt={image.user.displayName || image.user.username}
-            className="w-6 h-6 rounded-full"
+            className="w-5 h-5 rounded-full"
           />
         )}
-        <span className="text-sm text-white truncate">
+        <span className="text-xs text-white truncate">
           {image.user.displayName || image.user.username}
         </span>
       </div>
