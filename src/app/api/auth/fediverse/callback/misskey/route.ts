@@ -100,17 +100,7 @@ export async function GET(request: NextRequest) {
     }
 
     // JWTセッション作成
-    await createSession(
-      {
-        id: user.id,
-        username: user.username,
-        displayName: user.displayName,
-        avatarUrl: user.avatarUrl,
-        emailPrefix: user.emailPrefix,
-        instanceId: user.instanceId,
-      },
-      instance
-    );
+    await createSession(user.id, instance.id);
 
     // リダイレクト
     return NextResponse.redirect(new URL(redirectTo, baseUrl));

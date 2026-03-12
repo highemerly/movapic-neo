@@ -5,7 +5,10 @@
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import prisma from "@/lib/db";
-import type { Instance } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+
+// Prismaから生成されたInstance型を取得
+type Instance = Prisma.InstanceGetPayload<object>;
 
 const SESSION_COOKIE_NAME = "movapic_session";
 const SESSION_DURATION_SECONDS = 7 * 24 * 60 * 60; // 7日
@@ -19,16 +22,10 @@ function getJWTSecret(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
-// JWTペイロードの型定義
+// JWTペイロードの型定義（認証に必要な最小限の情報のみ）
 interface SessionPayload extends JWTPayload {
   userId: string;
-  username: string;
-  displayName: string | null;
-  avatarUrl: string | null;
-  emailPrefix: string;
   instanceId: string;
-  instanceDomain: string;
-  instanceType: string;
 }
 
 // getCurrentUserの戻り値の型
@@ -51,25 +48,12 @@ export type SessionUserWithToken = SessionUser & {
  * JWTを作成してCookieに設定
  */
 export async function createSession(
-  user: {
-    id: string;
-    username: string;
-    displayName: string | null;
-    avatarUrl: string | null;
-    emailPrefix: string;
-    instanceId: string;
-  },
-  instance: Instance
+  userId: string,
+  instanceId: string
 ): Promise<void> {
   const payload: SessionPayload = {
-    userId: user.id,
-    username: user.username,
-    displayName: user.displayName,
-    avatarUrl: user.avatarUrl,
-    emailPrefix: user.emailPrefix,
-    instanceId: user.instanceId,
-    instanceDomain: instance.domain,
-    instanceType: instance.type,
+    userId,
+    instanceId,
   };
 
   const token = await new SignJWT(payload)
@@ -127,7 +111,7 @@ async function getSessionPayload(): Promise<SessionPayload | null> {
 
 /**
  * 現在のユーザーを取得（セッションがない場合はnull）
- * JWTからユーザー情報を復元し、インスタンス情報を含めて返す
+ * JWTからユーザーIDを取得し、DBからユーザー情報を取得して返す
  */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const payload = await getSessionPayload();
@@ -136,24 +120,25 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     return null;
   }
 
-  // インスタンス情報はDBから取得（型の整合性のため）
-  const instance = await prisma.instance.findUnique({
-    where: { id: payload.instanceId },
+  // ユーザーとインスタンスをDBから取得
+  const user = await prisma.user.findUnique({
+    where: { id: payload.userId },
+    include: { instance: true },
   });
 
-  if (!instance) {
-    // インスタンスが削除されている場合はセッション無効
+  if (!user) {
+    // ユーザーが削除されている場合はセッション無効
     return null;
   }
 
   return {
-    id: payload.userId,
-    username: payload.username,
-    displayName: payload.displayName,
-    avatarUrl: payload.avatarUrl,
-    emailPrefix: payload.emailPrefix,
-    instanceId: payload.instanceId,
-    instance,
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+    emailPrefix: user.emailPrefix,
+    instanceId: user.instanceId,
+    instance: user.instance,
   };
 }
 
