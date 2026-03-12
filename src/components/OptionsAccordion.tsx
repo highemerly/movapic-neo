@@ -12,6 +12,8 @@ import {
   POSITION_LABELS,
   FONT_LABELS,
   COLORS,
+  STROKE_COLORS,
+  COLOR_LABELS,
   DEFAULT_POSITION,
   DEFAULT_FONT,
   DEFAULT_COLOR,
@@ -205,9 +207,19 @@ export function OptionsAccordion({
               disabled={disabled}
               renderOption={(c) => (
                 <span
-                  className="block h-5 w-5 mx-auto rounded-full border border-gray-300 shadow-sm"
-                  style={{ backgroundColor: COLORS[c] }}
-                />
+                  className="text-base font-bold"
+                  style={{
+                    color: COLORS[c],
+                    textShadow: `
+                      -1px -1px 0 ${STROKE_COLORS[c]},
+                       1px -1px 0 ${STROKE_COLORS[c]},
+                      -1px  1px 0 ${STROKE_COLORS[c]},
+                       1px  1px 0 ${STROKE_COLORS[c]}
+                    `,
+                  }}
+                >
+                  {COLOR_LABELS[c]}
+                </span>
               )}
             />
           </div>
