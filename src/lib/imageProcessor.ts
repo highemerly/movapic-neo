@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import * as jpeg from "jpeg-js";
 import path from "path";
 import { Canvas, FontLibrary, CanvasRenderingContext2D } from "skia-canvas";
 import {
@@ -340,7 +341,43 @@ export async function processImage({
   // EXIF Orientationに従って自動回転（回転後にOrientationタグは削除される）
   // sharpはHEIC/HEIFを直接読み込み可能（libheif経由）
   // rotate()後のメタデータを取得するため、一度バッファに変換してから再度読み込む
-  const rotatedBuffer = await sharp(imageBuffer).rotate().toBuffer();
+  //
+  // iOSのJPEGはMPF（Multi-Picture Format）やDisplay P3カラースペースを含む場合があり、
+  // sharpが処理できないことがある。まずsharpを試し、失敗したらjpeg-jsでフォールバック。
+  let rotatedBuffer: Buffer;
+  let usedFallback = false;
+  try {
+    rotatedBuffer = await sharp(imageBuffer).rotate().toBuffer();
+  } catch (sharpError) {
+    // sharpが失敗した場合、JPEGならjpeg-jsでクリーンアップを試みる
+    const magic = imageBuffer.subarray(0, 2).toString('hex');
+    const isJpeg = magic === 'ffd8';
+    if (!isJpeg) {
+      console.error(`[imageProcessor] rid=${rid} SHARP_FAILED (non-JPEG):`, sharpError);
+      throw sharpError; // JPEG以外はそのままエラー
+    }
+    console.log(`[imageProcessor] rid=${rid} SHARP_FAILED (JPEG), trying jpeg-js fallback. Error: ${sharpError instanceof Error ? sharpError.message : sharpError}`);
+    try {
+      // jpeg-jsで純粋なJavaScriptデコード（MPFやICCプロファイルを無視）
+      const decodeStart = Date.now();
+      const rawImageData = jpeg.decode(imageBuffer, { useTArray: true, tolerantDecoding: true });
+      const decodeTime = Date.now() - decodeStart;
+      // 再エンコード（quality 100でほぼ劣化なし）
+      const encodeStart = Date.now();
+      const reencoded = jpeg.encode(rawImageData, 100);
+      const encodeTime = Date.now() - encodeStart;
+      const cleanedBuffer = Buffer.from(reencoded.data);
+      console.log(`[imageProcessor] rid=${rid} JPEG_JS_CLEANED: originalSize=${inputSizeKB}KB, cleanedSize=${Math.round(cleanedBuffer.length / 1024)}KB, decodeTime=${decodeTime}ms, encodeTime=${encodeTime}ms`);
+      rotatedBuffer = await sharp(cleanedBuffer).rotate().toBuffer();
+      usedFallback = true;
+    } catch (jpegError) {
+      console.error(`[imageProcessor] rid=${rid} JPEG_JS_FALLBACK_FAILED:`, jpegError);
+      throw sharpError; // フォールバックも失敗したら元のエラーを投げる
+    }
+  }
+  if (usedFallback) {
+    console.log(`[imageProcessor] rid=${rid} FALLBACK_SUCCESS: jpeg-js workaround applied`);
+  }
   const rotatedImage = sharp(rotatedBuffer);
   const metadata = await rotatedImage.metadata();
 
