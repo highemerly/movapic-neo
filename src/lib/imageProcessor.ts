@@ -36,6 +36,7 @@ interface ProcessImageParams {
   size: Size;
   font: FontFamily;
   output: OutputFormat;
+  requestId?: string;
 }
 
 interface ProcessImageResult {
@@ -328,20 +329,34 @@ export async function processImage({
   size,
   font,
   output,
+  requestId,
 }: ProcessImageParams): Promise<ProcessImageResult> {
+  const startTime = Date.now();
+  const inputSizeKB = Math.round(imageBuffer.length / 1024);
+  const rid = requestId || "unknown";
+
+  const magic = imageBuffer.subarray(0, 4).toString('hex');
+  console.log(`[imageProcessor] rid=${rid} START: inputSize=${inputSizeKB}KB, output=${output}, position=${position}, font=${font}, magic=${magic}`);
+
   // EXIF Orientationに従って自動回転（回転後にOrientationタグは削除される）
   // sharpはHEIC/HEIFを直接読み込み可能（libheif経由）
-  const image = sharp(imageBuffer).rotate();
-  const metadata = await image.metadata();
+  // rotate()後のメタデータを取得するため、一度バッファに変換してから再度読み込む
+  const rotatedBuffer = await sharp(imageBuffer).rotate().toBuffer();
+  const rotatedImage = sharp(rotatedBuffer);
+  const metadata = await rotatedImage.metadata();
 
   const width = metadata.width || 800;
   const height = metadata.height || 600;
+  const sharpReadTime = Date.now() - startTime;
+
+  console.log(`[imageProcessor] rid=${rid} SHARP_READ: ${sharpReadTime}ms, format=${metadata.format}, size=${width}x${height}`);
 
   const fontSize = calculateFontSize(width, height, position, size);
   const textColor = COLORS[color];
   const strokeColor = STROKE_COLORS[color];
 
   // Canvasでテキストオーバーレイを生成
+  const textOverlayStart = Date.now();
   const textOverlay = await createTextOverlay(
     width,
     height,
@@ -352,9 +367,13 @@ export async function processImage({
     textColor,
     strokeColor
   );
+  const textOverlayTime = Date.now() - textOverlayStart;
+
+  console.log(`[imageProcessor] rid=${rid} TEXT_OVERLAY: ${textOverlayTime}ms, fontSize=${fontSize}`);
 
   // 画像にテキストを合成してJPEGで一時出力
-  const composited = await image
+  const compositeStart = Date.now();
+  const composited = await rotatedImage
     .composite([
       {
         input: textOverlay,
@@ -364,9 +383,18 @@ export async function processImage({
     ])
     .jpeg({ quality: 90 })
     .toBuffer();
+  const compositeTime = Date.now() - compositeStart;
+
+  console.log(`[imageProcessor] rid=${rid} COMPOSITE: ${compositeTime}ms, jpegSize=${Math.round(composited.length / 1024)}KB`);
 
   // 出力形式に応じて変換
+  const outputStart = Date.now();
   const result = await applyOutputFormat(composited, output);
+  const outputTime = Date.now() - outputStart;
+
+  const totalTime = Date.now() - startTime;
+  console.log(`[imageProcessor] rid=${rid} OUTPUT_FORMAT: ${outputTime}ms, finalSize=${Math.round(result.buffer.length / 1024)}KB, type=${result.contentType}`);
+  console.log(`[imageProcessor] rid=${rid} DONE: totalTime=${totalTime}ms`);
 
   return result;
 }

@@ -28,7 +28,7 @@ const VALID_SIZES: Size[] = ["small", "medium", "large"];
 const VALID_OUTPUT_FORMATS: OutputFormat[] = ["mastodon", "misskey", "none"];
 
 // 画像処理のタイムアウト（ミリ秒）
-const PROCESS_TIMEOUT_MS = 15000;
+const PROCESS_TIMEOUT_MS = 21000;
 
 /**
  * タイムアウト付きでPromiseを実行する
@@ -58,6 +58,8 @@ export async function POST(request: NextRequest) {
       }
     );
   }
+
+  const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
   try {
     const formData = await request.formData();
@@ -146,6 +148,11 @@ export async function POST(request: NextRequest) {
 
     // 画像処理（タイムアウト付き）
     const imageBuffer = Buffer.from(await image.arrayBuffer());
+    const fileSizeKB = Math.round(imageBuffer.length / 1024);
+    const fileExt = fileName.split('.').pop()?.toLowerCase() || 'unknown';
+
+    console.log(`[generate] rid=${requestId} REQUEST: file=${fileName}, size=${fileSizeKB}KB, ext=${fileExt}, mimeType=${image.type || 'empty'}`);
+
     const result = await withTimeout(
       processImage({
         imageBuffer,
@@ -155,11 +162,13 @@ export async function POST(request: NextRequest) {
         size,
         font,
         output,
+        requestId,
       }),
       PROCESS_TIMEOUT_MS
     );
 
     // 画像を返す（Content-Lengthヘッダーを含む）
+    console.log(`[generate] rid=${requestId} SUCCESS: outputSize=${Math.round(result.buffer.length / 1024)}KB, type=${result.contentType}`);
     return new NextResponse(new Uint8Array(result.buffer), {
       status: 200,
       headers: {
@@ -170,15 +179,16 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Image generation error:", error);
-
     // タイムアウトエラーの場合は専用メッセージを返す
     if (error instanceof Error && error.message === "処理がタイムアウトしました") {
+      console.error(`[generate] rid=${requestId} TIMEOUT: exceeded ${PROCESS_TIMEOUT_MS}ms`);
       return NextResponse.json(
         { error: "画像の処理に時間がかかりすぎました。画像サイズを小さくして再試行してください" },
         { status: 504 }
       );
     }
+
+    console.error(`[generate] rid=${requestId} ERROR:`, error);
 
     return NextResponse.json(
       { error: "画像の生成に失敗しました" },

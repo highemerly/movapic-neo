@@ -173,7 +173,7 @@ export default function CreatePage() {
       formData.append("output", formState.output);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 18000);
+      const timeoutId = setTimeout(() => controller.abort(), 23000);
 
       const response = await fetch("/api/v1/generate", {
         method: "POST",

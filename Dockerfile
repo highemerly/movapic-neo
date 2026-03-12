@@ -3,8 +3,9 @@ FROM node:22-alpine AS base
 # Install dependencies only when needed
 FROM base AS deps
 # libheif with HEVC decoder (libde265) for HEIC support in sharp
+# libheif-hevc is REQUIRED for HEVC-compressed HEIC files (most iPhone photos)
 # python3, make, g++ are needed for node-gyp to build sharp (only in build stage)
-RUN apk add --no-cache libc6-compat vips-dev libheif-dev python3 make g++
+RUN apk add --no-cache libc6-compat vips-dev libheif-dev libde265-dev python3 make g++
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -31,7 +32,8 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Runtime libraries for sharp with HEIC support
-RUN apk add --no-cache vips libheif
+# libheif alone is NOT enough - need libde265 for HEVC decoding (used by most HEIC files)
+RUN apk add --no-cache vips libheif libde265
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
