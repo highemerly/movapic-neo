@@ -335,8 +335,7 @@ export async function processImage({
   const inputSizeKB = Math.round(imageBuffer.length / 1024);
   const rid = requestId || "unknown";
 
-  const magic = imageBuffer.subarray(0, 4).toString('hex');
-  console.log(`[imageProcessor] rid=${rid} START: inputSize=${inputSizeKB}KB, output=${output}, position=${position}, font=${font}, magic=${magic}`);
+  console.log(`[imageProcessor] rid=${rid} START: inputSize=${inputSizeKB}KB, output=${output}, position=${position}, font=${font}`);
 
   // EXIF Orientationに従って自動回転（回転後にOrientationタグは削除される）
   // sharpはHEIC/HEIFを直接読み込み可能（libheif経由）
