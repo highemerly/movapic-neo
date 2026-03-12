@@ -2,11 +2,15 @@ FROM node:22-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+# libheif with HEVC decoder (libde265) for HEIC support in sharp
+# python3, make, g++ are needed for node-gyp to build sharp (only in build stage)
+RUN apk add --no-cache libc6-compat vips-dev libheif-dev python3 make g++
 WORKDIR /app
 
 COPY package.json package-lock.json ./
+# Rebuild sharp from source with system libvips (HEIC support)
 RUN npm ci
+RUN npm rebuild sharp
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -25,6 +29,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Runtime libraries for sharp with HEIC support
+RUN apk add --no-cache vips libheif
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs

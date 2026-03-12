@@ -16,7 +16,7 @@ import prisma from "@/lib/db";
 import { MAX_TEXT_LENGTH, MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from "@/types";
 
 // 処理タイムアウト
-const PROCESS_TIMEOUT_MS = 30000;
+const PROCESS_TIMEOUT_MS = 15000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
@@ -97,8 +97,8 @@ export async function POST(request: NextRequest) {
 
     // ファイルタイプチェック
     const contentType = parsed.image.contentType.toLowerCase();
-    const isHEIC = contentType.includes("heic") || contentType.includes("heif");
-    const isValidType = ALLOWED_FILE_TYPES.some((t) => contentType.includes(t.split("/")[1])) || isHEIC;
+    const isHEICFile = contentType.includes("heic") || contentType.includes("heif");
+    const isValidType = ALLOWED_FILE_TYPES.some((t) => contentType.includes(t.split("/")[1])) || isHEICFile;
 
     if (!isValidType) {
       return NextResponse.json({ error: "Invalid image type" }, { status: 400 });
@@ -117,7 +117,6 @@ export async function POST(request: NextRequest) {
         size: parsed.options.size,
         font: parsed.options.font,
         output: outputFormat,
-        isHEIC,
       }),
       PROCESS_TIMEOUT_MS
     );

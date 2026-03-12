@@ -28,7 +28,7 @@ const VALID_SIZES: Size[] = ["small", "medium", "large"];
 const VALID_OUTPUT_FORMATS: OutputFormat[] = ["mastodon", "misskey", "none"];
 
 // 画像処理のタイムアウト（ミリ秒）
-const PROCESS_TIMEOUT_MS = 30000;
+const PROCESS_TIMEOUT_MS = 15000;
 
 /**
  * タイムアウト付きでPromiseを実行する
@@ -78,8 +78,8 @@ export async function POST(request: NextRequest) {
 
     // HEICファイルはMIMEタイプが空や不正な場合があるので、拡張子でもチェック
     const fileName = image.name.toLowerCase();
-    const isHEIC = fileName.endsWith(".heic") || fileName.endsWith(".heif");
-    const isValidType = ALLOWED_FILE_TYPES.includes(image.type) || isHEIC;
+    const isHEICFile = fileName.endsWith(".heic") || fileName.endsWith(".heif");
+    const isValidType = ALLOWED_FILE_TYPES.includes(image.type) || isHEICFile;
 
     if (!isValidType) {
       return NextResponse.json(
@@ -155,7 +155,6 @@ export async function POST(request: NextRequest) {
         size,
         font,
         output,
-        isHEIC,
       }),
       PROCESS_TIMEOUT_MS
     );

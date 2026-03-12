@@ -173,7 +173,7 @@ export default function CreatePage() {
       formData.append("output", formState.output);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 35000);
+      const timeoutId = setTimeout(() => controller.abort(), 18000);
 
       const response = await fetch("/api/v1/generate", {
         method: "POST",
@@ -184,8 +184,16 @@ export default function CreatePage() {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "画像の生成に失敗しました");
+        // 504 Gateway Timeout の場合
+        if (response.status === 504) {
+          throw new Error("サーバーでの処理がタイムアウトしました。画像サイズを小さくして再試行してください");
+        }
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "画像の生成に失敗しました");
+        } catch {
+          throw new Error("画像の生成に失敗しました");
+        }
       }
 
       const blob = await response.blob();

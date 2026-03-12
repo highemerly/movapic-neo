@@ -36,20 +36,6 @@ interface ProcessImageParams {
   size: Size;
   font: FontFamily;
   output: OutputFormat;
-  isHEIC?: boolean;
-}
-
-/**
- * HEICバッファをJPEGバッファに変換
- */
-async function convertHEICtoJPEG(heicBuffer: Buffer): Promise<Buffer> {
-  const heicConvert = (await import("heic-convert")).default;
-  const outputBuffer = await heicConvert({
-    buffer: heicBuffer,
-    format: "JPEG",
-    quality: 0.92,
-  });
-  return Buffer.from(outputBuffer);
 }
 
 interface ProcessImageResult {
@@ -342,16 +328,10 @@ export async function processImage({
   size,
   font,
   output,
-  isHEIC = false,
 }: ProcessImageParams): Promise<ProcessImageResult> {
-  // HEICの場合は先にJPEGに変換
-  let processableBuffer = imageBuffer;
-  if (isHEIC) {
-    processableBuffer = await convertHEICtoJPEG(imageBuffer);
-  }
-
   // EXIF Orientationに従って自動回転（回転後にOrientationタグは削除される）
-  const image = sharp(processableBuffer).rotate();
+  // sharpはHEIC/HEIFを直接読み込み可能（libheif経由）
+  const image = sharp(imageBuffer).rotate();
   const metadata = await image.metadata();
 
   const width = metadata.width || 800;
