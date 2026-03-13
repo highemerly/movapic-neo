@@ -35,6 +35,16 @@ export interface ParsedMention {
   options: ParsedMentionOptions;
 }
 
+/**
+ * ユーザーのデフォルト設定（DBから取得した値）
+ */
+export interface UserDefaults {
+  position?: string | null;
+  font?: string | null;
+  color?: string | null;
+  size?: string | null;
+}
+
 // オプションのマッピング（email parserと同じ）
 const POSITION_MAP: Record<string, Position> = {
   "上": "top",
@@ -78,7 +88,7 @@ const VISIBILITY_MAP: Record<string, CommandVisibility> = {
   "unlisted": "unlisted",
 };
 
-const DEFAULT_OPTIONS: ParsedMentionOptions = {
+const FALLBACK_OPTIONS: ParsedMentionOptions = {
   position: "top",
   font: "hui-font",
   color: "white",
@@ -87,6 +97,21 @@ const DEFAULT_OPTIONS: ParsedMentionOptions = {
   debug: false,
   keep: false,
 };
+
+/**
+ * ユーザーのデフォルト設定とフォールバック値からデフォルトオプションを構築
+ */
+function buildDefaultOptions(userDefaults?: UserDefaults): ParsedMentionOptions {
+  return {
+    position: (userDefaults?.position as Position) || FALLBACK_OPTIONS.position,
+    font: (userDefaults?.font as FontFamily) || FALLBACK_OPTIONS.font,
+    color: (userDefaults?.color as Color) || FALLBACK_OPTIONS.color,
+    size: (userDefaults?.size as Size) || FALLBACK_OPTIONS.size,
+    arrangement: FALLBACK_OPTIONS.arrangement,
+    debug: FALLBACK_OPTIONS.debug,
+    keep: FALLBACK_OPTIONS.keep,
+  };
+}
 
 // HTMLエンティティのデコード
 const HTML_ENTITIES: Record<string, string> = {
@@ -191,8 +216,9 @@ function parseCommandTokens(commandString: string): Partial<ParsedMentionOptions
  * メンション内容をパース
  * @param html status.content（HTML）
  * @param botAcct Botのアカウント名（@なし）
+ * @param userDefaults ユーザーのデフォルト設定（オプション）
  */
-export function parseMentionContent(html: string, botAcct: string): ParsedMention {
+export function parseMentionContent(html: string, botAcct: string, userDefaults?: UserDefaults): ParsedMention {
   // HTMLタグを除去
   let text = stripHtmlTags(html);
 
@@ -201,7 +227,7 @@ export function parseMentionContent(html: string, botAcct: string): ParsedMentio
 
   // コマンド部分を抽出 [...]
   const commandMatch = text.match(/\[([^\]]*)\]/);
-  let options = { ...DEFAULT_OPTIONS };
+  let options = buildDefaultOptions(userDefaults);
 
   if (commandMatch) {
     const commandOptions = parseCommandTokens(commandMatch[1]);

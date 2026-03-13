@@ -25,6 +25,7 @@ export interface MastodonMediaAttachment {
 
 export interface MastodonStatus {
   id: string;
+  uri: string; // オリジナル投稿のURI (例: https://handon.club/users/username/statuses/123456)
   content: string; // HTML
   visibility: "public" | "unlisted" | "private" | "direct";
   media_attachments: MastodonMediaAttachment[];

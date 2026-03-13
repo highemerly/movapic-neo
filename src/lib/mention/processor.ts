@@ -40,6 +40,12 @@ interface UserWithInstance {
     domain: string;
     type: string;
   };
+  defaults: {
+    position: string | null;
+    font: string | null;
+    color: string | null;
+    size: string | null;
+  };
 }
 
 /**
@@ -100,14 +106,27 @@ async function fetchImage(url: string): Promise<Buffer> {
 }
 
 /**
- * 元投稿を削除（ユーザーのトークンで）
+ * URIからオリジナルのステータスIDを抽出
+ * 例: https://handon.club/users/username/statuses/123456 → 123456
+ */
+function extractStatusIdFromUri(uri: string): string | null {
+  // Mastodon形式: https://instance/users/username/statuses/ID
+  const mastodonMatch = uri.match(/\/statuses\/(\d+)$/);
+  if (mastodonMatch) {
+    return mastodonMatch[1];
+  }
+  return null;
+}
+
+/**
+ * 元投稿を削除（ユーザーのトークンで、ユーザーのインスタンスから）
  */
 async function deleteOriginalStatus(
-  instanceUrl: string,
+  userInstanceDomain: string,
   accessToken: string,
-  statusId: string
+  originalStatusId: string
 ): Promise<void> {
-  const response = await fetch(`https://${instanceUrl}/api/v1/statuses/${statusId}`, {
+  const response = await fetch(`https://${userInstanceDomain}/api/v1/statuses/${originalStatusId}`, {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -161,10 +180,16 @@ async function findUserByAcct(acct: string, botInstanceDomain: string): Promise<
     id: user.id,
     username: user.username,
     accessToken: decryptedToken,
-    mentionVisibility: user.mentionVisibility,
+    mentionVisibility: user.mentionVisibility ?? "public",
     instance: {
       domain: user.instance.domain,
       type: user.instance.type,
+    },
+    defaults: {
+      position: user.defaultPosition,
+      font: user.defaultFont,
+      color: user.defaultColor,
+      size: user.defaultSize,
     },
   };
 }
@@ -239,15 +264,34 @@ export async function processOneMention(
     });
   }
 
-  // STEP2: コマンド解析
-  const parsed = parseMentionContent(notification.status!.content, botAcct);
+  // エラーハンドリング用のヘルパー（ユーザー検索前のエラー用）
+  const handleErrorBeforeUser = async (errorCode: string, errorMessage: string) => {
+    await prisma.processedMention.update({
+      where: { statusId },
+      data: {
+        retryCount: { increment: 1 },
+        errorCode,
+      },
+    });
+    await sendBotReply(statusId, replyToAcct, errorMessage, originalVisibility);
+    return { statusId, success: false, skipped: false, error: errorMessage, errorCode };
+  };
+
+  // STEP2: ユーザー検索（コマンド解析より先に実行してデフォルト設定を取得）
+  const user = await findUserByAcct(notification.account.acct, botInstanceDomain);
+  if (!user) {
+    return handleErrorBeforeUser(
+      ErrorCodes.NOT_FOUND,
+      "このサービスにアカウント登録されていません。サービスページでログインしてください。"
+    );
+  }
+
+  // STEP3: コマンド解析（ユーザーのデフォルト設定を使用）
+  const parsed = parseMentionContent(notification.status!.content, botAcct, user.defaults);
   const options: ParsedMentionOptions = parsed.options;
   const text = parsed.text;
 
-  // STEP3: debug開始通知（ユーザー情報取得前なので、デフォルトvisibilityは後で表示）
-  // ※debug通知はSTEP4の後に移動
-
-  // エラーハンドリング用のヘルパー
+  // エラーハンドリング用のヘルパー（ユーザー検索後のエラー用）
   const handleError = async (errorCode: string, errorMessage: string, withRequestId: boolean = false) => {
     await prisma.processedMention.update({
       where: { statusId },
@@ -262,15 +306,6 @@ export async function processOneMention(
     await sendBotReply(statusId, replyToAcct, message, originalVisibility);
     return { statusId, success: false, skipped: false, error: errorMessage, errorCode };
   };
-
-  // STEP4: ユーザー検索
-  const user = await findUserByAcct(notification.account.acct, botInstanceDomain);
-  if (!user) {
-    return handleError(
-      ErrorCodes.NOT_FOUND,
-      "このサービスにアカウント登録されていません。サービスページでログインしてください。"
-    );
-  }
 
   // 実際に使用するvisibilityを決定（コマンド指定 > ユーザー設定）
   // ただし、コマンドでlocalは指定できない（public/unlistedのみ）
@@ -410,11 +445,17 @@ export async function processOneMention(
 
   // STEP10: 元投稿削除（keepオプション無効時のみ）
   if (!options.keep) {
-    try {
-      await deleteOriginalStatus(user.instance.domain, user.accessToken, statusId);
-    } catch (error) {
-      console.error(`[mention] 元投稿削除失敗:`, error);
-      // 元投稿削除失敗はログのみ、処理は続行
+    // URIからオリジナルのステータスIDを抽出
+    const originalStatusId = extractStatusIdFromUri(notification.status!.uri);
+    if (originalStatusId) {
+      try {
+        await deleteOriginalStatus(user.instance.domain, user.accessToken, originalStatusId);
+      } catch (error) {
+        console.error(`[mention] 元投稿削除失敗:`, error);
+        // 元投稿削除失敗はログのみ、処理は続行
+      }
+    } else {
+      console.warn(`[mention] URIからステータスIDを抽出できませんでした: ${notification.status!.uri}`);
     }
   }
 
