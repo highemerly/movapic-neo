@@ -64,7 +64,7 @@ export default async function DashboardPage() {
           </Link>
           <Link href="/settings" className="flex-1">
             <Button variant="outline" className="w-full" size="lg">
-              設定を確認
+              設定
             </Button>
           </Link>
         </div>

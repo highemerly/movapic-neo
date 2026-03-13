@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Menu, ImagePlus, Images, Globe, Settings, Heart } from "lucide-react";
+import { Menu, ImagePlus, Images, Globe, Settings, Heart, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,6 +16,34 @@ type SiteHeaderProps = {
     username: string;
   } | null;
 };
+
+function LogoutMenuItem() {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleLogout = async () => {
+    setIsLoading(true);
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+      });
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Logout error:", error);
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <DropdownMenuItem
+      onClick={handleLogout}
+      disabled={isLoading}
+      className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+    >
+      <LogOut className="h-4 w-4" />
+      {isLoading ? "処理中..." : "ログアウト"}
+    </DropdownMenuItem>
+  );
+}
 
 export function SiteHeader({ user }: SiteHeaderProps = {}) {
   return (
@@ -67,9 +96,12 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
               <DropdownMenuItem asChild>
                 <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
                   <Settings className="h-4 w-4" />
-                  設定を確認
+                  設定
                 </Link>
               </DropdownMenuItem>
+              {user && (
+                <LogoutMenuItem />
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
