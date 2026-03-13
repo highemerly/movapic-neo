@@ -192,6 +192,13 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               minute: "2-digit",
               timeZone: "Asia/Tokyo",
             })}
+            <span className="ml-2">
+              {image.source === "email"
+                ? "📧 メール投稿"
+                : image.source === "mention"
+                  ? "🤖 Bot投稿"
+                  : "🌐 Web投稿"}
+            </span>
           </p>
         </div>
 
