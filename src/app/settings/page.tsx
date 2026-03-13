@@ -1,7 +1,23 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { EmailAddressDisplay } from "./EmailAddressDisplay";
+import { PreferencesResetButton } from "./PreferencesResetButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import prisma from "@/lib/db";
+import {
+  POSITION_LABELS,
+  FONT_LABELS,
+  COLOR_LABELS,
+  SIZE_LABELS,
+  OUTPUT_LABELS,
+  ARRANGEMENT_LABELS,
+  Position,
+  FontFamily,
+  Color,
+  Size,
+  OutputFormat,
+  Arrangement,
+} from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +27,28 @@ export default async function SettingsPage() {
   if (!user) {
     redirect("/");
   }
+
+  // ユーザーのデフォルト設定を取得
+  const userWithPreferences = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: {
+      defaultPosition: true,
+      defaultFont: true,
+      defaultColor: true,
+      defaultSize: true,
+      defaultOutput: true,
+      defaultArrangement: true,
+    },
+  });
+
+  const hasPreferences = userWithPreferences && (
+    userWithPreferences.defaultPosition ||
+    userWithPreferences.defaultFont ||
+    userWithPreferences.defaultColor ||
+    userWithPreferences.defaultSize ||
+    userWithPreferences.defaultOutput ||
+    userWithPreferences.defaultArrangement
+  );
 
   const emailDomain = "pic.handon.club";
 
@@ -74,6 +112,72 @@ export default async function SettingsPage() {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* デフォルト設定 */}
+      <section className="bg-muted rounded-lg p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-4">投稿のデフォルト設定</h2>
+        <div className="space-y-4">
+          {hasPreferences ? (
+            <>
+              <dl className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <dt className="text-muted-foreground">位置</dt>
+                  <dd className="mt-1 font-medium">
+                    {userWithPreferences.defaultPosition
+                      ? POSITION_LABELS[userWithPreferences.defaultPosition as Position]
+                      : "システム標準"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">フォント</dt>
+                  <dd className="mt-1 font-medium">
+                    {userWithPreferences.defaultFont
+                      ? FONT_LABELS[userWithPreferences.defaultFont as FontFamily]
+                      : "システム標準"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">色</dt>
+                  <dd className="mt-1 font-medium">
+                    {userWithPreferences.defaultColor
+                      ? COLOR_LABELS[userWithPreferences.defaultColor as Color]
+                      : "システム標準"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">サイズ</dt>
+                  <dd className="mt-1 font-medium">
+                    {userWithPreferences.defaultSize
+                      ? SIZE_LABELS[userWithPreferences.defaultSize as Size]
+                      : "システム標準"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">出力形式</dt>
+                  <dd className="mt-1 font-medium">
+                    {userWithPreferences.defaultOutput
+                      ? OUTPUT_LABELS[userWithPreferences.defaultOutput as OutputFormat]
+                      : "システム標準"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">アレンジ</dt>
+                  <dd className="mt-1 font-medium">
+                    {userWithPreferences.defaultArrangement
+                      ? ARRANGEMENT_LABELS[userWithPreferences.defaultArrangement as Arrangement]
+                      : "システム標準"}
+                  </dd>
+                </div>
+              </dl>
+              <PreferencesResetButton />
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              デフォルト設定は未設定です。投稿ページで「初期値として保存」ボタンを押すと設定できます。
+            </p>
+          )}
         </div>
       </section>
 

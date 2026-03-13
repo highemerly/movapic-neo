@@ -24,6 +24,15 @@ import {
   DEFAULT_ARRANGEMENT,
 } from "@/types";
 
+interface UserDefaults {
+  position: Position | null;
+  font: FontFamily | null;
+  color: Color | null;
+  size: Size | null;
+  output: OutputFormat | null;
+  arrangement: Arrangement | null;
+}
+
 interface OptionsAccordionProps {
   position: Position;
   font: FontFamily;
@@ -38,6 +47,10 @@ interface OptionsAccordionProps {
   onOutputChange: (value: OutputFormat) => void;
   onArrangementChange: (value: Arrangement) => void;
   disabled?: boolean;
+  onSaveDefaults?: () => void;
+  isSavingDefaults?: boolean;
+  saveSuccess?: boolean;
+  userDefaults?: UserDefaults;
 }
 
 // セグメントコントロール用コンポーネント
@@ -146,16 +159,21 @@ export function OptionsAccordion({
   onOutputChange,
   onArrangementChange,
   disabled,
+  onSaveDefaults,
+  isSavingDefaults,
+  saveSuccess,
+  userDefaults,
 }: OptionsAccordionProps) {
   const [isOpen, setIsOpen] = useState(false);
 
+  // ユーザーのデフォルト値があればそれを、なければシステムデフォルト値を使用
   const handleReset = () => {
-    onPositionChange(DEFAULT_POSITION);
-    onFontChange(DEFAULT_FONT);
-    onColorChange(DEFAULT_COLOR);
-    onSizeChange(DEFAULT_SIZE);
-    onOutputChange(DEFAULT_OUTPUT);
-    onArrangementChange(DEFAULT_ARRANGEMENT);
+    onPositionChange(userDefaults?.position || DEFAULT_POSITION);
+    onFontChange(userDefaults?.font || DEFAULT_FONT);
+    onColorChange(userDefaults?.color || DEFAULT_COLOR);
+    onSizeChange(userDefaults?.size || DEFAULT_SIZE);
+    onOutputChange(userDefaults?.output || DEFAULT_OUTPUT);
+    onArrangementChange(userDefaults?.arrangement || DEFAULT_ARRANGEMENT);
   };
 
   const positions: Position[] = ["top", "bottom", "left", "right"];
@@ -318,15 +336,31 @@ export function OptionsAccordion({
             />
           </div>
 
-          {/* 設定リセット */}
-          <button
-            type="button"
-            onClick={handleReset}
-            disabled={disabled}
-            className="w-full text-sm text-muted-foreground hover:text-foreground underline"
-          >
-            設定をリセット
-          </button>
+          {/* 設定リセット・初期値保存 */}
+          <div className="flex gap-4 justify-center">
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={disabled}
+              className="text-sm text-muted-foreground hover:text-foreground underline"
+            >
+              設定をリセット
+            </button>
+            {onSaveDefaults && (
+              <button
+                type="button"
+                onClick={onSaveDefaults}
+                disabled={disabled || isSavingDefaults}
+                className={`text-sm hover:text-foreground underline ${
+                  saveSuccess
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-muted-foreground"
+                } ${(disabled || isSavingDefaults) ? "opacity-50 cursor-not-allowed" : ""}`}
+              >
+                {isSavingDefaults ? "保存中..." : saveSuccess ? "保存しました" : "初期値として保存"}
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

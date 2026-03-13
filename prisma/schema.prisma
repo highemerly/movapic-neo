@@ -34,6 +34,15 @@ model User {
   emailPrefix  String    @unique @map("email_prefix") @db.VarChar(32)
   accessToken  String    @map("access_token") @db.Text
   refreshToken String?   @map("refresh_token") @db.Text
+
+  // 投稿のデフォルト設定
+  defaultPosition    String?   @map("default_position") @db.VarChar(20)
+  defaultFont        String?   @map("default_font") @db.VarChar(50)
+  defaultColor       String?   @map("default_color") @db.VarChar(20)
+  defaultSize        String?   @map("default_size") @db.VarChar(20)
+  defaultOutput      String?   @map("default_output") @db.VarChar(20)
+  defaultArrangement String?   @map("default_arrangement") @db.VarChar(20)
+
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   lastLoginAt  DateTime? @map("last_login_at")

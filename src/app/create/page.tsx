@@ -18,6 +18,11 @@ import {
   DEFAULT_ARRANGEMENT,
   OUTPUT_CONFIG,
   OutputFormat,
+  Position,
+  FontFamily,
+  Color,
+  Size,
+  Arrangement,
 } from "@/types";
 import { parseApiError, formatErrorMessage, type ParsedApiError } from "@/lib/errors";
 
@@ -42,6 +47,14 @@ interface UserSession {
   instance: {
     domain: string;
     type: string;
+  };
+  preferences?: {
+    position: Position | null;
+    font: FontFamily | null;
+    color: Color | null;
+    size: Size | null;
+    output: OutputFormat | null;
+    arrangement: Arrangement | null;
   };
 }
 
@@ -74,20 +87,30 @@ export default function CreatePage() {
   const [lastGeneratedState, setLastGeneratedState] =
     useState<GenerateFormState | null>(null);
   const [visibility, setVisibility] = useState<Visibility>("public");
+  const [isSavingDefaults, setIsSavingDefaults] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // 認証チェック
+  // 認証チェックとユーザー設定の読み込み
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch("/api/auth/session");
+        const response = await fetch("/api/v1/me");
         if (response.ok) {
           const data = await response.json();
-          if (data.user) {
-            setIsAuthenticated(true);
-            setUser(data.user);
-          } else {
-            setIsAuthenticated(false);
-            router.push("/");
+          setIsAuthenticated(true);
+          setUser(data);
+
+          // ユーザー設定を初期値に適用
+          if (data.preferences) {
+            setFormState((prev) => ({
+              ...prev,
+              position: data.preferences.position || DEFAULT_POSITION,
+              font: data.preferences.font || DEFAULT_FONT,
+              color: data.preferences.color || DEFAULT_COLOR,
+              size: data.preferences.size || DEFAULT_SIZE,
+              output: data.preferences.output || DEFAULT_OUTPUT,
+              arrangement: data.preferences.arrangement || DEFAULT_ARRANGEMENT,
+            }));
           }
         } else {
           setIsAuthenticated(false);
@@ -288,6 +311,39 @@ export default function CreatePage() {
     }
   };
 
+  // 設定を初期値として保存
+  const handleSaveDefaults = async () => {
+    setIsSavingDefaults(true);
+    setSaveSuccess(false);
+
+    try {
+      const response = await fetch("/api/v1/me/preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          position: formState.position,
+          font: formState.font,
+          color: formState.color,
+          size: formState.size,
+          output: formState.output,
+          arrangement: formState.arrangement,
+        }),
+      });
+
+      if (response.ok) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        const data = await response.json();
+        setError({ message: data.error?.message || "設定の保存に失敗しました" });
+      }
+    } catch {
+      setError({ message: "設定の保存に失敗しました" });
+    } finally {
+      setIsSavingDefaults(false);
+    }
+  };
+
   const canGenerate = formState.text.trim().length > 0 && formState.imageFile !== null;
 
   // 生成後に設定が変更されたかどうか
@@ -402,6 +458,10 @@ export default function CreatePage() {
               setFormState((prev) => ({ ...prev, arrangement }))
             }
             disabled={isLoading || isPosting}
+            onSaveDefaults={handleSaveDefaults}
+            isSavingDefaults={isSavingDefaults}
+            saveSuccess={saveSuccess}
+            userDefaults={user?.preferences}
           />
         </div>
 

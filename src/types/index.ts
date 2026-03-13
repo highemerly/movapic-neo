@@ -136,6 +136,16 @@ export const DEFAULT_SIZE: Size = "medium";
 export const DEFAULT_OUTPUT: OutputFormat = "mastodon";
 export const DEFAULT_ARRANGEMENT: Arrangement = "none";
 
+// ユーザーのデフォルト設定
+export interface UserPreferences {
+  position: Position | null;
+  font: FontFamily | null;
+  color: Color | null;
+  size: Size | null;
+  output: OutputFormat | null;
+  arrangement: Arrangement | null;
+}
+
 export const MAX_TEXT_LENGTH = 140;
 export const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 export const ALLOWED_FILE_TYPES = [
