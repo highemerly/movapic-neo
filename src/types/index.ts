@@ -16,6 +16,8 @@ export type Size = "small" | "medium" | "large";
 
 export type OutputFormat = "mastodon" | "misskey" | "none";
 
+export type Arrangement = "none" | "neon" | "stamp";
+
 export interface GenerateParams {
   text: string;
   position: Position;
@@ -23,6 +25,7 @@ export interface GenerateParams {
   color: Color;
   size: Size;
   output: OutputFormat;
+  arrangement: Arrangement;
 }
 
 export interface GenerateFormState {
@@ -32,6 +35,7 @@ export interface GenerateFormState {
   color: Color;
   size: Size;
   output: OutputFormat;
+  arrangement: Arrangement;
   imageFile: File | null;
   imagePreview: string | null;
 }
@@ -77,6 +81,12 @@ export const OUTPUT_LABELS: Record<OutputFormat, string> = {
   none: "なし",
 };
 
+export const ARRANGEMENT_LABELS: Record<Arrangement, string> = {
+  none: "なし",
+  neon: "ネオン",
+  stamp: "ハンコ",
+};
+
 // 出力形式の設定
 export const OUTPUT_CONFIG: Record<OutputFormat, { maxSize: number; maxFileSize: number; format: "avif" | "jpeg" } | null> = {
   mastodon: { maxSize: 2048, maxFileSize: 16 * 1024 * 1024, format: "avif" }, // 16MB, AVIF
@@ -99,9 +109,9 @@ export const FONT_FILES: Record<FontFamily, string> = {
 
 // サイズ係数（mediumを1.0として）
 export const SIZE_MULTIPLIERS: Record<Size, number> = {
-  small: 0.7,
+  small: 0.65,
   medium: 1.0,
-  large: 1.4,
+  large: 1.55,
 };
 
 // 縁取りの色（薄い色は黒、濃い色は白）
@@ -122,6 +132,7 @@ export const DEFAULT_FONT: FontFamily = "hui-font";
 export const DEFAULT_COLOR: Color = "white";
 export const DEFAULT_SIZE: Size = "medium";
 export const DEFAULT_OUTPUT: OutputFormat = "mastodon";
+export const DEFAULT_ARRANGEMENT: Arrangement = "none";
 
 export const MAX_TEXT_LENGTH = 140;
 export const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB

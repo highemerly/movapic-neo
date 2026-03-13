@@ -17,6 +17,7 @@ import {
   Color,
   Size,
   OutputFormat,
+  Arrangement,
 } from "@/types";
 
 export async function POST(request: NextRequest) {
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
     const color = formData.get("color") as Color | null;
     const size = formData.get("size") as Size | null;
     const output = formData.get("output") as OutputFormat | null;
+    const arrangement = (formData.get("arrangement") as Arrangement | null) || "none";
     const mimeType = formData.get("mimeType") as string | null;
     const visibility = formData.get("visibility") as string | null;
 
@@ -83,6 +85,7 @@ export async function POST(request: NextRequest) {
         color,
         size,
         outputFormat: output,
+        arrangement,
         source: "web",
         isPublic: true,
       },

@@ -63,6 +63,7 @@ model Image {
   color         String   @db.VarChar(20)
   size          String   @db.VarChar(20)
   outputFormat  String   @map("output_format") @db.VarChar(20)
+  arrangement   String   @default("none") @db.VarChar(20)
   source        String   @default("web") @db.VarChar(20) // "web" | "email"
   isPublic      Boolean  @default(true) @map("is_public")
   favoriteCount Int      @default(0) @map("favorite_count")

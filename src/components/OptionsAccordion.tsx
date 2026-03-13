@@ -9,16 +9,19 @@ import {
   Color,
   Size,
   OutputFormat,
+  Arrangement,
   POSITION_LABELS,
   FONT_LABELS,
   COLORS,
   STROKE_COLORS,
   COLOR_LABELS,
+  ARRANGEMENT_LABELS,
   DEFAULT_POSITION,
   DEFAULT_FONT,
   DEFAULT_COLOR,
   DEFAULT_SIZE,
   DEFAULT_OUTPUT,
+  DEFAULT_ARRANGEMENT,
 } from "@/types";
 
 interface OptionsAccordionProps {
@@ -27,11 +30,13 @@ interface OptionsAccordionProps {
   color: Color;
   size: Size;
   output: OutputFormat;
+  arrangement: Arrangement;
   onPositionChange: (value: Position) => void;
   onFontChange: (value: FontFamily) => void;
   onColorChange: (value: Color) => void;
   onSizeChange: (value: Size) => void;
   onOutputChange: (value: OutputFormat) => void;
+  onArrangementChange: (value: Arrangement) => void;
   disabled?: boolean;
 }
 
@@ -133,11 +138,13 @@ export function OptionsAccordion({
   color,
   size,
   output,
+  arrangement,
   onPositionChange,
   onFontChange,
   onColorChange,
   onSizeChange,
   onOutputChange,
+  onArrangementChange,
   disabled,
 }: OptionsAccordionProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -148,6 +155,7 @@ export function OptionsAccordion({
     onColorChange(DEFAULT_COLOR);
     onSizeChange(DEFAULT_SIZE);
     onOutputChange(DEFAULT_OUTPUT);
+    onArrangementChange(DEFAULT_ARRANGEMENT);
   };
 
   const positions: Position[] = ["top", "bottom", "left", "right"];
@@ -155,6 +163,7 @@ export function OptionsAccordion({
   const sizes: Size[] = ["small", "medium", "large"];
   const fonts: FontFamily[] = ["hui-font", "noto-sans-jp", "light-novel-pop"];
   const outputs: OutputFormat[] = ["mastodon", "misskey", "none"];
+  const arrangements: Arrangement[] = ["none", "neon", "stamp"];
 
   return (
     <div className="rounded-lg border">
@@ -262,6 +271,28 @@ export function OptionsAccordion({
                   alt={FONT_LABELS[f]}
                   className="h-8 mx-auto object-contain"
                 />
+              )}
+            />
+          </div>
+
+          {/* アレンジ */}
+          <div className="space-y-2">
+            <Label>アレンジ</Label>
+            <SegmentControl
+              value={arrangement}
+              options={arrangements}
+              onChange={onArrangementChange}
+              disabled={disabled}
+              renderOption={(a) => (
+                a === "none" ? (
+                  <span className="text-sm">{ARRANGEMENT_LABELS[a]}</span>
+                ) : (
+                  <img
+                    src={`/arrangements/${a}.png`}
+                    alt={ARRANGEMENT_LABELS[a]}
+                    className="h-8 mx-auto object-contain"
+                  />
+                )
               )}
             />
           </div>

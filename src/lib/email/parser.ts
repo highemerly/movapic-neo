@@ -4,13 +4,14 @@
  */
 
 import { simpleParser, ParsedMail, Attachment } from "mailparser";
-import { Position, FontFamily, Color, Size } from "@/types";
+import { Position, FontFamily, Color, Size, Arrangement } from "@/types";
 
 export interface ParsedEmailOptions {
   position: Position;
   font: FontFamily;
   color: Color;
   size: Size;
+  arrangement: Arrangement;
 }
 
 export interface ParsedEmail {
@@ -56,11 +57,17 @@ const FONT_MAP: Record<string, FontFamily> = {
   "ラノベ": "light-novel-pop",
 };
 
+const ARRANGEMENT_MAP: Record<string, Arrangement> = {
+  "ネオン": "neon",
+  "ハンコ": "stamp",
+};
+
 const DEFAULT_OPTIONS: ParsedEmailOptions = {
   position: "top",
   font: "hui-font",
   color: "white",
   size: "medium",
+  arrangement: "none",
 };
 
 /**
@@ -123,6 +130,8 @@ function parseSubjectOptions(subject: string): ParsedEmailOptions {
       options.size = SIZE_MAP[token];
     } else if (FONT_MAP[token]) {
       options.font = FONT_MAP[token];
+    } else if (ARRANGEMENT_MAP[token]) {
+      options.arrangement = ARRANGEMENT_MAP[token];
     }
     // 不明なトークンは無視
   }

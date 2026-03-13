@@ -7,6 +7,7 @@ import {
   Color,
   Size,
   OutputFormat,
+  Arrangement,
   MAX_TEXT_LENGTH,
   MAX_FILE_SIZE,
   ALLOWED_FILE_TYPES,
@@ -33,6 +34,7 @@ const VALID_COLORS: Color[] = [
 ];
 const VALID_SIZES: Size[] = ["small", "medium", "large"];
 const VALID_OUTPUT_FORMATS: OutputFormat[] = ["mastodon", "misskey", "none"];
+const VALID_ARRANGEMENTS: Arrangement[] = ["none", "neon", "stamp"];
 
 // 画像処理のタイムアウト（ミリ秒）
 const PROCESS_TIMEOUT_MS = 21000;
@@ -80,6 +82,7 @@ export async function POST(request: NextRequest) {
     const color = formData.get("color") as Color | null;
     const size = formData.get("size") as Size | null;
     const output = formData.get("output") as OutputFormat | null;
+    const arrangement = (formData.get("arrangement") as Arrangement | null) || "none";
 
     // バリデーション
     if (!image) {
@@ -180,6 +183,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!VALID_ARRANGEMENTS.includes(arrangement)) {
+      return errorResponse(
+        ErrorCodes.VALIDATION_INVALID,
+        "無効なアレンジが指定されています",
+        400,
+        { requestId }
+      );
+    }
+
     // 画像処理（タイムアウト付き）
     const imageBuffer = Buffer.from(await image.arrayBuffer());
     const fileSizeKB = Math.round(imageBuffer.length / 1024);
@@ -196,6 +208,7 @@ export async function POST(request: NextRequest) {
         size,
         font,
         output,
+        arrangement,
         requestId,
       }),
       PROCESS_TIMEOUT_MS,

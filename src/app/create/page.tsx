@@ -15,6 +15,7 @@ import {
   DEFAULT_COLOR,
   DEFAULT_SIZE,
   DEFAULT_OUTPUT,
+  DEFAULT_ARRANGEMENT,
   OUTPUT_CONFIG,
   OutputFormat,
 } from "@/types";
@@ -51,6 +52,7 @@ const initialState: GenerateFormState = {
   color: DEFAULT_COLOR,
   size: DEFAULT_SIZE,
   output: DEFAULT_OUTPUT,
+  arrangement: DEFAULT_ARRANGEMENT,
   imageFile: null,
   imagePreview: null,
 };
@@ -172,6 +174,7 @@ export default function CreatePage() {
       formData.append("color", formState.color);
       formData.append("size", formState.size);
       formData.append("output", formState.output);
+      formData.append("arrangement", formState.arrangement);
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 23000);
@@ -255,6 +258,7 @@ export default function CreatePage() {
       formData.append("color", lastGeneratedState.color);
       formData.append("size", lastGeneratedState.size);
       formData.append("output", lastGeneratedState.output);
+      formData.append("arrangement", lastGeneratedState.arrangement);
       formData.append("mimeType", resultMimeType);
       formData.append("visibility", visibility);
 
@@ -295,7 +299,8 @@ export default function CreatePage() {
       formState.font !== lastGeneratedState.font ||
       formState.color !== lastGeneratedState.color ||
       formState.size !== lastGeneratedState.size ||
-      formState.output !== lastGeneratedState.output
+      formState.output !== lastGeneratedState.output ||
+      formState.arrangement !== lastGeneratedState.arrangement
     );
   }, [formState, lastGeneratedState, hasGenerated]);
 
@@ -377,6 +382,7 @@ export default function CreatePage() {
             color={formState.color}
             size={formState.size}
             output={formState.output}
+            arrangement={formState.arrangement}
             onPositionChange={(position) =>
               setFormState((prev) => ({ ...prev, position }))
             }
@@ -391,6 +397,9 @@ export default function CreatePage() {
             }
             onOutputChange={(output) =>
               setFormState((prev) => ({ ...prev, output }))
+            }
+            onArrangementChange={(arrangement) =>
+              setFormState((prev) => ({ ...prev, arrangement }))
             }
             disabled={isLoading || isPosting}
           />
