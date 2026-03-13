@@ -83,7 +83,7 @@
   - output: "mastodon" | "misskey" | "none"
 - **レスポンス**: image/jpeg または image/avif（バイナリ）
 - **レスポンスヘッダー**: Content-Type, Content-Length, Content-Disposition, Cache-Control
-- **エラーレスポンス**: 400(バリデーション) / 429(レート制限) / 504(タイムアウト) / 500(その他)
+- **エラーレスポンス**: `{ success: false, error: { code, message, suggestion?, requestId? } }`
 
 ### POST /api/v1/post
 - **Content-Type**: multipart/form-data
@@ -155,3 +155,9 @@
 2. Mastodon: 動的クライアント登録 → OAuth認可画面へリダイレクト
 3. Misskey: MiAuthセッション生成 → MiAuth認可画面へリダイレクト
 4. コールバックでトークン取得 → ユーザー作成/更新 → JWTセッション発行
+
+## 本番DBマイグレーション
+
+```bash
+DATABASE_URL="postgresql://..." npx prisma migrate deploy
+```
