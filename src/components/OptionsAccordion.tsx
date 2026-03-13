@@ -160,7 +160,7 @@ export function OptionsAccordion({
 
   const positions: Position[] = ["top", "bottom", "left", "right"];
   const colors: Color[] = ["white", "red", "blue", "green", "yellow", "brown", "pink", "orange"];
-  const sizes: Size[] = ["small", "medium", "large"];
+  const sizes: Size[] = ["small", "medium", "large", "extra-large"];
   const fonts: FontFamily[] = ["hui-font", "noto-sans-jp", "light-novel-pop"];
   const outputs: OutputFormat[] = ["mastodon", "misskey", "none"];
   const arrangements: Arrangement[] = ["none", "neon", "stamp"];
@@ -248,10 +248,12 @@ export function OptionsAccordion({
                       ? "text-xs"
                       : s === "medium"
                         ? "text-sm"
-                        : "text-lg"
+                        : s === "large"
+                          ? "text-lg"
+                          : "text-xl"
                   }
                 >
-                  {s === "small" ? "小" : s === "medium" ? "中" : "大"}
+                  {s === "small" ? "小" : s === "medium" ? "中" : s === "large" ? "大" : "特大"}
                 </span>
               )}
             />

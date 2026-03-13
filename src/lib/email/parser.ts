@@ -49,6 +49,7 @@ const SIZE_MAP: Record<string, Size> = {
   "小": "small",
   "中": "medium",
   "大": "large",
+  "特大": "extra-large",
 };
 
 const FONT_MAP: Record<string, FontFamily> = {

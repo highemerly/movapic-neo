@@ -71,7 +71,7 @@ function calculateFontSize(
   }
 
   const fontSize = Math.floor(baseFontSize * multiplier);
-  return Math.max(16, Math.min(fontSize, 300));
+  return Math.max(16, Math.min(fontSize, 500));
 }
 
 // 縦書き用の文字変換マッピング

@@ -29,7 +29,7 @@
   - 位置: 上(default) / 右 / 左 / 下
   - フォント: ふい字(default) / Noto Sans JP / ラノベPOP
   - カラー: 白(default) / 赤 / 青 / 緑 / 黄 / 茶 / 桃 / 橙
-  - サイズ: 中(default) / 大 / 小
+  - サイズ: 中(default) / 大 / 小 / 特大
   - 出力形式: Mastodon(AVIF) / Misskey(AVIF) / なし(JPEG)
 
 ### 出力
@@ -48,7 +48,7 @@
 - 画像サイズに基づいて自動計算
   - 横書き: 画像幅の1/20程度（約20文字入る）
   - 縦書き: 画像高さの1/15程度（約15文字入る）
-- サイズ係数: 小(0.7) / 中(1.0) / 大(1.4)
+- サイズ係数: 小(0.65) / 中(1.0) / 大(1.55) / 特大(2.3)
 
 ### 文字の影
 - 視認性向上のため、全ての文字に影を追加
@@ -79,7 +79,7 @@
   - position: "top" | "right" | "left" | "bottom"
   - font: "hui-font" | "noto-sans-jp" | "light-novel-pop"
   - color: "white" | "red" | "blue" | "green" | "yellow" | "brown" | "pink" | "orange"
-  - size: "small" | "medium" | "large"
+  - size: "small" | "medium" | "large" | "extra-large"
   - output: "mastodon" | "misskey" | "none"
 - **レスポンス**: image/jpeg または image/avif（バイナリ）
 - **レスポンスヘッダー**: Content-Type, Content-Length, Content-Disposition, Cache-Control
@@ -124,7 +124,7 @@
 - **オプション指定**: 件名にスペース区切りで日本語キーワード
   - 位置: 上/下/左/右
   - 色: 白/赤/青/緑/黄/茶/桃/橙
-  - サイズ: 小/中/大
+  - サイズ: 小/中/大/特大
   - フォント: ふい字/ゴシック/ラノベ
 
 ## 公開範囲（Visibility）

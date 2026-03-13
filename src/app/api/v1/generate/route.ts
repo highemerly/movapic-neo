@@ -32,7 +32,7 @@ const VALID_COLORS: Color[] = [
   "pink",
   "orange",
 ];
-const VALID_SIZES: Size[] = ["small", "medium", "large"];
+const VALID_SIZES: Size[] = ["small", "medium", "large", "extra-large"];
 const VALID_OUTPUT_FORMATS: OutputFormat[] = ["mastodon", "misskey", "none"];
 const VALID_ARRANGEMENTS: Arrangement[] = ["none", "neon", "stamp"];
 

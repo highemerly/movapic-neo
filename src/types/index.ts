@@ -12,7 +12,7 @@ export type Color =
   | "pink"
   | "orange";
 
-export type Size = "small" | "medium" | "large";
+export type Size = "small" | "medium" | "large" | "extra-large";
 
 export type OutputFormat = "mastodon" | "misskey" | "none";
 
@@ -73,6 +73,7 @@ export const SIZE_LABELS: Record<Size, string> = {
   small: "小",
   medium: "中",
   large: "大",
+  "extra-large": "特大",
 };
 
 export const OUTPUT_LABELS: Record<OutputFormat, string> = {
@@ -112,6 +113,7 @@ export const SIZE_MULTIPLIERS: Record<Size, number> = {
   small: 0.65,
   medium: 1.0,
   large: 1.55,
+  "extra-large": 2.5,
 };
 
 // 縁取りの色（薄い色は黒、濃い色は白）
