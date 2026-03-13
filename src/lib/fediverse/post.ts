@@ -80,7 +80,7 @@ export async function postToMastodon(
         "User-Agent": USER_AGENT,
       },
       body: JSON.stringify({
-        status: `${statusText}\n\n${imageUrl}`,
+        status: `${statusText}\n${imageUrl}`,
         media_ids: [mediaId],
         visibility,
       }),
@@ -174,7 +174,7 @@ export async function postToMisskey(
       },
       body: JSON.stringify({
         i: accessToken,
-        text: `${statusText}\n\n${imageUrl}`,
+        text: `${statusText}\n${imageUrl}`,
         fileIds: [fileId],
         visibility,
       }),
