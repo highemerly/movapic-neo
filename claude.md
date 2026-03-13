@@ -127,6 +127,68 @@
   - サイズ: 小/中/大/特大
   - フォント: ふい字/ゴシック/ラノベ
 
+## Bot投稿機能（メンション投稿）
+Mastodon上でBotアカウントにメンションすることで画像生成・投稿を行う機能。
+
+### 仕組み
+- **Botアカウント**: `@movapic@handon.club`（環境変数で設定可能）
+- **処理フロー**:
+  1. ユーザーがBotに画像付きメンションを送信
+  2. Botが通知をポーリングで取得（`src/lib/mention/fetcher.ts`）
+  3. メンション内容をパース（`src/lib/mention/parser.ts`）
+  4. 画像処理・投稿を実行（`src/lib/mention/processor.ts`）
+  5. 元投稿を削除し、処理済み画像をユーザーのアカウントで再投稿
+  6. DBに保存（source: "mention"）
+
+### コマンド形式
+```
+@movapic [オプション] テキスト
+```
+
+### オプション指定（`[...]`内にスペース区切り）
+- **位置**: 上/下/左/右
+- **色**: 白/赤/青/緑/黄/茶/桃/橙
+- **サイズ**: 小/中/大/特大
+- **フォント**: ふい字/ゴシック/ラノベ
+- **アレンジ**: ネオン/ハンコ
+- **公開範囲**: public/unlisted（指定なしの場合はユーザー設定を使用）
+- **特殊コマンド**:
+  - `debug`: 処理開始・完了時にBotからリプライで通知
+  - `keep`: 元投稿を削除せずに保持
+
+### 例
+```
+@movapic [上 赤 大] こんにちは
+@movapic [下 ネオン debug] テスト投稿
+@movapic [keep unlisted] 元投稿を残す
+```
+
+### 制約
+- 画像は1枚のみ添付可能（動画・GIF不可）
+- テキストは1〜140文字
+- ユーザーは事前にサービスにログイン済みである必要がある
+- リトライは最大2回まで、失敗時はBotがリプライでエラー通知
+
+### 出力形式
+ユーザーの連携インスタンスに基づいて自動決定：
+- Mastodonユーザー → AVIF（Mastodon形式）
+- Misskeyユーザー → AVIF（Misskey形式）
+
+### 環境変数
+- `MASTODON_BOT_INSTANCE_URL`: BotインスタンスのURL（例: `https://handon.club`）
+- `MASTODON_BOT_INSTANCE_DOMAIN`: Botインスタンスのドメイン（例: `handon.club`）
+- `MASTODON_BOT_ACCESS_TOKEN`: Botのアクセストークン
+- `MASTODON_BOT_ACCT`: Botのアカウント名（例: `movapic`）
+
+## 投稿ソース（source）
+DBの`Image.source`フィールドで投稿元を識別：
+
+| 値 | 説明 | 画像ページ表示 |
+|----|------|----------------|
+| `web` | Web投稿ページから投稿 | 🌐 Web投稿 |
+| `email` | メール経由で投稿 | 📧 メール投稿 |
+| `mention` | Bot（メンション）経由で投稿 | 🤖 Bot投稿 |
+
 ## 公開範囲（Visibility）
 投稿時に選択可能な公開範囲：
 
