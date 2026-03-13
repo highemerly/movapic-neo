@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { EmailAddressDisplay } from "./EmailAddressDisplay";
+import { CopyableText } from "./CopyableText";
 import { PreferencesResetButton } from "./PreferencesResetButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import prisma from "@/lib/db";
@@ -50,7 +51,7 @@ export default async function SettingsPage() {
     userWithPreferences.defaultArrangement
   );
 
-  const emailDomain = "pic.handon.club";
+  const emailDomain = "pic-dev.handon.club";
 
   return (
     <>
@@ -70,48 +71,27 @@ export default async function SettingsPage() {
             <dt className="text-sm font-medium text-muted-foreground">表示名</dt>
             <dd className="mt-1">{user.displayName || user.username}</dd>
           </div>
+          <div>
+            <dt className="text-sm font-medium text-muted-foreground">アイコンのURL</dt>
+            <dd className="mt-1 break-all">{user.avatarUrl || "未設定"}</dd>
+            <p className="mt-1 text-xs text-muted-foreground">アイコンは再ログイン時に更新されます。アイコンが正しく表示できない場合はログインし直してください。</p>
+          </div>
         </dl>
       </section>
 
-      {/* メール投稿設定 */}
+      {/* 公開設定 */}
       <section className="bg-muted rounded-lg p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4">メール投稿＜準備中＞</h2>
+        <h2 className="text-lg font-semibold mb-4">公開設定</h2>
         <div className="space-y-4">
-          <EmailAddressDisplay emailPrefix={user.emailPrefix} emailDomain={emailDomain} />
-          <div className="text-sm text-muted-foreground">
-            <p className="mb-2">このアドレスに画像を添付してメールを送信すると、画像が生成されるようになります（いまはされません）。</p>
-            <p className="mb-2 font-medium">メールの形式:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>
-                <strong>件名:</strong> オプションをスペース区切りで指定
-                <br />
-                <span className="text-xs">例: 「下 赤 大 ラノベ」</span>
-              </li>
-              <li>
-                <strong>本文:</strong> 画像に入れるテキスト（1〜140文字）
-              </li>
-              <li>
-                <strong>添付:</strong> 画像ファイル（JPEG/PNG/WebP/HEIC/AVIF）
-              </li>
-            </ul>
+          <div>
+            <dt className="text-sm font-medium text-muted-foreground">公開ギャラリーURL</dt>
+            <dd className="mt-1">
+              <CopyableText text={`${process.env.NEXT_PUBLIC_APP_URL}/u/${user.username}`} />
+            </dd>
           </div>
-          <div className="text-sm">
-            <p className="font-medium mb-2">利用可能なオプション:</p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="font-medium">位置:</span> 上 下 左 右
-              </div>
-              <div>
-                <span className="font-medium">色:</span> 白 赤 青 緑 黄 茶 桃 橙
-              </div>
-              <div>
-                <span className="font-medium">サイズ:</span> 小 中 大
-              </div>
-              <div>
-                <span className="font-medium">フォント:</span> ふい字 ゴシック ラノベ
-              </div>
-            </div>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            投稿したすべての画像は、公開ギャラリーと公開タイムラインに追加されます。
+          </p>
         </div>
       </section>
 
@@ -181,21 +161,45 @@ export default async function SettingsPage() {
         </div>
       </section>
 
-      {/* 公開設定 */}
+      {/* メール投稿設定 */}
       <section className="bg-muted rounded-lg p-6">
-        <h2 className="text-lg font-semibold mb-4">公開設定</h2>
+        <h2 className="text-lg font-semibold mb-4">メール投稿＜準備中＞</h2>
         <div className="space-y-4">
-          <div>
-            <dt className="text-sm font-medium text-muted-foreground">公開ギャラリーURL</dt>
-            <dd className="mt-1">
-              <code className="bg-background px-2 py-1 rounded text-sm">
-                {process.env.NEXT_PUBLIC_APP_URL}/u/{user.username}
-              </code>
-            </dd>
+          <EmailAddressDisplay emailPrefix={user.emailPrefix} emailDomain={emailDomain} />
+          <div className="text-sm text-muted-foreground">
+            <p className="mb-2">このアドレスに画像を添付してメールを送信すると、画像が生成されるようになります（いまはされません）。</p>
+            <p className="mb-2 font-medium">メールの形式:</p>
+            <ul className="list-disc list-inside space-y-1 ml-2">
+              <li>
+                <strong>件名:</strong> オプションをスペース区切りで指定
+                <br />
+                <span className="text-xs">例: 「下 赤 大 ラノベ」</span>
+              </li>
+              <li>
+                <strong>本文:</strong> 画像に入れるテキスト（1〜140文字）
+              </li>
+              <li>
+                <strong>添付:</strong> 画像ファイル（JPEG/PNG/WebP/HEIC/AVIF）
+              </li>
+            </ul>
           </div>
-          <p className="text-sm text-muted-foreground">
-            生成した画像は自動的に公開ギャラリーに表示されます。
-          </p>
+          <div className="text-sm">
+            <p className="font-medium mb-2">利用可能なオプション:</p>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span className="font-medium">位置:</span> 上 下 左 右
+              </div>
+              <div>
+                <span className="font-medium">色:</span> 白 赤 青 緑 黄 茶 桃 橙
+              </div>
+              <div>
+                <span className="font-medium">サイズ:</span> 小 中 大
+              </div>
+              <div>
+                <span className="font-medium">フォント:</span> ふい字 ゴシック ラノベ
+              </div>
+            </div>
+          </div>
         </div>
       </section>
     </div>
