@@ -65,14 +65,21 @@ export async function GET(
     const result = hasMore ? images.slice(0, -1) : images;
     const nextCursor = hasMore ? result[result.length - 1]?.id : null;
 
-    return NextResponse.json({
-      images: result.map((img: (typeof result)[number]) => ({
-        ...img,
-        createdAt: img.createdAt.toISOString(),
-      })),
-      nextCursor,
-      hasMore,
-    });
+    return NextResponse.json(
+      {
+        images: result.map((img: (typeof result)[number]) => ({
+          ...img,
+          createdAt: img.createdAt.toISOString(),
+        })),
+        nextCursor,
+        hasMore,
+      },
+      {
+        headers: {
+          "Cache-Control": "public, max-age=10, stale-while-revalidate=30",
+        },
+      }
+    );
   } catch (error) {
     console.error("Failed to fetch user images:", error);
     return NextResponse.json(

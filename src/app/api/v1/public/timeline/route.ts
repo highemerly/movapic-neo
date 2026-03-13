@@ -55,26 +55,33 @@ export async function GET(request: NextRequest) {
     const result = hasMore ? images.slice(0, -1) : images;
     const nextCursor = hasMore ? result[result.length - 1]?.id : null;
 
-    return NextResponse.json({
-      images: result.map((img: (typeof result)[number]) => ({
-        id: img.id,
-        storageKey: img.storageKey,
-        width: img.width,
-        height: img.height,
-        overlayText: img.overlayText,
-        position: img.position,
-        favoriteCount: img.favoriteCount,
-        createdAt: img.createdAt.toISOString(),
-        user: {
-          username: img.user.username,
-          displayName: img.user.displayName,
-          avatarUrl: img.user.avatarUrl,
-          instance: img.user.instance.domain,
+    return NextResponse.json(
+      {
+        images: result.map((img: (typeof result)[number]) => ({
+          id: img.id,
+          storageKey: img.storageKey,
+          width: img.width,
+          height: img.height,
+          overlayText: img.overlayText,
+          position: img.position,
+          favoriteCount: img.favoriteCount,
+          createdAt: img.createdAt.toISOString(),
+          user: {
+            username: img.user.username,
+            displayName: img.user.displayName,
+            avatarUrl: img.user.avatarUrl,
+            instance: img.user.instance.domain,
+          },
+        })),
+        nextCursor,
+        hasMore,
+      },
+      {
+        headers: {
+          "Cache-Control": "public, max-age=10, stale-while-revalidate=30",
         },
-      })),
-      nextCursor,
-      hasMore,
-    });
+      }
+    );
   } catch (error) {
     console.error("Failed to fetch timeline:", error);
     return NextResponse.json(
