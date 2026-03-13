@@ -93,10 +93,10 @@ export function FavoriteButton({
         <button
           onClick={handleFavorite}
           disabled={!isLoggedIn || isLoading}
-          className={`flex items-center gap-2 transition-colors ${
+          className={`flex items-center gap-2 px-3 py-2 border rounded-lg transition-colors ${
             isFavorited
-              ? "text-red-500 hover:text-red-600"
-              : "text-muted-foreground hover:text-red-500"
+              ? "text-red-500 hover:text-red-600 border-red-200"
+              : "text-muted-foreground hover:text-red-500 border-border"
           } ${!isLoggedIn ? "cursor-not-allowed opacity-50" : ""}`}
           title={!isLoggedIn ? "ログインするとお気に入り登録できます" : undefined}
         >
