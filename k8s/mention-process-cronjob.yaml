@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mention-process
+  labels:
+    app: movapic-neo
+    component: mention-process
+spec:
+  schedule: "* * * * *"  # 1分ごと
+  concurrencyPolicy: Forbid  # 重複実行防止
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 55  # 次のジョブ実行前に終了するように
+      backoffLimit: 0  # リトライしない（次回のcronで再試行）
+      template:
+        metadata:
+          labels:
+            app: movapic-neo
+            component: mention-process
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: mention-process
+            image: curlimages/curl:8.5.0
+            command:
+            - /bin/sh
+            - -c
+            - |
+              curl -s -X POST \
+                -H "X-API-Key: ${MENTION_PROCESS_API_KEY}" \
+                -H "Content-Type: application/json" \
+                --max-time 50 \
+                "${SERVICE_URL}/api/v1/mention-process"
+            env:
+            - name: MENTION_PROCESS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: movapic-neo-secret
+                  key: MENTION_PROCESS_API_KEY
+            - name: SERVICE_URL
+              value: "http://movapic-neo-service"  # クラスタ内部のService名
+            resources:
+              requests:
+                cpu: "10m"
+                memory: "16Mi"
+              limits:
+                cpu: "100m"
+                memory: "64Mi"

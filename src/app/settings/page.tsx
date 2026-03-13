@@ -4,6 +4,7 @@ import { EmailAddressDisplay } from "./EmailAddressDisplay";
 import { CopyableText } from "./CopyableText";
 import { PreferencesResetButton } from "./PreferencesResetButton";
 import { BioEditForm } from "./BioEditForm";
+import { MentionVisibilityForm } from "./MentionVisibilityForm";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import prisma from "@/lib/db";
 import {
@@ -35,6 +36,7 @@ export default async function SettingsPage() {
     where: { id: user.id },
     select: {
       bio: true,
+      mentionVisibility: true,
       defaultPosition: true,
       defaultFont: true,
       defaultColor: true,
@@ -166,6 +168,19 @@ export default async function SettingsPage() {
               デフォルト設定は未設定です。投稿ページで「初期値として保存」ボタンを押すと設定できます。
             </p>
           )}
+        </div>
+      </section>
+
+      {/* メンション投稿設定 */}
+      <section className="bg-muted rounded-lg p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-4">メンション投稿</h2>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground mb-4">
+            Botアカウントにメンションして画像を投稿する際の公開範囲を設定します。
+          </p>
+          <MentionVisibilityForm
+            initialVisibility={userWithPreferences?.mentionVisibility as "public" | "unlisted" | "local" ?? "public"}
+          />
         </div>
       </section>
 

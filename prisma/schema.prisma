@@ -43,6 +43,7 @@ model User {
   defaultSize        String?   @map("default_size") @db.VarChar(20)
   defaultOutput      String?   @map("default_output") @db.VarChar(20)
   defaultArrangement String?   @map("default_arrangement") @db.VarChar(20)
+  mentionVisibility  String    @default("public") @map("mention_visibility") @db.VarChar(20)
 
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
@@ -101,4 +102,32 @@ model Favorite {
   @@index([userId, createdAt])
   @@index([imageId])
   @@map("favorites")
+}
+
+// Bot状態管理（シングルトン）
+model BotState {
+  id                 String   @id @default("singleton")
+  lastNotificationId String?  @map("last_notification_id")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("bot_state")
+}
+
+// 処理済みメンション
+model ProcessedMention {
+  statusId   String        @id @map("status_id")
+  status     MentionStatus @default(pending)
+  retryCount Int           @default(0) @map("retry_count")
+  errorCode  String?       @map("error_code") @db.VarChar(100)
+  createdAt  DateTime      @default(now()) @map("created_at")
+  updatedAt  DateTime      @updatedAt @map("updated_at")
+
+  @@index([createdAt])
+  @@map("processed_mentions")
+}
+
+enum MentionStatus {
+  pending
+  success
+  failed
 }

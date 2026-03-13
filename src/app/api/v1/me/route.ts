@@ -90,6 +90,8 @@ export async function GET() {
 }
 
 const BIO_MAX_LENGTH = 40;
+const VALID_VISIBILITIES = ["public", "unlisted", "local"] as const;
+type Visibility = typeof VALID_VISIBILITIES[number];
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -101,32 +103,65 @@ export async function PATCH(request: NextRequest) {
 
     const body = await request.json();
 
-    if (typeof body.bio !== "string") {
+    // 更新するフィールドを収集
+    const updateData: { bio?: string | null; mentionVisibility?: string } = {};
+
+    // bioの更新
+    if (body.bio !== undefined) {
+      if (typeof body.bio !== "string") {
+        return NextResponse.json(
+          { error: "bioは文字列である必要があります" },
+          { status: 400 }
+        );
+      }
+
+      // サニタイズして長さチェック
+      const sanitizedBio = sanitizeBio(body.bio);
+
+      if (sanitizedBio.length > BIO_MAX_LENGTH) {
+        return NextResponse.json(
+          { error: `プロフィールは${BIO_MAX_LENGTH}文字以内で入力してください` },
+          { status: 400 }
+        );
+      }
+
+      // 空文字の場合はnullとして保存
+      updateData.bio = sanitizedBio.length === 0 ? null : sanitizedBio;
+    }
+
+    // mentionVisibilityの更新
+    if (body.mentionVisibility !== undefined) {
+      if (!VALID_VISIBILITIES.includes(body.mentionVisibility as Visibility)) {
+        return NextResponse.json(
+          { error: "無効な公開設定です" },
+          { status: 400 }
+        );
+      }
+      updateData.mentionVisibility = body.mentionVisibility;
+    }
+
+    // 更新するフィールドがない場合
+    if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
-        { error: "bioは文字列である必要があります" },
+        { error: "更新するフィールドがありません" },
         { status: 400 }
       );
     }
 
-    // サニタイズして長さチェック
-    const sanitizedBio = sanitizeBio(body.bio);
-
-    if (sanitizedBio.length > BIO_MAX_LENGTH) {
-      return NextResponse.json(
-        { error: `プロフィールは${BIO_MAX_LENGTH}文字以内で入力してください` },
-        { status: 400 }
-      );
-    }
-
-    // 空文字の場合はnullとして保存
-    const bioToSave = sanitizedBio.length === 0 ? null : sanitizedBio;
-
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: sessionUser.id },
-      data: { bio: bioToSave },
+      data: updateData,
+      select: {
+        bio: true,
+        mentionVisibility: true,
+      },
     });
 
-    return NextResponse.json({ success: true, bio: bioToSave });
+    return NextResponse.json({
+      success: true,
+      bio: updatedUser.bio,
+      mentionVisibility: updatedUser.mentionVisibility,
+    });
   } catch (error) {
     console.error("Failed to update profile:", error);
     return NextResponse.json(
