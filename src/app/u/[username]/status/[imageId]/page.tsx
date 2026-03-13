@@ -192,13 +192,6 @@ export default async function ImageDetailPage({ params }: PageProps) {
           />
         </div>
 
-        {/* 削除ボタン（自分の画像のみ） */}
-        {isOwner && (
-          <div className="mt-8 pt-6 border-t">
-            <DeleteButton imageId={imageId} username={username} />
-          </div>
-        )}
-
         {/* 前後の画像ナビゲーション */}
         <div className="mt-8">
           <ImageNavigation
@@ -207,6 +200,13 @@ export default async function ImageDetailPage({ params }: PageProps) {
             nextImage={nextImage}
           />
         </div>
+
+        {/* 削除ボタン（自分の画像のみ） */}
+        {isOwner && (
+          <div className="mt-8">
+            <DeleteButton imageId={imageId} username={username} />
+          </div>
+        )}
       </main>
     </div>
   );

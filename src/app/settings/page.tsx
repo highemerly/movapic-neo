@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { EmailAddressDisplay } from "./EmailAddressDisplay";
 import { CopyableText } from "./CopyableText";
 import { PreferencesResetButton } from "./PreferencesResetButton";
+import { BioEditForm } from "./BioEditForm";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import prisma from "@/lib/db";
 import {
@@ -29,10 +30,11 @@ export default async function SettingsPage() {
     redirect("/");
   }
 
-  // ユーザーのデフォルト設定を取得
+  // ユーザーのデフォルト設定とbioを取得
   const userWithPreferences = await prisma.user.findUnique({
     where: { id: user.id },
     select: {
+      bio: true,
       defaultPosition: true,
       defaultFont: true,
       defaultColor: true,
@@ -76,6 +78,12 @@ export default async function SettingsPage() {
             <dd className="mt-1 break-all">{user.avatarUrl || "未設定"}</dd>
             <p className="mt-1 text-xs text-muted-foreground">アイコンは再ログイン時に更新されます。アイコンが正しく表示できない場合はログインし直してください。</p>
           </div>
+          <div>
+            <dt className="text-sm font-medium text-muted-foreground mb-2">プロフィール</dt>
+            <dd>
+              <BioEditForm initialBio={userWithPreferences?.bio ?? null} />
+            </dd>
+          </div>
         </dl>
       </section>
 
@@ -84,7 +92,7 @@ export default async function SettingsPage() {
         <h2 className="text-lg font-semibold mb-4">公開設定</h2>
         <div className="space-y-4">
           <div>
-            <dt className="text-sm font-medium text-muted-foreground">公開ギャラリーURL</dt>
+            <dt className="text-sm font-medium text-muted-foreground">公開ギャラリー（ユーザーページ）</dt>
             <dd className="mt-1">
               <CopyableText text={`${process.env.NEXT_PUBLIC_APP_URL}/u/${user.username}`} />
             </dd>

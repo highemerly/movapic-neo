@@ -34,6 +34,7 @@ model User {
   emailPrefix  String    @unique @map("email_prefix") @db.VarChar(32)
   accessToken  String    @map("access_token") @db.Text
   refreshToken String?   @map("refresh_token") @db.Text
+  bio          String?   @db.VarChar(40)
 
   // 投稿のデフォルト設定
   defaultPosition    String?   @map("default_position") @db.VarChar(20)

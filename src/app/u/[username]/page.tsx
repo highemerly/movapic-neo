@@ -85,6 +85,9 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
           >
             @{user.username}@{user.instance.domain}
           </a>
+          {user.bio && (
+            <p className="text-sm text-muted-foreground mt-1">{user.bio}</p>
+          )}
           <p className="text-xs text-muted-foreground mt-1">
             {user.createdAt.toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}に登録 · {images.length}枚の画像
           </p>

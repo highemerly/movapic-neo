@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
 
 interface DeleteButtonProps {
   imageId: string;
@@ -45,6 +46,7 @@ export function DeleteButton({ imageId, username }: DeleteButtonProps) {
       onClick={handleDelete}
       disabled={isDeleting}
     >
+      <Trash2 className="w-4 h-4 mr-1" />
       {isDeleting ? "削除中..." : "この画像を削除"}
     </Button>
   );
