@@ -64,7 +64,6 @@ export function BioEditForm({ initialBio }: BioEditFormProps) {
           className="flex-1"
         />
         <Button
-          variant="outline"
           onClick={handleSave}
           disabled={!hasChanges || isOverLimit || isSaving}
           size="sm"

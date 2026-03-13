@@ -39,12 +39,12 @@ export function PreferencesResetButton() {
 
   return (
     <Button
-      variant="outline"
+      variant="destructive"
       size="sm"
       onClick={handleReset}
       disabled={isResetting}
     >
-      {isResetting ? "リセット中..." : "リセット"}
+      {isResetting ? "リセット中..." : "設定をリセット"}
     </Button>
   );
 }

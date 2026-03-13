@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, ImagePlus, Images, Globe, Settings, Heart, LogOut } from "lucide-react";
+import { Menu, ImagePlus, Images, Globe, LayoutDashboard, Heart, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -65,8 +65,16 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
+              {user && (
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard" className="flex items-center gap-2 cursor-pointer font-semibold">
+                    <LayoutDashboard className="h-4 w-4" />
+                    ダッシュボード
+                  </Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem asChild>
-                <Link href="/create" className="flex items-center gap-2 cursor-pointer font-semibold">
+                <Link href="/create" className="flex items-center gap-2 cursor-pointer">
                   <ImagePlus className="h-4 w-4" />
                   画像を投稿
                 </Link>
@@ -91,12 +99,6 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
                 <Link href="/public" className="flex items-center gap-2 cursor-pointer">
                   <Globe className="h-4 w-4" />
                   公開タイムライン
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/settings" className="flex items-center gap-2 cursor-pointer">
-                  <Settings className="h-4 w-4" />
-                  設定
                 </Link>
               </DropdownMenuItem>
               {user && (
