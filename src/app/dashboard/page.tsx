@@ -53,8 +53,7 @@ export default async function DashboardPage() {
 
   // Bot設定を環境変数から取得
   const botUsername = process.env.MASTODON_BOT_ACCT || "pic";
-  const botInstanceUrl = process.env.MASTODON_BOT_INSTANCE_URL || "https://handon.club";
-  const botDomain = new URL(botInstanceUrl).hostname;
+  const botDomain = process.env.MASTODON_BOT_INSTANCE_DOMAIN || "handon.club";
   const botAcct = `${botUsername}@${botDomain}`;
 
   const hasPreferences = userWithPreferences && (

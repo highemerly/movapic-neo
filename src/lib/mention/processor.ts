@@ -20,6 +20,7 @@ const MAX_RETRY_COUNT = 2;
 
 // 環境変数
 const getBotInstanceUrl = () => process.env.MASTODON_BOT_INSTANCE_URL || "https://handon.club";
+const getBotInstanceDomain = () => process.env.MASTODON_BOT_INSTANCE_DOMAIN || "handon.club";
 const getBotAccessToken = () => process.env.MASTODON_BOT_ACCESS_TOKEN || "";
 const getBotAcct = () => process.env.MASTODON_BOT_ACCT || "movapic";
 
@@ -228,8 +229,7 @@ export async function processOneMention(
   let requestId: string | undefined;
 
   const botAcct = getBotAcct();
-  const botInstanceUrl = getBotInstanceUrl();
-  const botInstanceDomain = new URL(botInstanceUrl).hostname;
+  const botInstanceDomain = getBotInstanceDomain();
   const originalVisibility = notification.status!.visibility as MastodonVisibility;
   const replyToAcct = notification.account.acct; // リプライ先ユーザーのacct
 
