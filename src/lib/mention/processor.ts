@@ -36,6 +36,7 @@ interface UserWithInstance {
   username: string;
   accessToken: string;
   mentionVisibility: string;
+  mentionKeep: boolean;
   instance: {
     domain: string;
     type: string;
@@ -181,6 +182,7 @@ async function findUserByAcct(acct: string, botInstanceDomain: string): Promise<
     username: user.username,
     accessToken: decryptedToken,
     mentionVisibility: user.mentionVisibility ?? "public",
+    mentionKeep: user.mentionKeep ?? false,
     instance: {
       domain: user.instance.domain,
       type: user.instance.type,
@@ -310,6 +312,10 @@ export async function processOneMention(
   // 実際に使用するvisibilityを決定（コマンド指定 > ユーザー設定）
   // ただし、コマンドでlocalは指定できない（public/unlistedのみ）
   const effectiveVisibility = options.visibility || user.mentionVisibility;
+
+  // 実際に使用するkeepを決定（コマンド指定 > ユーザー設定）
+  // options.keepはコマンドで[keep]指定時のみtrue、それ以外はユーザー設定を使用
+  const effectiveKeep = options.keep || user.mentionKeep;
 
   // STEP3: debug開始通知（ユーザー情報取得後に実行）
   if (options.debug) {
@@ -443,8 +449,8 @@ export async function processOneMention(
     }
   }
 
-  // STEP10: 元投稿削除（keepオプション無効時のみ）
-  if (!options.keep) {
+  // STEP10: 元投稿削除（effectiveKeepがfalseの場合のみ）
+  if (!effectiveKeep) {
     // URIからオリジナルのステータスIDを抽出
     const originalStatusId = extractStatusIdFromUri(notification.status!.uri);
     if (originalStatusId) {

@@ -104,7 +104,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
 
     // 更新するフィールドを収集
-    const updateData: { bio?: string | null; mentionVisibility?: string } = {};
+    const updateData: { bio?: string | null; mentionVisibility?: string; mentionKeep?: boolean } = {};
 
     // bioの更新
     if (body.bio !== undefined) {
@@ -140,6 +140,17 @@ export async function PATCH(request: NextRequest) {
       updateData.mentionVisibility = body.mentionVisibility;
     }
 
+    // mentionKeepの更新
+    if (body.mentionKeep !== undefined) {
+      if (typeof body.mentionKeep !== "boolean") {
+        return NextResponse.json(
+          { error: "mentionKeepはboolean型である必要があります" },
+          { status: 400 }
+        );
+      }
+      updateData.mentionKeep = body.mentionKeep;
+    }
+
     // 更新するフィールドがない場合
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
@@ -154,6 +165,7 @@ export async function PATCH(request: NextRequest) {
       select: {
         bio: true,
         mentionVisibility: true,
+        mentionKeep: true,
       },
     });
 
@@ -161,6 +173,7 @@ export async function PATCH(request: NextRequest) {
       success: true,
       bio: updatedUser.bio,
       mentionVisibility: updatedUser.mentionVisibility,
+      mentionKeep: updatedUser.mentionKeep,
     });
   } catch (error) {
     console.error("Failed to update profile:", error);

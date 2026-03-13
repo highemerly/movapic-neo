@@ -4,7 +4,7 @@ import { EmailAddressDisplay } from "./EmailAddressDisplay";
 import { CopyableText } from "./CopyableText";
 import { PreferencesResetButton } from "./PreferencesResetButton";
 import { BioEditForm } from "./BioEditForm";
-import { MentionVisibilityForm } from "./MentionVisibilityForm";
+import { MentionSettingsForm } from "./MentionSettingsForm";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import prisma from "@/lib/db";
 import {
@@ -37,6 +37,7 @@ export default async function SettingsPage() {
     select: {
       bio: true,
       mentionVisibility: true,
+      mentionKeep: true,
       defaultPosition: true,
       defaultFont: true,
       defaultColor: true,
@@ -45,6 +46,12 @@ export default async function SettingsPage() {
       defaultArrangement: true,
     },
   });
+
+  // Bot設定を環境変数から取得
+  const botUsername = process.env.MASTODON_BOT_ACCT || "pic";
+  const botInstanceUrl = process.env.MASTODON_BOT_INSTANCE_URL || "https://handon.club";
+  const botDomain = new URL(botInstanceUrl).hostname;
+  const botAcct = `${botUsername}@${botDomain}`;
 
   const hasPreferences = userWithPreferences && (
     userWithPreferences.defaultPosition ||
@@ -173,15 +180,13 @@ export default async function SettingsPage() {
 
       {/* メンション投稿設定 */}
       <section className="bg-muted rounded-lg p-6 mb-6">
-        <h2 className="text-lg font-semibold mb-4">メンション投稿</h2>
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground mb-4">
-            Botアカウントにメンションして画像を投稿する際の公開範囲を設定します。
-          </p>
-          <MentionVisibilityForm
-            initialVisibility={userWithPreferences?.mentionVisibility as "public" | "unlisted" | "local" ?? "public"}
-          />
-        </div>
+        <h2 className="text-lg font-semibold mb-4">{user.instance.domain}から直接投稿</h2>
+        <MentionSettingsForm
+          initialVisibility={userWithPreferences?.mentionVisibility as "public" | "unlisted" | "local" ?? "public"}
+          initialKeep={userWithPreferences?.mentionKeep ?? false}
+          botAcct={botAcct}
+          userInstanceDomain={user.instance.domain}
+        />
       </section>
 
       {/* メール投稿設定 */}
