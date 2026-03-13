@@ -15,10 +15,15 @@ interface PageProps {
     username: string;
     imageId: string;
   }>;
+  searchParams: Promise<{
+    from?: string;
+  }>;
 }
 
-export default async function ImageDetailPage({ params }: PageProps) {
+export default async function ImageDetailPage({ params, searchParams }: PageProps) {
   const { username, imageId } = await params;
+  const { from } = await searchParams;
+  const isFromPublic = from === "public";
 
   // ログインユーザーを取得
   const currentUser = await getCurrentUser();
@@ -74,27 +79,39 @@ export default async function ImageDetailPage({ params }: PageProps) {
     }),
   ]);
 
-  // 前後の画像を取得（同じユーザーの公開画像のみ）
+  // 前後の画像を取得
+  // 公開TLからの場合: 全ユーザーの公開画像を対象
+  // ユーザーギャラリーからの場合: 同じユーザーの公開画像のみ
+  const navigationSelect = {
+    id: true,
+    overlayText: true,
+    user: {
+      select: {
+        username: true,
+      },
+    },
+  };
+
   const [prevImage, nextImage] = await Promise.all([
     // 前の画像（古い方向）
     prisma.image.findFirst({
       where: {
-        userId: image.userId,
+        ...(isFromPublic ? {} : { userId: image.userId }),
         isPublic: true,
         createdAt: { lt: image.createdAt },
       },
       orderBy: { createdAt: "desc" },
-      select: { id: true, overlayText: true },
+      select: navigationSelect,
     }),
     // 次の画像（新しい方向）
     prisma.image.findFirst({
       where: {
-        userId: image.userId,
+        ...(isFromPublic ? {} : { userId: image.userId }),
         isPublic: true,
         createdAt: { gt: image.createdAt },
       },
       orderBy: { createdAt: "asc" },
-      select: { id: true, overlayText: true },
+      select: navigationSelect,
     }),
   ]);
 
@@ -110,9 +127,9 @@ export default async function ImageDetailPage({ params }: PageProps) {
       <main className="container mx-auto max-w-2xl px-4 py-8">
         {/* ヘッダー */}
         <div className="mb-6">
-          <Link href={`/u/${username}`}>
+          <Link href={isFromPublic ? "/public" : `/u/${username}`}>
             <Button variant="ghost" size="sm">
-              ← {image.user.displayName || username} のギャラリーに戻る
+              ← {isFromPublic ? "公開タイムラインに戻る" : `${image.user.displayName || username} のギャラリーに戻る`}
             </Button>
           </Link>
         </div>
@@ -195,9 +212,9 @@ export default async function ImageDetailPage({ params }: PageProps) {
         {/* 前後の画像ナビゲーション */}
         <div className="mt-8">
           <ImageNavigation
-            username={username}
             prevImage={prevImage}
             nextImage={nextImage}
+            from={isFromPublic ? "public" : undefined}
           />
         </div>
 

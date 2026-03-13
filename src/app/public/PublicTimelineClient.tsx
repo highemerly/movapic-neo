@@ -113,7 +113,7 @@ function TimelineImageCard({
 }) {
   const imageUrl = `${publicUrl}/${image.storageKey}`;
 
-  const detailUrl = `/u/${image.user.username}/status/${image.id}`;
+  const detailUrl = `/u/${image.user.username}/status/${image.id}?from=public`;
 
   return (
     <Link href={detailUrl} className="block relative rounded-lg overflow-hidden group">

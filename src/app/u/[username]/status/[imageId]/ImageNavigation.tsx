@@ -1,9 +1,17 @@
 import Link from "next/link";
 
+interface NavImage {
+  id: string;
+  overlayText: string;
+  user: {
+    username: string;
+  };
+}
+
 interface ImageNavigationProps {
-  username: string;
-  prevImage: { id: string; overlayText: string } | null;
-  nextImage: { id: string; overlayText: string } | null;
+  prevImage: NavImage | null;
+  nextImage: NavImage | null;
+  from?: "public";
 }
 
 // テキストを指定文字数で切り詰める
@@ -15,10 +23,11 @@ function truncateText(text: string, maxLength: number): string {
 }
 
 export function ImageNavigation({
-  username,
   prevImage,
   nextImage,
+  from,
 }: ImageNavigationProps) {
+  const queryString = from ? `?from=${from}` : "";
   // 両方ない場合は何も表示しない
   if (!prevImage && !nextImage) {
     return null;
@@ -30,7 +39,7 @@ export function ImageNavigation({
       <div className="flex-1 min-w-0">
         {prevImage ? (
           <Link
-            href={`/u/${username}/status/${prevImage.id}`}
+            href={`/u/${prevImage.user.username}/status/${prevImage.id}${queryString}`}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group"
           >
             <span className="shrink-0">←</span>
@@ -47,7 +56,7 @@ export function ImageNavigation({
       <div className="flex-1 min-w-0 text-right">
         {nextImage ? (
           <Link
-            href={`/u/${username}/status/${nextImage.id}`}
+            href={`/u/${nextImage.user.username}/status/${nextImage.id}${queryString}`}
             className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group"
           >
             <span className="truncate group-hover:underline">
