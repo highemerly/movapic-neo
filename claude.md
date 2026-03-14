@@ -9,6 +9,7 @@
 - `/create` → **投稿ページ**
 - `/settings` → **設定ページ**
 - `/u/[username]` → **ユーザーページ**
+- `/u/[username]/calendar` → **カレンダーページ**
 - `/u/[username]/status/[imageId]` → **画像ページ**
 - `/public` → **公開タイムライン**
 - `/favorite` → **お気に入りページ**（ログインユーザーのみ）
@@ -119,6 +120,21 @@
 - **レスポンス**: `{ images[], nextCursor, hasMore }`
 - 自分がお気に入り登録した画像一覧を最新順で取得
 
+### GET /api/v1/public/users/[username]/calendar
+- **パラメータ**: year, month
+- **レスポンス**:
+  ```typescript
+  {
+    year: number
+    month: number
+    days: { [day: number]: { count, latest: { id, thumbnailKey, storageKey, position } } }
+    hasPrevMonth: boolean
+    hasNextMonth: boolean
+    isPerfectAttendance: boolean  // 皆勤賞（その月毎日投稿）
+  }
+  ```
+- カレンダー表示用の月別画像データ
+
 ## メール投稿機能
 - **Cloudflare Email Worker** (`workers/email-forwarder/`): メールを受信しraw dataをAPIへ転送
 - **メールパーサー** (`src/lib/email/parser.ts`): 件名→オプション、本文→テキスト、添付→画像
@@ -218,6 +234,23 @@ DBの`Image.source`フィールドで投稿元を識別：
 2. Mastodon: 動的クライアント登録 → OAuth認可画面へリダイレクト
 3. Misskey: MiAuthセッション生成 → MiAuth認可画面へリダイレクト
 4. コールバックでトークン取得 → ユーザー作成/更新 → JWTセッション発行
+
+## カレンダー機能
+ユーザーページから閲覧できる投稿カレンダー。
+
+### 機能
+- 月別カレンダー表示（投稿日にサムネイル表示）
+- 日付クリックでその日の全画像をモーダル表示
+- **皆勤賞**: その月に毎日投稿すると👑を表示（過去月のみ判定）
+
+### サムネイル
+- **サイズ**: 64x64px（WebP形式、quality 60）
+- **生成タイミング**: 投稿時（`/api/v1/post`内）
+- **クロップ位置**: 文字位置に応じた角を基準
+  - top/left → 左上から
+  - bottom → 左下から
+  - right → 右上から
+- **既存画像のサムネイル生成**: `npx tsx scripts/generate-thumbnails.ts`
 
 ## 本番DBマイグレーション
 

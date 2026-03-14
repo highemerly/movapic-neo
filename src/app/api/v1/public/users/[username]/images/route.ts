@@ -33,15 +33,33 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams;
     const cursor = searchParams.get("cursor");
     const limitParam = searchParams.get("limit");
+    const startDateParam = searchParams.get("startDate");
+    const endDateParam = searchParams.get("endDate");
     const limit = Math.min(
       Math.max(1, parseInt(limitParam || String(DEFAULT_LIMIT), 10)),
       MAX_LIMIT
     );
 
+    // 日付フィルタを構築
+    const dateFilter: { gte?: Date; lt?: Date } = {};
+    if (startDateParam) {
+      const startDate = new Date(startDateParam);
+      if (!isNaN(startDate.getTime())) {
+        dateFilter.gte = startDate;
+      }
+    }
+    if (endDateParam) {
+      const endDate = new Date(endDateParam);
+      if (!isNaN(endDate.getTime())) {
+        dateFilter.lt = endDate;
+      }
+    }
+
     const images = await prisma.image.findMany({
       where: {
         userId: user.id,
         isPublic: true,
+        ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
       },
       orderBy: { createdAt: "desc" },
       take: limit + 1,
@@ -52,6 +70,7 @@ export async function GET(
       select: {
         id: true,
         storageKey: true,
+        thumbnailKey: true,
         width: true,
         height: true,
         overlayText: true,

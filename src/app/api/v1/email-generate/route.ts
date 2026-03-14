@@ -11,6 +11,7 @@ import sharp from "sharp";
 import { parseEmail } from "@/lib/email/parser";
 import { processImage } from "@/lib/imageProcessor";
 import { uploadImage, generateStorageKey, getExtensionFromMimeType } from "@/lib/storage/r2";
+import { generateThumbnail, generateThumbnailKey } from "@/lib/thumbnail";
 import { verifyRequestSignature, hashRequestBody } from "@/lib/auth/crypto";
 import prisma from "@/lib/db";
 import { MAX_TEXT_LENGTH, MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from "@/types";
@@ -195,6 +196,11 @@ export async function POST(request: NextRequest) {
 
     await uploadImage(result.buffer, storageKey, result.contentType);
 
+    // サムネイルを生成してR2にアップロード
+    const thumbnailKey = generateThumbnailKey(storageKey);
+    const thumbnailBuffer = await generateThumbnail(result.buffer, parsed.options.position);
+    await uploadImage(thumbnailBuffer, thumbnailKey, "image/webp");
+
     // 画像メタデータを取得
     const metadata = await sharp(result.buffer).metadata();
 
@@ -216,6 +222,7 @@ export async function POST(request: NextRequest) {
         size: parsed.options.size,
         outputFormat,
         arrangement: parsed.options.arrangement,
+        thumbnailKey,
         source: "email",
         isPublic: true,
       },

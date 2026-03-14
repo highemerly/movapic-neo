@@ -34,9 +34,12 @@ export async function DELETE(
       return NextResponse.json({ error: "権限がありません" }, { status: 403 });
     }
 
-    // R2から削除
+    // R2から削除（元画像とサムネイル）
     try {
       await deleteImage(image.storageKey);
+      if (image.thumbnailKey) {
+        await deleteImage(image.thumbnailKey);
+      }
     } catch (error) {
       console.error("Failed to delete from R2:", error);
       // R2削除に失敗してもDB削除は続行

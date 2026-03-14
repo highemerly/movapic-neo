@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { Calendar } from "lucide-react";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { UserGalleryClient } from "./UserGalleryClient";
@@ -63,18 +64,27 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
       <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
       <div className="container mx-auto px-4 py-8 max-w-6xl">
       {/* ユーザー情報 */}
-      <div className="flex items-center gap-4 mb-8">
-        {user.avatarUrl && (
-          <Link href={`/u/${cleanUsername}`}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={user.avatarUrl}
-              alt={user.displayName || user.username}
-              className="w-16 h-16 rounded-full hover:opacity-80 transition-opacity"
-            />
+      <div className="flex items-start gap-4 mb-8">
+        <div className="flex flex-col items-center gap-1">
+          {user.avatarUrl && (
+            <Link href={`/u/${cleanUsername}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={user.avatarUrl}
+                alt={user.displayName || user.username}
+                className="w-16 h-16 rounded-full hover:opacity-80 transition-opacity"
+              />
+            </Link>
+          )}
+          <Link
+            href={`/u/${cleanUsername}/calendar`}
+            className="text-xs text-muted-foreground hover:underline flex items-center gap-0.5"
+          >
+            <Calendar className="w-3 h-3" />
+            カレンダー
           </Link>
-        )}
-        <div>
+        </div>
+        <div className="flex-1">
           <h1 className="text-xl font-bold">
             {user.displayName || user.username}
           </h1>

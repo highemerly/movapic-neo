@@ -10,6 +10,7 @@ import { getCurrentUserWithValidation } from "@/lib/auth/session";
 import { decryptToken } from "@/lib/auth/tokens";
 import { uploadImage, generateStorageKey, getExtensionFromMimeType } from "@/lib/storage/r2";
 import { postToMastodon, postToMisskey, MastodonVisibility, MisskeyVisibility } from "@/lib/fediverse/post";
+import { generateThumbnail, generateThumbnailKey } from "@/lib/thumbnail";
 import prisma from "@/lib/db";
 import {
   Position,
@@ -65,6 +66,11 @@ export async function POST(request: NextRequest) {
     // R2にアップロード
     await uploadImage(imageBuffer, storageKey, mimeType);
 
+    // サムネイルを生成してR2にアップロード
+    const thumbnailKey = generateThumbnailKey(storageKey);
+    const thumbnailBuffer = await generateThumbnail(imageBuffer, position);
+    await uploadImage(thumbnailBuffer, thumbnailKey, "image/webp");
+
     // 画像メタデータを取得
     const metadata = await sharp(imageBuffer).metadata();
 
@@ -86,6 +92,7 @@ export async function POST(request: NextRequest) {
         size,
         outputFormat: output,
         arrangement,
+        thumbnailKey,
         source: "web",
         isPublic: true,
       },

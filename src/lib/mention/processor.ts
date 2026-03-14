@@ -7,6 +7,7 @@ import sharp from "sharp";
 import { prisma } from "@/lib/db";
 import { processImage } from "@/lib/imageProcessor";
 import { uploadImage, generateStorageKey } from "@/lib/storage/r2";
+import { generateThumbnail, generateThumbnailKey } from "@/lib/thumbnail";
 import { postToMastodon, MastodonVisibility } from "@/lib/fediverse/post";
 import { decryptToken } from "@/lib/auth/tokens";
 import { MastodonNotification } from "./fetcher";
@@ -405,8 +406,14 @@ export async function processOneMention(
   // STEP8: R2にアップロード
   const imageId = randomUUID();
   const storageKey = generateStorageKey(imageId, processedImage.extension);
+  let thumbnailKey: string;
   try {
     await uploadImage(processedImage.buffer, storageKey, processedImage.contentType);
+
+    // サムネイルを生成してR2にアップロード
+    thumbnailKey = generateThumbnailKey(storageKey);
+    const thumbnailBuffer = await generateThumbnail(processedImage.buffer, options.position);
+    await uploadImage(thumbnailBuffer, thumbnailKey, "image/webp");
   } catch (error) {
     console.error(`[mention] R2アップロード失敗:`, error);
     return handleError(
@@ -485,6 +492,7 @@ export async function processOneMention(
       size: options.size,
       outputFormat,
       arrangement: options.arrangement,
+      thumbnailKey,
       source: "mention",
       isPublic: effectiveVisibility !== "local",
     },
