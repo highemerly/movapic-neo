@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -15,17 +16,38 @@ interface LoginButtonProps {
 }
 
 export function LoginButton({ allowedServers }: LoginButtonProps) {
+  const router = useRouter();
   const [server, setServer] = useState(
     allowedServers?.length === 1 ? allowedServers[0] : ""
   );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
 
   // 単一サーバー限定モード
   const singleServerMode = allowedServers?.length === 1;
 
+  // ログイン状態をチェック
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("/api/v1/me");
+        setIsLoggedIn(response.ok);
+      } catch {
+        setIsLoggedIn(false);
+      }
+    };
+    checkAuth();
+  }, []);
+
   const handleLogin = async (e?: React.FormEvent) => {
     e?.preventDefault();
+
+    // ログイン済みの場合はダッシュボードへ
+    if (isLoggedIn) {
+      router.push("/dashboard");
+      return;
+    }
 
     const targetServer = singleServerMode ? allowedServers[0] : server.trim();
 
@@ -65,23 +87,43 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
 
   // 単一サーバー限定モード: シンプルなボタン
   if (singleServerMode) {
+    const buttonLabel = isLoggedIn
+      ? "ダッシュボードへ"
+      : isLoading
+        ? "処理中..."
+        : `${allowedServers[0]} でログイン`;
+
     return (
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          みんなでコメント付きの写真を共有するサービスです。
-        </p>
         <Button
           onClick={() => handleLogin()}
-          disabled={isLoading}
+          disabled={isLoading || isLoggedIn === null}
           className="w-full py-6 text-lg"
           size="lg"
         >
-          {isLoading ? "処理中..." : `${allowedServers[0]} でログイン`}
+          {isLoggedIn === null ? "読み込み中..." : buttonLabel}
         </Button>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <p className="text-xs text-muted-foreground">
-          他のサーバーでは現在利用できません
-        </p>
+        {!isLoggedIn && (
+          <p className="text-xs text-muted-foreground">
+            他のサーバーでは現在利用できません
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // ログイン済みの場合
+  if (isLoggedIn) {
+    return (
+      <div className="space-y-4">
+        <Button
+          onClick={() => router.push("/dashboard")}
+          className="w-full py-6 text-lg"
+          size="lg"
+        >
+          ダッシュボードへ
+        </Button>
       </div>
     );
   }
@@ -89,28 +131,36 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
   // 自由入力モード
   return (
     <form onSubmit={handleLogin} className="space-y-4">
-      <div className="flex gap-2">
-        <Input
-          type="text"
-          value={server}
-          onChange={(e) => setServer(e.target.value)}
-          placeholder="mastodon.social"
-          disabled={isLoading}
-          className="flex-1 py-6 text-lg"
-        />
-        <Button
-          type="submit"
-          disabled={isLoading || !server.trim()}
-          className="py-6 text-lg"
-          size="lg"
-        >
-          {isLoading ? "処理中..." : "ログイン"}
+      {isLoggedIn === null ? (
+        <Button disabled className="w-full py-6 text-lg" size="lg">
+          読み込み中...
         </Button>
-      </div>
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      <p className="text-xs text-muted-foreground">
-        Mastodon または Misskey サーバーのドメインを入力してください
-      </p>
+      ) : (
+        <>
+          <div className="flex gap-2">
+            <Input
+              type="text"
+              value={server}
+              onChange={(e) => setServer(e.target.value)}
+              placeholder="mastodon.social"
+              disabled={isLoading}
+              className="flex-1 py-6 text-lg"
+            />
+            <Button
+              type="submit"
+              disabled={isLoading || !server.trim()}
+              className="py-6 text-lg"
+              size="lg"
+            >
+              {isLoading ? "処理中..." : "ログイン"}
+            </Button>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <p className="text-xs text-muted-foreground">
+            Mastodon または Misskey サーバーのドメインを入力してください
+          </p>
+        </>
+      )}
     </form>
   );
 }

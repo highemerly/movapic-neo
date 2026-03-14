@@ -162,7 +162,7 @@ export default async function DashboardPage() {
         <section className="mb-8">
           <h2 className="text-lg font-semibold mb-1">投稿する</h2>
           <p className="text-xs text-muted-foreground mb-4">
-            好きな方法で写真とコメントをアップロードしましょう。
+            好きな方法で写真とコメントをアップロードしよう。
           </p>
           <div className="bg-muted rounded-lg p-4">
             <PostMethodTabs

@@ -237,12 +237,19 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           />
         </div>
 
-        {/* 削除ボタン（自分の画像のみ） */}
-        {isOwner && (
-          <div className="mt-8">
+        {/* アクションボタン */}
+        <div className="mt-8 flex gap-4 flex-wrap">
+          <Link href="/public">
+            <Button variant="default">みんなの投稿を見る</Button>
+          </Link>
+          <Link href="/create">
+            <Button variant="outline">画像を作成する</Button>
+          </Link>
+          {/* 削除ボタン（自分の画像のみ） */}
+          {isOwner && (
             <DeleteButton imageId={imageId} username={username} />
-          </div>
-        )}
+          )}
+        </div>
 
         <Footer />
       </main>
