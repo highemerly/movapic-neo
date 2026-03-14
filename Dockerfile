@@ -21,6 +21,11 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npx prisma generate
+
+# ビルド時にダミーの環境変数を設定（ISRページのプリレンダリングをスキップするため）
+# 実際のDB接続は必要なく、Prismaクライアントの初期化だけ行われる
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+
 RUN npm run build
 
 # Production image, copy all the files and run next

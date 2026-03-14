@@ -7,6 +7,12 @@ const globalForPrisma = globalThis as unknown as {
   pool: Pool | undefined;
 };
 
+// ビルド時かどうかを判定（ダミーURLの場合はビルド時）
+function isBuildTime(): boolean {
+  const url = process.env.DATABASE_URL;
+  return !url || url.includes("dummy");
+}
+
 function createPrismaClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
@@ -34,6 +40,28 @@ function getPrismaClient(): PrismaClient {
 // This allows the module to be imported during build without DATABASE_URL
 export const prisma = new Proxy({} as PrismaClient, {
   get(_target, prop: string | symbol) {
+    // ビルド時はダミーの結果を返す
+    if (isBuildTime()) {
+      // findMany等のメソッドは空配列を返すPromiseを返す
+      if (prop === "image" || prop === "user" || prop === "instance") {
+        return new Proxy({}, {
+          get(_t, method: string) {
+            if (method === "findMany") {
+              return async () => [];
+            }
+            if (method === "findUnique" || method === "findFirst") {
+              return async () => null;
+            }
+            if (method === "count") {
+              return async () => 0;
+            }
+            return async () => null;
+          },
+        });
+      }
+      return undefined;
+    }
+
     const client = getPrismaClient();
     const value = client[prop as keyof PrismaClient];
     if (typeof value === "function") {
