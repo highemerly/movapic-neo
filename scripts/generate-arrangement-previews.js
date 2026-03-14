@@ -4,6 +4,7 @@
  * Usage: node scripts/generate-arrangement-previews.js
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { Canvas } = require("skia-canvas");
 const fs = require("fs");
 const path = require("path");

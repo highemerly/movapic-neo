@@ -18,6 +18,7 @@ import { ImageProcessError } from "@/lib/errors";
 
 // フォントを登録
 const fontsDir = path.join(process.cwd(), "fonts");
+// eslint-disable-next-line react-hooks/rules-of-hooks
 FontLibrary.use([
   path.join(fontsDir, "HuiFont29.ttf"),
   path.join(fontsDir, "NotoSansJP-Regular.ttf"),

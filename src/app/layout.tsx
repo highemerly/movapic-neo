@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "写真に文字を合成するやつ（仮）",
-  description: "画像に文字を合成してSNSに投稿します",
+  description: "写真に文字を合成してSNSに投稿します",
 };
 
 export default function RootLayout({

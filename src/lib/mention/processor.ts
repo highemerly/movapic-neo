@@ -226,6 +226,7 @@ export async function processOneMention(
 ): Promise<ProcessResult> {
   const statusId = notification.status!.id;
   const startTime = Date.now();
+  // eslint-disable-next-line prefer-const
   let requestId: string | undefined;
 
   const botAcct = getBotAcct();

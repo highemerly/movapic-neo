@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Cloudflare Email Worker
  * メールのraw dataをそのままNext.js APIへ転送する軽量Worker
@@ -52,7 +51,7 @@ async function generateSignature(
   return signatureArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export default {
+const emailWorker = {
   async email(message: EmailMessage, env: Env): Promise<void> {
     try {
       // メールのraw dataを取得
@@ -92,3 +91,5 @@ export default {
     }
   },
 };
+
+export default emailWorker;

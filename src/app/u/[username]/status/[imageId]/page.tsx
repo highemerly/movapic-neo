@@ -243,7 +243,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             <Button variant="default">みんなの投稿を見る</Button>
           </Link>
           <Link href="/create">
-            <Button variant="outline">画像を作成する</Button>
+            <Button variant="outline">写真を投稿する</Button>
           </Link>
           {/* 削除ボタン（自分の画像のみ） */}
           {isOwner && (

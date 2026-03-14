@@ -72,14 +72,6 @@ export async function createSession(
   });
 }
 
-/**
- * セッションCookieを設定（後方互換性のため残す - createSessionに統合済み）
- * @deprecated createSessionを使用してください
- */
-export async function setSessionCookie(_sessionToken: string): Promise<void> {
-  // JWTではcreateSession内でCookieを設定するため、この関数は不要
-  // 呼び出し元の移行が完了したら削除予定
-}
 
 /**
  * セッションCookieを削除

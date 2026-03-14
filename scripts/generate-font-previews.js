@@ -4,6 +4,7 @@
  * Usage: node scripts/generate-font-previews.js
  */
 
+/* eslint-disable @typescript-eslint/no-require-imports, react-hooks/rules-of-hooks */
 const { Canvas, FontLibrary } = require("skia-canvas");
 const fs = require("fs");
 const path = require("path");

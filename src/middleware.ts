@@ -4,7 +4,8 @@ import type { NextRequest } from "next/server";
 /**
  * セキュリティヘッダーを追加するmiddleware
  */
-export function middleware(request: NextRequest) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function middleware(_request: NextRequest) {
   const response = NextResponse.next();
 
   // X-Content-Type-Options: MIMEタイプスニッフィング防止
