@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DayCell } from "./DayCell";
-import { DayDetailModal } from "./DayDetailModal";
 
 interface DayData {
   count: number;
@@ -39,11 +39,11 @@ export function CalendarView({
   initialYear,
   initialMonth,
 }: CalendarViewProps) {
+  const router = useRouter();
   const [year, setYear] = useState(initialYear);
   const [month, setMonth] = useState(initialMonth);
   const [data, setData] = useState<CalendarData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   const fetchCalendarData = useCallback(async () => {
     setLoading(true);
@@ -158,22 +158,16 @@ export function CalendarView({
             isSunday={index % 7 === 0}
             isSaturday={index % 7 === 6}
             loading={loading}
-            onClick={() => day && data?.days[day] && setSelectedDay(day)}
+            onClick={() => {
+              if (day && data?.days[day]) {
+                const imageId = data.days[day].latest.id;
+                router.push(`/u/${username}/status/${imageId}`);
+              }
+            }}
           />
         ))}
       </div>
 
-      {/* 日付詳細モーダル */}
-      {selectedDay && data?.days[selectedDay] && (
-        <DayDetailModal
-          username={username}
-          year={year}
-          month={month}
-          day={selectedDay}
-          publicUrl={publicUrl}
-          onClose={() => setSelectedDay(null)}
-        />
-      )}
     </div>
   );
 }
