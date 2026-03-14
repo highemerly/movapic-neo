@@ -69,7 +69,7 @@ export function MentionSettingsForm({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Botアカウント（
+        投稿用のBotアカウント（
         <a
           href={botProfileUrl}
           target="_blank"
@@ -78,10 +78,10 @@ export function MentionSettingsForm({
         >
           @{botAcct}
         </a>
-        ）にメンションで画像を送信すると、自動で合成して投稿できます。
+        ）にメンションで画像を送信するだけで、数分後にコメントを合成して写真が投稿されます。
       </p>
 
-      <div className="text-sm text-muted-foreground">
+      <div className="text-sm space-y-3">
         <p className="font-medium">投稿の形式:</p>
         <ul className="list-disc list-inside space-y-1 ml-2">
           <li>
@@ -105,12 +105,12 @@ export function MentionSettingsForm({
         <div className="space-y-2">
           {/* シンプルな投稿 */}
           <div className="p-3 bg-muted/50 rounded-lg space-y-2">
-            <p className="text-xs text-muted-foreground">標準の使い方</p>
+            <p className="text-xs text-muted-foreground">コメントをつけて投稿する</p>
             <code className="block text-xs bg-background p-2 rounded border">
               @{botAcct} マックチキン！
             </code>
             <a
-              href={`https://${userInstanceDomain}/share?text=${encodeURIComponent(`@${botAcct} ここに好きな文章を入力`)}`}
+              href={`https://${userInstanceDomain}/share?text=${encodeURIComponent(`@${botAcct} マックチキン！`)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block text-xs text-primary hover:underline"
@@ -122,7 +122,7 @@ export function MentionSettingsForm({
           <div className="p-3 bg-muted/50 rounded-lg space-y-2">
             <p className="text-xs text-muted-foreground">オプションを指定する</p>
             <code className="block text-xs bg-background p-2 rounded border">
-              @{botAcct} [右 赤 ネオン] 今日も良い天気！
+              @{botAcct} [右 赤 ネオン] マックチキン！
             </code>
             <a
               href={`https://${userInstanceDomain}/share?text=${encodeURIComponent(`@${botAcct} [右 赤 ネオン] ここに好きな文章を入力`)}`}
