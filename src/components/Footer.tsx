@@ -9,6 +9,12 @@ export function Footer() {
       >
         フォントライセンス
       </Link>
+      <Link
+        href="/privacy"
+        className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+      >
+        プライバシーポリシー
+      </Link>
       <a
         href="https://handon.club/@highemerly"
         target="_blank"
