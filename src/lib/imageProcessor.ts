@@ -32,6 +32,9 @@ const CANVAS_FONT_NAMES: Record<FontFamily, string> = {
   "light-novel-pop": "LightNovelPopV2",
 };
 
+// プロポーショナルフォント（横書き時のみ適用）
+const PROPORTIONAL_FONTS: Set<FontFamily> = new Set(["noto-sans-jp"]);
+
 interface ProcessImageParams {
   imageBuffer: Buffer;
   text: string;
@@ -99,6 +102,57 @@ const MARGIN_RATIO = 0.05;
 const STROKE_WIDTH_RATIO = 0.08;
 
 /**
+ * テキストを行に分割する（プロポーショナル/等幅対応）
+ */
+function splitTextIntoLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  useProportional: boolean,
+  fontSize: number
+): string[] {
+  const lines: string[] = [];
+  const paragraphs = text.split("\n");
+
+  for (const paragraph of paragraphs) {
+    if (paragraph === "") {
+      lines.push("");
+      continue;
+    }
+
+    if (useProportional) {
+      // プロポーショナル: 文字幅を累積して改行判定
+      let currentLine = "";
+      let currentWidth = 0;
+
+      for (const char of paragraph) {
+        const charWidth = ctx.measureText(char).width;
+        if (currentWidth + charWidth > maxWidth && currentLine !== "") {
+          lines.push(currentLine);
+          currentLine = char;
+          currentWidth = charWidth;
+        } else {
+          currentLine += char;
+          currentWidth += charWidth;
+        }
+      }
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+    } else {
+      // 等幅: 固定文字数で分割
+      const chars = Array.from(paragraph);
+      const charsPerLine = Math.max(1, Math.floor(maxWidth / fontSize));
+      for (let i = 0; i < chars.length; i += charsPerLine) {
+        lines.push(chars.slice(i, i + charsPerLine).join(""));
+      }
+    }
+  }
+
+  return lines;
+}
+
+/**
  * HEX色をRGBオブジェクトに変換
  */
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -140,11 +194,11 @@ async function createTextOverlay(
 
   // アレンジに応じた描画方法を選択
   if (arrangement === "stamp") {
-    drawStampText(ctx, text, position, width, height, fontSize, margin, textColor, fontName);
+    drawStampText(ctx, text, position, width, height, fontSize, margin, textColor, fontName, fontFamily);
   } else if (isVertical) {
     drawVerticalText(ctx, text, position, width, height, fontSize, margin, textColor, strokeColor, strokeWidth, arrangement);
   } else {
-    drawHorizontalText(ctx, text, position, width, height, fontSize, margin, textColor, strokeColor, strokeWidth, arrangement);
+    drawHorizontalText(ctx, text, position, width, height, fontSize, margin, textColor, strokeColor, strokeWidth, arrangement, fontFamily);
   }
 
   return Buffer.from(await canvas.toBuffer("png"));
@@ -224,17 +278,20 @@ function drawStampText(
   fontSize: number,
   margin: number,
   textColor: string,
-  fontName: string
+  fontName: string,
+  fontFamily: FontFamily
 ) {
   const chars = Array.from(text);
   const isVertical = position === "left" || position === "right";
   const rgb = hexToRgb(textColor);
+  const useProportional = !isVertical && PROPORTIONAL_FONTS.has(fontFamily);
 
   // テキストの配置を計算
   let textWidth: number;
   let textHeight: number;
   let columns: string[][];
   let lines: string[];
+  let lineWidths: number[] = []; // プロポーショナル用: 各行の実際の幅
 
   // 縦書き/横書きで共通の行間・列幅
   const verticalLineHeight = fontSize * 1.2;
@@ -257,14 +314,18 @@ function drawStampText(
     lines = [];
   } else {
     // 横書き: 行ごとに分割
-    const maxWidth = width - margin * 2;
-    const charsPerLine = Math.max(1, Math.floor((maxWidth - margin * 2) / fontSize));
-    lines = [];
-    for (let i = 0; i < chars.length; i += charsPerLine) {
-      lines.push(chars.slice(i, i + charsPerLine).join(""));
+    const maxWidth = width - margin * 2 - margin * 2; // padding分を考慮
+    lines = splitTextIntoLines(ctx, text, maxWidth, useProportional, fontSize);
+
+    if (useProportional) {
+      // プロポーショナル: 各行の実際の幅を計算
+      lineWidths = lines.map(line => ctx.measureText(line).width);
+      textWidth = Math.max(...lineWidths, 0);
+    } else {
+      // 等幅: 最長行の文字数 × fontSize
+      const maxCharsInLine = Math.max(...lines.map(l => Array.from(l).length), 0);
+      textWidth = maxCharsInLine * fontSize;
     }
-    // 文字数 × 文字幅
-    textWidth = Math.min(chars.length, charsPerLine) * fontSize;
     // 行数 × 行高
     textHeight = lines.length * horizontalLineHeight;
     columns = [];
@@ -495,39 +556,75 @@ function drawStampText(
     });
   } else {
     // 横書き描画
-    const firstCharCenterX = boxX + padding + fontSize / 2;
     const firstLineCenterY = boxY + padding + horizontalLineHeight / 2;
 
     lines.forEach((line, lineIndex) => {
       const lineChars = Array.from(line);
-      lineChars.forEach((char, charIndex) => {
-        // 手書き風ずれ（強化）
-        const offsetX = (Math.random() - 0.5) * fontSize * 0.15;
-        const offsetY = (Math.random() - 0.5) * fontSize * 0.15;
-        const rotation = (Math.random() - 0.5) * 0.1; // ±5度
+      const y = firstLineCenterY + lineIndex * horizontalLineHeight;
 
-        // 位置に基づくインクムラ
-        const normalizedX = charIndex / Math.max(1, lineChars.length - 1);
-        const normalizedY = lineIndex / Math.max(1, lines.length - 1);
-        const alpha = getInkAlpha(normalizedX, normalizedY);
+      if (useProportional) {
+        // プロポーショナル: 累積幅で配置
+        let currentX = boxX + padding;
+        lineChars.forEach((char, charIndex) => {
+          const charWidth = ctx.measureText(char).width;
+          // 手書き風ずれ（強化）
+          const offsetX = (Math.random() - 0.5) * fontSize * 0.15;
+          const offsetY = (Math.random() - 0.5) * fontSize * 0.15;
+          const rotation = (Math.random() - 0.5) * 0.1; // ±5度
 
-        const x = firstCharCenterX + charIndex * fontSize + offsetX;
-        const y = firstLineCenterY + lineIndex * horizontalLineHeight + offsetY;
+          // 位置に基づくインクムラ
+          const normalizedX = charIndex / Math.max(1, lineChars.length - 1);
+          const normalizedY = lineIndex / Math.max(1, lines.length - 1);
+          const alpha = getInkAlpha(normalizedX, normalizedY);
 
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(rotation);
+          const x = currentX + charWidth / 2 + offsetX;
 
-        // 縁取り（白）
-        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
-        ctx.lineWidth = textStrokeWidth;
-        ctx.strokeText(char, 0, 0);
-        // 本体（選択色）
-        ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
-        ctx.fillText(char, 0, 0);
+          ctx.save();
+          ctx.translate(x, y + offsetY);
+          ctx.rotate(rotation);
 
-        ctx.restore();
-      });
+          // 縁取り（白）
+          ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
+          ctx.lineWidth = textStrokeWidth;
+          ctx.strokeText(char, 0, 0);
+          // 本体（選択色）
+          ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+          ctx.fillText(char, 0, 0);
+
+          ctx.restore();
+          currentX += charWidth;
+        });
+      } else {
+        // 等幅: 固定幅で配置
+        const firstCharCenterX = boxX + padding + fontSize / 2;
+        lineChars.forEach((char, charIndex) => {
+          // 手書き風ずれ（強化）
+          const offsetX = (Math.random() - 0.5) * fontSize * 0.15;
+          const offsetY = (Math.random() - 0.5) * fontSize * 0.15;
+          const rotation = (Math.random() - 0.5) * 0.1; // ±5度
+
+          // 位置に基づくインクムラ
+          const normalizedX = charIndex / Math.max(1, lineChars.length - 1);
+          const normalizedY = lineIndex / Math.max(1, lines.length - 1);
+          const alpha = getInkAlpha(normalizedX, normalizedY);
+
+          const x = firstCharCenterX + charIndex * fontSize + offsetX;
+
+          ctx.save();
+          ctx.translate(x, y + offsetY);
+          ctx.rotate(rotation);
+
+          // 縁取り（白）
+          ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
+          ctx.lineWidth = textStrokeWidth;
+          ctx.strokeText(char, 0, 0);
+          // 本体（選択色）
+          ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+          ctx.fillText(char, 0, 0);
+
+          ctx.restore();
+        });
+      }
     });
   }
 
@@ -548,25 +645,15 @@ function drawHorizontalText(
   textColor: string,
   strokeColor: string,
   strokeWidth: number,
-  arrangement: Arrangement
+  arrangement: Arrangement,
+  fontFamily: FontFamily
 ) {
   const maxWidth = width - margin * 2;
-  const charsPerLine = Math.max(1, Math.floor(maxWidth / fontSize));
   const lineHeight = fontSize * 1.4;
+  const useProportional = PROPORTIONAL_FONTS.has(fontFamily);
 
-  // 改行で分割し、各行を幅に応じてさらに分割
-  const lines: string[] = [];
-  const paragraphs = text.split("\n");
-  for (const paragraph of paragraphs) {
-    const chars = Array.from(paragraph);
-    if (chars.length === 0) {
-      lines.push(""); // 空行を保持
-    } else {
-      for (let i = 0; i < chars.length; i += charsPerLine) {
-        lines.push(chars.slice(i, i + charsPerLine).join(""));
-      }
-    }
-  }
+  // 行分割（プロポーショナル/等幅対応）
+  const lines = splitTextIntoLines(ctx, text, maxWidth, useProportional, fontSize);
 
   // Y開始位置
   let startY: number;
@@ -582,14 +669,30 @@ function drawHorizontalText(
     const y = startY + lineIndex * lineHeight;
     const lineChars = Array.from(line);
 
-    lineChars.forEach((char, charIndex) => {
-      const x = margin + fontSize / 2 + charIndex * fontSize;
-      if (arrangement === "neon") {
-        drawNeonText(ctx, char, x, y, fontSize, textColor);
-      } else {
-        drawTextWithStroke(ctx, char, x, y, textColor, strokeColor, strokeWidth);
-      }
-    });
+    if (useProportional) {
+      // プロポーショナル: 累積幅で配置
+      let currentX = margin;
+      lineChars.forEach((char) => {
+        const charWidth = ctx.measureText(char).width;
+        const x = currentX + charWidth / 2;
+        if (arrangement === "neon") {
+          drawNeonText(ctx, char, x, y, fontSize, textColor);
+        } else {
+          drawTextWithStroke(ctx, char, x, y, textColor, strokeColor, strokeWidth);
+        }
+        currentX += charWidth;
+      });
+    } else {
+      // 等幅: 固定幅で配置
+      lineChars.forEach((char, charIndex) => {
+        const x = margin + fontSize / 2 + charIndex * fontSize;
+        if (arrangement === "neon") {
+          drawNeonText(ctx, char, x, y, fontSize, textColor);
+        } else {
+          drawTextWithStroke(ctx, char, x, y, textColor, strokeColor, strokeWidth);
+        }
+      });
+    }
   });
 }
 
