@@ -1,7 +1,6 @@
 "use client";
 
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { MAX_TEXT_LENGTH } from "@/types";
 
 interface TextInputProps {
@@ -20,6 +19,11 @@ export function TextInput({ value, onChange, disabled }: TextInputProps) {
 
   return (
     <div className="space-y-1">
+      <div className="flex justify-end">
+        <span className="text-xs text-muted-foreground">
+          {value.length} / {MAX_TEXT_LENGTH}
+        </span>
+      </div>
       <Textarea
         id="text-input"
         value={value}
@@ -28,11 +32,6 @@ export function TextInput({ value, onChange, disabled }: TextInputProps) {
         disabled={disabled}
         className="min-h-[100px] resize-none"
       />
-      <div className="flex justify-end">
-        <span className="text-xs text-muted-foreground">
-          {value.length} / {MAX_TEXT_LENGTH}
-        </span>
-      </div>
     </div>
   );
 }

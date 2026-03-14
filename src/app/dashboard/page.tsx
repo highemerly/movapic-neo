@@ -36,21 +36,27 @@ export default async function DashboardPage() {
     redirect("/");
   }
 
-  // ユーザーのデフォルト設定とbioを取得
-  const userWithPreferences = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: {
-      bio: true,
-      mentionVisibility: true,
-      mentionKeep: true,
-      defaultPosition: true,
-      defaultFont: true,
-      defaultColor: true,
-      defaultSize: true,
-      defaultOutput: true,
-      defaultArrangement: true,
-    },
-  });
+  // ユーザーのデフォルト設定、bio、統計情報を取得
+  const [userWithPreferences, imageCount] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        createdAt: true,
+        bio: true,
+        mentionVisibility: true,
+        mentionKeep: true,
+        defaultPosition: true,
+        defaultFont: true,
+        defaultColor: true,
+        defaultSize: true,
+        defaultOutput: true,
+        defaultArrangement: true,
+      },
+    }),
+    prisma.image.count({
+      where: { userId: user.id },
+    }),
+  ]);
 
   // Bot設定を環境変数から取得
   const botUsername = process.env.MASTODON_BOT_ACCT || "pic";
@@ -128,7 +134,8 @@ export default async function DashboardPage() {
         {/* セクション1: みる */}
         <section className="mb-8">
           <h2 className="text-lg font-semibold mb-4">みる</h2>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="bg-muted rounded-lg p-4">
+            <div className="grid grid-cols-3 gap-3">
             <Link href="/public">
               <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
                 <Globe className="h-5 w-5" />
@@ -147,13 +154,14 @@ export default async function DashboardPage() {
                 <span className="text-sm">お気に入り</span>
               </Button>
             </Link>
+            </div>
           </div>
         </section>
 
         {/* セクション2: 投稿する */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold mb-2">投稿する</h2>
-          <p className="text-sm text-muted-foreground mb-4">
+          <h2 className="text-lg font-semibold mb-1">投稿する</h2>
+          <p className="text-xs text-muted-foreground mb-4">
             好きな方法で写真とコメントをアップロードしましょう。
           </p>
           <div className="bg-muted rounded-lg p-4">
@@ -165,123 +173,130 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* セクション3: その他 */}
-        <section>
-          <h2 className="text-lg font-semibold mb-4">その他のメニュー</h2>
-
-          {/* アカウント情報 */}
-          <div className="bg-muted rounded-lg p-6 mb-4">
-            <h3 className="text-base font-medium mb-4">アカウント情報</h3>
-            <div className="flex items-center gap-4 mb-4">
+        {/* セクション3: アカウント */}
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold mb-4">アカウント</h2>
+          <div className="bg-muted rounded-lg p-4">
+            <div className="flex items-center gap-4">
               {user.avatarUrl && (
                 <Link href={`/u/${user.username}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={user.avatarUrl}
                     alt={user.displayName || user.username}
-                    className="w-16 h-16 rounded-full hover:opacity-80 transition-opacity"
+                    className="w-12 h-12 rounded-full hover:opacity-80 transition-opacity"
                   />
                 </Link>
               )}
-              <div>
-                <h4 className="text-lg font-semibold">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">
                   {user.displayName || user.username}
-                </h4>
+                </p>
                 <a
                   href={`https://${user.instance.domain}/@${user.username}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-muted-foreground hover:underline"
+                  className="text-sm text-muted-foreground hover:underline"
                 >
                   @{user.username}@{user.instance.domain}
                 </a>
               </div>
             </div>
             {!user.avatarUrl && (
-              <p className="text-xs text-muted-foreground mb-4">
+              <p className="text-xs text-muted-foreground mt-3">
                 アイコンが表示されていない場合は、ログインし直すと反映されます。
               </p>
             )}
-            <dl className="space-y-4">
+            <div className="mt-4 flex gap-6 text-sm">
               <div>
-                <dt className="text-sm font-medium text-muted-foreground mb-2">プロフィール</dt>
-                <dd>
-                  <BioEditForm initialBio={userWithPreferences?.bio ?? null} />
-                </dd>
+                <p className="text-muted-foreground text-xs">投稿数</p>
+                <p className="font-medium">{imageCount}件</p>
               </div>
-            </dl>
-            <div className="mt-6">
-              <LogoutButton />
-            </div>
-          </div>
-
-          {/* 投稿のデフォルト設定 */}
-          <div className="bg-muted rounded-lg p-6">
-            <h3 className="text-base font-medium mb-4">投稿のデフォルト設定</h3>
-            <div className="space-y-4">
-              {hasPreferences ? (
-                <>
-                  <dl className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <dt className="text-muted-foreground">位置</dt>
-                      <dd className="mt-1 font-medium">
-                        {userWithPreferences.defaultPosition
-                          ? POSITION_LABELS[userWithPreferences.defaultPosition as Position]
-                          : "システム標準"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">フォント</dt>
-                      <dd className="mt-1 font-medium">
-                        {userWithPreferences.defaultFont
-                          ? FONT_LABELS[userWithPreferences.defaultFont as FontFamily]
-                          : "システム標準"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">色</dt>
-                      <dd className="mt-1 font-medium">
-                        {userWithPreferences.defaultColor
-                          ? COLOR_LABELS[userWithPreferences.defaultColor as Color]
-                          : "システム標準"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">サイズ</dt>
-                      <dd className="mt-1 font-medium">
-                        {userWithPreferences.defaultSize
-                          ? SIZE_LABELS[userWithPreferences.defaultSize as Size]
-                          : "システム標準"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">出力形式</dt>
-                      <dd className="mt-1 font-medium">
-                        {userWithPreferences.defaultOutput
-                          ? OUTPUT_LABELS[userWithPreferences.defaultOutput as OutputFormat]
-                          : "システム標準"}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">アレンジ</dt>
-                      <dd className="mt-1 font-medium">
-                        {userWithPreferences.defaultArrangement
-                          ? ARRANGEMENT_LABELS[userWithPreferences.defaultArrangement as Arrangement]
-                          : "システム標準"}
-                      </dd>
-                    </div>
-                  </dl>
-                  <p className="text-xs text-muted-foreground">
-                    設定の変更は<Link href="/create" className="text-primary hover:underline">Web投稿画面</Link>で行ってください。
+              {userWithPreferences?.createdAt && (
+                <div>
+                  <p className="text-muted-foreground text-xs">登録日</p>
+                  <p className="font-medium">
+                    {userWithPreferences.createdAt.toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}
                   </p>
-                  <PreferencesResetButton />
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  デフォルト設定は未設定です。<Link href="/create" className="text-primary hover:underline">Web投稿画面</Link>で「初期値として保存」ボタンを押すと設定できます。
-                </p>
+                </div>
               )}
             </div>
+            <div className="mt-4">
+              <LogoutButton />
+            </div>
+            <div className="mt-4 pt-4 border-t border-border">
+              <BioEditForm initialBio={userWithPreferences?.bio ?? null} />
+            </div>
+          </div>
+        </section>
+
+        {/* セクション4: 設定 */}
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold mb-4">設定</h2>
+          <div className="bg-muted rounded-lg p-4">
+            <p className="text-sm font-medium mb-3">投稿のデフォルト設定</p>
+            {hasPreferences ? (
+              <div className="space-y-4">
+                <dl className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <dt className="text-muted-foreground text-xs">位置</dt>
+                    <dd className="font-medium">
+                      {userWithPreferences.defaultPosition
+                        ? POSITION_LABELS[userWithPreferences.defaultPosition as Position]
+                        : "システム標準"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs">フォント</dt>
+                    <dd className="font-medium">
+                      {userWithPreferences.defaultFont
+                        ? FONT_LABELS[userWithPreferences.defaultFont as FontFamily]
+                        : "システム標準"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs">色</dt>
+                    <dd className="font-medium">
+                      {userWithPreferences.defaultColor
+                        ? COLOR_LABELS[userWithPreferences.defaultColor as Color]
+                        : "システム標準"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs">サイズ</dt>
+                    <dd className="font-medium">
+                      {userWithPreferences.defaultSize
+                        ? SIZE_LABELS[userWithPreferences.defaultSize as Size]
+                        : "システム標準"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs">出力形式</dt>
+                    <dd className="font-medium">
+                      {userWithPreferences.defaultOutput
+                        ? OUTPUT_LABELS[userWithPreferences.defaultOutput as OutputFormat]
+                        : "システム標準"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground text-xs">アレンジ</dt>
+                    <dd className="font-medium">
+                      {userWithPreferences.defaultArrangement
+                        ? ARRANGEMENT_LABELS[userWithPreferences.defaultArrangement as Arrangement]
+                        : "システム標準"}
+                    </dd>
+                  </div>
+                </dl>
+                <p className="text-xs text-muted-foreground">
+                  変更は<Link href="/create" className="text-primary hover:underline">Web投稿画面</Link>から
+                </p>
+                <PreferencesResetButton />
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                未設定です。<Link href="/create" className="text-primary hover:underline">Web投稿画面</Link>で「初期値として保存」を押すと設定できます。
+              </p>
+            )}
           </div>
         </section>
 

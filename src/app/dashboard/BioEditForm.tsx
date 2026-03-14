@@ -54,15 +54,22 @@ export function BioEditForm({ initialBio }: BioEditFormProps) {
 
   return (
     <div className="space-y-2">
-      <div className="flex gap-2">
+      <div>
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-sm text-muted-foreground">プロフィール</span>
+          <span className={`text-xs ${isOverLimit ? "text-destructive" : "text-muted-foreground"}`}>
+            {bio.length}/{BIO_MAX_LENGTH}
+          </span>
+        </div>
         <Input
           type="text"
           value={bio}
           onChange={(e) => setBio(e.target.value)}
           placeholder="プロフィールを入力"
           maxLength={BIO_MAX_LENGTH + 10}
-          className="flex-1"
         />
+      </div>
+      <div className="flex items-center gap-3">
         <Button
           onClick={handleSave}
           disabled={!hasChanges || isOverLimit || isSaving}
@@ -70,15 +77,8 @@ export function BioEditForm({ initialBio }: BioEditFormProps) {
         >
           {isSaving ? "保存中..." : "保存"}
         </Button>
-      </div>
-      <div className="flex justify-between text-xs">
-        <span>
-          {error && <span className="text-destructive">{error}</span>}
-          {success && <span className="text-green-600">保存しました</span>}
-        </span>
-        <span className={isOverLimit ? "text-destructive" : "text-muted-foreground"}>
-          {bio.length}/{BIO_MAX_LENGTH}
-        </span>
+        {error && <span className="text-xs text-destructive">{error}</span>}
+        {success && <span className="text-xs text-green-600">保存しました</span>}
       </div>
     </div>
   );
