@@ -15,6 +15,9 @@ const getBotInstanceUrl = () => process.env.MASTODON_BOT_INSTANCE_URL || "https:
 const getBotAccessToken = () => process.env.MASTODON_BOT_ACCESS_TOKEN || "";
 const getMentionProcessApiKey = () => process.env.MENTION_PROCESS_API_KEY || "";
 
+// 1回のCronJobにつき、ユーザーあたりの最大処理数
+const MAX_MENTIONS_PER_USER = 3;
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
@@ -81,10 +84,24 @@ export async function POST(request: NextRequest) {
     let processed = 0;
     let skipped = 0;
     let failed = 0;
+    let rateLimited = 0;
+
+    // ユーザーごとの処理数をカウント
+    const userProcessCount = new Map<string, number>();
 
     for (const notification of notifications.reverse()) {
+      const userAcct = notification.account.acct;
+
+      // ユーザーごとの制限をチェック
+      const currentCount = userProcessCount.get(userAcct) || 0;
+      if (currentCount >= MAX_MENTIONS_PER_USER) {
+        rateLimited++;
+        console.log(`[mention-process] Rate limited ${notification.id}: user @${userAcct} exceeded ${MAX_MENTIONS_PER_USER} mentions per batch`);
+        continue;
+      }
+
       try {
-        console.log(`[mention-process] Processing notification ${notification.id} from @${notification.account.acct}`);
+        console.log(`[mention-process] Processing notification ${notification.id} from @${userAcct}`);
         const result = await processOneMention(notification);
 
         if (result.skipped) {
@@ -92,6 +109,7 @@ export async function POST(request: NextRequest) {
           console.log(`[mention-process] Skipped ${notification.id}: already processed`);
         } else if (result.success) {
           processed++;
+          userProcessCount.set(userAcct, currentCount + 1);
           console.log(`[mention-process] Success ${notification.id}`);
         } else {
           failed++;
@@ -110,13 +128,14 @@ export async function POST(request: NextRequest) {
     }
 
     const duration = Date.now() - startTime;
-    console.log(`[mention-process] Done: processed=${processed}, skipped=${skipped}, failed=${failed}, duration=${duration}ms`);
+    console.log(`[mention-process] Done: processed=${processed}, skipped=${skipped}, failed=${failed}, rateLimited=${rateLimited}, duration=${duration}ms`);
 
     return NextResponse.json({
       success: true,
       processed,
       skipped,
       failed,
+      rateLimited,
       duration,
     });
   } catch (error) {

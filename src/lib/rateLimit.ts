@@ -6,7 +6,7 @@
 const lastAccessMap = new Map<string, number>();
 
 // 設定
-const RATE_LIMIT_MS = 5000; // 5秒
+const RATE_LIMIT_MS = 8000; // 8秒
 const CLEANUP_INTERVAL_MS = 60000; // 1分ごとにクリーンアップ
 const ENTRY_TTL_MS = 60000; // 1分以上古いエントリは削除
 
