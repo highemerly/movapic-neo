@@ -193,11 +193,22 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               timeZone: "Asia/Tokyo",
             })}
             <span className="ml-2">
-              {image.source === "email"
-                ? "📧 メール投稿"
-                : image.source === "mention"
-                  ? "🤖 Bot投稿"
-                  : "🌐 Web投稿"}
+              {image.source === "email" ? (
+                "メール"
+              ) : image.source === "mention" ? (
+                <a
+                  href={`https://${image.user.instance.domain}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline"
+                >
+                  {image.user.instance.domain}
+                </a>
+              ) : (
+                <Link href="/create" className="hover:underline">
+                  Web
+                </Link>
+              )}
             </span>
           </p>
         </div>
