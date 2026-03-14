@@ -68,8 +68,8 @@ export function ActionButtons({
   const generateButtonLabel = isLoading
     ? loadingText
     : canRegenerate
-      ? "画像を再生成"
-      : "画像を生成";
+      ? "画像を再作成"
+      : "画像を作成";
 
   const generateDisabled = isLoading || (!canGenerate && !canRegenerate) || (canPost && !canRegenerate);
 
@@ -167,8 +167,8 @@ export function ActionButtons({
         )}
       </div>
       </div>
-      <p className="text-xs text-muted-foreground text-center">
-        すべての投稿は<Link href="/public" className="underline hover:text-foreground">公開タイムライン</Link>に表示されます
+      <p className="text-xs text-muted-foreground">
+        すべての投稿は<Link href="/public" className="underline hover:text-foreground">みんなの写真</Link>に表示されます
       </p>
     </div>
   );

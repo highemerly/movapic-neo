@@ -20,20 +20,17 @@ export function TextInput({ value, onChange, disabled }: TextInputProps) {
 
   return (
     <div className="space-y-2">
-      <div className="flex justify-between items-center">
-        <Label htmlFor="text-input">テキスト</Label>
-        <span className="text-sm text-muted-foreground">
-          {value.length} / {MAX_TEXT_LENGTH}
-        </span>
-      </div>
       <Textarea
         id="text-input"
         value={value}
         onChange={handleChange}
-        placeholder="テキストを入力してください"
+        placeholder="合成するコメントを入力してください（最大140文字）"
         disabled={disabled}
         className="min-h-[100px] resize-none"
       />
+      <span className="text-sm text-muted-foreground">
+          {value.length} / {MAX_TEXT_LENGTH}
+      </span>
     </div>
   );
 }
