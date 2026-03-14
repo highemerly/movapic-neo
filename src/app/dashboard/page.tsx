@@ -169,9 +169,8 @@ export default async function DashboardPage() {
           <h2 className="text-lg font-semibold mb-4">その他のメニュー</h2>
 
           {/* アカウント情報 */}
-          <div className="bg-muted rounded-lg p-6 mb-4 relative">
+          <div className="bg-muted rounded-lg p-6 mb-4">
             <h3 className="text-base font-medium mb-4">アカウント情報</h3>
-            <LogoutButton className="absolute top-4 right-4" />
             <div className="flex items-center gap-4 mb-4">
               {user.avatarUrl && (
                 <Link href={`/u/${user.username}`}>
@@ -210,6 +209,9 @@ export default async function DashboardPage() {
                 </dd>
               </div>
             </dl>
+            <div className="mt-6">
+              <LogoutButton />
+            </div>
           </div>
 
           {/* 投稿のデフォルト設定 */}
@@ -269,7 +271,7 @@ export default async function DashboardPage() {
                     </div>
                   </dl>
                   <p className="text-xs text-muted-foreground">
-                    設定の変更は<Link href="/create" className="text-primary hover:underline">Web投稿画面</Link>で行えます。
+                    設定の変更は<Link href="/create" className="text-primary hover:underline">Web投稿画面</Link>で行ってください。
                   </p>
                   <PreferencesResetButton />
                 </>
@@ -281,6 +283,23 @@ export default async function DashboardPage() {
             </div>
           </div>
         </section>
+
+        <footer className="mt-8 space-x-4">
+          <Link
+            href="/license"
+            className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+          >
+            フォントライセンス
+          </Link>
+          <a
+            href="https://handon.club/@highemerly"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+          >
+            お問い合わせ
+          </a>
+        </footer>
       </div>
     </>
   );

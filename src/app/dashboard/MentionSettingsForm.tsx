@@ -125,7 +125,7 @@ export function MentionSettingsForm({
               @{botAcct} [右 赤 ネオン] マックチキン！
             </code>
             <a
-              href={`https://${userInstanceDomain}/share?text=${encodeURIComponent(`@${botAcct} [右 赤 ネオン] ここに好きな文章を入力`)}`}
+              href={`https://${userInstanceDomain}/share?text=${encodeURIComponent(`@${botAcct} [右 赤 ネオン] マックチキン！`)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-block text-xs text-primary hover:underline"
@@ -163,89 +163,94 @@ export function MentionSettingsForm({
         </div>
       </div>
 
-      <div className="border-t pt-4 space-y-4">
-        <p className="text-sm font-medium">Bot投稿時の設定</p>
+      <details className="border-t pt-4">
+        <summary className="text-sm font-medium cursor-pointer hover:text-primary transition-colors">
+          詳細設定
+        </summary>
 
-        {/* 投稿先の選択 */}
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">{userInstanceDomain}への同時投稿</p>
+        <div className="mt-4 space-y-4">
+          {/* 投稿先の選択 */}
           <div className="space-y-2">
-            {VISIBILITY_OPTIONS.map((v) => (
-              <label
-                key={v}
-                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  visibility === v
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:bg-muted/50"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="visibility"
-                  value={v}
-                  checked={visibility === v}
-                  onChange={(e) => setVisibility(e.target.value as Visibility)}
-                  className="sr-only"
-                />
-                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                  visibility === v ? "border-primary" : "border-muted-foreground"
-                }`}>
-                  {visibility === v && (
-                    <div className="w-2 h-2 rounded-full bg-primary" />
-                  )}
-                </div>
+            <p className="text-xs text-muted-foreground">{userInstanceDomain}への同時投稿</p>
+            <div className="space-y-2">
+              {VISIBILITY_OPTIONS.map((v) => (
+                <label
+                  key={v}
+                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                    visibility === v
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:bg-muted/50"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="visibility"
+                    value={v}
+                    checked={visibility === v}
+                    onChange={(e) => setVisibility(e.target.value as Visibility)}
+                    className="sr-only"
+                  />
+                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    visibility === v ? "border-primary" : "border-muted-foreground"
+                  }`}>
+                    {visibility === v && (
+                      <div className="w-2 h-2 rounded-full bg-primary" />
+                    )}
+                  </div>
+                  <p className="text-sm">
+                    {v === "local"
+                      ? "しない"
+                      : v === "public"
+                        ? "する（公開）"
+                        : "する（非収載）"}
+                  </p>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* 元投稿を残すオプション */}
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">{userInstanceDomain}の元投稿</p>
+            <label className="flex items-center justify-between gap-4 p-3 cursor-pointer">
+              <div className="flex-1 min-w-0">
                 <p className="text-sm">
-                  {v === "local"
-                    ? "しない"
-                    : v === "public"
-                      ? "する（公開）"
-                      : "する（非収載）"}
+                  元投稿を残す
+                  <span className="ml-2 text-xs text-muted-foreground">（非推奨）</span>
                 </p>
-              </label>
-            ))}
+                <p className="text-xs text-muted-foreground">
+                  元画像が添付されているBot宛投稿は、通常は不要なので、自動で削除されます。このオプションが有効な場合に限り、削除せずに残します。
+                </p>
+              </div>
+              <div className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors ${
+                keep ? "bg-primary" : "bg-muted"
+              }`}>
+                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                  keep ? "translate-x-6" : "translate-x-1"
+                }`} />
+              </div>
+              <input
+                type="checkbox"
+                checked={keep}
+                onChange={(e) => setKeep(e.target.checked)}
+                className="sr-only"
+              />
+            </label>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={handleSave}
+              disabled={!hasChanges || isSaving}
+              size="sm"
+            >
+              {isSaving ? "保存中..." : "設定を保存"}
+            </Button>
+            {error && <span className="text-sm text-destructive">{error}</span>}
+            {success && <span className="text-sm text-green-600">保存しました</span>}
           </div>
         </div>
-
-        {/* 元投稿を残すオプション */}
-        <label className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
-          keep ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"
-        }`}>
-          <div>
-            <p className="text-sm font-medium">
-              元投稿を残す
-              <span className="ml-2 text-xs text-muted-foreground">（非推奨）</span>
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Bot宛のメンション投稿を削除せずに残します
-            </p>
-          </div>
-          <div className={`relative w-11 h-6 rounded-full transition-colors ${
-            keep ? "bg-primary" : "bg-muted"
-          }`}>
-            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-              keep ? "translate-x-6" : "translate-x-1"
-            }`} />
-          </div>
-          <input
-            type="checkbox"
-            checked={keep}
-            onChange={(e) => setKeep(e.target.checked)}
-            className="sr-only"
-          />
-        </label>
-
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={handleSave}
-            disabled={!hasChanges || isSaving}
-            size="sm"
-          >
-            {isSaving ? "保存中..." : "設定を保存"}
-          </Button>
-          {error && <span className="text-sm text-destructive">{error}</span>}
-          {success && <span className="text-sm text-green-600">保存しました</span>}
-        </div>
-      </div>
+      </details>
     </div>
   );
 }

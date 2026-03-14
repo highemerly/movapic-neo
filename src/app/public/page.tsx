@@ -1,3 +1,4 @@
+import Link from "next/link";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { PublicTimelineClient } from "./PublicTimelineClient";
@@ -44,7 +45,7 @@ export default async function PublicTimelinePage() {
     <>
       <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
       <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <h1 className="text-2xl font-bold mb-8">タイムライン</h1>
+        <h1 className="text-2xl font-bold mb-8">みんなの写真</h1>
 
         <PublicTimelineClient
           initialImages={images.map((img: (typeof images)[number]) => ({
@@ -65,6 +66,23 @@ export default async function PublicTimelinePage() {
           }))}
           publicUrl={publicUrl}
         />
+
+        <footer className="mt-8 space-x-4">
+          <Link
+            href="/license"
+            className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+          >
+            フォントライセンス
+          </Link>
+          <a
+            href="https://handon.club/@highemerly"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+          >
+            お問い合わせ
+          </a>
+        </footer>
       </div>
     </>
   );

@@ -66,15 +66,22 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
   // 単一サーバー限定モード: シンプルなボタン
   if (singleServerMode) {
     return (
-      <div className="space-y-2">
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          みんなでコメント付きの写真を共有するサービスです。
+        </p>
         <Button
           onClick={() => handleLogin()}
           disabled={isLoading}
-          className="w-full"
+          className="w-full py-6 text-lg"
+          size="lg"
         >
           {isLoading ? "処理中..." : `${allowedServers[0]} でログイン`}
         </Button>
         {error && <p className="text-sm text-destructive">{error}</p>}
+        <p className="text-xs text-muted-foreground">
+          他のサーバーでは現在利用できません
+        </p>
       </div>
     );
   }
@@ -89,9 +96,14 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
           onChange={(e) => setServer(e.target.value)}
           placeholder="mastodon.social"
           disabled={isLoading}
-          className="flex-1"
+          className="flex-1 py-6 text-lg"
         />
-        <Button type="submit" disabled={isLoading || !server.trim()}>
+        <Button
+          type="submit"
+          disabled={isLoading || !server.trim()}
+          className="py-6 text-lg"
+          size="lg"
+        >
           {isLoading ? "処理中..." : "ログイン"}
         </Button>
       </div>

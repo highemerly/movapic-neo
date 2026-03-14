@@ -1,4 +1,3 @@
-import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth/session";
 import prisma from "@/lib/db";
@@ -19,12 +18,6 @@ function getAllowedServers(): string[] | undefined {
 
 export default async function HomePage() {
   const user = await getCurrentUser();
-
-  // ログイン済みの場合は/dashboardにリダイレクト
-  if (user) {
-    redirect("/dashboard");
-  }
-
   const allowedServers = getAllowedServers();
   const publicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
@@ -76,9 +69,24 @@ export default async function HomePage() {
         <div className="text-center mb-6">
           <h1 className="text-xl font-bold mb-4">写真に文字を合成するやつ（仮）</h1>
 
-          {/* ログインボタン */}
-          <div className="max-w-xs mx-auto">
-            <LoginButton allowedServers={allowedServers} />
+          {/* ログインボタン / ユーザーメニュー */}
+          <div className="max-w-sm mx-auto mt-8 mb-8">
+            {user ? (
+              <div className="flex flex-col gap-3">
+                <Link href={`/u/${user.username}`}>
+                  <Button className="w-full py-6 text-lg" size="lg">
+                    わたしの写真
+                  </Button>
+                </Link>
+                <Link href="/dashboard">
+                  <Button variant="outline" className="w-full py-6 text-lg" size="lg">
+                    ダッシュボード
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <LoginButton allowedServers={allowedServers} />
+            )}
           </div>
         </div>
 

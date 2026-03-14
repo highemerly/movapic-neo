@@ -25,7 +25,7 @@ export function LogoutButton({ className }: LogoutButtonProps) {
 
   return (
     <Button
-      variant="ghost"
+      variant="destructive"
       size="sm"
       onClick={handleLogout}
       disabled={isLoading}

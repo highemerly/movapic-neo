@@ -76,14 +76,20 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
               <DropdownMenuItem asChild>
                 <Link href="/create" className="flex items-center gap-2 cursor-pointer">
                   <ImagePlus className="h-4 w-4" />
-                  画像を投稿
+                  写真を投稿
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/public" className="flex items-center gap-2 cursor-pointer">
+                  <Globe className="h-4 w-4" />
+                  みんなの投稿
                 </Link>
               </DropdownMenuItem>
               {user && (
                 <DropdownMenuItem asChild>
                   <Link href={`/u/${user.username}`} className="flex items-center gap-2 cursor-pointer">
                     <Images className="h-4 w-4" />
-                    自分の投稿を確認
+                    わたしの投稿
                   </Link>
                 </DropdownMenuItem>
               )}
@@ -95,12 +101,6 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
                   </Link>
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem asChild>
-                <Link href="/public" className="flex items-center gap-2 cursor-pointer">
-                  <Globe className="h-4 w-4" />
-                  公開タイムライン
-                </Link>
-              </DropdownMenuItem>
               {user && (
                 <LogoutMenuItem />
               )}
