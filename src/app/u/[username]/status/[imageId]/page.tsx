@@ -86,6 +86,8 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   const navigationSelect = {
     id: true,
     overlayText: true,
+    thumbnailKey: true,
+    storageKey: true,
     user: {
       select: {
         username: true,
@@ -234,6 +236,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             prevImage={prevImage}
             nextImage={nextImage}
             from={isFromPublic ? "public" : undefined}
+            publicUrl={publicUrl}
           />
         </div>
 
