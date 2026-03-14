@@ -71,12 +71,14 @@ export function BioEditForm({ initialBio }: BioEditFormProps) {
           {isSaving ? "保存中..." : "保存"}
         </Button>
       </div>
-      <div className="text-xs text-muted-foreground">
-        <span className={isOverLimit ? "text-destructive" : ""}>
-          {bio.length}/{BIO_MAX_LENGTH}文字
+      <div className="flex justify-between text-xs">
+        <span>
+          {error && <span className="text-destructive">{error}</span>}
+          {success && <span className="text-green-600">保存しました</span>}
         </span>
-        {error && <span className="text-destructive ml-2">{error}</span>}
-        {success && <span className="text-green-600 ml-2">保存しました</span>}
+        <span className={isOverLimit ? "text-destructive" : "text-muted-foreground"}>
+          {bio.length}/{BIO_MAX_LENGTH}
+        </span>
       </div>
     </div>
   );

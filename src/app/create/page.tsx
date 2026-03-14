@@ -6,8 +6,8 @@ import { TextInput } from "@/components/TextInput";
 import { ImageUpload } from "@/components/ImageUpload";
 import { OptionsAccordion } from "@/components/OptionsAccordion";
 import { ActionButtons, Visibility } from "@/components/ActionButtons";
-import Link from "next/link";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { Footer } from "@/components/Footer";
 import {
   GenerateFormState,
   DEFAULT_POSITION,
@@ -396,7 +396,7 @@ export default function CreatePage() {
 
           {/* エラー表示 */}
           {error && (
-            <div className="rounded-lg bg-destructive/10 p-4 text-center">
+            <div className="rounded-lg bg-destructive/10 p-4">
               <p className="text-destructive">
                 {formatErrorMessage(error)}
               </p>
@@ -466,14 +466,7 @@ export default function CreatePage() {
         </div>
 
         {/* フッター */}
-        <footer className="mt-12 pt-8 border-t border-gray-200 text-center">
-          <Link
-            href="/license"
-            className="text-sm text-muted-foreground hover:text-foreground hover:underline"
-          >
-            フォントライセンス
-          </Link>
-        </footer>
+        <Footer />
       </main>
     </div>
   );

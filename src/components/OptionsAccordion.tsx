@@ -75,7 +75,7 @@ function SegmentControl<T extends string>({
           type="button"
           onClick={() => onChange(option)}
           disabled={disabled}
-          className={`flex-1 rounded-md px-3 py-2 font-medium transition-colors ${
+          className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
             value === option
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
@@ -114,7 +114,7 @@ function TwoRowSegmentControl<T extends string>({
             type="button"
             onClick={() => onChange(option)}
             disabled={disabled}
-            className={`flex-1 rounded-md px-3 py-2 font-medium transition-colors ${
+            className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
               value === option
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -131,7 +131,7 @@ function TwoRowSegmentControl<T extends string>({
             type="button"
             onClick={() => onChange(option)}
             disabled={disabled}
-            className={`flex-1 rounded-md px-3 py-2 font-medium transition-colors ${
+            className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
               value === option
                 ? "bg-background text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -183,6 +183,26 @@ export function OptionsAccordion({
   const outputs: OutputFormat[] = ["mastodon", "misskey", "none"];
   const arrangements: Arrangement[] = ["none", "neon", "stamp"];
 
+  // サイズのラベル
+  const SIZE_LABELS: Record<Size, string> = {
+    small: "小",
+    medium: "中",
+    large: "大",
+    "extra-large": "特大",
+  };
+
+  // 現在の設定の要約を生成
+  const summaryParts: string[] = [
+    POSITION_LABELS[position],
+    COLOR_LABELS[color],
+    SIZE_LABELS[size],
+    FONT_LABELS[font],
+  ];
+  if (arrangement !== "none") {
+    summaryParts.push(ARRANGEMENT_LABELS[arrangement]);
+  }
+  const summary = summaryParts.join(" / ");
+
   return (
     <div className="rounded-lg border">
       {/* アコーディオンヘッダー */}
@@ -192,7 +212,12 @@ export function OptionsAccordion({
         className="flex w-full items-center justify-between p-4 text-left"
         disabled={disabled}
       >
-        <span className="font-medium">オプション設定</span>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-sm font-medium">オプション設定</span>
+          {!isOpen && (
+            <span className="text-xs text-muted-foreground">{summary}</span>
+          )}
+        </div>
         <ChevronDown
           className={`h-5 w-5 text-muted-foreground transition-transform ${
             isOpen ? "rotate-180" : ""

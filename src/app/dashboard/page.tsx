@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { Footer } from "@/components/Footer";
 import { PostMethodTabs } from "./PostMethodTabs";
 import { MentionSettingsForm } from "./MentionSettingsForm";
 import { EmailAddressDisplay } from "./EmailAddressDisplay";
@@ -284,22 +285,7 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        <footer className="mt-8 space-x-4">
-          <Link
-            href="/license"
-            className="text-sm text-muted-foreground hover:text-foreground hover:underline"
-          >
-            フォントライセンス
-          </Link>
-          <a
-            href="https://handon.club/@highemerly"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-muted-foreground hover:text-foreground hover:underline"
-          >
-            お問い合わせ
-          </a>
-        </footer>
+        <Footer />
       </div>
     </>
   );

@@ -19,18 +19,20 @@ export function TextInput({ value, onChange, disabled }: TextInputProps) {
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       <Textarea
         id="text-input"
         value={value}
         onChange={handleChange}
-        placeholder="合成するコメントを入力してください（最大140文字）"
+        placeholder="合成するコメントを入力してください"
         disabled={disabled}
         className="min-h-[100px] resize-none"
       />
-      <span className="text-sm text-muted-foreground">
+      <div className="flex justify-end">
+        <span className="text-xs text-muted-foreground">
           {value.length} / {MAX_TEXT_LENGTH}
-      </span>
+        </span>
+      </div>
     </div>
   );
 }

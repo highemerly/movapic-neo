@@ -219,9 +219,6 @@ export function ImageUpload({
           <p className="text-sm text-muted-foreground">
             タップして写真を選択してください
           </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            JPEG, PNG, WebP, HEIC, AVIF（最大25MB）
-          </p>
         </div>
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}

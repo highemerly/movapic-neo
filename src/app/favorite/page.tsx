@@ -3,6 +3,7 @@ import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { FavoritesClient } from "./FavoritesClient";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { Footer } from "@/components/Footer";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +78,8 @@ export default async function FavoritePage() {
           publicUrl={publicUrl}
           initialCursor={favorites.length >= 20 ? favorites[favorites.length - 1]?.id : null}
         />
+
+        <Footer />
       </div>
     </>
   );

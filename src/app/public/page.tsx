@@ -1,8 +1,8 @@
-import Link from "next/link";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { PublicTimelineClient } from "./PublicTimelineClient";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { Footer } from "@/components/Footer";
 
 // 動的レンダリングを強制
 export const dynamic = "force-dynamic";
@@ -67,22 +67,7 @@ export default async function PublicTimelinePage() {
           publicUrl={publicUrl}
         />
 
-        <footer className="mt-8 space-x-4">
-          <Link
-            href="/license"
-            className="text-sm text-muted-foreground hover:text-foreground hover:underline"
-          >
-            フォントライセンス
-          </Link>
-          <a
-            href="https://handon.club/@highemerly"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-muted-foreground hover:text-foreground hover:underline"
-          >
-            お問い合わせ
-          </a>
-        </footer>
+        <Footer />
       </div>
     </>
   );

@@ -4,6 +4,7 @@ import prisma from "@/lib/db";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { Button } from "@/components/ui/button";
 import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
+import { Footer } from "@/components/Footer";
 
 export const dynamic = "force-dynamic";
 
@@ -121,19 +122,7 @@ export default async function HomePage() {
         )}
 
         {/* フッター */}
-        <footer className="mt-16 pt-8 border-t text-center text-sm text-muted-foreground flex justify-center gap-4">
-          <Link href="/license" className="hover:underline">
-            フォントライセンス
-          </Link>
-          <a
-            href="https://handon.club/@highemerly"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:underline"
-          >
-            問い合わせ先
-          </a>
-        </footer>
+        <Footer />
       </main>
     </div>
   );
