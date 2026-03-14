@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { UserGalleryClient } from "./UserGalleryClient";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
+import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
@@ -76,12 +77,11 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
               />
             </Link>
           )}
-          <Link
-            href={`/u/${cleanUsername}/calendar`}
-            className="text-xs text-muted-foreground hover:underline flex items-center gap-0.5"
-          >
-            <Calendar className="w-3 h-3" />
-            カレンダー
+          <Link href={`/u/${cleanUsername}/calendar`}>
+            <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1">
+              <Calendar className="w-3 h-3" />
+              カレンダー
+            </Button>
           </Link>
         </div>
         <div className="flex-1">
