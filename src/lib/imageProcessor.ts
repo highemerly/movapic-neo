@@ -74,16 +74,21 @@ function calculateFontSize(
   return Math.max(16, Math.min(fontSize, 500));
 }
 
-// 縦書き用の文字変換マッピング
+// 縦書き用の文字変換マッピング（長音のみ変換、括弧は回転で対応）
 const VERTICAL_CHAR_MAP: Record<string, string> = {
-  "（": "︵", "）": "︶", "(": "︵", ")": "︶",
-  "「": "﹁", "」": "﹂", "『": "﹃", "』": "﹄",
-  "【": "︻", "】": "︼", "〔": "︹", "〕": "︺",
-  "《": "︽", "》": "︾", "〈": "︿", "〉": "﹀",
-  "[": "﹇", "]": "﹈", "{": "︷", "}": "︸",
   "ー": "丨", "―": "丨", "－": "丨", "-": "丨",
   "〜": "∣", "~": "∣",
 };
+
+// 縦書き時に90度回転させる文字（括弧類）
+const ROTATE_CHARS = new Set([
+  "（", "）", "(", ")",
+  "「", "」", "『", "』",
+  "【", "】", "〔", "〕",
+  "《", "》", "〈", "〉",
+  "[", "]", "{", "}",
+  "｛", "｝", "［", "］",
+]);
 
 const PUNCTUATION_CHARS = new Set(["、", "。", ",", "."]);
 
@@ -609,13 +614,14 @@ function drawVerticalText(
   const columnWidth = fontSize * 1.5;
 
   // 改行で分割し、各段落を高さに応じてさらに列に分割
-  type CharInfo = { char: string; isPunctuation: boolean };
+  type CharInfo = { char: string; isPunctuation: boolean; shouldRotate: boolean };
   const columns: CharInfo[][] = [];
   const paragraphs = text.split("\n");
   for (const paragraph of paragraphs) {
     const chars = Array.from(paragraph).map((char) => ({
       char: VERTICAL_CHAR_MAP[char] || char,
       isPunctuation: PUNCTUATION_CHARS.has(char),
+      shouldRotate: ROTATE_CHARS.has(char),
     }));
     if (chars.length === 0) {
       columns.push([]); // 空列を保持（改行のみの行）
@@ -643,14 +649,25 @@ function drawVerticalText(
     const x = startX - colIndex * columnWidth;
 
     column.forEach((charInfo, charIndex) => {
-      const { char, isPunctuation } = charInfo;
+      const { char, isPunctuation, shouldRotate } = charInfo;
       const baseY = startY + charIndex * lineHeight;
 
       // 句読点は右上に配置
       const charX = isPunctuation ? x + fontSize * 0.3 : x;
       const charY = isPunctuation ? baseY - fontSize * 0.3 : baseY;
 
-      if (arrangement === "neon") {
+      if (shouldRotate) {
+        // 括弧類は90度回転させて描画
+        ctx.save();
+        ctx.translate(charX, charY);
+        ctx.rotate(Math.PI / 2); // 90度回転
+        if (arrangement === "neon") {
+          drawNeonText(ctx, char, 0, 0, fontSize, textColor);
+        } else {
+          drawTextWithStroke(ctx, char, 0, 0, textColor, strokeColor, strokeWidth);
+        }
+        ctx.restore();
+      } else if (arrangement === "neon") {
         drawNeonText(ctx, char, charX, charY, fontSize, textColor);
       } else {
         drawTextWithStroke(ctx, char, charX, charY, textColor, strokeColor, strokeWidth);
