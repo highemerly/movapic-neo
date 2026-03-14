@@ -1,0 +1,183 @@
+import { CanvasRenderingContext2D } from "skia-canvas";
+import { FontFamily, Size, Position } from "@/types";
+import { SIZE_MULTIPLIERS } from "@/types";
+
+// プロポーショナルフォント（横書き時のみ適用）
+export const PROPORTIONAL_FONTS: Set<FontFamily> = new Set(["noto-sans-jp"]);
+
+// 縦書き用の文字変換マッピング（長音のみ変換、括弧は回転で対応）
+export const VERTICAL_CHAR_MAP: Record<string, string> = {
+  "ー": "丨",
+  "―": "丨",
+  "－": "丨",
+  "-": "丨",
+  "〜": "∣",
+  "~": "∣",
+};
+
+// 縦書き時に90度回転させる文字（括弧類）
+export const ROTATE_CHARS = new Set([
+  "（", "）", "(", ")",
+  "「", "」", "『", "』",
+  "【", "】", "〔", "〕",
+  "《", "》", "〈", "〉",
+  "[", "]", "{", "}",
+  "｛", "｝", "［", "］",
+]);
+
+export const PUNCTUATION_CHARS = new Set(["、", "。", ",", "."]);
+
+// マージン比率
+export const MARGIN_RATIO = 0.05;
+// 縁取りの太さ（フォントサイズに対する比率）
+export const STROKE_WIDTH_RATIO = 0.08;
+
+/**
+ * 画像サイズに基づいてフォントサイズを計算
+ */
+export function calculateFontSize(
+  width: number,
+  height: number,
+  position: Position,
+  size: Size
+): number {
+  const isVertical = position === "left" || position === "right";
+  const multiplier = SIZE_MULTIPLIERS[size];
+
+  // 基準サイズ（全体を約15%大きく調整済み）
+  let baseFontSize: number;
+  if (isVertical) {
+    baseFontSize = Math.floor(height / 13);
+  } else {
+    baseFontSize = Math.floor(width / 17);
+  }
+
+  const fontSize = Math.floor(baseFontSize * multiplier);
+  return Math.max(16, Math.min(fontSize, 500));
+}
+
+/**
+ * テキストを行に分割する（プロポーショナル/等幅対応）
+ */
+export function splitTextIntoLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  useProportional: boolean,
+  fontSize: number
+): string[] {
+  const lines: string[] = [];
+  const paragraphs = text.split("\n");
+
+  for (const paragraph of paragraphs) {
+    if (paragraph === "") {
+      lines.push("");
+      continue;
+    }
+
+    if (useProportional) {
+      // プロポーショナル: 文字幅を累積して改行判定
+      let currentLine = "";
+      let currentWidth = 0;
+
+      for (const char of paragraph) {
+        const charWidth = ctx.measureText(char).width;
+        if (currentWidth + charWidth > maxWidth && currentLine !== "") {
+          lines.push(currentLine);
+          currentLine = char;
+          currentWidth = charWidth;
+        } else {
+          currentLine += char;
+          currentWidth += charWidth;
+        }
+      }
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+    } else {
+      // 等幅: 固定文字数で分割
+      const chars = Array.from(paragraph);
+      const charsPerLine = Math.max(1, Math.floor(maxWidth / fontSize));
+      for (let i = 0; i < chars.length; i += charsPerLine) {
+        lines.push(chars.slice(i, i + charsPerLine).join(""));
+      }
+    }
+  }
+
+  return lines;
+}
+
+/**
+ * HEX色をRGBオブジェクトに変換
+ */
+export function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16),
+      }
+    : { r: 255, g: 255, b: 255 };
+}
+
+/**
+ * 縁取り付きで文字を描画（通常）
+ */
+export function drawTextWithStroke(
+  ctx: CanvasRenderingContext2D,
+  char: string,
+  x: number,
+  y: number,
+  textColor: string,
+  strokeColor: string,
+  strokeWidth: number
+): void {
+  // 縁取り（ストローク）
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = strokeWidth;
+  ctx.lineJoin = "round";
+  ctx.strokeText(char, x, y);
+
+  // 本体（フィル）
+  ctx.fillStyle = textColor;
+  ctx.fillText(char, x, y);
+}
+
+/**
+ * ネオン効果で文字を描画
+ * 複数レイヤーの発光効果（揺れなし）
+ */
+export function drawNeonText(
+  ctx: CanvasRenderingContext2D,
+  char: string,
+  x: number,
+  y: number,
+  fontSize: number,
+  textColor: string
+): void {
+  ctx.save();
+
+  // 外側グロー（大きくぼかし、選択色で発光）
+  ctx.shadowColor = textColor;
+  ctx.shadowBlur = fontSize * 0.5;
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.fillStyle = textColor;
+  ctx.fillText(char, x, y);
+
+  // 中間グロー
+  ctx.shadowBlur = fontSize * 0.25;
+  ctx.fillText(char, x, y);
+
+  // 内側グロー
+  ctx.shadowBlur = fontSize * 0.1;
+  ctx.fillText(char, x, y);
+
+  // 中心（白く光る芯）
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillText(char, x, y);
+
+  ctx.restore();
+}

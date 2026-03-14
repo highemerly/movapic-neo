@@ -156,3 +156,19 @@ export const ALLOWED_FILE_TYPES = [
   "image/heif",
   "image/avif",
 ];
+
+// バリデーション用の有効値リスト（型から自動生成）
+export const VALID_POSITIONS: Position[] = ["top", "right", "left", "bottom"];
+export const VALID_FONTS: FontFamily[] = ["hui-font", "noto-sans-jp", "light-novel-pop"];
+export const VALID_COLORS: Color[] = ["white", "red", "blue", "green", "yellow", "brown", "pink", "orange"];
+export const VALID_SIZES: Size[] = ["small", "medium", "large", "extra-large"];
+export const VALID_OUTPUTS: OutputFormat[] = ["mastodon", "misskey", "none"];
+export const VALID_ARRANGEMENTS: Arrangement[] = ["none", "neon", "stamp"];
+
+// バリデーションヘルパー関数
+export const isValidPosition = (v: unknown): v is Position => VALID_POSITIONS.includes(v as Position);
+export const isValidFont = (v: unknown): v is FontFamily => VALID_FONTS.includes(v as FontFamily);
+export const isValidColor = (v: unknown): v is Color => VALID_COLORS.includes(v as Color);
+export const isValidSize = (v: unknown): v is Size => VALID_SIZES.includes(v as Size);
+export const isValidOutput = (v: unknown): v is OutputFormat => VALID_OUTPUTS.includes(v as OutputFormat);
+export const isValidArrangement = (v: unknown): v is Arrangement => VALID_ARRANGEMENTS.includes(v as Arrangement);

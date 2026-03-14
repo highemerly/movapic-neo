@@ -8,22 +8,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import prisma from "@/lib/db";
 import {
-  Position,
-  FontFamily,
-  Color,
-  Size,
-  OutputFormat,
-  Arrangement,
+  isValidPosition,
+  isValidFont,
+  isValidColor,
+  isValidSize,
+  isValidOutput,
+  isValidArrangement,
 } from "@/types";
 import { ErrorCodes, errorResponse } from "@/lib/errors";
-
-// 有効な値のリスト
-const VALID_POSITIONS: Position[] = ["top", "right", "left", "bottom"];
-const VALID_FONTS: FontFamily[] = ["hui-font", "noto-sans-jp", "light-novel-pop"];
-const VALID_COLORS: Color[] = ["white", "red", "blue", "green", "yellow", "brown", "pink", "orange"];
-const VALID_SIZES: Size[] = ["small", "medium", "large", "extra-large"];
-const VALID_OUTPUTS: OutputFormat[] = ["mastodon", "misskey", "none"];
-const VALID_ARRANGEMENTS: Arrangement[] = ["none", "neon", "stamp"];
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,23 +29,23 @@ export async function POST(request: NextRequest) {
 
     const { position, font, color, size, output, arrangement } = body;
 
-    // バリデーション
-    if (position && !VALID_POSITIONS.includes(position)) {
+    // バリデーション（値が指定されている場合のみチェック）
+    if (position && !isValidPosition(position)) {
       return errorResponse(ErrorCodes.VALIDATION_INVALID, "無効な位置です", 400);
     }
-    if (font && !VALID_FONTS.includes(font)) {
+    if (font && !isValidFont(font)) {
       return errorResponse(ErrorCodes.VALIDATION_INVALID, "無効なフォントです", 400);
     }
-    if (color && !VALID_COLORS.includes(color)) {
+    if (color && !isValidColor(color)) {
       return errorResponse(ErrorCodes.VALIDATION_INVALID, "無効な色です", 400);
     }
-    if (size && !VALID_SIZES.includes(size)) {
+    if (size && !isValidSize(size)) {
       return errorResponse(ErrorCodes.VALIDATION_INVALID, "無効なサイズです", 400);
     }
-    if (output && !VALID_OUTPUTS.includes(output)) {
+    if (output && !isValidOutput(output)) {
       return errorResponse(ErrorCodes.VALIDATION_INVALID, "無効な出力形式です", 400);
     }
-    if (arrangement && !VALID_ARRANGEMENTS.includes(arrangement)) {
+    if (arrangement && !isValidArrangement(arrangement)) {
       return errorResponse(ErrorCodes.VALIDATION_INVALID, "無効なアレンジです", 400);
     }
 

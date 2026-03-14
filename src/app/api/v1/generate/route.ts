@@ -11,6 +11,12 @@ import {
   MAX_TEXT_LENGTH,
   MAX_FILE_SIZE,
   ALLOWED_FILE_TYPES,
+  isValidPosition,
+  isValidFont,
+  isValidColor,
+  isValidSize,
+  isValidOutput,
+  isValidArrangement,
 } from "@/types";
 import {
   ErrorCodes,
@@ -19,22 +25,6 @@ import {
   handleImageProcessError,
   handleUnknownError,
 } from "@/lib/errors";
-
-const VALID_POSITIONS: Position[] = ["top", "right", "left", "bottom"];
-const VALID_FONTS: FontFamily[] = ["hui-font", "noto-sans-jp", "light-novel-pop"];
-const VALID_COLORS: Color[] = [
-  "white",
-  "red",
-  "blue",
-  "green",
-  "yellow",
-  "brown",
-  "pink",
-  "orange",
-];
-const VALID_SIZES: Size[] = ["small", "medium", "large", "extra-large"];
-const VALID_OUTPUT_FORMATS: OutputFormat[] = ["mastodon", "misskey", "none"];
-const VALID_ARRANGEMENTS: Arrangement[] = ["none", "neon", "stamp"];
 
 // 画像処理のタイムアウト（ミリ秒）
 const PROCESS_TIMEOUT_MS = 21000;
@@ -138,7 +128,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!position || !VALID_POSITIONS.includes(position)) {
+    if (!isValidPosition(position)) {
       return errorResponse(
         ErrorCodes.VALIDATION_INVALID,
         "無効な位置が指定されています",
@@ -147,7 +137,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!font || !VALID_FONTS.includes(font)) {
+    if (!isValidFont(font)) {
       return errorResponse(
         ErrorCodes.VALIDATION_INVALID,
         "無効なフォントが指定されています",
@@ -156,7 +146,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!color || !VALID_COLORS.includes(color)) {
+    if (!isValidColor(color)) {
       return errorResponse(
         ErrorCodes.VALIDATION_INVALID,
         "無効なカラーが指定されています",
@@ -165,7 +155,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!size || !VALID_SIZES.includes(size)) {
+    if (!isValidSize(size)) {
       return errorResponse(
         ErrorCodes.VALIDATION_INVALID,
         "無効なサイズが指定されています",
@@ -174,7 +164,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!output || !VALID_OUTPUT_FORMATS.includes(output)) {
+    if (!isValidOutput(output)) {
       return errorResponse(
         ErrorCodes.VALIDATION_INVALID,
         "無効な出力形式が指定されています",
@@ -183,7 +173,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!VALID_ARRANGEMENTS.includes(arrangement)) {
+    if (!isValidArrangement(arrangement)) {
       return errorResponse(
         ErrorCodes.VALIDATION_INVALID,
         "無効なアレンジが指定されています",
