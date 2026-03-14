@@ -78,7 +78,7 @@ export function MentionSettingsForm({
         >
           @{botAcct}
         </a>
-        ）にメンションで画像を送信するだけで、数分後にコメントを合成して写真が投稿されます。
+        ）にメンションで画像を送信するだけで、数分後にコメントを合成した写真が投稿されます。
       </p>
 
       <div className="text-sm space-y-3">
