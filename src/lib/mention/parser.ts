@@ -236,8 +236,8 @@ export function parseMentionContent(html: string, botAcct: string, userDefaults?
     text = text.replace(/\[[^\]]*\]/, "").trim();
   }
 
-  // 連続する空白を1つに
-  text = text.replace(/\s+/g, " ").trim();
+  // 連続する空白を1つに（改行は保持）
+  text = text.replace(/[^\S\n]+/g, " ").replace(/\n+/g, "\n").trim();
 
   return {
     text,

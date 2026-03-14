@@ -544,15 +544,22 @@ function drawHorizontalText(
   strokeWidth: number,
   arrangement: Arrangement
 ) {
-  const chars = Array.from(text);
   const maxWidth = width - margin * 2;
   const charsPerLine = Math.max(1, Math.floor(maxWidth / fontSize));
   const lineHeight = fontSize * 1.4;
 
-  // 行に分割
+  // 改行で分割し、各行を幅に応じてさらに分割
   const lines: string[] = [];
-  for (let i = 0; i < chars.length; i += charsPerLine) {
-    lines.push(chars.slice(i, i + charsPerLine).join(""));
+  const paragraphs = text.split("\n");
+  for (const paragraph of paragraphs) {
+    const chars = Array.from(paragraph);
+    if (chars.length === 0) {
+      lines.push(""); // 空行を保持
+    } else {
+      for (let i = 0; i < chars.length; i += charsPerLine) {
+        lines.push(chars.slice(i, i + charsPerLine).join(""));
+      }
+    }
   }
 
   // Y開始位置
@@ -596,20 +603,27 @@ function drawVerticalText(
   strokeWidth: number,
   arrangement: Arrangement
 ) {
-  const chars = Array.from(text).map((char) => ({
-    char: VERTICAL_CHAR_MAP[char] || char,
-    isPunctuation: PUNCTUATION_CHARS.has(char),
-  }));
-
   const maxHeight = height - margin * 2;
   const lineHeight = fontSize * 1.2;
   const charsPerColumn = Math.max(1, Math.floor(maxHeight / lineHeight));
   const columnWidth = fontSize * 1.5;
 
-  // 列に分割
-  const columns: typeof chars[] = [];
-  for (let i = 0; i < chars.length; i += charsPerColumn) {
-    columns.push(chars.slice(i, i + charsPerColumn));
+  // 改行で分割し、各段落を高さに応じてさらに列に分割
+  type CharInfo = { char: string; isPunctuation: boolean };
+  const columns: CharInfo[][] = [];
+  const paragraphs = text.split("\n");
+  for (const paragraph of paragraphs) {
+    const chars = Array.from(paragraph).map((char) => ({
+      char: VERTICAL_CHAR_MAP[char] || char,
+      isPunctuation: PUNCTUATION_CHARS.has(char),
+    }));
+    if (chars.length === 0) {
+      columns.push([]); // 空列を保持（改行のみの行）
+    } else {
+      for (let i = 0; i < chars.length; i += charsPerColumn) {
+        columns.push(chars.slice(i, i + charsPerColumn));
+      }
+    }
   }
 
   // X開始位置（縦書きは右から左へ）
