@@ -9,6 +9,12 @@ interface ResultInfo {
   format: string;
   width: number;
   height: number;
+  processingTime: number;
+  originalFileSize: number;
+  originalFormat: string;
+  originalWidth: number;
+  originalHeight: number;
+  requestId: string;
 }
 
 // ファイルサイズをフォーマットする関数
@@ -167,11 +173,16 @@ export function ImageUpload({
                   <X className="h-4 w-4" />
                 </button>
               )}
-              {/* 画像情報オーバーレイ（下部） */}
+              {/* 画像情報オーバーレイ（下部） - 簡潔に */}
               {hasGenerated && resultInfo && !isLoading && (
                 <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-3 py-1.5 text-center">
                   <p className="text-xs text-white">
-                    {resultInfo.width} × {resultInfo.height} / {resultInfo.format} / {formatFileSize(resultInfo.fileSize)}
+                    成功 / {resultInfo.processingTime >= 1000
+                      ? `${(resultInfo.processingTime / 1000).toFixed(2)}秒`
+                      : `${resultInfo.processingTime}ms`}, {formatFileSize(resultInfo.fileSize)}
+                    {resultInfo.originalFileSize > 0 && (
+                      <span> ({Math.round((1 - resultInfo.fileSize / resultInfo.originalFileSize) * 100)}%減</span>
+                    )})
                   </p>
                 </div>
               )}

@@ -186,9 +186,13 @@ export async function POST(request: NextRequest) {
     const imageBuffer = Buffer.from(await image.arrayBuffer());
     const fileSizeKB = Math.round(imageBuffer.length / 1024);
     const fileExt = fileName.split('.').pop()?.toLowerCase() || 'unknown';
+    const originalFileSize = imageBuffer.length;
+    // 元画像の形式（拡張子ベース、HEICはMIMEタイプが不正な場合があるため）
+    const originalFormat = fileExt.toUpperCase();
 
     console.log(`[generate] rid=${requestId} REQUEST: file=${fileName}, size=${fileSizeKB}KB, ext=${fileExt}, mimeType=${image.type || 'empty'}`);
 
+    const startTime = performance.now();
     const result = await withTimeout(
       processImage({
         imageBuffer,
@@ -206,7 +210,8 @@ export async function POST(request: NextRequest) {
     );
 
     // 画像を返す（Content-Lengthヘッダーを含む）
-    console.log(`[generate] rid=${requestId} SUCCESS: outputSize=${Math.round(result.buffer.length / 1024)}KB, type=${result.contentType}`);
+    const processingTime = Math.round(performance.now() - startTime);
+    console.log(`[generate] rid=${requestId} SUCCESS: outputSize=${Math.round(result.buffer.length / 1024)}KB, type=${result.contentType}, time=${processingTime}ms`);
     return new NextResponse(new Uint8Array(result.buffer), {
       status: 200,
       headers: {
@@ -214,6 +219,12 @@ export async function POST(request: NextRequest) {
         "Content-Length": String(result.buffer.length),
         "Content-Disposition": `inline; filename="generated.${result.extension}"`,
         "Cache-Control": "no-store",
+        "X-Request-Id": requestId,
+        "X-Processing-Time": String(processingTime),
+        "X-Original-File-Size": String(originalFileSize),
+        "X-Original-Format": originalFormat,
+        "X-Original-Width": String(result.originalWidth || 0),
+        "X-Original-Height": String(result.originalHeight || 0),
       },
     });
   } catch (error) {

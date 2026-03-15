@@ -5,6 +5,8 @@ export interface ProcessImageResult {
   buffer: Buffer;
   contentType: string;
   extension: string;
+  originalWidth?: number;
+  originalHeight?: number;
 }
 
 /**

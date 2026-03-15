@@ -183,5 +183,9 @@ export async function processImage({
   );
   console.log(`[imageProcessor] rid=${rid} DONE: totalTime=${totalTime}ms`);
 
-  return result;
+  return {
+    ...result,
+    originalWidth,
+    originalHeight,
+  };
 }

@@ -8,6 +8,7 @@ import { OptionsAccordion } from "@/components/OptionsAccordion";
 import { ActionButtons, Visibility } from "@/components/ActionButtons";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
+import { ResultDetails } from "@/components/ResultDetails";
 import {
   GenerateFormState,
   DEFAULT_POSITION,
@@ -38,6 +39,12 @@ interface ResultInfo {
   format: string;
   width: number;
   height: number;
+  processingTime: number;
+  originalFileSize: number;
+  originalFormat: string;
+  originalWidth: number;
+  originalHeight: number;
+  requestId: string;
 }
 
 interface UserSession {
@@ -216,6 +223,14 @@ export default function CreatePage() {
         return;
       }
 
+      // レスポンスヘッダーから情報を取得
+      const requestId = response.headers.get("X-Request-Id") || "";
+      const processingTime = parseInt(response.headers.get("X-Processing-Time") || "0", 10);
+      const originalFileSize = parseInt(response.headers.get("X-Original-File-Size") || "0", 10);
+      const originalFormat = response.headers.get("X-Original-Format") || "";
+      const originalWidth = parseInt(response.headers.get("X-Original-Width") || "0", 10);
+      const originalHeight = parseInt(response.headers.get("X-Original-Height") || "0", 10);
+
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
 
@@ -242,6 +257,12 @@ export default function CreatePage() {
         format: OUTPUT_LABELS[formState.output],
         width: img.naturalWidth,
         height: img.naturalHeight,
+        processingTime,
+        originalFileSize,
+        originalFormat,
+        originalWidth,
+        originalHeight,
+        requestId,
       });
 
       setResultUrl(url);
@@ -463,6 +484,11 @@ export default function CreatePage() {
             saveSuccess={saveSuccess}
             userDefaults={user?.preferences}
           />
+
+          {/* 生成結果の詳細情報 */}
+          {hasGenerated && resultInfo && !isLoading && (
+            <ResultDetails resultInfo={resultInfo} />
+          )}
         </div>
 
         {/* フッター */}
