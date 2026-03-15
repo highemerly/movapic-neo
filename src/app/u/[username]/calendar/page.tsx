@@ -10,10 +10,12 @@ export const dynamic = "force-dynamic";
 
 interface CalendarPageProps {
   params: Promise<{ username: string }>;
+  searchParams: Promise<{ year?: string; month?: string }>;
 }
 
-export default async function CalendarPage({ params }: CalendarPageProps) {
+export default async function CalendarPage({ params, searchParams }: CalendarPageProps) {
   const { username } = await params;
+  const query = await searchParams;
   const currentUser = await getCurrentUser();
 
   // @を除去
@@ -38,10 +40,17 @@ export default async function CalendarPage({ params }: CalendarPageProps) {
 
   const publicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
-  // 現在の年月を初期値として使用
+  // クエリパラメータまたは現在の年月を使用
   const now = new Date();
-  const initialYear = now.getFullYear();
-  const initialMonth = now.getMonth() + 1;
+  const queryYear = query.year ? parseInt(query.year, 10) : null;
+  const queryMonth = query.month ? parseInt(query.month, 10) : null;
+
+  // 有効な年月かどうかをチェック
+  const isValidYear = queryYear && queryYear >= 2000 && queryYear <= 2100;
+  const isValidMonth = queryMonth && queryMonth >= 1 && queryMonth <= 12;
+
+  const initialYear = isValidYear ? queryYear : now.getFullYear();
+  const initialMonth = isValidMonth ? queryMonth : now.getMonth() + 1;
 
   // 総画像数を取得
   const totalImageCount = await prisma.image.count({

@@ -66,22 +66,40 @@ export function CalendarView({
     fetchCalendarData();
   }, [fetchCalendarData]);
 
+  // URLを更新する（履歴に追加せずに置き換え）
+  const updateUrl = (newYear: number, newMonth: number) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("year", String(newYear));
+    url.searchParams.set("month", String(newMonth));
+    window.history.replaceState({}, "", url.toString());
+  };
+
   const goToPrevMonth = () => {
+    let newYear = year;
+    let newMonth = month;
     if (month === 1) {
-      setYear(year - 1);
-      setMonth(12);
+      newYear = year - 1;
+      newMonth = 12;
     } else {
-      setMonth(month - 1);
+      newMonth = month - 1;
     }
+    setYear(newYear);
+    setMonth(newMonth);
+    updateUrl(newYear, newMonth);
   };
 
   const goToNextMonth = () => {
+    let newYear = year;
+    let newMonth = month;
     if (month === 12) {
-      setYear(year + 1);
-      setMonth(1);
+      newYear = year + 1;
+      newMonth = 1;
     } else {
-      setMonth(month + 1);
+      newMonth = month + 1;
     }
+    setYear(newYear);
+    setMonth(newMonth);
+    updateUrl(newYear, newMonth);
   };
 
   // カレンダーのグリッドを生成
