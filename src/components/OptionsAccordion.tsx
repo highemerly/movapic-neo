@@ -16,22 +16,7 @@ import {
   STROKE_COLORS,
   COLOR_LABELS,
   ARRANGEMENT_LABELS,
-  DEFAULT_POSITION,
-  DEFAULT_FONT,
-  DEFAULT_COLOR,
-  DEFAULT_SIZE,
-  DEFAULT_OUTPUT,
-  DEFAULT_ARRANGEMENT,
 } from "@/types";
-
-interface UserDefaults {
-  position: Position | null;
-  font: FontFamily | null;
-  color: Color | null;
-  size: Size | null;
-  output: OutputFormat | null;
-  arrangement: Arrangement | null;
-}
 
 interface OptionsAccordionProps {
   position: Position;
@@ -50,7 +35,6 @@ interface OptionsAccordionProps {
   onSaveDefaults?: () => void;
   isSavingDefaults?: boolean;
   saveSuccess?: boolean;
-  userDefaults?: UserDefaults;
 }
 
 // セグメントコントロール用コンポーネント
@@ -162,19 +146,8 @@ export function OptionsAccordion({
   onSaveDefaults,
   isSavingDefaults,
   saveSuccess,
-  userDefaults,
 }: OptionsAccordionProps) {
   const [isOpen, setIsOpen] = useState(false);
-
-  // ユーザーのデフォルト値があればそれを、なければシステムデフォルト値を使用
-  const handleReset = () => {
-    onPositionChange(userDefaults?.position || DEFAULT_POSITION);
-    onFontChange(userDefaults?.font || DEFAULT_FONT);
-    onColorChange(userDefaults?.color || DEFAULT_COLOR);
-    onSizeChange(userDefaults?.size || DEFAULT_SIZE);
-    onOutputChange(userDefaults?.output || DEFAULT_OUTPUT);
-    onArrangementChange(userDefaults?.arrangement || DEFAULT_ARRANGEMENT);
-  };
 
   const positions: Position[] = ["top", "bottom", "left", "right"];
   const colors: Color[] = ["white", "red", "blue", "green", "yellow", "brown", "pink", "orange"];
@@ -361,17 +334,9 @@ export function OptionsAccordion({
             />
           </div>
 
-          {/* 設定リセット・初期値保存 */}
-          <div className="flex gap-4 justify-center">
-            <button
-              type="button"
-              onClick={handleReset}
-              disabled={disabled}
-              className="text-sm text-muted-foreground hover:text-foreground underline"
-            >
-              設定をリセット
-            </button>
-            {onSaveDefaults && (
+          {/* 初期値保存 */}
+          {onSaveDefaults && (
+            <div className="flex justify-start">
               <button
                 type="button"
                 onClick={onSaveDefaults}
@@ -384,8 +349,8 @@ export function OptionsAccordion({
               >
                 {isSavingDefaults ? "保存中..." : saveSuccess ? "保存しました" : "初期値として保存"}
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>
