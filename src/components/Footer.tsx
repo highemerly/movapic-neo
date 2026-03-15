@@ -15,6 +15,12 @@ export function Footer() {
       >
         プライバシーポリシー
       </Link>
+      <Link
+        href="/spec"
+        className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+      >
+        技術仕様
+      </Link>
       <a
         href="https://handon.club/@highemerly"
         target="_blank"
