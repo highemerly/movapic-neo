@@ -483,7 +483,6 @@ export default function CreatePage() {
             onSaveDefaults={handleSaveDefaults}
             isSavingDefaults={isSavingDefaults}
             saveSuccess={saveSuccess}
-            userDefaults={user?.preferences}
           />
 
           {/* 生成結果の詳細情報 */}
