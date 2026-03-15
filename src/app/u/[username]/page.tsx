@@ -1,12 +1,10 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
-import { Calendar } from "lucide-react";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { UserGalleryClient } from "./UserGalleryClient";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
-import { Button } from "@/components/ui/button";
+import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -60,63 +58,43 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
 
   const publicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
+  // 総画像数を取得
+  const totalImageCount = await prisma.image.count({
+    where: {
+      userId: user.id,
+      isPublic: true,
+    },
+  });
+
   return (
     <>
       <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-      {/* ユーザー情報 */}
-      <div className="flex items-start gap-4 mb-8">
-        <div className="flex flex-col items-center gap-1">
-          {user.avatarUrl && (
-            <Link href={`/u/${cleanUsername}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={user.avatarUrl}
-                alt={user.displayName || user.username}
-                className="w-16 h-16 rounded-full hover:opacity-80 transition-opacity"
-              />
-            </Link>
-          )}
-          <Link href={`/u/${cleanUsername}/calendar`}>
-            <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1">
-              <Calendar className="w-3 h-3" />
-              カレンダー
-            </Button>
-          </Link>
-        </div>
-        <div className="flex-1">
-          <h1 className="text-xl font-bold">
-            {user.displayName || user.username}
-          </h1>
-          <a
-            href={`https://${user.instance.domain}/@${user.username}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-muted-foreground hover:underline"
-          >
-            @{user.username}@{user.instance.domain}
-          </a>
-          {user.bio && (
-            <p className="text-sm text-muted-foreground mt-1">{user.bio}</p>
-          )}
-          <p className="text-xs text-muted-foreground mt-1">
-            {user.createdAt.toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}に登録 · {images.length}枚の画像
-          </p>
-        </div>
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        <UserProfileHeader
+          user={{
+            username: cleanUsername,
+            displayName: user.displayName,
+            avatarUrl: user.avatarUrl,
+            bio: user.bio,
+            createdAt: user.createdAt.toISOString(),
+            instance: { domain: user.instance.domain },
+          }}
+          imageCount={totalImageCount}
+          activeTab="photos"
+        />
+
+        {/* 画像一覧 */}
+        <UserGalleryClient
+          initialImages={images.map((img: typeof images[number]) => ({
+            ...img,
+            createdAt: img.createdAt.toISOString(),
+          }))}
+          publicUrl={publicUrl}
+          username={cleanUsername}
+        />
+
+        <Footer />
       </div>
-
-      {/* 画像一覧 */}
-      <UserGalleryClient
-        initialImages={images.map((img: typeof images[number]) => ({
-          ...img,
-          createdAt: img.createdAt.toISOString(),
-        }))}
-        publicUrl={publicUrl}
-        username={cleanUsername}
-      />
-
-      <Footer />
-    </div>
     </>
   );
 }
