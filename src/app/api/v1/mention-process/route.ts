@@ -54,9 +54,7 @@ export async function POST(request: NextRequest) {
 
   try {
     // 通知を取得
-    console.log(`[mention-process] Fetching notifications from ${botInstanceUrl}`);
     const notifications = await fetchMentionNotifications(botInstanceUrl, botAccessToken, 10);
-    console.log(`[mention-process] Fetched ${notifications.length} notifications`);
 
     if (notifications.length === 0) {
       // クリーンアップは実行
