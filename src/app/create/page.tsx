@@ -402,39 +402,40 @@ export default function CreatePage() {
       <SiteHeader user={user ? { username: user.username } : null} />
       <main className="container mx-auto max-w-md px-4 py-8">
         <div className="space-y-6">
-          {/* 画像エリア */}
-          <ImageUpload
-            imageFile={formState.imageFile}
-            imagePreview={formState.imagePreview}
-            resultUrl={resultUrl}
-            hasGenerated={hasGenerated}
-            resultInfo={resultInfo}
-            isLoading={isLoading}
-            onImageSelect={handleImageSelect}
-            onReset={handleReset}
-            disabled={isLoading || isPosting}
-          />
+          {/* 画像エリア + テキスト入力 + エラー表示 */}
+          <div className="space-y-2">
+            <ImageUpload
+              imageFile={formState.imageFile}
+              imagePreview={formState.imagePreview}
+              resultUrl={resultUrl}
+              hasGenerated={hasGenerated}
+              resultInfo={resultInfo}
+              isLoading={isLoading}
+              onImageSelect={handleImageSelect}
+              onReset={handleReset}
+              disabled={isLoading || isPosting}
+            />
 
-          {/* エラー表示 */}
-          {error && (
-            <div className="rounded-lg bg-destructive/10 p-4">
-              <p className="text-destructive">
-                {formatErrorMessage(error)}
-              </p>
-              {error.supportInfo && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {error.supportInfo}
+            <TextInput
+              value={formState.text}
+              onChange={(text) => setFormState((prev) => ({ ...prev, text }))}
+              disabled={isLoading || isPosting}
+            />
+
+            {/* エラー表示 */}
+            {error && (
+              <div className="rounded-md bg-destructive/10 px-3 py-2">
+                <p className="text-sm text-destructive">
+                  {formatErrorMessage(error)}
                 </p>
-              )}
-            </div>
-          )}
-
-          {/* テキスト入力 */}
-          <TextInput
-            value={formState.text}
-            onChange={(text) => setFormState((prev) => ({ ...prev, text }))}
-            disabled={isLoading || isPosting}
-          />
+                {error.supportInfo && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {error.supportInfo}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* アクションボタン（生成・投稿） */}
           <ActionButtons

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
@@ -77,7 +77,7 @@ export function ActionButtons({
   const postDisabled = !canPost || isLoading || isPosting;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-4">
       <div className="grid grid-cols-[4fr_6fr] gap-2">
       {/* 生成ボタン */}
       <Button
@@ -167,9 +167,10 @@ export function ActionButtons({
         )}
       </div>
       </div>
-      <p className="text-xs text-muted-foreground">
-        すべての投稿は<Link href="/public" className="underline hover:text-foreground">みんなの写真</Link>に表示されます
-      </p>
+      <div className="flex items-center gap-1.5 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+        <Info className="h-3 w-3 shrink-0" />
+        <span>すべての投稿は<Link href="/public" className="underline hover:text-foreground">みんなの写真</Link>に表示されます</span>
+      </div>
     </div>
   );
 }
