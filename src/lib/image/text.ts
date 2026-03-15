@@ -2,7 +2,7 @@ import { CanvasRenderingContext2D } from "skia-canvas";
 import { FontFamily, Size, Position } from "@/types";
 import { SIZE_MULTIPLIERS } from "@/types";
 
-// プロポーショナルフォント（横書き時のみ適用）
+// プロポーショナルフォント（横書き時のみ）
 export const PROPORTIONAL_FONTS: Set<FontFamily> = new Set(["noto-sans-jp"]);
 
 // 等幅フォント（半角文字の幅を半分にする）
@@ -84,7 +84,7 @@ export function calculateFontSize(
 }
 
 /**
- * テキストを行に分割する（プロポーショナル/等幅対応）
+ * テキストを行に分割
  */
 export function splitTextIntoLines(
   ctx: CanvasRenderingContext2D,
@@ -191,40 +191,3 @@ export function drawTextWithStroke(
   ctx.fillText(char, x, y);
 }
 
-/**
- * ネオン効果で文字を描画
- * 複数レイヤーの発光効果（揺れなし）
- */
-export function drawNeonText(
-  ctx: CanvasRenderingContext2D,
-  char: string,
-  x: number,
-  y: number,
-  fontSize: number,
-  textColor: string
-): void {
-  ctx.save();
-
-  // 外側グロー（大きくぼかし、選択色で発光）
-  ctx.shadowColor = textColor;
-  ctx.shadowBlur = fontSize * 0.5;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 0;
-  ctx.fillStyle = textColor;
-  ctx.fillText(char, x, y);
-
-  // 中間グロー
-  ctx.shadowBlur = fontSize * 0.25;
-  ctx.fillText(char, x, y);
-
-  // 内側グロー
-  ctx.shadowBlur = fontSize * 0.1;
-  ctx.fillText(char, x, y);
-
-  // 中心（白く光る芯）
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = "#FFFFFF";
-  ctx.fillText(char, x, y);
-
-  ctx.restore();
-}

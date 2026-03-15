@@ -11,11 +11,11 @@ import {
   STROKE_WIDTH_RATIO,
   splitTextIntoLines,
   drawTextWithStroke,
-  drawNeonText,
   getMonospaceCharWidth,
   isHalfWidthChar,
 } from "./text";
 import { drawStampText } from "./stamp";
+import { drawNeonText } from "./neon";
 
 // フォントを登録
 const fontsDir = path.join(process.cwd(), "fonts");
