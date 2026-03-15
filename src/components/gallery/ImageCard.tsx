@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ThumbnailImage } from "./ThumbnailImage";
 import { FavoriteOverlay } from "@/components/favorite/FavoriteOverlay";
+import { PinOverlay } from "@/components/pin/PinOverlay";
 
 interface ImageCardProps {
   image: {
@@ -20,9 +21,10 @@ interface ImageCardProps {
   username?: string;
   showDelete?: boolean;
   onDelete?: (id: string) => void;
+  isPinned?: boolean;
 }
 
-export function ImageCard({ image, publicUrl, username, showDelete, onDelete }: ImageCardProps) {
+export function ImageCard({ image, publicUrl, username, showDelete, onDelete, isPinned }: ImageCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const imageUrl = `${publicUrl}/${image.storageKey}`;
   const detailUrl = username ? `/u/${username}/status/${image.id}` : imageUrl;
@@ -59,6 +61,8 @@ export function ImageCard({ image, publicUrl, username, showDelete, onDelete }: 
           {isDeleting ? "..." : "×"}
         </button>
       )}
+      {/* ピン留めオーバーレイ */}
+      <PinOverlay isPinned={!!isPinned} />
       {/* お気に入り数オーバーレイ */}
       {image.favoriteCount !== undefined && (
         <FavoriteOverlay count={image.favoriteCount} />

@@ -36,11 +36,35 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
     notFound();
   }
 
-  // ユーザーの公開画像を取得
+  // ピン留め画像を取得（最大4つ、pinnedAtの降順）
+  const pinnedImages = await prisma.image.findMany({
+    where: {
+      userId: user.id,
+      isPublic: true,
+      pinnedAt: { not: null },
+    },
+    orderBy: { pinnedAt: "desc" },
+    select: {
+      id: true,
+      storageKey: true,
+      width: true,
+      height: true,
+      overlayText: true,
+      position: true,
+      favoriteCount: true,
+      pinnedAt: true,
+      createdAt: true,
+    },
+  });
+
+  const pinnedImageIds = pinnedImages.map((img) => img.id);
+
+  // 通常の公開画像を取得（ピン留め画像を除く）
   const images = await prisma.image.findMany({
     where: {
       userId: user.id,
       isPublic: true,
+      id: { notIn: pinnedImageIds },
     },
     orderBy: { createdAt: "desc" },
     take: 20,
@@ -52,6 +76,7 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
       overlayText: true,
       position: true,
       favoriteCount: true,
+      pinnedAt: true,
       createdAt: true,
     },
   });
@@ -83,14 +108,23 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
           activeTab="photos"
         />
 
-        {/* 画像一覧 */}
+        {/* 画像一覧（ピン留め画像を先頭に） */}
         <UserGalleryClient
-          initialImages={images.map((img: typeof images[number]) => ({
-            ...img,
-            createdAt: img.createdAt.toISOString(),
-          }))}
+          initialImages={[
+            ...pinnedImages.map((img) => ({
+              ...img,
+              pinnedAt: img.pinnedAt?.toISOString() ?? null,
+              createdAt: img.createdAt.toISOString(),
+            })),
+            ...images.map((img) => ({
+              ...img,
+              pinnedAt: img.pinnedAt?.toISOString() ?? null,
+              createdAt: img.createdAt.toISOString(),
+            })),
+          ]}
           publicUrl={publicUrl}
           username={cleanUsername}
+          pinnedImageIds={pinnedImageIds}
         />
 
         <Footer />

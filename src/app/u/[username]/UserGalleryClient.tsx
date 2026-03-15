@@ -11,6 +11,7 @@ interface GalleryImage {
   overlayText: string;
   position: string;
   favoriteCount: number;
+  pinnedAt: string | null;
   createdAt: string;
 }
 
@@ -18,12 +19,14 @@ interface UserGalleryClientProps {
   initialImages: GalleryImage[];
   publicUrl: string;
   username: string;
+  pinnedImageIds?: string[];
 }
 
 export function UserGalleryClient({
   initialImages,
   publicUrl,
   username,
+  pinnedImageIds = [],
 }: UserGalleryClientProps) {
   const [images, setImages] = useState(initialImages);
   const [isLoading, setIsLoading] = useState(false);
@@ -86,6 +89,7 @@ export function UserGalleryClient({
             image={image}
             publicUrl={publicUrl}
             username={username}
+            isPinned={pinnedImageIds.includes(image.id)}
           />
         ))}
       </div>

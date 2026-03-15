@@ -76,6 +76,7 @@ export async function GET(
         overlayText: true,
         position: true,
         favoriteCount: true,
+        pinnedAt: true,
         createdAt: true,
       },
     });
@@ -88,6 +89,7 @@ export async function GET(
       {
         images: result.map((img: (typeof result)[number]) => ({
           ...img,
+          pinnedAt: img.pinnedAt?.toISOString() ?? null,
           createdAt: img.createdAt.toISOString(),
         })),
         nextCursor,

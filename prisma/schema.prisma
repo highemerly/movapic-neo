@@ -80,6 +80,7 @@ model Image {
   thumbnailKey  String?  @map("thumbnail_key") @db.VarChar(500)
   isPublic      Boolean  @default(true) @map("is_public")
   favoriteCount Int      @default(0) @map("favorite_count")
+  pinnedAt      DateTime? @map("pinned_at")
   createdAt     DateTime @default(now()) @map("created_at")
 
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)

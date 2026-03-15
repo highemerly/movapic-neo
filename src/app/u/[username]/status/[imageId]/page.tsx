@@ -7,6 +7,7 @@ import { DeleteButton } from "./DeleteButton";
 import { ImageNavigation } from "./ImageNavigation";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
+import { PinButton } from "@/components/pin/PinButton";
 import { Footer } from "@/components/Footer";
 import { User, CalendarDays } from "lucide-react";
 
@@ -265,9 +266,12 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           <Link href="/create">
             <Button variant="outline">写真を投稿する</Button>
           </Link>
-          {/* 削除ボタン（自分の画像のみ） */}
+          {/* ピン留め・削除ボタン（自分の画像のみ） */}
           {isOwner && (
-            <DeleteButton imageId={imageId} username={username} />
+            <>
+              <PinButton imageId={imageId} initialIsPinned={!!image.pinnedAt} />
+              <DeleteButton imageId={imageId} username={username} />
+            </>
           )}
         </div>
 

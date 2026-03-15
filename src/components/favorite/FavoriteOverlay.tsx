@@ -11,7 +11,7 @@ export function FavoriteOverlay({ count }: FavoriteOverlayProps) {
   }
 
   return (
-    <div className="absolute bottom-0 right-0 p-1.5 h-8 flex items-center gap-1 text-white/90 text-xs">
+    <div className="absolute bottom-0 right-0 p-1.5 h-8 flex items-center gap-1 text-white text-xs drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
       <Heart className="h-3 w-3 fill-current" />
       <span>{formatFavoriteCount(count)}</span>
     </div>
