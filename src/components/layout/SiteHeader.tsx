@@ -48,13 +48,13 @@ function LogoutMenuItem() {
 export function SiteHeader({ user }: SiteHeaderProps = {}) {
   return (
     <header className="border-b bg-background">
-      <div className="container mx-auto px-4 py-3 max-w-6xl">
+      <div className="container mx-auto px-4 py-1 max-w-6xl">
         <div className="flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">文</span>
+              <span className="text-primary-foreground font-bold text-sm">景</span>
             </div>
-            <span className="font-semibold text-lg">写真に文字を合成するやつ（仮）</span>
+            <span className="font-medium text-sm">写真に文字を合成するやつ（仮）</span>
           </Link>
 
           <DropdownMenu>
