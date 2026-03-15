@@ -384,9 +384,8 @@ export default function CreatePage() {
   // ローディング中のボタンテキスト
   const loadingText = useMemo(() => {
     if (!isLoading) return "";
-    if (loadingTime === 0) return "生成中...";
-    return `生成中... ${loadingTime}秒`;
-  }, [isLoading, loadingTime]);
+    return "生成中...";
+  }, [isLoading]);
 
   // 認証チェック中
   if (isAuthenticated === null) {
@@ -411,6 +410,7 @@ export default function CreatePage() {
               hasGenerated={hasGenerated}
               resultInfo={resultInfo}
               isLoading={isLoading}
+              loadingTime={loadingTime}
               onImageSelect={handleImageSelect}
               onReset={handleReset}
               disabled={isLoading || isPosting}

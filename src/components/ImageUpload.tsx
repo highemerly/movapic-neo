@@ -31,6 +31,7 @@ interface ImageUploadProps {
   hasGenerated: boolean;
   resultInfo: ResultInfo | null;
   isLoading?: boolean;
+  loadingTime?: number;
   onImageSelect: (file: File, preview: string) => void;
   onReset: () => void;
   disabled?: boolean;
@@ -49,6 +50,7 @@ export function ImageUpload({
   hasGenerated,
   resultInfo,
   isLoading,
+  loadingTime,
   onImageSelect,
   onReset,
   disabled,
@@ -159,6 +161,9 @@ export function ImageUpload({
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   <p className="mt-2 text-sm font-medium text-foreground">生成中...</p>
+                  {loadingTime !== undefined && loadingTime > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">{loadingTime}秒</p>
+                  )}
                 </div>
               )}
               {/* 右上の×ボタン */}
@@ -193,6 +198,9 @@ export function ImageUpload({
                 <div className="flex flex-col items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                   <p className="mt-2 text-sm font-medium text-foreground">生成中...</p>
+                  {loadingTime !== undefined && loadingTime > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">{loadingTime}秒</p>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
