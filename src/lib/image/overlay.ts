@@ -3,6 +3,7 @@ import { Canvas, FontLibrary, CanvasRenderingContext2D } from "skia-canvas";
 import { Position, FontFamily, Arrangement } from "@/types";
 import {
   PROPORTIONAL_FONTS,
+  MONOSPACE_FONTS,
   VERTICAL_CHAR_MAP,
   ROTATE_CHARS,
   PUNCTUATION_CHARS,
@@ -11,6 +12,8 @@ import {
   splitTextIntoLines,
   drawTextWithStroke,
   drawNeonText,
+  getMonospaceCharWidth,
+  isHalfWidthChar,
 } from "./text";
 import { drawStampText } from "./stamp";
 
@@ -82,7 +85,8 @@ export async function createTextOverlay(
       textColor,
       strokeColor,
       strokeWidth,
-      arrangement
+      arrangement,
+      fontFamily
     );
   } else {
     drawHorizontalText(
@@ -124,9 +128,10 @@ function drawHorizontalText(
   const maxWidth = width - margin * 2;
   const lineHeight = fontSize * 1.4;
   const useProportional = PROPORTIONAL_FONTS.has(fontFamily);
+  const useHalfWidth = MONOSPACE_FONTS.has(fontFamily);
 
   // 行分割（プロポーショナル/等幅対応）
-  const lines = splitTextIntoLines(ctx, text, maxWidth, useProportional, fontSize);
+  const lines = splitTextIntoLines(ctx, text, maxWidth, useProportional, fontSize, useHalfWidth);
 
   // Y開始位置
   let startY: number;
@@ -155,8 +160,21 @@ function drawHorizontalText(
         }
         currentX += charWidth;
       });
+    } else if (useHalfWidth) {
+      // 等幅（半角対応）: 半角は0.5幅、全角は1.0幅
+      let currentX = margin;
+      lineChars.forEach((char) => {
+        const charWidth = getMonospaceCharWidth(char, fontSize);
+        const x = currentX + charWidth / 2;
+        if (arrangement === "neon") {
+          drawNeonText(ctx, char, x, y, fontSize, textColor);
+        } else {
+          drawTextWithStroke(ctx, char, x, y, textColor, strokeColor, strokeWidth);
+        }
+        currentX += charWidth;
+      });
     } else {
-      // 等幅: 固定幅で配置
+      // 等幅（半角非対応）: 固定幅で配置
       lineChars.forEach((char, charIndex) => {
         const x = margin + fontSize / 2 + charIndex * fontSize;
         if (arrangement === "neon") {
@@ -183,22 +201,26 @@ function drawVerticalText(
   textColor: string,
   strokeColor: string,
   strokeWidth: number,
-  arrangement: Arrangement
+  arrangement: Arrangement,
+  fontFamily: FontFamily
 ): void {
   const maxHeight = height - margin * 2;
   const lineHeight = fontSize * 1.2;
   const charsPerColumn = Math.max(1, Math.floor(maxHeight / lineHeight));
   const columnWidth = fontSize * 1.5;
+  const useHalfWidth = MONOSPACE_FONTS.has(fontFamily);
 
   // 改行で分割し、各段落を高さに応じてさらに列に分割
-  type CharInfo = { char: string; isPunctuation: boolean; shouldRotate: boolean };
+  type CharInfo = { char: string; originalChar: string; isPunctuation: boolean; shouldRotate: boolean; isHalf: boolean };
   const columns: CharInfo[][] = [];
   const paragraphs = text.split("\n");
   for (const paragraph of paragraphs) {
     const chars = Array.from(paragraph).map((char) => ({
       char: VERTICAL_CHAR_MAP[char] || char,
+      originalChar: char,
       isPunctuation: PUNCTUATION_CHARS.has(char),
       shouldRotate: ROTATE_CHARS.has(char),
+      isHalf: useHalfWidth && isHalfWidthChar(char),
     }));
     if (chars.length === 0) {
       columns.push([]);
@@ -225,15 +247,17 @@ function drawVerticalText(
     const x = startX - colIndex * columnWidth;
 
     column.forEach((charInfo, charIndex) => {
-      const { char, isPunctuation, shouldRotate } = charInfo;
+      const { char, isPunctuation, shouldRotate, isHalf } = charInfo;
       const baseY = startY + charIndex * lineHeight;
 
+      // 半角文字はX位置を中央に寄せる（全角の中心に揃える）
+      const halfXOffset = isHalf ? fontSize * 0.25 : 0;
+
       // 句読点は右上に配置
-      const charX = isPunctuation ? x + fontSize * 0.3 : x;
+      const charX = isPunctuation ? x + fontSize * 0.3 : x + halfXOffset;
       const charY = isPunctuation ? baseY - fontSize * 0.3 : baseY;
 
       if (shouldRotate) {
-        // 括弧類は90度回転させて描画
         ctx.save();
         ctx.translate(charX, charY);
         ctx.rotate(Math.PI / 2);
