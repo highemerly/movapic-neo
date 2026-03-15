@@ -88,12 +88,12 @@ export function FavoriteButton({
   }, [imageId, isLoggedIn, isLoading, isFavorited, count, recentFavoriters]);
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2">
       <div className="relative">
         <button
           onClick={handleFavorite}
           disabled={!isLoggedIn || isLoading}
-          className={`flex items-center gap-2 px-3 py-2 border rounded-lg transition-colors ${
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-colors ${
             isFavorited
               ? "text-red-500 hover:text-red-600 border-red-200"
               : "text-muted-foreground hover:text-red-500 border-border"
@@ -101,17 +101,17 @@ export function FavoriteButton({
           title={!isLoggedIn ? "ログインするとお気に入り登録できます" : undefined}
         >
           <Heart
-            className={`h-6 w-6 transition-all ${
+            className={`h-4 w-4 transition-all ${
               isFavorited ? "fill-current" : ""
             }`}
           />
-          <span className="text-lg font-medium">{formatFavoriteCount(count)}</span>
+          <span className="text-sm font-medium">{formatFavoriteCount(count)}</span>
         </button>
 
         {/* Floating heart animation */}
         {showAnimation && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <Heart className="h-6 w-6 fill-red-500 text-red-500 animate-float-up" />
+            <Heart className="h-4 w-4 fill-red-500 text-red-500 animate-float-up" />
           </div>
         )}
       </div>

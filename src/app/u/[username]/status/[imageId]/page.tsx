@@ -8,6 +8,7 @@ import { ImageNavigation } from "./ImageNavigation";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
 import { Footer } from "@/components/Footer";
+import { User, CalendarDays } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -127,9 +128,9 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
-      <main className="container mx-auto max-w-2xl px-4 py-8">
+      <main className="container mx-auto max-w-2xl px-4 py-2">
         {/* ヘッダー */}
-        <div className="mb-6">
+        <div className="mb-2">
           <Link href={isFromPublic ? "/public" : `/u/${username}`}>
             <Button variant="ghost" size="sm">
               ← {isFromPublic ? "公開タイムラインに戻る" : `${image.user.displayName || username} のギャラリーに戻る`}
@@ -138,7 +139,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         </div>
 
         {/* 画像 */}
-        <div className="mb-6">
+        <div className="mb-4">
           <div className="rounded-lg overflow-hidden bg-muted">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -150,21 +151,21 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         </div>
 
         {/* 投稿者情報 */}
-        <div className="flex items-center gap-3 mb-6 p-4 bg-muted rounded-lg">
+        <div className="flex items-center gap-2 mb-4 p-3 bg-muted rounded-lg">
           {image.user.avatarUrl && (
             <Link href={`/u/${username}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={image.user.avatarUrl}
                 alt={image.user.displayName || image.user.username}
-                className="w-12 h-12 rounded-full hover:opacity-80 transition-opacity"
+                className="w-10 h-10 rounded-full hover:opacity-80 transition-opacity"
               />
             </Link>
           )}
-          <div>
+          <div className="flex-1 min-w-0">
             <Link
               href={`/u/${username}`}
-              className="font-semibold hover:underline"
+              className="text-sm font-semibold hover:underline"
             >
               {image.user.displayName || image.user.username}
             </Link>
@@ -172,20 +173,36 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               href={`https://${image.user.instance.domain}/@${image.user.username}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="block text-sm text-muted-foreground hover:underline"
+              className="block text-xs text-muted-foreground hover:underline truncate"
             >
               @{image.user.username}@{image.user.instance.domain}
             </a>
           </div>
+          <div className="flex items-center gap-1">
+            <Link
+              href={`/u/${username}`}
+              className="p-1.5 rounded-full hover:bg-background transition-colors"
+              title="ユーザーページ"
+            >
+              <User className="w-4 h-4 text-muted-foreground" />
+            </Link>
+            <Link
+              href={`/u/${username}/calendar`}
+              className="p-1.5 rounded-full hover:bg-background transition-colors"
+              title="カレンダー"
+            >
+              <CalendarDays className="w-4 h-4 text-muted-foreground" />
+            </Link>
+          </div>
         </div>
 
         {/* テキスト */}
-        <div className="mb-6">
-          <p className="text-lg whitespace-pre-wrap">{image.overlayText}</p>
+        <div className="mb-4">
+          <p className="text-base whitespace-pre-wrap">{image.overlayText}</p>
         </div>
 
         {/* メタ情報 */}
-        <div className="text-sm text-muted-foreground">
+        <div className="text-xs text-muted-foreground">
           <p>
             {new Date(image.createdAt).toLocaleString("ja-JP", {
               year: "numeric",
