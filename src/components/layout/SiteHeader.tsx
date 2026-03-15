@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { AnnouncementBar } from "./AnnouncementBar";
 
 type SiteHeaderProps = {
   user?: {
@@ -47,7 +48,8 @@ function LogoutMenuItem() {
 
 export function SiteHeader({ user }: SiteHeaderProps = {}) {
   return (
-    <header className="border-b bg-background">
+    <>
+      <header className="border-b bg-background">
       <div className="container mx-auto px-4 py-1 max-w-6xl">
         <div className="flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
@@ -109,5 +111,7 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
         </div>
       </div>
     </header>
+      <AnnouncementBar />
+    </>
   );
 }
