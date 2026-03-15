@@ -20,7 +20,7 @@ export class AppError extends Error {
 /**
  * 画像処理エラー（ステージ別タイムアウト対応）
  */
-export type ProcessStage = "rotate" | "overlay" | "composite" | "convert";
+export type ProcessStage = "rotate" | "resize" | "overlay" | "composite" | "convert";
 
 export class ImageProcessError extends Error {
   constructor(

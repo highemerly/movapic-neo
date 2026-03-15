@@ -63,6 +63,11 @@ export function handleImageProcessError(error: ImageProcessError) {
         message: "画像の回転処理がタイムアウトしました",
         suggestion: "別の画像形式で再試行してください",
       },
+      resize: {
+        code: ErrorCodes.TIMEOUT_RESIZE,
+        message: "画像のリサイズ処理がタイムアウトしました",
+        suggestion: "画像サイズを小さくして再試行してください",
+      },
       overlay: {
         code: ErrorCodes.TIMEOUT_OVERLAY,
         message: "テキスト描画がタイムアウトしました",

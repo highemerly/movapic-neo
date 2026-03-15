@@ -32,6 +32,10 @@ interface ProcessImageParams {
 
 export type { ProcessImageResult };
 
+// 処理用の最大サイズ（事前リサイズ）
+// 最終出力が2048pxなので、それに合わせて事前に縮小することで後続処理を高速化
+const MAX_PROCESSING_SIZE = 2048;
+
 export async function processImage({
   imageBuffer,
   text,
@@ -60,15 +64,52 @@ export async function processImage({
   }
 
   const rotateTime = Date.now() - rotateStart;
-  const rotatedImage = sharp(rotatedBuffer);
-  const metadata = await rotatedImage.metadata();
+  let processedImage = sharp(rotatedBuffer);
+  const originalMetadata = await processedImage.metadata();
 
-  const width = metadata.width || 800;
-  const height = metadata.height || 600;
+  const originalWidth = originalMetadata.width || 800;
+  const originalHeight = originalMetadata.height || 600;
 
   console.log(
-    `[imageProcessor] rid=${rid} ROTATE: ${rotateTime}ms, format=${metadata.format}, size=${width}x${height}`
+    `[imageProcessor] rid=${rid} ROTATE: ${rotateTime}ms, format=${originalMetadata.format}, size=${originalWidth}x${originalHeight}`
   );
+
+  // 事前リサイズ: 長辺がMAX_PROCESSING_SIZEを超える場合は縮小
+  // テキスト描画・合成・出力変換の全工程が高速化される
+  let width = originalWidth;
+  let height = originalHeight;
+
+  if (originalWidth > MAX_PROCESSING_SIZE || originalHeight > MAX_PROCESSING_SIZE) {
+    const resizeStart = Date.now();
+
+    try {
+      if (originalWidth > originalHeight) {
+        processedImage = processedImage.resize(MAX_PROCESSING_SIZE, null, {
+          withoutEnlargement: true,
+        });
+        width = MAX_PROCESSING_SIZE;
+        height = Math.round(originalHeight * (MAX_PROCESSING_SIZE / originalWidth));
+      } else {
+        processedImage = processedImage.resize(null, MAX_PROCESSING_SIZE, {
+          withoutEnlargement: true,
+        });
+        height = MAX_PROCESSING_SIZE;
+        width = Math.round(originalWidth * (MAX_PROCESSING_SIZE / originalHeight));
+      }
+
+      // リサイズを適用してバッファを取得
+      const resizedBuffer = await processedImage.toBuffer();
+      processedImage = sharp(resizedBuffer);
+
+      const resizeTime = Date.now() - resizeStart;
+      console.log(
+        `[imageProcessor] rid=${rid} PRE_RESIZE: ${resizeTime}ms, ${originalWidth}x${originalHeight} -> ${width}x${height}`
+      );
+    } catch (error) {
+      console.error(`[imageProcessor] rid=${rid} PRE_RESIZE_FAILED:`, error);
+      throw new ImageProcessError("画像のリサイズに失敗しました", "resize", rid);
+    }
+  }
 
   const fontSize = calculateFontSize(width, height, position, size);
   const textColor = COLORS[color];
@@ -101,7 +142,7 @@ export async function processImage({
   const compositeStart = Date.now();
   let composited: Buffer;
   try {
-    composited = await rotatedImage
+    composited = await processedImage
       .composite([
         {
           input: textOverlay,
