@@ -30,7 +30,7 @@ export async function applyOutputFormat(
 
   // AVIF出力
   // effort: 0-9 (default 4), 低いほど高速だが圧縮率が下がる
-  // 大きな画像のエンコードが遅いため、effort: 2 で高速化
+  // effort: 2 で高速化しつつ圧縮効率を維持
   if (format === "avif") {
     // 初回出力（quality 80, effort 2で高速化）
     let result = await sharp(imageBuffer)
