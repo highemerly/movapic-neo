@@ -133,7 +133,7 @@ function TimelineImageCard({
             className="w-5 h-5 rounded-full"
           />
         )}
-        <span className="text-xs text-white truncate">
+        <span className="text-xs text-white truncate min-w-0">
           {image.user.displayName || image.user.username}
         </span>
       </div>
