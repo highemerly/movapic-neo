@@ -17,14 +17,6 @@ interface ImageNavigationProps {
   publicUrl: string;
 }
 
-// テキストを指定文字数で切り詰める
-function truncateText(text: string, maxLength: number): string {
-  if (text.length <= maxLength) {
-    return text;
-  }
-  return text.slice(0, maxLength) + "…";
-}
-
 // サムネイルURLを取得（サムネイルがなければフルサイズ画像にフォールバック）
 function getThumbnailUrl(
   image: NavImage,
@@ -47,23 +39,25 @@ export function ImageNavigation({
   }
 
   return (
-    <nav className="flex justify-between items-center gap-4 py-4 border-t">
+    <nav className="flex justify-between gap-4 py-4 border-t">
       {/* 前の画像（古い方向） */}
       <div className="flex-1 min-w-0">
         {prevImage ? (
           <Link
             href={`/u/${prevImage.user.username}/status/${prevImage.id}${queryString}`}
-            className="flex items-center gap-3 text-sm text-muted-foreground hover:text-foreground transition-colors group"
+            className="flex flex-col items-start gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors group"
           >
-            <span className="shrink-0">←</span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={getThumbnailUrl(prevImage, publicUrl)}
-              alt=""
-              className="w-8 h-8 rounded object-cover shrink-0"
-            />
-            <span className="truncate group-hover:underline">
-              {truncateText(prevImage.overlayText, 20)}
+            <div className="flex items-center gap-2">
+              <span className="shrink-0">←</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={getThumbnailUrl(prevImage, publicUrl)}
+                alt=""
+                className="w-8 h-8 rounded object-cover shrink-0"
+              />
+            </div>
+            <span className="truncate w-full group-hover:underline">
+              {prevImage.overlayText}
             </span>
           </Link>
         ) : (
@@ -72,22 +66,24 @@ export function ImageNavigation({
       </div>
 
       {/* 次の画像（新しい方向） */}
-      <div className="flex-1 min-w-0 text-right">
+      <div className="flex-1 min-w-0">
         {nextImage ? (
           <Link
             href={`/u/${nextImage.user.username}/status/${nextImage.id}${queryString}`}
-            className="inline-flex items-center gap-3 text-sm text-muted-foreground hover:text-foreground transition-colors group justify-end"
+            className="flex flex-col items-end gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors group"
           >
-            <span className="truncate group-hover:underline">
-              {truncateText(nextImage.overlayText, 20)}
+            <div className="flex items-center gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={getThumbnailUrl(nextImage, publicUrl)}
+                alt=""
+                className="w-8 h-8 rounded object-cover shrink-0"
+              />
+              <span className="shrink-0">→</span>
+            </div>
+            <span className="truncate w-full text-right group-hover:underline">
+              {nextImage.overlayText}
             </span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={getThumbnailUrl(nextImage, publicUrl)}
-              alt=""
-              className="w-8 h-8 rounded object-cover shrink-0"
-            />
-            <span className="shrink-0">→</span>
           </Link>
         ) : (
           <span />
