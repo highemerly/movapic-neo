@@ -10,24 +10,33 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 # Rebuild sharp from source with system libvips (HEIC support)
-RUN npm ci && npm rebuild sharp
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci && npm rebuild sharp
+
+# Prisma client generation (separate stage for caching)
+FROM deps AS prisma
+WORKDIR /app
+
+COPY prisma ./prisma
+
+RUN npx prisma generate
 
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=prisma /app/node_modules/.prisma ./node_modules/.prisma
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
-
-RUN npx prisma generate
 
 # ビルド時にダミーの環境変数を設定（ISRページのプリレンダリングをスキップするため）
 # 実際のDB接続は必要なく、Prismaクライアントの初期化だけ行われる
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 ENV ALLOWED_SERVERS="handon.club"
 
-RUN npm run build
+RUN --mount=type=cache,target=/app/.next/cache \
+    npm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner
@@ -62,3 +71,16 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "server.js"]
+
+# ============================================
+# Migration image (built only when needed)
+# ============================================
+FROM base AS migration
+WORKDIR /app
+
+# Prisma CLI and generated client
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=prisma /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/prisma ./prisma
+
+CMD ["npx", "prisma", "migrate", "deploy"]

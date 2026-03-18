@@ -2,17 +2,20 @@ name: Build and Push Docker Image
 
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag (e.g., v1.0.0)'
+        required: true
+        default: 'latest'
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  K8S_REPO: highemerly/k8sg1-repo
+  K8S_MANIFEST_PATH: manifests/movapic-neo/dev/web.yaml
 
 jobs:
   build-and-push:
@@ -20,10 +23,15 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      has_migration: ${{ steps.migration.outputs.has_migration }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Checkout fonts (private repository)
         uses: actions/checkout@v4
@@ -36,12 +44,37 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for migration changes
+        id: migration
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            if git diff --name-only "$PREV_TAG" HEAD | grep -q "^prisma/migrations/"; then
+              echo "has_migration=true" >> $GITHUB_OUTPUT
+              echo "Migration files changed since $PREV_TAG"
+            else
+              echo "has_migration=false" >> $GITHUB_OUTPUT
+              echo "No migration changes since $PREV_TAG"
+            fi
+          else
+            echo "has_migration=false" >> $GITHUB_OUTPUT
+            echo "No previous tag found"
+          fi
 
       - name: Extract metadata (tags, labels)
         id: meta
@@ -49,20 +82,77 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
-      - name: Build and push Docker image
+      - name: Build and push Docker image (production)
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          target: runner
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
+
+      - name: Build and push Docker image (migration)
+        if: steps.migration.outputs.has_migration == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: migration
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}-migrate
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+  create-k8s-pr:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout k8s repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.K8S_REPO }}
+          token: ${{ secrets.K8SG1_PAT }}
+          path: k8s-repo
+
+      - name: Update image tag
+        run: |
+          cd k8s-repo
+          sed -i "s|image: ghcr.io/highemerly/movapic-neo:.*|image: ghcr.io/highemerly/movapic-neo:${{ needs.build-and-push.outputs.version }}|" ${{ env.K8S_MANIFEST_PATH }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          path: k8s-repo
+          token: ${{ secrets.K8SG1_PAT }}
+          branch: update-movapic-neo-${{ needs.build-and-push.outputs.version }}
+          commit-message: "Update movapic-neo to ${{ needs.build-and-push.outputs.version }}"
+          title: "Update movapic-neo to ${{ needs.build-and-push.outputs.version }}"
+          body: |
+            ## Changes
+            - Update image: `ghcr.io/highemerly/movapic-neo:${{ needs.build-and-push.outputs.version }}`
+
+            ## Migration
+            ${{ needs.build-and-push.outputs.has_migration == 'true' && '⚠️ **このリリースにはDBマイグレーションが含まれます**' || '✅ マイグレーション不要' }}
+
+            ${{ needs.build-and-push.outputs.has_migration == 'true' && '### マイグレーション実行手順' || '' }}
+            ${{ needs.build-and-push.outputs.has_migration == 'true' && '```bash' || '' }}
+            ${{ needs.build-and-push.outputs.has_migration == 'true' && format('# マイグレーション用イメージ: ghcr.io/highemerly/movapic-neo:{0}-migrate', needs.build-and-push.outputs.version) || '' }}
+            ${{ needs.build-and-push.outputs.has_migration == 'true' && 'kubectl apply -f manifests/movapic-neo/dev/migration-job.yaml' || '' }}
+            ${{ needs.build-and-push.outputs.has_migration == 'true' && '```' || '' }}
+
+            ---
+            🤖 Auto-generated by GitHub Actions
+          labels: |
+            movapic-neo
+            ${{ needs.build-and-push.outputs.has_migration == 'true' && 'requires-migration' || '' }}
