@@ -101,6 +101,15 @@ export default function PrivacyPage() {
                   <li>有効期限：10分間</li>
                 </ul>
               </div>
+              <div>
+                <h3 className="font-medium text-gray-900 mb-2">
+                  お知らせ既読管理Cookie（ann）
+                </h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>目的：お知らせの既読状態を記憶</li>
+                  <li>有効期限：30日間</li>
+                </ul>
+              </div>
             </div>
           </section>
 
@@ -235,7 +244,7 @@ export default function PrivacyPage() {
           </section>
 
           <section className="text-center text-gray-500 text-sm">
-            <p>最終更新日：2026年3月14日</p>
+            <p>最終更新日：2026年3月18日</p>
           </section>
         </div>
 
