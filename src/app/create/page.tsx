@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { TextInput } from "@/components/TextInput";
 import { ImageUpload } from "@/components/ImageUpload";
 import { OptionsAccordion } from "@/components/OptionsAccordion";
+import { OtherPostMethods } from "@/components/OtherPostMethods";
 import { ActionButtons, Visibility } from "@/components/ActionButtons";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
@@ -484,6 +485,9 @@ export default function CreatePage() {
             isSavingDefaults={isSavingDefaults}
             saveSuccess={saveSuccess}
           />
+
+          {/* 他の投稿方法 */}
+          <OtherPostMethods />
 
           {/* 生成結果の詳細情報 */}
           {hasGenerated && resultInfo && !isLoading && (
