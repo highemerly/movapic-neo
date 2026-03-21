@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth/session";
 import { DeleteButton } from "./DeleteButton";
 import { ImageNavigation } from "./ImageNavigation";
+import { ImageOptionsButton } from "./ImageOptionsButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
 import { PinButton } from "@/components/pin/PinButton";
@@ -203,7 +204,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         </div>
 
         {/* メタ情報 */}
-        <div className="text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <p>
             {new Date(image.createdAt).toLocaleString("ja-JP", {
               year: "numeric",
@@ -232,6 +233,13 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               )}
             </span>
           </p>
+          <ImageOptionsButton
+            position={image.position}
+            color={image.color}
+            size={image.size}
+            font={image.font}
+            arrangement={image.arrangement}
+          />
         </div>
 
         {/* お気に入りボタン */}
