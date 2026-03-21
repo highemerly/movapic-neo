@@ -90,8 +90,7 @@ export async function fetchMentionNotifications(
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`通知の取得に失敗しました: ${response.status} ${error}`);
+    throw new Error(`通知の取得に失敗しました: ${response.status}`);
   }
 
   const notifications: MastodonNotification[] = await response.json();

@@ -86,8 +86,7 @@ async function sendBotReply(
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    console.error(`[mention] Botリプライ失敗: ${response.status} ${error}`);
+    console.error(`[mention] Botリプライ失敗: ${response.status}`);
   }
 }
 
@@ -139,8 +138,7 @@ async function deleteOriginalStatus(
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    console.error(`[mention] 元投稿削除失敗: ${response.status} ${error}`);
+    console.error(`[mention] 元投稿削除失敗: ${response.status}`);
   }
 }
 
