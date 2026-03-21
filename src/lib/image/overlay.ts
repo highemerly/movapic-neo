@@ -4,7 +4,6 @@ import { Position, FontFamily, Arrangement } from "@/types";
 import {
   PROPORTIONAL_FONTS,
   MONOSPACE_FONTS,
-  VERTICAL_CHAR_MAP,
   ROTATE_CHARS,
   PUNCTUATION_CHARS,
   MARGIN_RATIO,
@@ -211,13 +210,12 @@ function drawVerticalText(
   const useHalfWidth = MONOSPACE_FONTS.has(fontFamily);
 
   // 改行で分割し、各段落を高さに応じてさらに列に分割
-  type CharInfo = { char: string; originalChar: string; isPunctuation: boolean; shouldRotate: boolean; isHalf: boolean };
+  type CharInfo = { char: string; isPunctuation: boolean; shouldRotate: boolean; isHalf: boolean };
   const columns: CharInfo[][] = [];
   const paragraphs = text.split("\n");
   for (const paragraph of paragraphs) {
     const chars = Array.from(paragraph).map((char) => ({
-      char: VERTICAL_CHAR_MAP[char] || char,
-      originalChar: char,
+      char,
       isPunctuation: PUNCTUATION_CHARS.has(char),
       shouldRotate: ROTATE_CHARS.has(char),
       isHalf: useHalfWidth && isHalfWidthChar(char),
@@ -258,9 +256,13 @@ function drawVerticalText(
       const charY = isPunctuation ? baseY - fontSize * 0.3 : baseY;
 
       if (shouldRotate) {
+        // 回転する文字は文字セルの中心を基準に回転
+        // 通常文字は左端基準で描画されるため、中心位置に調整
+        const centerX = x + fontSize / 2;
         ctx.save();
-        ctx.translate(charX, charY);
+        ctx.translate(centerX, charY);
         ctx.rotate(Math.PI / 2);
+        ctx.textAlign = "center";
         if (arrangement === "neon") {
           drawNeonText(ctx, char, 0, 0, fontSize, textColor);
         } else {

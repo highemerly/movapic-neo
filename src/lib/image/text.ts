@@ -32,24 +32,19 @@ export function getMonospaceCharWidth(char: string, fontSize: number): number {
   return isHalfWidthChar(char) ? fontSize * 0.5 : fontSize;
 }
 
-// 縦書き用の文字変換マッピング（長音のみ変換、括弧は回転で対応）
-export const VERTICAL_CHAR_MAP: Record<string, string> = {
-  "ー": "丨",
-  "―": "丨",
-  "－": "丨",
-  "-": "丨",
-  "〜": "∣",
-  "~": "∣",
-};
-
-// 縦書き時に90度回転させる文字（括弧類）
+// 縦書き時に90度回転させる文字（括弧類・長音記号・波線）
 export const ROTATE_CHARS = new Set([
+  // 括弧類
   "（", "）", "(", ")",
   "「", "」", "『", "』",
   "【", "】", "〔", "〕",
   "《", "》", "〈", "〉",
   "[", "]", "{", "}",
   "｛", "｝", "［", "］",
+  // 長音記号
+  "ー", "―", "－", "-",
+  // 波線
+  "〜", "~",
 ]);
 
 export const PUNCTUATION_CHARS = new Set(["、", "。", ",", "."]);

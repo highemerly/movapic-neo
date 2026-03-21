@@ -2,7 +2,7 @@ import { CanvasRenderingContext2D } from "skia-canvas";
 import { Position, FontFamily } from "@/types";
 import {
   PROPORTIONAL_FONTS,
-  VERTICAL_CHAR_MAP,
+  ROTATE_CHARS,
   splitTextIntoLines,
   hexToRgb,
 } from "./text";
@@ -341,25 +341,26 @@ function drawVerticalStampChars(
     column.forEach((char, charIndex) => {
       const offsetX = (Math.random() - 0.5) * fontSize * 0.15;
       const offsetY = (Math.random() - 0.5) * fontSize * 0.15;
-      const rotation = (Math.random() - 0.5) * 0.1;
+      const baseRotation = (Math.random() - 0.5) * 0.1;
 
       const normalizedX = colIndex / Math.max(1, columns.length - 1);
       const normalizedY = charIndex / Math.max(1, column.length - 1);
       const alpha = getInkAlpha(normalizedX, normalizedY);
 
-      const mappedChar = VERTICAL_CHAR_MAP[char] || char;
+      const shouldRotate = ROTATE_CHARS.has(char);
       const x = firstColumnCenterX - colIndex * columnWidth + offsetX;
       const y = firstCharCenterY + charIndex * lineHeight + offsetY;
 
       ctx.save();
       ctx.translate(x, y);
-      ctx.rotate(rotation);
+      // 縦書き用回転（括弧・長音記号など）+ かすれ用の微小回転
+      ctx.rotate(baseRotation + (shouldRotate ? Math.PI / 2 : 0));
 
       ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
       ctx.lineWidth = strokeWidth;
-      ctx.strokeText(mappedChar, 0, 0);
+      ctx.strokeText(char, 0, 0);
       ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
-      ctx.fillText(mappedChar, 0, 0);
+      ctx.fillText(char, 0, 0);
 
       ctx.restore();
     });
