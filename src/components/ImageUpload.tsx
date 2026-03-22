@@ -68,7 +68,7 @@ export function ImageUpload({
       return "JPEG、PNG、WebP、HEIC、AVIF形式のみ対応しています";
     }
     if (file.size > MAX_FILE_SIZE) {
-      return "ファイルサイズは25MB以下にしてください";
+      return "ファイルサイズは20MB以下にしてください";
     }
     return null;
   };
