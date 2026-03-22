@@ -102,6 +102,14 @@ export function ImageUpload({
     const file = e.target.files?.[0];
     if (file) {
       handleFile(file);
+    } else {
+      // Androidで1回目のファイル選択時にfilesが遅延ロードされる場合に対応
+      setTimeout(() => {
+        const delayedFile = e.target.files?.[0];
+        if (delayedFile) {
+          handleFile(delayedFile);
+        }
+      }, 100);
     }
   };
 
