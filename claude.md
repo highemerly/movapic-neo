@@ -26,7 +26,7 @@
 
 ### 入力
 - **テキスト**: 1〜140文字（必須、空白のみは不可）
-- **画像**: JPEG/PNG/WebP/HEIC/AVIF、最大25MB
+- **画像**: JPEG/PNG/WebP/HEIC/AVIF、最大20MB
 - **コマンド設定**:
   - 位置: 上(default) / 右 / 左 / 下
   - フォント: ふい字(default) / Noto Sans JP / ラノベPOP
