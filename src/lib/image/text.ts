@@ -60,22 +60,16 @@ export const STROKE_WIDTH_RATIO = 0.08;
 export function calculateFontSize(
   width: number,
   height: number,
-  position: Position,
+  _position: Position,
   size: Size
 ): number {
-  const isVertical = position === "left" || position === "right";
   const multiplier = SIZE_MULTIPLIERS[size];
 
-  // 基準サイズ（全体を約15%大きく調整済み）
-  let baseFontSize: number;
-  if (isVertical) {
-    baseFontSize = Math.floor(height / 13);
-  } else {
-    baseFontSize = Math.floor(width / 17);
-  }
+  // 基準サイズ（短辺基準で統一）
+  const baseFontSize = Math.floor(Math.min(width, height) / 14);
 
   const fontSize = Math.floor(baseFontSize * multiplier);
-  return Math.max(16, Math.min(fontSize, 500));
+  return Math.max(14, Math.min(fontSize, 500));
 }
 
 /**

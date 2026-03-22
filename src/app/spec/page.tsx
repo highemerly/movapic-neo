@@ -31,14 +31,13 @@ export default function SpecPage() {
                 <h3 className="font-medium text-gray-900 mb-2">画像</h3>
                 <ul className="list-disc list-inside text-gray-700 space-y-1">
                   <li>対応フォーマット: JPEG, PNG, WebP, HEIC, AVIF</li>
-                  <li>最大ファイルサイズ: 25MB</li>
+                  <li>最大ファイルサイズ: 20MB</li>
                 </ul>
               </div>
               <div>
                 <h3 className="font-medium text-gray-900 mb-2">テキスト</h3>
                 <ul className="list-disc list-inside text-gray-700 space-y-1">
                   <li>文字数: 1〜140文字</li>
-                  <li>空白のみのテキストは不可</li>
                 </ul>
               </div>
             </div>
@@ -49,7 +48,7 @@ export default function SpecPage() {
               レート制限
             </h2>
             <p className="text-gray-700">
-              画像生成APIは8秒に1回のみ実行できます。短時間に連続してリクエストを送信した場合、一時的に制限がかかります。
+              画像生成APIに短時間に連続してリクエストを送信した場合、一時的に制限がかかります。
             </p>
           </section>
 
@@ -106,23 +105,14 @@ export default function SpecPage() {
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
               Bot投稿（メンション投稿）
             </h2>
-            <p className="text-gray-700 mb-4">
-              Mastodon上でBotアカウント（@movapic@handon.club）に画像付きでメンションすることで、画像生成・投稿を行えます。
-            </p>
-            <div className="bg-gray-50 rounded p-4 mb-4">
-              <p className="text-sm text-gray-600 mb-2">使用例:</p>
-              <code className="text-sm text-gray-800">
-                @movapic [上 赤 大] こんにちは
-              </code>
-            </div>
             <p className="text-gray-700">
-              Botは2分に1回、メンションを確認して処理を実行します。
+              Botは3分に1回、メンションを定期的に確認して処理を実行します。
             </p>
           </section>
 
           <section className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              文字描画の仕様
+              文字描画仕様
             </h2>
             <div className="space-y-4">
               <div>
@@ -144,10 +134,7 @@ export default function SpecPage() {
                 <h3 className="font-medium text-gray-900 mb-2">縦書きの処理</h3>
                 <ul className="list-disc list-inside text-gray-700 space-y-1">
                   <li>
-                    長音記号（ー、―、－、-、〜、~）は縦向きの記号に変換
-                  </li>
-                  <li>
-                    括弧類（「」、（）、【】など）は90度回転して描画
+                    括弧類（「」、（）、【】など）と長音記号（ー〜など）は90度回転して描画
                   </li>
                   <li>句読点（、。）は右上寄せで描画</li>
                 </ul>
@@ -163,7 +150,7 @@ export default function SpecPage() {
                   フォントサイズ
                 </h3>
                 <p className="text-gray-700">
-                  画像のサイズに応じて自動計算されます。横書きでは約17文字、縦書きでは約13文字が1行に収まる大きさが基準となり、サイズオプション（小/中/大/特大）で調整できます。
+                  画像のサイズに応じて自動計算されます。横書きでは画像幅に17文字、縦書きでは画像高さ約13文字が1行に収まる大きさを基準（中）として計算するようにしています。
                 </p>
               </div>
             </div>
@@ -175,7 +162,7 @@ export default function SpecPage() {
             </h2>
             <ul className="list-disc list-inside text-gray-700 space-y-2">
               <li>
-                スマートフォンで撮影した画像は、向き（Orientation）を自動で補正します
+                スマートフォン、特にiOSで撮影した画像は、向き（Orientation）を自動補正しています
               </li>
               <li>
                 プライバシー保護のため、GPS情報やカメラ情報などのメタデータは出力時に削除されます

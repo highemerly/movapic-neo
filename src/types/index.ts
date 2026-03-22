@@ -110,10 +110,10 @@ export const FONT_FILES: Record<FontFamily, string> = {
 
 // サイズ係数（mediumを1.0として）
 export const SIZE_MULTIPLIERS: Record<Size, number> = {
-  small: 0.65,
+  small: 0.75,
   medium: 1.0,
-  large: 1.55,
-  "extra-large": 2.5,
+  large: 1.4,
+  "extra-large": 2.35,
 };
 
 // 縁取りの色（薄い色は黒、濃い色は白）
