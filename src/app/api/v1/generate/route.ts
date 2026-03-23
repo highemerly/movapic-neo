@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     if (image.size > MAX_FILE_SIZE) {
       return errorResponse(
         ErrorCodes.VALIDATION_FILE_TOO_LARGE,
-        "ファイルサイズは25MB以下にしてください",
+        "ファイルサイズは20MB以下にしてください",
         400,
         {
           suggestion: "画像を圧縮してください",

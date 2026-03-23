@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "20mb",
     },
+    // Route Handler（API）のボディサイズ制限
+    proxyClientMaxBodySize: "20mb",
   },
 };
 
