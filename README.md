@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SHAMEZO
 
-## Getting Started
+"SHAMEZO" （写メゾー） is a web application for adding text overlays to images.
 
-First, run the development server:
+## Tech Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Framework**: Next.js 16
+- **UI**: Tailwind CSS + shadcn/ui
+- **Image Processing**: sharp + skia-canvas + heic-convert (server-side)
+- **Language**: TypeScript
+
+## Text Compositing
+
+Generate composite images by overlaying text on images.
+
+- **Text**: 1–140 characters
+- **Supported Image Formats**: JPEG / PNG / WebP / HEIC / AVIF (up to 20MB)
+- **Output Formats**: JPEG or AVIF
+
+### Customization Options
+
+| Option | Choices |
+|--------|---------|
+| Text Position | Top / Right / Left / Bottom |
+| Font | Hui Font / Noto Sans JP / Light Novel POP |
+| Text Color | White / Red / Blue / Green / Yellow / Brown / Pink / Orange |
+| Size | Small / Medium / Large / Extra Large |
+| Output Format | Mastodon (AVIF) / Misskey (AVIF) / None (JPEG) |
+
+Font files are stored in a private repository to prevent license violations (redistribution).
+
+### Text Rendering
+
+- Width
+   - Noto Sans JP: Rendered with proportional font width.
+   - Hui Font / Light Novel POP: Rendered with monospace width. However, half-width alphanumeric characters are displayed at half width.
+- Vertical Writing
+   - Brackets (「」, （）, 【】, etc.) and prolonged sound marks (ー, 〜, etc.) are rotated 90 degrees instead of using vertical writing fonts.
+   - Punctuation marks (、。) are aligned to the upper right.
+- Text Outline
+   - All text has outlines added for better visibility. Light colors (white, green, yellow, pink, orange) have black outlines, while dark colors (red, blue, brown) have white outlines.
+- Font Size
+   - Automatically calculated based on image size. The medium size is calibrated so that 16 characters fit within the shorter edge of the image.
+
+## Posting Images
+
+Images can be posted in three ways.
+
+### Web Posting
+
+Post directly from a web browser. Log in with a Mastodon / Misskey account and generate/post images from the posting page.
+
+### Bot Posting (Mention)
+
+Post by mentioning the bot account on Mastodon. The bot account is pre-configured and processes posts by periodically polling its mentions. Replies to the bot (containing the original unconverted image) are automatically deleted using the user's token to reduce the burden on server administrators.
+
+Example:
+```
+@pic [上 赤 大] Hello
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Email Posting
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Post via email. Specify options in the subject line, text in the body, and attach an image. Triggered via Cloudflare Workers.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Subject: Options separated by spaces (e.g., "上 赤 大")
+- Body: Text to overlay on the image
+- Attachment: Image file
 
-## Learn More
+## User Interface
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- "Like"
+- User page (`/u/[username]`)
+   - Pinning user post
+   - Calendar view
+- Public timeline (`/public/`)

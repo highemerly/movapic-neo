@@ -45,6 +45,52 @@ export default function SpecPage() {
 
           <section className="bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              テキストの処理
+            </h2>
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-medium text-gray-900 mb-2">
+                  フォントの種類
+                </h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>
+                    <span className="font-medium">Noto Sans JP</span>
+                    ：文字幅はプロポーショナルフォントで表示します。
+                  </li>
+                  <li>
+                    <span className="font-medium">ふい字・ラノベPOP</span>
+                    ：文字幅は等幅で表示します。ただし、半角英数字は半分の幅で表示します。
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-900 mb-2">縦書きの処理</h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>
+                    括弧類（「」、（）、【】など）と長音記号（ー〜など）は90度回転して描画します。
+                  </li>
+                  <li>句読点（、。）は右上寄せで描画します。</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-900 mb-2">文字の縁取り</h3>
+                <p className="text-gray-700">
+                  視認性を高めるため、すべての文字に縁取りを追加しています。薄い色（白、緑、黄、桃、橙）には黒い縁取り、濃い色（赤、青、茶）には白い縁取りが付きます。
+                </p>
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-900 mb-2">
+                  フォントサイズ
+                </h3>
+                <p className="text-gray-700">
+                  画像のサイズに応じて自動計算されます。画像の短辺の画像幅に16文字納まる文字サイズを基準（中）として計算しています。
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
               レート制限
             </h2>
             <p className="text-gray-700">
@@ -108,52 +154,6 @@ export default function SpecPage() {
             <p className="text-gray-700">
               Botは3分に1回、メンションを定期的に確認して処理を実行します。
             </p>
-          </section>
-
-          <section className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              文字描画仕様
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-medium text-gray-900 mb-2">
-                  フォントの種類
-                </h3>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>
-                    <span className="font-medium">Noto Sans JP</span>
-                    ：プロポーショナルフォント（文字ごとに幅が異なる）
-                  </li>
-                  <li>
-                    <span className="font-medium">ふい字・ラノベPOP</span>
-                    ：等幅フォント（半角文字は全角の半分の幅で描画）
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <h3 className="font-medium text-gray-900 mb-2">縦書きの処理</h3>
-                <ul className="list-disc list-inside text-gray-700 space-y-1">
-                  <li>
-                    括弧類（「」、（）、【】など）と長音記号（ー〜など）は90度回転して描画
-                  </li>
-                  <li>句読点（、。）は右上寄せで描画</li>
-                </ul>
-              </div>
-              <div>
-                <h3 className="font-medium text-gray-900 mb-2">文字の縁取り</h3>
-                <p className="text-gray-700">
-                  視認性を高めるため、すべての文字に縁取りを追加しています。薄い色（白、緑、黄、桃、橙）には黒い縁取り、濃い色（赤、青、茶）には白い縁取りが付きます。
-                </p>
-              </div>
-              <div>
-                <h3 className="font-medium text-gray-900 mb-2">
-                  フォントサイズ
-                </h3>
-                <p className="text-gray-700">
-                  画像のサイズに応じて自動計算されます。横書きでは画像幅に17文字、縦書きでは画像高さ約13文字が1行に収まる大きさを基準（中）として計算するようにしています。
-                </p>
-              </div>
-            </div>
           </section>
 
           <section className="bg-white rounded-lg shadow p-6">

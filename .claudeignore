@@ -1,0 +1,22 @@
+# Environment variables
+.env
+.env.*
+.env.local
+.env.production
+
+# Allow sample env file
+!.env.sample
+
+# Secrets
+*.pem
+
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+build/
+
+# Generated files
+src/generated/
