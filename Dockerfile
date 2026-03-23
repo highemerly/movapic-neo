@@ -46,8 +46,9 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Runtime libraries for sharp with HEIC support
-# libheif alone is NOT enough - need libde265 for HEVC decoding (used by most HEIC files)
-RUN apk add --no-cache vips libheif libde265
+# libheif alone is NOT enough - need libheif-libde265 plugin for HEVC decoding (used by most HEIC files)
+# Note: "libheif-libde265" is the plugin that connects libheif to libde265 decoder
+RUN apk add --no-cache vips libheif libheif-libde265
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
