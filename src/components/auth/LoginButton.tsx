@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface LoginButtonProps {
   /**
@@ -23,6 +25,7 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [agreed, setAgreed] = useState(false);
 
   // 単一サーバー限定モード
   const singleServerMode = allowedServers?.length === 1;
@@ -85,6 +88,23 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
     }
   };
 
+  const agreementCheckbox = (
+    <div className="flex items-start gap-2">
+      <Checkbox
+        id="agree"
+        checked={agreed}
+        onCheckedChange={(checked) => setAgreed(checked === true)}
+        className="mt-0.5"
+      />
+      <label htmlFor="agree" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+        <Link href="/terms" className="underline hover:text-foreground">利用規約</Link>
+        {" "}および{" "}
+        <Link href="/privacy" className="underline hover:text-foreground">プライバシーポリシー</Link>
+        に同意してログインします
+      </label>
+    </div>
+  );
+
   // 単一サーバー限定モード: シンプルなボタン
   if (singleServerMode) {
     const buttonLabel = isLoggedIn
@@ -95,9 +115,10 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
 
     return (
       <div className="space-y-4">
+        {!isLoggedIn && agreementCheckbox}
         <Button
           onClick={() => handleLogin()}
-          disabled={isLoading || isLoggedIn === null}
+          disabled={isLoading || isLoggedIn === null || (!isLoggedIn && !agreed)}
           className="w-full py-6 text-lg"
           size="lg"
         >
@@ -137,6 +158,7 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
         </Button>
       ) : (
         <>
+          {agreementCheckbox}
           <div className="flex gap-2">
             <Input
               type="text"
@@ -148,7 +170,7 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
             />
             <Button
               type="submit"
-              disabled={isLoading || !server.trim()}
+              disabled={isLoading || !server.trim() || !agreed}
               className="py-6 text-lg"
               size="lg"
             >

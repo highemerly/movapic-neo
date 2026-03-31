@@ -10,6 +10,12 @@ export function Footer() {
         フォントライセンス
       </Link>
       <Link
+        href="/terms"
+        className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+      >
+        利用規約
+      </Link>
+      <Link
         href="/privacy"
         className="text-sm text-muted-foreground hover:text-foreground hover:underline"
       >
