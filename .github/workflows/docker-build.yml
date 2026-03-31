@@ -15,7 +15,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   K8S_REPO: highemerly/k8sg1-repo
-  K8S_MANIFEST_PATH: manifests/movapic-neo/dev/web.yaml
+  K8S_MANIFEST_PATH: manifests/movapic-neo/prd/web.yaml
 
 jobs:
   build-and-push:
@@ -148,7 +148,7 @@ jobs:
             ${{ needs.build-and-push.outputs.has_migration == 'true' && '### マイグレーション実行手順' || '' }}
             ${{ needs.build-and-push.outputs.has_migration == 'true' && '```bash' || '' }}
             ${{ needs.build-and-push.outputs.has_migration == 'true' && format('# マイグレーション用イメージ: ghcr.io/highemerly/movapic-neo:{0}-migrate', needs.build-and-push.outputs.version) || '' }}
-            ${{ needs.build-and-push.outputs.has_migration == 'true' && 'kubectl apply -f manifests/movapic-neo/dev/migration-job.yaml' || '' }}
+            ${{ needs.build-and-push.outputs.has_migration == 'true' && 'kubectl apply -f manifests/movapic-neo/prd/migration-job.yaml' || '' }}
             ${{ needs.build-and-push.outputs.has_migration == 'true' && '```' || '' }}
 
             ---
