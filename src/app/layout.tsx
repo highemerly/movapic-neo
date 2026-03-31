@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "写真に文字を合成するやつ（仮）",
-  description: "写真に文字を合成してSNSに投稿します",
+  title: "SHAMEZO",
+  description: "写真 × ひとこと = SNSに投稿しよう。",
 };
 
 export default function RootLayout({

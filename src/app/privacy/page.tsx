@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "プライバシーポリシー",
-  description: "movapicのプライバシーポリシー",
+  description: "SHAMEZOのプライバシーポリシー",
 };
 
 export default function PrivacyPage() {
@@ -29,7 +29,7 @@ export default function PrivacyPage() {
               基本方針
             </h2>
             <p className="text-gray-700">
-              本サービス（以下「movapic」）は、個人情報保護法をはじめとする関連法令を遵守し、ユーザーの個人情報を適切に取り扱います。
+              本サービス（以下「SHAMEZO」）は、個人情報保護法をはじめとする関連法令を遵守し、ユーザーの個人情報を適切に取り扱います。
             </p>
           </section>
 

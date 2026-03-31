@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { Menu, ImagePlus, Images, Globe, LayoutDashboard, Heart, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,16 +53,13 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
       <header className="border-b bg-background">
       <div className="container mx-auto px-4 py-1 max-w-6xl">
         <div className="flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">景</span>
-            </div>
-            <span className="font-medium text-sm">写真に文字を合成するやつ（仮）</span>
+          <Link href="/dashboard" className="flex items-center hover:opacity-80 transition-opacity">
+            <Image src="/shamezo_logo.svg" alt="SHAMEZO" width={160} height={29} priority />
           </Link>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="outline" size="icon">
                 <Menu className="h-5 w-5" />
                 <span className="sr-only">メニューを開く</span>
               </Button>

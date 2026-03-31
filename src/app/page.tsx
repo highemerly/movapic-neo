@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import prisma from "@/lib/db";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { Button } from "@/components/ui/button";
@@ -44,10 +45,9 @@ export default async function HomePage() {
       <main className="container mx-auto max-w-2xl px-4 py-6">
         {/* ヘッダー */}
         <div className="text-center mb-6">
-          <h1 className="text-xl font-bold mb-2">写真に文字を合成するやつ（仮）</h1>
-          <p className="text-muted-foreground text-sm mb-6">
-            写真 × ひとこと → SNSに投稿しよう。
-          </p>
+          <div className="flex justify-center mb-4">
+            <Image src="/shamezo_logo_with_tagline.svg" alt="SHAMEZO" width={340} height={76} priority />
+          </div>
 
           {/* ログインボタン */}
           <div className="max-w-sm mx-auto mt-6 mb-8">
