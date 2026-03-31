@@ -62,17 +62,11 @@ export function EmailAddressDisplay({ emailPrefix: initialEmailPrefix, emailDoma
       <div>
         <dt className="text-sm font-medium text-muted-foreground">投稿用メールアドレス</dt>
         <dd className="mt-1 flex items-start gap-2">
-          <code className="bg-background px-2 py-1 rounded text-sm">
+          <code className="bg-background px-2 py-1 rounded text-sm break-all">
             {isVisible ? (
-              <>
-                <span className="block">{currentEmailPrefix}</span>
-                <span className="block">@{emailDomain}</span>
-              </>
+              fullEmail
             ) : (
-              <>
-                <span className="block blur-sm select-none" aria-hidden="true">{currentEmailPrefix}</span>
-                <span className="block blur-sm select-none" aria-hidden="true">@{emailDomain}</span>
-              </>
+              <span className="blur-sm select-none" aria-hidden="true">{fullEmail}</span>
             )}
           </code>
           <button

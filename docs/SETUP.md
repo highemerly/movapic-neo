@@ -141,11 +141,10 @@ openssl rand -hex 32
 
 メール投稿機能を有効にするための設定。
 
-### 1. Wranglerのインストール
+### 1. Cloudflareへのログイン
 
 ```bash
-npm install -g wrangler
-wrangler login
+npx wrangler login
 ```
 
 ### 2. Workerのデプロイ
@@ -153,14 +152,14 @@ wrangler login
 ```bash
 cd workers/email-forwarder
 npm install
-wrangler deploy
+npx wrangler deploy
 ```
 
 ### 3. シークレットの設定
 
 ```bash
 # INTERNAL_API_KEYをシークレットとして設定
-wrangler secret put INTERNAL_API_KEY
+npx wrangler secret put INTERNAL_API_KEY
 # プロンプトが表示されたら、.envのINTERNAL_API_KEYの値を入力
 ```
 
@@ -280,8 +279,8 @@ npx prisma generate
 
 ```bash
 # Workerのログ確認
-wrangler tail movapic-email-forwarder
+npx wrangler tail movapic-email-forwarder
 
 # シークレットの確認
-wrangler secret list
+npx wrangler secret list
 ```

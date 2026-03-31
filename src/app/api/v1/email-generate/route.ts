@@ -204,6 +204,40 @@ export async function POST(request: NextRequest) {
     // 画像メタデータを取得
     const metadata = await sharp(result.buffer).metadata();
 
+    // Fediverseに投稿
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+    const imagePageUrl = `${appUrl}/u/${user.username}/status/${imageId}`;
+    const { postToMastodon, postToMisskey } = await import("@/lib/fediverse/post");
+    const { decryptToken } = await import("@/lib/auth/tokens");
+    const accessToken = decryptToken(user.accessToken);
+
+    let postUrl: string | undefined;
+    if (user.instance.type === "mastodon") {
+      const postResult = await postToMastodon(
+        user.instance.domain,
+        accessToken,
+        result.buffer,
+        result.contentType,
+        `movapic-${imageId}.${extension}`,
+        parsed.text,
+        imagePageUrl,
+        "public"
+      );
+      postUrl = postResult.postUrl;
+    } else if (user.instance.type === "misskey") {
+      const postResult = await postToMisskey(
+        user.instance.domain,
+        accessToken,
+        result.buffer,
+        result.contentType,
+        `movapic-${imageId}.${extension}`,
+        parsed.text,
+        imagePageUrl,
+        "public"
+      );
+      postUrl = postResult.postUrl;
+    }
+
     // DBに保存
     await prisma.image.create({
       data: {
@@ -225,6 +259,7 @@ export async function POST(request: NextRequest) {
         thumbnailKey,
         source: "email",
         isPublic: true,
+        postUrl,
       },
     });
 

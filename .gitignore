@@ -46,3 +46,7 @@ next-env.d.ts
 
 # fonts (stored in private repository)
 /fonts/
+
+# workers
+/workers/**/node_modules/
+/workers/**/package-lock.json

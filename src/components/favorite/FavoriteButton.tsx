@@ -8,6 +8,7 @@ import { formatFavoriteCount } from "@/lib/utils";
 interface Favoriter {
   username: string;
   displayName: string | null;
+  avatarUrl: string | null;
 }
 
 interface FavoriteButtonProps {
@@ -118,19 +119,23 @@ export function FavoriteButton({
 
       {/* Recent favoriters */}
       {recentFavoriters.length > 0 && (
-        <div className="text-xs text-muted-foreground">
-          {recentFavoriters.slice(0, 5).map((favoriter, index) => (
-            <span key={favoriter.username}>
-              {index > 0 && ", "}
-              <Link
-                href={`/u/${favoriter.username}`}
-                className="hover:underline hover:text-foreground"
-              >
-                {favoriter.displayName || favoriter.username}
-              </Link>
-            </span>
+        <div className="flex items-center gap-1">
+          {recentFavoriters.slice(0, 5).map((favoriter) => (
+            <Link key={favoriter.username} href={`/u/${favoriter.username}`} title={favoriter.displayName || favoriter.username}>
+              {favoriter.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={favoriter.avatarUrl}
+                  alt={favoriter.displayName || favoriter.username}
+                  className="w-6 h-6 rounded-full hover:opacity-80 transition-opacity"
+                />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-muted-foreground/20 flex items-center justify-center text-xs text-muted-foreground hover:opacity-80 transition-opacity">
+                  {(favoriter.displayName || favoriter.username).charAt(0)}
+                </div>
+              )}
+            </Link>
           ))}
-          {count > 5 && <span> ほか</span>}
         </div>
       )}
     </div>

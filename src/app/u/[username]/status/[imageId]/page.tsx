@@ -10,7 +10,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
 import { PinButton } from "@/components/pin/PinButton";
 import { Footer } from "@/components/Footer";
-import { User, CalendarDays } from "lucide-react";
+import { User, CalendarDays, Globe, Heart } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +77,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           select: {
             username: true,
             displayName: true,
+            avatarUrl: true,
           },
         },
       },
@@ -206,14 +207,32 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         {/* メタ情報 */}
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <p>
-            {new Date(image.createdAt).toLocaleString("ja-JP", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-              timeZone: "Asia/Tokyo",
-            })}
+            {image.postUrl ? (
+              <a
+                href={image.postUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline"
+              >
+                {new Date(image.createdAt).toLocaleString("ja-JP", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  timeZone: "Asia/Tokyo",
+                })}
+              </a>
+            ) : (
+              new Date(image.createdAt).toLocaleString("ja-JP", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "Asia/Tokyo",
+              })
+            )}
             <span className="ml-2">
               {image.source === "email" ? (
                 "メール"
@@ -243,7 +262,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         </div>
 
         {/* お気に入りボタン */}
-        <div className="mt-4">
+        <div className="mt-4 flex items-center gap-2">
           <FavoriteButton
             imageId={imageId}
             initialCount={image.favoriteCount}
@@ -251,10 +270,19 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             recentFavoriters={recentFavoriters.map((f) => ({
               username: f.user.username,
               displayName: f.user.displayName,
+              avatarUrl: f.user.avatarUrl,
             }))}
             isLoggedIn={!!currentUser}
           />
         </div>
+
+        {/* ピン留め・削除ボタン（自分の画像のみ） */}
+        {isOwner && (
+          <div className="mt-2 flex items-center gap-2">
+            <PinButton imageId={imageId} initialIsPinned={!!image.pinnedAt} />
+            <DeleteButton imageId={imageId} username={username} />
+          </div>
+        )}
 
         {/* 前後の画像ナビゲーション */}
         <div className="mt-8">
@@ -267,20 +295,36 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         </div>
 
         {/* アクションボタン */}
-        <div className="mt-8 flex gap-4 flex-wrap">
-          <Link href="/public">
-            <Button variant="default">みんなの投稿を見る</Button>
+        <div className="mt-8 space-y-3">
+          <Link href="/create" className="block">
+            <Button variant="default" className="w-full">写真を投稿する</Button>
           </Link>
-          <Link href="/create">
-            <Button variant="outline">写真を投稿する</Button>
-          </Link>
-          {/* ピン留め・削除ボタン（自分の画像のみ） */}
-          {isOwner && (
-            <>
-              <PinButton imageId={imageId} initialIsPinned={!!image.pinnedAt} />
-              <DeleteButton imageId={imageId} username={username} />
-            </>
-          )}
+          <div className="bg-muted rounded-lg p-3">
+            <div className={`grid gap-3 ${currentUser ? "grid-cols-3" : "grid-cols-1"}`}>
+              <Link href="/public">
+                <Button variant="outline" className="w-full h-auto py-3 flex flex-col gap-1.5">
+                  <Globe className="h-4 w-4" />
+                  <span className="text-xs">みんなの写真</span>
+                </Button>
+              </Link>
+              {currentUser && (
+                <>
+                  <Link href={`/u/${currentUser.username}`}>
+                    <Button variant="outline" className="w-full h-auto py-3 flex flex-col gap-1.5">
+                      <User className="h-4 w-4" />
+                      <span className="text-xs">わたしの写真</span>
+                    </Button>
+                  </Link>
+                  <Link href="/favorite">
+                    <Button variant="outline" className="w-full h-auto py-3 flex flex-col gap-1.5">
+                      <Heart className="h-4 w-4" />
+                      <span className="text-xs">お気に入り</span>
+                    </Button>
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
         <Footer />

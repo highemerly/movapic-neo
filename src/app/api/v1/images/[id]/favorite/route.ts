@@ -56,6 +56,7 @@ export async function GET(
           select: {
             username: true,
             displayName: true,
+            avatarUrl: true,
           },
         },
       },
@@ -68,6 +69,7 @@ export async function GET(
       recentFavoriters: recentFavoriters.map((f) => ({
         username: f.user.username,
         displayName: f.user.displayName,
+        avatarUrl: f.user.avatarUrl,
       })),
     });
   } catch (error) {

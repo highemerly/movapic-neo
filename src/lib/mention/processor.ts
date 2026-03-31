@@ -493,6 +493,7 @@ export async function processOneMention(
       thumbnailKey,
       source: "mention",
       isPublic: effectiveVisibility !== "local",
+      postUrl: postResult?.postUrl,
     },
   });
 

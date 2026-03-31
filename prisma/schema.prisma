@@ -78,6 +78,7 @@ model Image {
   arrangement   String   @default("none") @db.VarChar(20)
   source        String   @default("web") @db.VarChar(20) // "web" | "email"
   thumbnailKey  String?  @map("thumbnail_key") @db.VarChar(500)
+  postUrl       String?  @map("post_url") @db.Text
   isPublic      Boolean  @default(true) @map("is_public")
   favoriteCount Int      @default(0) @map("favorite_count")
   pinnedAt      DateTime? @map("pinned_at")

@@ -162,6 +162,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // postUrlをDBに保存
+    if (postResult.postUrl) {
+      await prisma.image.update({
+        where: { id: image.id },
+        data: { postUrl: postResult.postUrl },
+      });
+    }
+
     return NextResponse.json({
       success: true,
       imageId: image.id,

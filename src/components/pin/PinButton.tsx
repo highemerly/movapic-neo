@@ -59,7 +59,7 @@ export function PinButton({
       <button
         onClick={handlePin}
         disabled={isLoading}
-        className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-md transition-colors ${
+        className={`flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-colors ${
           isPinned
             ? "text-amber-500 hover:text-amber-600 border-amber-200"
             : "text-muted-foreground hover:text-amber-500 border-border"
@@ -71,7 +71,7 @@ export function PinButton({
             isPinned ? "fill-current" : ""
           }`}
         />
-        <span className="text-sm font-medium">
+        <span className="text-xs text-muted-foreground">
           {isPinned ? "ピン留め中" : "ピン留め"}
         </span>
       </button>

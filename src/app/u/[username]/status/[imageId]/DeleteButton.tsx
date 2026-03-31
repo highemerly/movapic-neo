@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 
 interface DeleteButtonProps {
@@ -30,7 +29,6 @@ export function DeleteButton({ imageId, username }: DeleteButtonProps) {
         throw new Error(data.error || "削除に失敗しました");
       }
 
-      // 削除成功後、ユーザーのギャラリーにリダイレクト
       router.push(`/u/${username}`);
       router.refresh();
     } catch (error) {
@@ -40,14 +38,14 @@ export function DeleteButton({ imageId, username }: DeleteButtonProps) {
   };
 
   return (
-    <Button
-      variant="destructive"
-      size="sm"
+    <button
       onClick={handleDelete}
       disabled={isDeleting}
+      className="flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-colors text-muted-foreground hover:text-red-600 hover:border-red-200 border-border disabled:opacity-50"
+      title="この画像を削除"
     >
-      <Trash2 className="w-4 h-4 mr-1" />
-      {isDeleting ? "削除中..." : "この画像を削除"}
-    </Button>
+      <Trash2 className="h-4 w-4" />
+      <span className="text-xs text-muted-foreground">削除</span>
+    </button>
   );
 }
