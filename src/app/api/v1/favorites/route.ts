@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import prisma from "@/lib/db";
+import { getAvatarUrl } from "@/lib/avatar";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
         user: {
           username: fav.image.user.username,
           displayName: fav.image.user.displayName,
-          avatarUrl: fav.image.user.avatarUrl,
+          avatarUrl: getAvatarUrl(fav.image.user.avatarUrl),
           instance: fav.image.user.instance.domain,
         },
       })),

@@ -271,7 +271,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             recentFavoriters={recentFavoriters.map((f) => ({
               username: f.user.username,
               displayName: f.user.displayName,
-              avatarUrl: f.user.avatarUrl,
+              avatarUrl: getAvatarUrl(f.user.avatarUrl),
             }))}
             isLoggedIn={!!currentUser}
           />

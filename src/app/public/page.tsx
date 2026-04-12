@@ -1,5 +1,6 @@
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
+import { getAvatarUrl } from "@/lib/avatar";
 import { PublicTimelineClient } from "./PublicTimelineClient";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
@@ -60,7 +61,7 @@ export default async function PublicTimelinePage() {
             user: {
               username: img.user.username,
               displayName: img.user.displayName,
-              avatarUrl: img.user.avatarUrl,
+              avatarUrl: getAvatarUrl(img.user.avatarUrl),
               instance: img.user.instance.domain,
             },
           }))}

@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { getAvatarUrl } from "@/lib/avatar";
 import { Heart } from "lucide-react";
 import { formatFavoriteCount } from "@/lib/utils";
 
@@ -126,7 +125,7 @@ export function FavoriteButton({
               {favoriter.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={getAvatarUrl(favoriter.avatarUrl) ?? favoriter.avatarUrl}
+                  src={favoriter.avatarUrl ?? undefined}
                   alt={favoriter.displayName || favoriter.username}
                   className="w-6 h-6 rounded-full hover:opacity-80 transition-opacity"
                 />

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { getAvatarUrl } from "@/lib/avatar";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
           user: {
             username: img.user.username,
             displayName: img.user.displayName,
-            avatarUrl: img.user.avatarUrl,
+            avatarUrl: getAvatarUrl(img.user.avatarUrl),
             instance: img.user.instance.domain,
           },
         })),
