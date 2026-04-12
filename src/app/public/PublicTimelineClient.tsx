@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
+import { getAvatarUrl } from "@/lib/avatar";
 import { FavoriteOverlay } from "@/components/favorite/FavoriteOverlay";
 
 interface TimelineImage {
@@ -128,7 +129,7 @@ function TimelineImageCard({
         {image.user.avatarUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={image.user.avatarUrl}
+            src={getAvatarUrl(image.user.avatarUrl) ?? image.user.avatarUrl}
             alt={image.user.displayName || image.user.username}
             className="w-5 h-5 rounded-full"
           />

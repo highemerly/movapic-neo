@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { getAvatarUrl } from "@/lib/avatar";
 import { Globe, User, Heart } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
@@ -182,7 +183,7 @@ export default async function DashboardPage() {
                 <Link href={`/u/${user.username}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={user.avatarUrl}
+                    src={getAvatarUrl(user.avatarUrl) ?? user.avatarUrl}
                     alt={user.displayName || user.username}
                     className="w-12 h-12 rounded-full hover:opacity-80 transition-opacity"
                   />

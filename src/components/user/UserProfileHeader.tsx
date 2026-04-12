@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Images, Calendar } from "lucide-react";
+import { getAvatarUrl } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 
@@ -48,7 +49,7 @@ export function UserProfileHeader({
           <Link href={`/u/${user.username}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={user.avatarUrl}
+              src={getAvatarUrl(user.avatarUrl) ?? user.avatarUrl}
               alt={user.displayName || user.username}
               className="w-12 h-12 rounded-full hover:opacity-80 transition-opacity"
             />
