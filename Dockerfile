@@ -48,7 +48,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Runtime libraries for sharp with HEIC support
 # vips-heif provides HEIC support through libheif
 # libde265 is the HEVC decoder needed for iPhone HEIC files
-RUN apk add --no-cache vips vips-heif libheif libde265
+# jemalloc: libvips/sharpのネイティブメモリをOSへ確実に返却させる (rss肥大化対策)
+RUN apk add --no-cache vips vips-heif libheif libde265 jemalloc
+
+ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
