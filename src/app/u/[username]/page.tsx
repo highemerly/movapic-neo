@@ -82,7 +82,7 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
     },
   });
 
-  const publicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
+  const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
   // 総画像数を取得
   const totalImageCount = await prisma.image.count({

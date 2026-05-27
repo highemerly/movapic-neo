@@ -39,7 +39,7 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
     notFound();
   }
 
-  const publicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
+  const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
   // クエリパラメータまたは現在の年月を使用
   const now = new Date();

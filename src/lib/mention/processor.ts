@@ -6,7 +6,7 @@ import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { prisma } from "@/lib/db";
 import { processImage } from "@/lib/imageProcessor";
-import { uploadImage, generateStorageKey } from "@/lib/storage/r2";
+import { uploadImage, generateStorageKey } from "@/lib/storage/storage";
 import { generateThumbnail, generateThumbnailKey } from "@/lib/thumbnail";
 import { postToMastodon, MastodonVisibility } from "@/lib/fediverse/post";
 import { decryptToken } from "@/lib/auth/tokens";

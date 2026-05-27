@@ -40,7 +40,7 @@ export default async function PublicTimelinePage() {
     },
   });
 
-  const publicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
+  const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
   return (
     <>

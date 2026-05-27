@@ -28,12 +28,12 @@ export function middleware(_request: NextRequest) {
 
   // Content-Security-Policy
   const mediaProxyOrigin = process.env.MEDIA_PROXY_BASE_URL ?? "";
-  const r2PublicOrigin = (process.env.R2_PUBLIC_URL ?? "").replace(/\/$/, "");
+  const storagePublicOrigin = (process.env.S3_PUBLIC_URL ?? process.env.R2_PUBLIC_URL ?? "").replace(/\/$/, "");
   const csp = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline'", // Next.js App Routerではunsafe-eval不要
     "style-src 'self' 'unsafe-inline'", // Tailwind等で必要
-    `img-src 'self' data: blob: ${mediaProxyOrigin} ${r2PublicOrigin}`, // 画像: アバターproxy・R2投稿画像
+    `img-src 'self' data: blob: ${mediaProxyOrigin} ${storagePublicOrigin}`, // 画像: アバターproxy・投稿画像
     "font-src 'self'",
     "connect-src 'self' https:", // Fediverseインスタンスは任意のため https: を維持
     "frame-ancestors 'none'", // iframe埋め込み禁止

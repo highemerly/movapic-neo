@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
-import { deleteImage } from "@/lib/storage/r2";
+import { deleteImage } from "@/lib/storage/storage";
 import prisma from "@/lib/db";
 
 export async function DELETE(

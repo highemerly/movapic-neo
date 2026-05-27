@@ -10,7 +10,7 @@ import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { parseEmail } from "@/lib/email/parser";
 import { processImage } from "@/lib/imageProcessor";
-import { uploadImage, generateStorageKey, getExtensionFromMimeType } from "@/lib/storage/r2";
+import { uploadImage, generateStorageKey, getExtensionFromMimeType } from "@/lib/storage/storage";
 import { generateThumbnail, generateThumbnailKey } from "@/lib/thumbnail";
 import { verifyRequestSignature, hashRequestBody } from "@/lib/auth/crypto";
 import prisma from "@/lib/db";

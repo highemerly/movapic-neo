@@ -123,7 +123,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     }),
   ]);
 
-  const publicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
+  const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
   const imageUrl = `${publicUrl}/${image.storageKey}`;
 
   // 自分の画像かどうか

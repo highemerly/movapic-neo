@@ -6,19 +6,16 @@
  *
  * 環境変数:
  *   DATABASE_URL: PostgreSQL接続文字列
- *   CF_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME: R2設定
+ *   S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_BUCKET_NAME: S3互換ストレージ設定
+ *     (R2_* / CF_ACCOUNT_ID も後方互換でフォールバック)
  */
 
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
-import {
-  S3Client,
-  GetObjectCommand,
-  PutObjectCommand,
-} from "@aws-sdk/client-s3";
 import sharp from "sharp";
+import { getImage, uploadImage } from "@/lib/storage/storage";
 
 // PrismaClientを初期化（アダプターパターン）
 const connectionString = process.env.DATABASE_URL;
@@ -32,82 +29,6 @@ const prisma = new PrismaClient({ adapter });
 const BATCH_SIZE = 100;
 const THUMBNAIL_SIZE = 64;
 const THUMBNAIL_QUALITY = 60;
-
-// R2クライアントを初期化
-function getR2Client(): S3Client {
-  const accountId = process.env.CF_ACCOUNT_ID;
-  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
-
-  if (!accountId || !accessKeyId || !secretAccessKey) {
-    throw new Error("R2 configuration is missing");
-  }
-
-  return new S3Client({
-    region: "auto",
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId,
-      secretAccessKey,
-    },
-  });
-}
-
-// R2から画像を取得
-async function getImage(client: S3Client, storageKey: string): Promise<Buffer | null> {
-  const bucketName = process.env.R2_BUCKET_NAME;
-  if (!bucketName) {
-    throw new Error("R2_BUCKET_NAME is not configured");
-  }
-
-  try {
-    const response = await client.send(
-      new GetObjectCommand({
-        Bucket: bucketName,
-        Key: storageKey,
-      })
-    );
-
-    if (!response.Body) {
-      return null;
-    }
-
-    const chunks: Uint8Array[] = [];
-    for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
-      chunks.push(chunk);
-    }
-
-    return Buffer.concat(chunks);
-  } catch (error) {
-    if ((error as { name?: string }).name === "NoSuchKey") {
-      return null;
-    }
-    throw error;
-  }
-}
-
-// R2に画像をアップロード
-async function uploadImage(
-  client: S3Client,
-  buffer: Buffer,
-  storageKey: string,
-  contentType: string
-): Promise<void> {
-  const bucketName = process.env.R2_BUCKET_NAME;
-  if (!bucketName) {
-    throw new Error("R2_BUCKET_NAME is not configured");
-  }
-
-  await client.send(
-    new PutObjectCommand({
-      Bucket: bucketName,
-      Key: storageKey,
-      Body: buffer,
-      ContentType: contentType,
-      CacheControl: "public, max-age=31536000, immutable",
-    })
-  );
-}
 
 // クロップ位置を決定
 function getCropPosition(
@@ -180,8 +101,6 @@ async function main() {
     console.log("(未生成のみ。全て再生成するには --force を付けて実行)\n");
   }
 
-  const r2Client = getR2Client();
-
   // 対象画像をカウント
   const whereCondition = forceRegenerate ? {} : { thumbnailKey: null };
   const totalCount = await prisma.image.count({ where: whereCondition });
@@ -221,8 +140,8 @@ async function main() {
 
     for (const image of images) {
       try {
-        // R2から元画像を取得
-        const imageBuffer = await getImage(r2Client, image.storageKey);
+        // ストレージから元画像を取得
+        const imageBuffer = await getImage(image.storageKey);
         if (!imageBuffer) {
           console.log(`  [SKIP] ${image.id}: 元画像が見つかりません`);
           errorCount++;
@@ -234,8 +153,8 @@ async function main() {
         const thumbnailKey = generateThumbnailKey(image.storageKey);
         const thumbnailBuffer = await generateThumbnail(imageBuffer, image.position);
 
-        // R2にアップロード
-        await uploadImage(r2Client, thumbnailBuffer, thumbnailKey, "image/webp");
+        // ストレージにアップロード
+        await uploadImage(thumbnailBuffer, thumbnailKey, "image/webp");
 
         // DBを更新
         await prisma.image.update({

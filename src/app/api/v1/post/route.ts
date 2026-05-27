@@ -8,7 +8,7 @@ import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { getCurrentUserWithValidation } from "@/lib/auth/session";
 import { decryptToken } from "@/lib/auth/tokens";
-import { uploadImage, generateStorageKey, getExtensionFromMimeType } from "@/lib/storage/r2";
+import { uploadImage, generateStorageKey, getExtensionFromMimeType } from "@/lib/storage/storage";
 import { postToMastodon, postToMisskey, MastodonVisibility, MisskeyVisibility } from "@/lib/fediverse/post";
 import { generateThumbnail, generateThumbnailKey } from "@/lib/thumbnail";
 import prisma from "@/lib/db";

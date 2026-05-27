@@ -20,7 +20,7 @@ function getAllowedServers(): string[] | undefined {
 
 export default async function HomePage() {
   const allowedServers = getAllowedServers();
-  const publicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
+  const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
   // フィーチャー画像を取得（最新6件）
   const featuredImages = await prisma.image.findMany({
