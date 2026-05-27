@@ -19,5 +19,6 @@ services:
     environment:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "K9cz8szGv14d"
+      POSTGRES_DB: "movapic"
     volumes:
       - ./data/postgres17:/var/lib/postgresql/data

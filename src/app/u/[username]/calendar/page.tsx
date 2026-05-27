@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
+import { getAvatarUrl } from "@/lib/avatar";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
@@ -68,7 +69,7 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
           user={{
             username: cleanUsername,
             displayName: user.displayName,
-            avatarUrl: user.avatarUrl,
+            avatarUrl: getAvatarUrl(user.avatarUrl),
             bio: user.bio,
             createdAt: user.createdAt.toISOString(),
             instance: { domain: user.instance.domain },

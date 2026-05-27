@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
+import { getAvatarUrl } from "@/lib/avatar";
 import { UserGalleryClient } from "./UserGalleryClient";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
@@ -99,7 +100,7 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
           user={{
             username: cleanUsername,
             displayName: user.displayName,
-            avatarUrl: user.avatarUrl,
+            avatarUrl: getAvatarUrl(user.avatarUrl),
             bio: user.bio,
             createdAt: user.createdAt.toISOString(),
             instance: { domain: user.instance.domain },
