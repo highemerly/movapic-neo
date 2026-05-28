@@ -45,8 +45,8 @@ export default async function PublicTimelinePage() {
   return (
     <>
       <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <h1 className="text-2xl font-bold mb-8">みんなの写真</h1>
+      <div className="container mx-auto px-4 pt-4 pb-8 max-w-6xl">
+        <h1 className="text-2xl font-bold mb-4">みんなの写真</h1>
 
         <PublicTimelineClient
           initialImages={images.map((img: (typeof images)[number]) => ({
