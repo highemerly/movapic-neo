@@ -43,6 +43,7 @@ model User {
   defaultSize        String?   @map("default_size") @db.VarChar(20)
   defaultOutput      String?   @map("default_output") @db.VarChar(20)
   defaultArrangement String?   @map("default_arrangement") @db.VarChar(20)
+  defaultVisibility  String?   @map("default_visibility") @db.VarChar(20)
   mentionVisibility  String    @default("public") @map("mention_visibility") @db.VarChar(20)
   mentionKeep        Boolean   @default(false) @map("mention_keep")
 

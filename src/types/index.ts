@@ -144,7 +144,17 @@ export interface UserPreferences {
   size: Size | null;
   output: OutputFormat | null;
   arrangement: Arrangement | null;
+  visibility: Visibility | null;
 }
+
+// 公開範囲
+export type Visibility = "public" | "unlisted" | "local";
+
+export const VISIBILITY_LABELS: Record<Visibility, string> = {
+  public: "公開投稿",
+  unlisted: "非収載投稿",
+  local: "なし",
+};
 
 export const MAX_TEXT_LENGTH = 140;
 export const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB

@@ -11,6 +11,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
 import { PinButton } from "@/components/pin/PinButton";
 import { Footer } from "@/components/Footer";
+import { PostSuccessToast } from "./PostSuccessToast";
 import { User, CalendarDays, Globe, Heart } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -22,13 +23,15 @@ interface PageProps {
   }>;
   searchParams: Promise<{
     from?: string;
+    posted?: string;
   }>;
 }
 
 export default async function ImageDetailPage({ params, searchParams }: PageProps) {
   const { username, imageId } = await params;
-  const { from } = await searchParams;
+  const { from, posted } = await searchParams;
   const isFromPublic = from === "public";
+  const justPosted = posted === "1";
 
   // ログインユーザーを取得
   const currentUser = await getCurrentUser();
@@ -132,6 +135,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
+      {justPosted && <PostSuccessToast />}
       <main className="container mx-auto max-w-2xl px-4 py-2">
         {/* ヘッダー */}
         <div className="mb-2">
@@ -153,6 +157,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             />
           </div>
         </div>
+
 
         {/* 投稿者情報 */}
         <div className="flex items-center gap-2 mb-4 p-3 bg-muted rounded-lg">

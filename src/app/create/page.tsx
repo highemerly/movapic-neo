@@ -2,11 +2,14 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { AlertCircle, X } from "lucide-react";
 import { TextInput } from "@/components/TextInput";
 import { ImageUpload } from "@/components/ImageUpload";
-import { OptionsAccordion } from "@/components/OptionsAccordion";
+import { OptionsPanel } from "@/components/OptionsPanel";
 import { OtherPostMethods } from "@/components/OtherPostMethods";
-import { ActionButtons, Visibility } from "@/components/ActionButtons";
+import { ActionButtons } from "@/components/ActionButtons";
+import { PostVisibilityNotice } from "@/components/PostVisibilityNotice";
+import { useStickyVisible } from "@/hooks/useStickyVisible";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { ResultDetails } from "@/components/ResultDetails";
@@ -25,6 +28,8 @@ import {
   Color,
   Size,
   Arrangement,
+  Visibility,
+  MAX_TEXT_LENGTH,
 } from "@/types";
 import { parseApiError, formatErrorMessage, type ParsedApiError } from "@/lib/errors";
 
@@ -48,6 +53,17 @@ interface ResultInfo {
   requestId: string;
 }
 
+interface GenerateResult {
+  blob: Blob;
+  mimeType: string;
+  requestId: string;
+  processingTime: number;
+  originalFileSize: number;
+  originalFormat: string;
+  originalWidth: number;
+  originalHeight: number;
+}
+
 interface UserSession {
   id: string;
   username: string;
@@ -63,7 +79,32 @@ interface UserSession {
     size: Size | null;
     output: OutputFormat | null;
     arrangement: Arrangement | null;
+    visibility: Visibility | null;
   };
+}
+
+function StepHeader({
+  num,
+  label,
+  right,
+}: {
+  num: number;
+  label: string;
+  right?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+          {num}
+        </span>
+        <span className="text-sm font-medium">{label}</span>
+      </div>
+      {right && (
+        <span className="shrink-0 text-xs text-muted-foreground">{right}</span>
+      )}
+    </div>
+  );
 }
 
 const initialState: GenerateFormState = {
@@ -119,6 +160,9 @@ export default function CreatePage() {
               output: data.preferences.output || DEFAULT_OUTPUT,
               arrangement: data.preferences.arrangement || DEFAULT_ARRANGEMENT,
             }));
+            if (data.preferences.visibility) {
+              setVisibility(data.preferences.visibility);
+            }
           }
         } else {
           setIsAuthenticated(false);
@@ -145,6 +189,14 @@ export default function CreatePage() {
 
     return () => clearInterval(interval);
   }, [isLoading]);
+
+  // エラートーストの自動消滅: 429(レート制限)は再試行可能になる秒数後、それ以外は5秒後
+  useEffect(() => {
+    if (!error) return;
+    const ms = error.retryAfterSeconds ? error.retryAfterSeconds * 1000 : 5000;
+    const timer = setTimeout(() => setError(null), ms);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   // BlobURLのクリーンアップ
   useEffect(() => {
@@ -181,35 +233,22 @@ export default function CreatePage() {
     setError(null);
   }, [resultUrl]);
 
-  const handleGenerate = async () => {
-    if (!formState.imageFile) {
-      setError({ message: "画像を選択してください" });
-      return;
-    }
+  // 生成APIを呼び出してblob・MIMEタイプ・元画像情報を返す（UI状態は更新しない）
+  const callGenerate = async (): Promise<GenerateResult | null> => {
+    const formData = new FormData();
+    formData.append("image", formState.imageFile!);
+    formData.append("text", formState.text);
+    formData.append("position", formState.position);
+    formData.append("font", formState.font);
+    formData.append("color", formState.color);
+    formData.append("size", formState.size);
+    formData.append("output", formState.output);
+    formData.append("arrangement", formState.arrangement);
 
-    const trimmedText = formState.text.trim();
-    if (!trimmedText) {
-      setError({ message: "テキストを入力してください" });
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 23000);
 
     try {
-      const formData = new FormData();
-      formData.append("image", formState.imageFile);
-      formData.append("text", formState.text);
-      formData.append("position", formState.position);
-      formData.append("font", formState.font);
-      formData.append("color", formState.color);
-      formData.append("size", formState.size);
-      formData.append("output", formState.output);
-      formData.append("arrangement", formState.arrangement);
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 23000);
-
       const response = await fetch("/api/v1/generate", {
         method: "POST",
         body: formData,
@@ -221,60 +260,24 @@ export default function CreatePage() {
       if (!response.ok) {
         const parsedError = await parseApiError(response);
         setError(parsedError);
-        return;
+        return null;
       }
 
-      // レスポンスヘッダーから情報を取得
-      const requestId = response.headers.get("X-Request-Id") || "";
-      const processingTime = parseInt(response.headers.get("X-Processing-Time") || "0", 10);
-      const originalFileSize = parseInt(response.headers.get("X-Original-File-Size") || "0", 10);
-      const originalFormat = response.headers.get("X-Original-Format") || "";
-      const originalWidth = parseInt(response.headers.get("X-Original-Width") || "0", 10);
-      const originalHeight = parseInt(response.headers.get("X-Original-Height") || "0", 10);
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-
-      // 以前のBlobURLを破棄
-      if (resultUrl) {
-        URL.revokeObjectURL(resultUrl);
-      }
-
-      // 拡張子とMIMEタイプを設定
       const config = OUTPUT_CONFIG[formState.output];
       const mimeType = config?.format === "avif" ? "image/avif" : "image/jpeg";
-      setResultBlob(blob);
-      setResultMimeType(mimeType);
 
-      // 画像サイズを取得してから結果情報を保存
-      const img = new Image();
-      img.src = url;
-      await new Promise<void>((resolve) => {
-        img.onload = () => resolve();
-      });
-
-      setResultInfo({
-        fileSize: blob.size,
-        format: OUTPUT_LABELS[formState.output],
-        width: img.naturalWidth,
-        height: img.naturalHeight,
-        processingTime,
-        originalFileSize,
-        originalFormat,
-        originalWidth,
-        originalHeight,
-        requestId,
-      });
-
-      setResultUrl(url);
-      setHasGenerated(true);
-      setLastGeneratedState({ ...formState });
-
-      // 生成完了後にページ最上部にスクロール
-      window.scrollTo(0, 0);
-      document.documentElement.scrollTop = 0;
-      document.body.scrollTop = 0;
+      return {
+        blob: await response.blob(),
+        mimeType,
+        requestId: response.headers.get("X-Request-Id") || "",
+        processingTime: parseInt(response.headers.get("X-Processing-Time") || "0", 10),
+        originalFileSize: parseInt(response.headers.get("X-Original-File-Size") || "0", 10),
+        originalFormat: response.headers.get("X-Original-Format") || "",
+        originalWidth: parseInt(response.headers.get("X-Original-Width") || "0", 10),
+        originalHeight: parseInt(response.headers.get("X-Original-Height") || "0", 10),
+      };
     } catch (err) {
+      clearTimeout(timeoutId);
       if (err instanceof Error && err.name === "AbortError") {
         setError({
           message: "リクエストがタイムアウトしました",
@@ -283,28 +286,112 @@ export default function CreatePage() {
       } else {
         setError({ message: "エラーが発生しました" });
       }
-    } finally {
-      setIsLoading(false);
+      return null;
     }
   };
 
+  // 生成結果をプレビューUIに反映
+  const applyPreview = async (result: GenerateResult) => {
+    const url = URL.createObjectURL(result.blob);
+    if (resultUrl) {
+      URL.revokeObjectURL(resultUrl);
+    }
+    setResultBlob(result.blob);
+    setResultMimeType(result.mimeType);
+
+    const img = new Image();
+    img.src = url;
+    await new Promise<void>((resolve) => {
+      img.onload = () => resolve();
+    });
+
+    setResultInfo({
+      fileSize: result.blob.size,
+      format: OUTPUT_LABELS[formState.output],
+      width: img.naturalWidth,
+      height: img.naturalHeight,
+      processingTime: result.processingTime,
+      originalFileSize: result.originalFileSize,
+      originalFormat: result.originalFormat,
+      originalWidth: result.originalWidth,
+      originalHeight: result.originalHeight,
+      requestId: result.requestId,
+    });
+
+    setResultUrl(url);
+    setHasGenerated(true);
+    setLastGeneratedState({ ...formState });
+  };
+
+  // プレビューボタン
+  const handleGenerate = async () => {
+    if (!formState.imageFile) {
+      setError({ message: "画像を選択してください" });
+      return;
+    }
+    if (!formState.text.trim()) {
+      setError({ message: "テキストを入力してください" });
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    const result = await callGenerate();
+    if (result) {
+      await applyPreview(result);
+      // 生成完了後にページ最上部にスクロール
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+    setIsLoading(false);
+  };
+
+  // 投稿ボタン: プレビュー済みならその画像を、未プレビュー/変更ありなら生成してから投稿
   const handlePost = async () => {
-    if (!resultBlob || !lastGeneratedState) return;
+    if (!formState.imageFile) {
+      setError({ message: "画像を選択してください" });
+      return;
+    }
+    if (!formState.text.trim()) {
+      setError({ message: "テキストを入力してください" });
+      return;
+    }
 
     setIsPosting(true);
     setError(null);
 
     try {
+      let blob: Blob;
+      let mimeType: string;
+      let stateToPost: GenerateFormState;
+
+      const canUseExisting =
+        hasGenerated && !hasChangedSinceGeneration && resultBlob && lastGeneratedState;
+
+      if (canUseExisting) {
+        blob = resultBlob;
+        mimeType = resultMimeType;
+        stateToPost = lastGeneratedState;
+      } else {
+        const result = await callGenerate();
+        if (!result) return;
+        blob = result.blob;
+        mimeType = result.mimeType;
+        stateToPost = { ...formState };
+      }
+
       const formData = new FormData();
-      formData.append("image", resultBlob);
-      formData.append("text", lastGeneratedState.text);
-      formData.append("position", lastGeneratedState.position);
-      formData.append("font", lastGeneratedState.font);
-      formData.append("color", lastGeneratedState.color);
-      formData.append("size", lastGeneratedState.size);
-      formData.append("output", lastGeneratedState.output);
-      formData.append("arrangement", lastGeneratedState.arrangement);
-      formData.append("mimeType", resultMimeType);
+      formData.append("image", blob);
+      formData.append("text", stateToPost.text);
+      formData.append("position", stateToPost.position);
+      formData.append("font", stateToPost.font);
+      formData.append("color", stateToPost.color);
+      formData.append("size", stateToPost.size);
+      formData.append("output", stateToPost.output);
+      formData.append("arrangement", stateToPost.arrangement);
+      formData.append("mimeType", mimeType);
       formData.append("visibility", visibility);
 
       const response = await fetch("/api/v1/post", {
@@ -320,9 +407,11 @@ export default function CreatePage() {
 
       const data = await response.json();
 
-      // 投稿成功後、詳細ページにリダイレクト
+      // 投稿成功後、詳細ページにリダイレクト（直後の完了メッセージ用に posted=1 を付与）
       if (data.imagePageUrl) {
-        router.push(data.imagePageUrl.replace(process.env.NEXT_PUBLIC_APP_URL || "", ""));
+        const path = data.imagePageUrl.replace(process.env.NEXT_PUBLIC_APP_URL || "", "");
+        const sep = path.includes("?") ? "&" : "?";
+        router.push(`${path}${sep}posted=1`);
       } else {
         router.push("/dashboard");
       }
@@ -349,6 +438,7 @@ export default function CreatePage() {
           size: formState.size,
           output: formState.output,
           arrangement: formState.arrangement,
+          visibility,
         }),
       });
 
@@ -382,11 +472,17 @@ export default function CreatePage() {
     );
   }, [formState, lastGeneratedState, hasGenerated]);
 
-  // ローディング中のボタンテキスト
-  const loadingText = useMemo(() => {
-    if (!isLoading) return "";
-    return "生成中...";
-  }, [isLoading]);
+  // アクションボタンが画面外に出たら下部固定表示
+  const { anchorRef, showSticky } = useStickyVisible<HTMLDivElement>();
+
+  const actionButtonsProps = {
+    canGenerate,
+    hasPreview: hasGenerated && !hasChangedSinceGeneration,
+    isLoading,
+    isPosting,
+    onGenerate: handleGenerate,
+    onPost: handlePost,
+  };
 
   // 認証チェック中
   if (isAuthenticated === null) {
@@ -400,10 +496,38 @@ export default function CreatePage() {
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader user={user ? { username: user.username } : null} />
-      <main className="container mx-auto max-w-md px-4 py-8">
+
+      {/* エラートースト（画面中央にフローティング・5秒で自動消滅） */}
+      {error && (
+        <div className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center px-4">
+          <div className="pointer-events-auto flex w-full max-w-md items-start gap-2 rounded-lg bg-destructive px-4 py-3 text-white shadow-xl">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">{formatErrorMessage(error)}</p>
+              {error.supportInfo && (
+                <p className="mt-1 text-xs text-white/80">{error.supportInfo}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="shrink-0 text-white/70 transition-colors hover:text-white"
+              aria-label="エラーを閉じる"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <main
+        className={`container mx-auto max-w-md px-4 pt-4 pb-8 ${showSticky ? "pb-28" : ""}`}
+      >
+        <h1 className="mb-3 text-xl font-bold">新しい写真を投稿する</h1>
         <div className="space-y-6">
-          {/* 画像エリア + テキスト入力 + エラー表示 */}
+          {/* ① 写真を選ぶ */}
           <div className="space-y-2">
+            <StepHeader num={1} label="写真を選ぶ" />
             <ImageUpload
               imageFile={formState.imageFile}
               imagePreview={formState.imagePreview}
@@ -416,75 +540,77 @@ export default function CreatePage() {
               onReset={handleReset}
               disabled={isLoading || isPosting}
             />
-
-            <TextInput
-              value={formState.text}
-              onChange={(text) => setFormState((prev) => ({ ...prev, text }))}
-              disabled={isLoading || isPosting}
-            />
-
-            {/* エラー表示 */}
-            {error && (
-              <div className="rounded-md bg-destructive/10 px-3 py-2">
-                <p className="text-sm text-destructive">
-                  {formatErrorMessage(error)}
-                </p>
-                {error.supportInfo && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {error.supportInfo}
-                  </p>
-                )}
-              </div>
-            )}
           </div>
 
-          {/* アクションボタン（生成・投稿） */}
-          <ActionButtons
-            instanceDomain={user?.instance.domain}
-            instanceType={user?.instance.type}
-            canGenerate={canGenerate}
-            canPost={hasGenerated && !hasChangedSinceGeneration}
-            canRegenerate={hasGenerated && hasChangedSinceGeneration}
-            isLoading={isLoading}
-            isPosting={isPosting}
-            loadingText={loadingText}
+          {/* 注意事項（①の時点から常に表示・公開範囲に応じて動的に変化） */}
+          <PostVisibilityNotice
             visibility={visibility}
-            onVisibilityChange={setVisibility}
-            onGenerate={handleGenerate}
-            onPost={handlePost}
+            instanceDomain={user?.instance.domain}
           />
 
-          {/* オプション設定（アコーディオン） */}
-          <OptionsAccordion
-            position={formState.position}
-            font={formState.font}
-            color={formState.color}
-            size={formState.size}
-            output={formState.output}
-            arrangement={formState.arrangement}
-            onPositionChange={(position) =>
-              setFormState((prev) => ({ ...prev, position }))
-            }
-            onFontChange={(font) =>
-              setFormState((prev) => ({ ...prev, font }))
-            }
-            onColorChange={(color) =>
-              setFormState((prev) => ({ ...prev, color }))
-            }
-            onSizeChange={(size) =>
-              setFormState((prev) => ({ ...prev, size }))
-            }
-            onOutputChange={(output) =>
-              setFormState((prev) => ({ ...prev, output }))
-            }
-            onArrangementChange={(arrangement) =>
-              setFormState((prev) => ({ ...prev, arrangement }))
-            }
-            disabled={isLoading || isPosting}
-            onSaveDefaults={handleSaveDefaults}
-            isSavingDefaults={isSavingDefaults}
-            saveSuccess={saveSuccess}
-          />
+          {/* ②コメント入力 → ③オプション → 投稿ボタン（画像選択後に表示） */}
+          {formState.imageFile && (
+            <>
+              <div className="space-y-2">
+                <StepHeader
+                  num={2}
+                  label="合成するコメントを入力"
+                  right={`${formState.text.length} / ${MAX_TEXT_LENGTH}`}
+                />
+                <TextInput
+                  value={formState.text}
+                  onChange={(text) => setFormState((prev) => ({ ...prev, text }))}
+                  disabled={isLoading || isPosting}
+                />
+              </div>
+
+              {/* ③ オプションを変更 */}
+              <div className="space-y-4">
+                <StepHeader num={3} label="オプションを変更" />
+                <OptionsPanel
+                  position={formState.position}
+                  font={formState.font}
+                  color={formState.color}
+                  size={formState.size}
+                  output={formState.output}
+                  arrangement={formState.arrangement}
+                  visibility={visibility}
+                  instanceDomain={user?.instance.domain}
+                  onPositionChange={(position) =>
+                    setFormState((prev) => ({ ...prev, position }))
+                  }
+                  onFontChange={(font) =>
+                    setFormState((prev) => ({ ...prev, font }))
+                  }
+                  onColorChange={(color) =>
+                    setFormState((prev) => ({ ...prev, color }))
+                  }
+                  onSizeChange={(size) =>
+                    setFormState((prev) => ({ ...prev, size }))
+                  }
+                  onOutputChange={(output) =>
+                    setFormState((prev) => ({ ...prev, output }))
+                  }
+                  onArrangementChange={(arrangement) =>
+                    setFormState((prev) => ({ ...prev, arrangement }))
+                  }
+                  onVisibilityChange={setVisibility}
+                  disabled={isLoading || isPosting}
+                  onSaveDefaults={handleSaveDefaults}
+                  isSavingDefaults={isSavingDefaults}
+                  saveSuccess={saveSuccess}
+                />
+              </div>
+
+              {/* ④ 写真を生成＆投稿 */}
+              <div className="space-y-2">
+                <StepHeader num={4} label="写真を生成＆投稿" />
+                <div ref={anchorRef}>
+                  <ActionButtons {...actionButtonsProps} />
+                </div>
+              </div>
+            </>
+          )}
 
           {/* 他の投稿方法 */}
           <OtherPostMethods />
@@ -498,6 +624,18 @@ export default function CreatePage() {
         {/* フッター */}
         <Footer />
       </main>
+
+      {/* 画面下固定アクションバー（ボタンが画面外のとき表示） */}
+      {showSticky && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-50 border-t bg-background/95 px-4 pt-2 shadow-[0_-2px_8px_rgba(0,0,0,0.08)] backdrop-blur"
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
+        >
+          <div className="container mx-auto max-w-md">
+            <ActionButtons {...actionButtonsProps} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

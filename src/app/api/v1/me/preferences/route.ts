@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    const { position, font, color, size, output, arrangement } = body;
+    const { position, font, color, size, output, arrangement, visibility } = body;
 
     // バリデーション（値が指定されている場合のみチェック）
     if (position && !isValidPosition(position)) {
@@ -48,6 +48,9 @@ export async function POST(request: NextRequest) {
     if (arrangement && !isValidArrangement(arrangement)) {
       return errorResponse(ErrorCodes.VALIDATION_INVALID, "無効なアレンジです", 400);
     }
+    if (visibility && !["public", "unlisted", "local"].includes(visibility)) {
+      return errorResponse(ErrorCodes.VALIDATION_INVALID, "無効な公開範囲です", 400);
+    }
 
     // 更新
     await prisma.user.update({
@@ -59,6 +62,7 @@ export async function POST(request: NextRequest) {
         defaultSize: size || null,
         defaultOutput: output || null,
         defaultArrangement: arrangement || null,
+        defaultVisibility: visibility || null,
       },
     });
 
@@ -71,6 +75,7 @@ export async function POST(request: NextRequest) {
         size: size || null,
         output: output || null,
         arrangement: arrangement || null,
+        visibility: visibility || null,
       },
     });
   } catch (error) {
@@ -100,6 +105,7 @@ export async function DELETE() {
         defaultSize: null,
         defaultOutput: null,
         defaultArrangement: null,
+        defaultVisibility: null,
       },
     });
 

@@ -6,6 +6,7 @@ export interface ParsedApiError {
   message: string;
   suggestion?: string;
   supportInfo?: string; // "Error code: {status} {code} {requestId}"
+  retryAfterSeconds?: number; // 429時、再試行可能までの秒数（Retry-Afterヘッダー由来）
 }
 
 interface ApiErrorResponse {
@@ -26,6 +27,11 @@ export async function parseApiError(
 ): Promise<ParsedApiError> {
   const status = response.status;
 
+  // Retry-Afterヘッダー（429のレート制限時に秒数が入る）
+  const retryAfterRaw = response.headers.get("Retry-After");
+  const retryAfterSeconds =
+    retryAfterRaw && /^\d+$/.test(retryAfterRaw) ? Number(retryAfterRaw) : undefined;
+
   try {
     const data = await response.json();
 
@@ -44,6 +50,7 @@ export async function parseApiError(
         message,
         suggestion,
         supportInfo,
+        retryAfterSeconds,
       };
     }
 

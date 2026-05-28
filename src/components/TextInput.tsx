@@ -18,20 +18,14 @@ export function TextInput({ value, onChange, disabled }: TextInputProps) {
   };
 
   return (
-    <div className="space-y-1">
-      <div className="flex justify-end">
-        <span className="text-xs text-muted-foreground">
-          {value.length} / {MAX_TEXT_LENGTH}
-        </span>
-      </div>
-      <Textarea
-        id="text-input"
-        value={value}
-        onChange={handleChange}
-        placeholder="合成するコメントを入力してください"
-        disabled={disabled}
-        className="min-h-[100px] resize-none"
-      />
-    </div>
+    <Textarea
+      id="text-input"
+      value={value}
+      onChange={handleChange}
+      placeholder="例: ねこ / おはよう / いただきます"
+      disabled={disabled}
+      rows={3}
+      className="min-h-[72px] resize-none"
+    />
   );
 }

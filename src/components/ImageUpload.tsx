@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
-import { X, Loader2 } from "lucide-react";
+import { X, Loader2, ImagePlus, Eye } from "lucide-react";
 import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from "@/types";
 
 interface ResultInfo {
@@ -186,17 +186,17 @@ export function ImageUpload({
                   <X className="h-4 w-4" />
                 </button>
               )}
-              {/* 画像情報オーバーレイ（下部） - 簡潔に */}
+              {/* 下部オーバーレイ: プレビュー + 生成情報（極小） */}
               {hasGenerated && resultInfo && !isLoading && (
-                <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-3 py-1.5 text-center">
-                  <p className="text-xs text-white">
-                    成功 / {resultInfo.processingTime >= 1000
-                      ? `${(resultInfo.processingTime / 1000).toFixed(2)}秒`
-                      : `${resultInfo.processingTime}ms`}, {formatFileSize(resultInfo.fileSize)}
-                    {resultInfo.originalFileSize > 0 && (
-                      <span> ({Math.round((1 - resultInfo.fileSize / resultInfo.originalFileSize) * 100)}%減</span>
-                    )})
-                  </p>
+                <div className="absolute inset-x-0 bottom-0 flex items-center gap-1.5 bg-black/55 px-2 py-1 leading-none text-white">
+                  <Eye className="h-2.5 w-2.5 shrink-0" />
+                  <span className="text-[10px] font-medium">プレビュー</span>
+                  <span className="truncate text-[9px] text-white/75">
+                    {(resultInfo.processingTime / 1000).toFixed(2)}sec・
+                    {resultInfo.format}・{formatFileSize(resultInfo.fileSize)}
+                    {resultInfo.originalFileSize > 0 &&
+                      `（${Math.round((1 - resultInfo.fileSize / resultInfo.originalFileSize) * 100)}%減）`}
+                  </span>
                 </div>
               )}
             </div>
@@ -237,14 +237,17 @@ export function ImageUpload({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`flex h-48 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed transition-colors ${
+          className={`flex h-64 cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed transition-colors ${
             isDragging
               ? "border-primary bg-primary/5"
               : "border-muted-foreground/25 hover:border-primary/50"
           } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
         >
-          <p className="text-sm text-muted-foreground">
-            タップして写真を選択してください
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+            <ImagePlus className="h-7 w-7 text-primary" />
+          </div>
+          <p className="text-base font-medium text-foreground">
+            タップして写真をアップロード
           </p>
         </div>
       )}

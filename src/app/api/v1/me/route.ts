@@ -47,6 +47,7 @@ export async function GET() {
         defaultSize: true,
         defaultOutput: true,
         defaultArrangement: true,
+        defaultVisibility: true,
         instance: {
           select: {
             domain: true,
@@ -78,6 +79,7 @@ export async function GET() {
         size: user.defaultSize,
         output: user.defaultOutput,
         arrangement: user.defaultArrangement,
+        visibility: user.defaultVisibility,
       },
     });
   } catch (error) {
