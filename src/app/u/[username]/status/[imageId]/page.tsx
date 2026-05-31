@@ -263,6 +263,23 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           />
         </div>
 
+        {/* EXIF情報（カメラ機種・撮影場所） */}
+        {(image.cameraModel || image.locationCity) && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {image.cameraModel && (
+              <span>
+                📷 {image.cameraMake && !image.cameraModel.startsWith(image.cameraMake) ? `${image.cameraMake} ` : ""}{image.cameraModel}
+              </span>
+            )}
+            {image.cameraModel && image.locationCity && <span className="mx-2">·</span>}
+            {image.locationCity && (
+              <span>
+                📍 {image.locationPrefecture ?? ""}{image.locationCity}
+              </span>
+            )}
+          </p>
+        )}
+
         {/* お気に入り（Mastodon連携） */}
         {favoritable ? (
           <div className="mt-2 flex items-center gap-2">

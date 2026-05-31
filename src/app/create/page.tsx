@@ -32,6 +32,7 @@ import {
   MAX_TEXT_LENGTH,
 } from "@/types";
 import { parseApiError, formatErrorMessage, type ParsedApiError } from "@/lib/errors";
+import { extractExif, type ExtractedExif } from "@/lib/exif/parser";
 
 // 出力形式の表示名
 const OUTPUT_LABELS: Record<OutputFormat, string> = {
@@ -138,6 +139,9 @@ export default function CreatePage() {
   const [visibility, setVisibility] = useState<Visibility>("public");
   const [isSavingDefaults, setIsSavingDefaults] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [exif, setExif] = useState<ExtractedExif | null>(null);
+  // 位置情報は毎回明示的にオプトインしない限り保存しない
+  const [saveLocation, setSaveLocation] = useState(false);
 
   // 認証チェックとユーザー設定の読み込み
   useEffect(() => {
@@ -207,7 +211,7 @@ export default function CreatePage() {
     };
   }, [resultUrl]);
 
-  const handleImageSelect = useCallback((file: File, preview: string) => {
+  const handleImageSelect = useCallback(async (file: File, preview: string) => {
     setFormState((prev) => ({
       ...prev,
       imageFile: file,
@@ -217,6 +221,11 @@ export default function CreatePage() {
     setHasGenerated(false);
     setResultUrl(null);
     setError(null);
+    // 位置情報のオプトインは画像ごとに毎回リセット（前回ONのまま流用されない）
+    setSaveLocation(false);
+    setExif(null);
+    const extracted = await extractExif(file);
+    setExif(extracted);
   }, []);
 
   const handleReset = useCallback(() => {
@@ -226,6 +235,8 @@ export default function CreatePage() {
     setResultInfo(null);
     setResultBlob(null);
     setResultMimeType("image/jpeg");
+    setExif(null);
+    setSaveLocation(false);
     if (resultUrl) {
       URL.revokeObjectURL(resultUrl);
       setResultUrl(null);
@@ -394,6 +405,15 @@ export default function CreatePage() {
       formData.append("mimeType", mimeType);
       formData.append("visibility", visibility);
 
+      // EXIFメタデータ（カメラ・撮影日時は常に送信、位置情報はオプトイン時のみ）
+      if (exif?.cameraMake) formData.append("cameraMake", exif.cameraMake);
+      if (exif?.cameraModel) formData.append("cameraModel", exif.cameraModel);
+      if (exif?.capturedAt) formData.append("capturedAt", exif.capturedAt.toISOString());
+      if (saveLocation && exif?.gpsLatitude != null && exif?.gpsLongitude != null) {
+        formData.append("gpsLatitude", String(exif.gpsLatitude));
+        formData.append("gpsLongitude", String(exif.gpsLongitude));
+      }
+
       const response = await fetch("/api/v1/post", {
         method: "POST",
         body: formData,
@@ -541,6 +561,34 @@ export default function CreatePage() {
               disabled={isLoading || isPosting}
             />
           </div>
+
+          {/* EXIF情報: カメラは常時表示、撮影場所はチェックで毎回明示的にオプトイン */}
+          {formState.imageFile && exif && (exif.cameraModel || exif.gpsLatitude != null) && (
+            <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+              {exif.cameraModel && (
+                <p className="text-xs text-muted-foreground">
+                  📷 <span className="font-medium text-foreground">{exif.cameraMake && !exif.cameraModel.startsWith(exif.cameraMake) ? `${exif.cameraMake} ` : ""}{exif.cameraModel}</span> を投稿に表示します
+                </p>
+              )}
+              {exif.gpsLatitude != null && exif.gpsLongitude != null && (
+                <label className="flex cursor-pointer items-start gap-2">
+                  <input
+                    type="checkbox"
+                    checked={saveLocation}
+                    onChange={(e) => setSaveLocation(e.target.checked)}
+                    disabled={isLoading || isPosting}
+                    className="mt-0.5"
+                  />
+                  <div className="text-xs">
+                    <p>📍 撮影場所（市区町村）も投稿に表示する</p>
+                    <p className="mt-0.5 text-muted-foreground">
+                      GPS座標は保存せず、市区町村名のみを記録します（ベータ機能）
+                    </p>
+                  </div>
+                </label>
+              )}
+            </div>
+          )}
 
           {/* 注意事項（①の時点から常に表示・公開範囲に応じて動的に変化） */}
           <PostVisibilityNotice

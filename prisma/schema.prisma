@@ -87,6 +87,12 @@ model Image {
   favoritesSyncedAt DateTime? @map("favorites_synced_at")
   postStatus        Int?      @map("post_status") // 最後のMastodon sync HTTP status（0=接続失敗、200=OK、4xx=失敗、5xx=サーバ不調）
   pinnedAt      DateTime? @map("pinned_at")
+  // EXIFメタデータ（出力画像からは常に除去、ここはDB保存のみ／位置情報は投稿時オプトイン）
+  cameraMake         String?   @map("camera_make") @db.VarChar(100)
+  cameraModel        String?   @map("camera_model") @db.VarChar(100)
+  capturedAt         DateTime? @map("captured_at")
+  locationPrefecture String?   @map("location_prefecture") @db.VarChar(50)
+  locationCity       String?   @map("location_city") @db.VarChar(100)
   createdAt     DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
