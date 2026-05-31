@@ -1,9 +1,14 @@
 /**
- * お気に入り一覧エンドポイント
+ * お気に入り一覧エンドポイント（best-effort）
  * GET /api/v1/favorites
+ *
+ * Mastodonが正データのため「自分がお気に入りした画像」を正確に出す手段はない。
+ * favoritersCache（オーナーインスタンスから取得した上位40件）に自分のacctが
+ * 含まれる画像をbest-effortで一覧する。人気投稿で上位40件外の自分のfavは出ない。
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/session";
 import prisma from "@/lib/db";
 import { getAvatarUrl } from "@/lib/avatar";
@@ -27,8 +32,15 @@ export async function GET(request: NextRequest) {
       MAX_LIMIT
     );
 
-    const favorites = await prisma.favorite.findMany({
-      where: { userId: currentUser.id },
+    const viewerAcct = `${currentUser.username}@${currentUser.instance.domain}`;
+
+    const images = await prisma.image.findMany({
+      where: {
+        isPublic: true,
+        favoritersCache: {
+          array_contains: [{ acct: viewerAcct }] as Prisma.InputJsonValue,
+        },
+      },
       orderBy: { createdAt: "desc" },
       take: limit + 1,
       ...(cursor && {
@@ -37,54 +49,43 @@ export async function GET(request: NextRequest) {
       }),
       select: {
         id: true,
+        storageKey: true,
+        width: true,
+        height: true,
+        overlayText: true,
+        position: true,
+        favoriteCount: true,
         createdAt: true,
-        image: {
+        user: {
           select: {
-            id: true,
-            storageKey: true,
-            width: true,
-            height: true,
-            overlayText: true,
-            position: true,
-            favoriteCount: true,
-            createdAt: true,
-            user: {
-              select: {
-                username: true,
-                displayName: true,
-                avatarUrl: true,
-                instance: {
-                  select: {
-                    domain: true,
-                  },
-                },
-              },
-            },
+            username: true,
+            displayName: true,
+            avatarUrl: true,
+            instance: { select: { domain: true } },
           },
         },
       },
     });
 
-    const hasMore = favorites.length > limit;
-    const result = hasMore ? favorites.slice(0, -1) : favorites;
+    const hasMore = images.length > limit;
+    const result = hasMore ? images.slice(0, -1) : images;
     const nextCursor = hasMore ? result[result.length - 1]?.id : null;
 
     return NextResponse.json({
-      images: result.map((fav) => ({
-        id: fav.image.id,
-        storageKey: fav.image.storageKey,
-        width: fav.image.width,
-        height: fav.image.height,
-        overlayText: fav.image.overlayText,
-        position: fav.image.position,
-        favoriteCount: fav.image.favoriteCount,
-        createdAt: fav.image.createdAt.toISOString(),
-        favoritedAt: fav.createdAt.toISOString(),
+      images: result.map((image) => ({
+        id: image.id,
+        storageKey: image.storageKey,
+        width: image.width,
+        height: image.height,
+        overlayText: image.overlayText,
+        position: image.position,
+        favoriteCount: image.favoriteCount,
+        createdAt: image.createdAt.toISOString(),
         user: {
-          username: fav.image.user.username,
-          displayName: fav.image.user.displayName,
-          avatarUrl: getAvatarUrl(fav.image.user.avatarUrl),
-          instance: fav.image.user.instance.domain,
+          username: image.user.username,
+          displayName: image.user.displayName,
+          avatarUrl: getAvatarUrl(image.user.avatarUrl),
+          instance: image.user.instance.domain,
         },
       })),
       nextCursor,

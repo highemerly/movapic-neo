@@ -494,6 +494,7 @@ export async function processOneMention(
       source: "mention",
       isPublic: effectiveVisibility !== "local",
       postUrl: postResult?.postUrl,
+      postId: postResult?.postId,
     },
   });
 

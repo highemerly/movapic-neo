@@ -52,7 +52,7 @@ export function PostMethodTabs({
             <Link href="/create">
               <Button className="w-full h-auto py-4 flex flex-col gap-2" size="lg">
                 <ImagePlus className="h-6 w-6" />
-                <span>写真とコメントをアップロード</span>
+                <span>写真をアップロード</span>
               </Button>
             </Link>
           </div>

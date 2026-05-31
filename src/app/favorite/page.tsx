@@ -1,11 +1,15 @@
 import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
+import { getAvatarUrl } from "@/lib/avatar";
 import { FavoritesClient } from "./FavoritesClient";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 
 export const dynamic = "force-dynamic";
+
+const PAGE_SIZE = 20;
 
 export default async function FavoritePage() {
   const currentUser = await getCurrentUser();
@@ -14,36 +18,32 @@ export default async function FavoritePage() {
     redirect("/");
   }
 
-  // お気に入り一覧を取得
-  const favorites = await prisma.favorite.findMany({
-    where: { userId: currentUser.id },
+  // best-effort: favoritersCache に自分のacctが含まれる画像を一覧
+  const viewerAcct = `${currentUser.username}@${currentUser.instance.domain}`;
+  const images = await prisma.image.findMany({
+    where: {
+      isPublic: true,
+      favoritersCache: {
+        array_contains: [{ acct: viewerAcct }] as Prisma.InputJsonValue,
+      },
+    },
     orderBy: { createdAt: "desc" },
-    take: 20,
+    take: PAGE_SIZE,
     select: {
       id: true,
+      storageKey: true,
+      width: true,
+      height: true,
+      overlayText: true,
+      position: true,
+      favoriteCount: true,
       createdAt: true,
-      image: {
+      user: {
         select: {
-          id: true,
-          storageKey: true,
-          width: true,
-          height: true,
-          overlayText: true,
-          position: true,
-          favoriteCount: true,
-          createdAt: true,
-          user: {
-            select: {
-              username: true,
-              displayName: true,
-              avatarUrl: true,
-              instance: {
-                select: {
-                  domain: true,
-                },
-              },
-            },
-          },
+          username: true,
+          displayName: true,
+          avatarUrl: true,
+          instance: { select: { domain: true } },
         },
       },
     },
@@ -58,25 +58,24 @@ export default async function FavoritePage() {
         <h1 className="text-2xl font-bold mb-8">お気に入り</h1>
 
         <FavoritesClient
-          initialImages={favorites.map((fav) => ({
-            id: fav.image.id,
-            storageKey: fav.image.storageKey,
-            width: fav.image.width,
-            height: fav.image.height,
-            overlayText: fav.image.overlayText,
-            position: fav.image.position,
-            favoriteCount: fav.image.favoriteCount,
-            createdAt: fav.image.createdAt.toISOString(),
-            favoritedAt: fav.createdAt.toISOString(),
+          initialImages={images.map((image) => ({
+            id: image.id,
+            storageKey: image.storageKey,
+            width: image.width,
+            height: image.height,
+            overlayText: image.overlayText,
+            position: image.position,
+            favoriteCount: image.favoriteCount,
+            createdAt: image.createdAt.toISOString(),
             user: {
-              username: fav.image.user.username,
-              displayName: fav.image.user.displayName,
-              avatarUrl: fav.image.user.avatarUrl,
-              instance: fav.image.user.instance.domain,
+              username: image.user.username,
+              displayName: image.user.displayName,
+              avatarUrl: getAvatarUrl(image.user.avatarUrl),
+              instance: image.user.instance.domain,
             },
           }))}
           publicUrl={publicUrl}
-          initialCursor={favorites.length >= 20 ? favorites[favorites.length - 1]?.id : null}
+          initialCursor={images.length >= PAGE_SIZE ? images[images.length - 1]?.id : null}
         />
 
         <Footer />

@@ -162,11 +162,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // postUrlをDBに保存
+    // postUrl/postIdをDBに保存（postIdはMastodonお気に入り連携で使用）
     if (postResult.postUrl) {
       await prisma.image.update({
         where: { id: image.id },
-        data: { postUrl: postResult.postUrl },
+        data: { postUrl: postResult.postUrl, postId: postResult.postId },
       });
     }
 

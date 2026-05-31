@@ -14,7 +14,6 @@ interface FavoriteImage {
   position: string;
   favoriteCount: number;
   createdAt: string;
-  favoritedAt: string;
   user: {
     username: string;
     displayName: string | null;

@@ -134,7 +134,7 @@ export default async function DashboardPage() {
 
         {/* セクション1: みる */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold mb-4">みる</h2>
+          <h2 className="text-lg font-semibold mb-2">みる</h2>
           <div className="bg-muted rounded-lg p-4">
             <div className="grid grid-cols-3 gap-3">
             <Link href="/public">
@@ -146,7 +146,7 @@ export default async function DashboardPage() {
             <Link href={`/u/${user.username}`}>
               <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
                 <User className="h-5 w-5" />
-                <span className="text-sm">わたしの写真</span>
+                <span className="text-sm">プロフィール</span>
               </Button>
             </Link>
             <Link href="/favorite">
@@ -161,10 +161,7 @@ export default async function DashboardPage() {
 
         {/* セクション2: 投稿する */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold mb-1">投稿する</h2>
-          <p className="text-xs text-muted-foreground mb-4">
-            好きな方法で写真とコメントをアップロードしよう。
-          </p>
+          <h2 className="text-lg font-semibold mb-2">投稿する</h2>
           <div className="bg-muted rounded-lg p-4">
             <PostMethodTabs
               instanceDomain={user.instance.domain}
@@ -176,7 +173,7 @@ export default async function DashboardPage() {
 
         {/* セクション3: アカウント */}
         <section className="mb-8">
-          <h2 className="text-lg font-semibold mb-4">アカウント</h2>
+          <h2 className="text-lg font-semibold mb-2">アカウント</h2>
           <div className="bg-muted rounded-lg p-4">
             <div className="flex items-center gap-4">
               {user.avatarUrl && (

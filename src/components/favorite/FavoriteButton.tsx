@@ -1,142 +1,180 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import Link from "next/link";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Heart } from "lucide-react";
 import { formatFavoriteCount } from "@/lib/utils";
 
 interface Favoriter {
-  username: string;
+  acct: string;
   displayName: string | null;
   avatarUrl: string | null;
+  profileUrl: string | null;
 }
 
 interface FavoriteButtonProps {
   imageId: string;
   initialCount: number;
   initialIsFavorited: boolean;
-  recentFavoriters: Favoriter[];
-  isLoggedIn: boolean;
+  initialFavoriters: Favoriter[];
+  canFavorite: boolean;
+  initialSyncError?: string | null;
+  disabledReason?: string;
 }
 
 export function FavoriteButton({
   imageId,
   initialCount,
   initialIsFavorited,
-  recentFavoriters: initialFavoriters,
-  isLoggedIn,
+  initialFavoriters,
+  canFavorite,
+  initialSyncError,
+  disabledReason,
 }: FavoriteButtonProps) {
   const [isFavorited, setIsFavorited] = useState(initialIsFavorited);
   const [count, setCount] = useState(initialCount);
-  const [recentFavoriters, setRecentFavoriters] =
-    useState<Favoriter[]>(initialFavoriters);
+  const [favoriters, setFavoriters] = useState<Favoriter[]>(initialFavoriters);
+  const [statusMessage, setStatusMessage] = useState<string | null>(initialSyncError ?? null);
   const [isLoading, setIsLoading] = useState(false);
   const [showAnimation, setShowAnimation] = useState(false);
 
-  const handleFavorite = useCallback(async () => {
-    if (!isLoggedIn || isLoading) return;
+  // マウント時にMastodonの最新状態へ同期（サーバー側でTTL切れ時のみMastodonにアクセス）
+  const hasSynced = useRef(false);
+  useEffect(() => {
+    if (hasSynced.current) return;
+    hasSynced.current = true;
+    (async () => {
+      try {
+        const res = await fetch(`/api/v1/images/${imageId}/favorite`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setCount(data.favoriteCount);
+        setIsFavorited(data.isFavorited);
+        setFavoriters(data.favoriters ?? []);
+        setStatusMessage(data.syncError ?? null);
+      } catch {
+        // ネットワーク等で同期API自体に到達できない場合
+        setStatusMessage("お気に入り情報の同期に失敗しました");
+      }
+    })();
+  }, [imageId]);
 
-    const wasForited = isFavorited;
+  const handleFavorite = useCallback(async () => {
+    if (!canFavorite || isLoading) return;
+
+    const wasFavorited = isFavorited;
     const previousCount = count;
-    const previousFavoriters = recentFavoriters;
+    const previousFavoriters = favoriters;
 
     // Optimistic update
-    setIsFavorited(!wasForited);
-    setCount(wasForited ? count - 1 : count + 1);
-
-    // Show animation when adding favorite
-    if (!wasForited) {
+    setIsFavorited(!wasFavorited);
+    setCount(wasFavorited ? count - 1 : count + 1);
+    if (!wasFavorited) {
       setShowAnimation(true);
       setTimeout(() => setShowAnimation(false), 600);
     }
 
     setIsLoading(true);
+    setStatusMessage(null);
     try {
       const response = await fetch(`/api/v1/images/${imageId}/favorite`, {
-        method: wasForited ? "DELETE" : "POST",
+        method: wasFavorited ? "DELETE" : "POST",
       });
 
       if (!response.ok) {
-        // Revert on error
-        setIsFavorited(wasForited);
+        setIsFavorited(wasFavorited);
         setCount(previousCount);
-        setRecentFavoriters(previousFavoriters);
-        const data = await response.json();
-        console.error("Favorite error:", data.error);
+        setFavoriters(previousFavoriters);
+        const body = await response.json().catch(() => null);
+        const message = body?.error?.message ?? "お気に入り操作に失敗しました";
+        const suggestion = body?.error?.suggestion;
+        setStatusMessage(suggestion ? `${message}（${suggestion}）` : message);
         return;
       }
 
-      // Update with actual server data
       const data = await response.json();
       setCount(data.favoriteCount);
       setIsFavorited(data.isFavorited);
-
-      // Refresh favoriters list
-      const statusResponse = await fetch(`/api/v1/images/${imageId}/favorite`);
-      if (statusResponse.ok) {
-        const statusData = await statusResponse.json();
-        setRecentFavoriters(statusData.recentFavoriters);
-      }
-    } catch (error) {
-      // Revert on error
-      setIsFavorited(wasForited);
+      setFavoriters(data.favoriters ?? previousFavoriters);
+      setStatusMessage(data.syncError ?? null);
+    } catch {
+      setIsFavorited(wasFavorited);
       setCount(previousCount);
-      setRecentFavoriters(previousFavoriters);
-      console.error("Favorite error:", error);
+      setFavoriters(previousFavoriters);
+      setStatusMessage("お気に入り操作中にエラーが発生しました");
     } finally {
       setIsLoading(false);
     }
-  }, [imageId, isLoggedIn, isLoading, isFavorited, count, recentFavoriters]);
+  }, [imageId, canFavorite, isLoading, isFavorited, count, favoriters]);
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="relative">
-        <button
-          onClick={handleFavorite}
-          disabled={!isLoggedIn || isLoading}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-colors ${
-            isFavorited
-              ? "text-red-500 hover:text-red-600 border-red-200"
-              : "text-muted-foreground hover:text-red-500 border-border"
-          } ${!isLoggedIn ? "cursor-not-allowed opacity-50" : ""}`}
-          title={!isLoggedIn ? "ログインするとお気に入り登録できます" : undefined}
-        >
-          <Heart
-            className={`h-4 w-4 transition-all ${
-              isFavorited ? "fill-current" : ""
-            }`}
-          />
-          <span className="text-sm font-medium">{formatFavoriteCount(count)}</span>
-        </button>
+    <div>
+      <div className="flex items-center gap-2">
+        <div className="relative">
+          <button
+            onClick={handleFavorite}
+            disabled={!canFavorite || isLoading}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-colors ${
+              isFavorited
+                ? "text-red-500 hover:text-red-600 border-red-200"
+                : "text-muted-foreground hover:text-red-500 border-border"
+            } ${!canFavorite ? "cursor-not-allowed opacity-50" : ""}`}
+            title={!canFavorite ? disabledReason : undefined}
+          >
+            <Heart
+              className={`h-4 w-4 transition-all ${isFavorited ? "fill-current" : ""}`}
+            />
+            <span className="text-sm font-medium">{formatFavoriteCount(count)}</span>
+          </button>
 
-        {/* Floating heart animation */}
-        {showAnimation && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <Heart className="h-4 w-4 fill-red-500 text-red-500 animate-float-up" />
-          </div>
-        )}
-      </div>
+          {/* Floating heart animation */}
+          {showAnimation && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <Heart className="h-4 w-4 fill-red-500 text-red-500 animate-float-up" />
+            </div>
+          )}
+        </div>
 
-      {/* Recent favoriters */}
-      {recentFavoriters.length > 0 && (
-        <div className="flex items-center gap-1">
-          {recentFavoriters.slice(0, 5).map((favoriter) => (
-            <Link key={favoriter.username} href={`/u/${favoriter.username}`} title={favoriter.displayName || favoriter.username}>
-              {favoriter.avatarUrl ? (
+        {/* お気に入りした人（Mastodon、外部プロフィールへリンク） */}
+        {favoriters.length > 0 && (
+          <div className="flex items-center gap-1">
+            {favoriters.slice(0, 5).map((favoriter) => {
+              const label = favoriter.displayName || favoriter.acct;
+              const avatar = favoriter.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={favoriter.avatarUrl ?? undefined}
-                  alt={favoriter.displayName || favoriter.username}
+                  src={favoriter.avatarUrl}
+                  alt={label}
                   className="w-6 h-6 rounded-full hover:opacity-80 transition-opacity"
                 />
               ) : (
                 <div className="w-6 h-6 rounded-full bg-muted-foreground/20 flex items-center justify-center text-xs text-muted-foreground hover:opacity-80 transition-opacity">
-                  {(favoriter.displayName || favoriter.username).charAt(0)}
+                  {label.charAt(0)}
                 </div>
-              )}
-            </Link>
-          ))}
-        </div>
+              );
+
+              return favoriter.profileUrl ? (
+                <a
+                  key={favoriter.acct}
+                  href={favoriter.profileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={label}
+                >
+                  {avatar}
+                </a>
+              ) : (
+                <span key={favoriter.acct} title={label}>
+                  {avatar}
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* お気に入り取得・操作の失敗メッセージ */}
+      {statusMessage && (
+        <p className="mt-1.5 text-[11px] text-muted-foreground/70">{statusMessage}</p>
       )}
     </div>
   );

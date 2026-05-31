@@ -9,6 +9,11 @@ import { ImageNavigation } from "./ImageNavigation";
 import { ImageOptionsButton } from "./ImageOptionsButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
+import {
+  classifyPostStatus,
+  favoriteErrorMessage,
+  type CachedFavoriter,
+} from "@/lib/fediverse/favorite";
 import { PinButton } from "@/components/pin/PinButton";
 import { Footer } from "@/components/Footer";
 import { PostSuccessToast } from "./PostSuccessToast";
@@ -58,35 +63,26 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     notFound();
   }
 
-  // お気に入り状態を取得
-  const [isFavorited, recentFavoriters] = await Promise.all([
-    currentUser
-      ? prisma.favorite
-          .findUnique({
-            where: {
-              userId_imageId: {
-                userId: currentUser.id,
-                imageId: image.id,
-              },
-            },
-          })
-          .then((f) => !!f)
-      : Promise.resolve(false),
-    prisma.favorite.findMany({
-      where: { imageId: image.id },
-      orderBy: { createdAt: "desc" },
-      take: 5,
-      select: {
-        user: {
-          select: {
-            username: true,
-            displayName: true,
-            avatarUrl: true,
-          },
-        },
-      },
-    }),
-  ]);
+  // Mastodonお気に入りキャッシュから初期表示データを算出
+  // お気に入り可能 = Mastodonのstatusが存在する投稿のみ（local投稿・Misskeyは対象外）
+  const favoritable = image.user.instance.type === "mastodon" && !!image.postId;
+  const isMisskey = image.user.instance.type === "misskey";
+  const cachedFavoriters =
+    (image.favoritersCache as unknown as CachedFavoriter[] | null) ?? [];
+  const viewerAcct = currentUser
+    ? `${currentUser.username}@${currentUser.instance.domain}`
+    : null;
+  const isFavorited = viewerAcct
+    ? cachedFavoriters.some((f) => f.acct === viewerAcct)
+    : false;
+  // 前回sync結果（postStatus）から現状の理由を復元
+  const persistedReason = favoritable ? classifyPostStatus(image.postStatus) : null;
+  const initialSyncError = favoriteErrorMessage(persistedReason);
+  // 削除確定（404/410）が分かっている時はトグル不可
+  const canFavorite =
+    !!currentUser &&
+    currentUser.instance.type === "mastodon" &&
+    persistedReason !== "deleted";
 
   // 前後の画像を取得
   // 公開TLからの場合: 全ユーザーの公開画像を対象
@@ -267,20 +263,35 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           />
         </div>
 
-        {/* お気に入りボタン */}
-        <div className="mt-4 flex items-center gap-2">
-          <FavoriteButton
-            imageId={imageId}
-            initialCount={image.favoriteCount}
-            initialIsFavorited={isFavorited}
-            recentFavoriters={recentFavoriters.map((f) => ({
-              username: f.user.username,
-              displayName: f.user.displayName,
-              avatarUrl: getAvatarUrl(f.user.avatarUrl),
-            }))}
-            isLoggedIn={!!currentUser}
-          />
-        </div>
+        {/* お気に入り（Mastodon連携） */}
+        {favoritable ? (
+          <div className="mt-2 flex items-center gap-2">
+            <FavoriteButton
+              imageId={imageId}
+              initialCount={image.favoriteCount}
+              initialIsFavorited={isFavorited}
+              initialFavoriters={cachedFavoriters.map((f) => ({
+                acct: f.acct,
+                displayName: f.displayName,
+                avatarUrl: getAvatarUrl(f.avatarUrl),
+                profileUrl: f.profileUrl,
+              }))}
+              canFavorite={canFavorite}
+              initialSyncError={initialSyncError}
+              disabledReason={
+                persistedReason === "deleted"
+                  ? "この投稿は削除されているため操作できません"
+                  : !currentUser
+                    ? "ログインするとお気に入りできます"
+                    : "お気に入りはMastodonアカウントで利用できます"
+              }
+            />
+          </div>
+        ) : !isMisskey ? (
+          <div className="mt-2 text-[11px] text-muted-foreground/70">
+            Mastodon に投稿されていないため、お気に入り機能は使えません。
+          </div>
+        ) : null}
 
         {/* ピン留め・削除ボタン（自分の画像のみ） */}
         {isOwner && (
@@ -318,7 +329,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
                   <Link href={`/u/${currentUser.username}`}>
                     <Button variant="outline" className="w-full h-auto py-3 flex flex-col gap-1.5">
                       <User className="h-4 w-4" />
-                      <span className="text-xs">わたしの写真</span>
+                      <span className="text-xs">プロフィール</span>
                     </Button>
                   </Link>
                   <Link href="/favorite">

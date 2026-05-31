@@ -141,7 +141,7 @@ export async function registerMastodonApp(
     body: JSON.stringify({
       client_name: "movapic",
       redirect_uris: redirectUri,
-      scopes: "read write:statuses write:media",
+      scopes: "read write:statuses write:media write:favourites",
       website: process.env.NEXT_PUBLIC_APP_URL,
     }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT),
@@ -172,7 +172,7 @@ export function getMastodonAuthorizationUrl(
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: "read write:statuses write:media",
+    scope: "read write:statuses write:media write:favourites",
     state,
   });
 

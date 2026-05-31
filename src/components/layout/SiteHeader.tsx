@@ -67,14 +67,14 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
             <DropdownMenuContent align="end" className="w-48">
               {user && (
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard" className="flex items-center gap-2 cursor-pointer font-semibold">
+                  <Link href="/dashboard" className="flex items-center gap-2 cursor-pointer">
                     <LayoutDashboard className="h-4 w-4" />
                     ダッシュボード
                   </Link>
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem asChild>
-                <Link href="/create" className="flex items-center gap-2 cursor-pointer">
+                <Link href="/create" className="flex items-center gap-2 cursor-pointer font-semibold">
                   <ImagePlus className="h-4 w-4" />
                   写真を投稿
                 </Link>
@@ -89,7 +89,7 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
                 <DropdownMenuItem asChild>
                   <Link href={`/u/${user.username}`} className="flex items-center gap-2 cursor-pointer">
                     <Images className="h-4 w-4" />
-                    わたしの投稿
+                    プロフィール
                   </Link>
                 </DropdownMenuItem>
               )}

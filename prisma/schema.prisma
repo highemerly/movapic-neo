@@ -51,9 +51,8 @@ model User {
   updatedAt    DateTime  @updatedAt @map("updated_at")
   lastLoginAt  DateTime? @map("last_login_at")
 
-  instance  Instance   @relation(fields: [instanceId], references: [id])
-  images    Image[]
-  favorites Favorite[]
+  instance Instance @relation(fields: [instanceId], references: [id])
+  images   Image[]
 
   @@unique([instanceId, remoteId])
   @@unique([instanceId, username])
@@ -80,33 +79,21 @@ model Image {
   source        String   @default("web") @db.VarChar(20) // "web" | "email"
   thumbnailKey  String?  @map("thumbnail_key") @db.VarChar(500)
   postUrl       String?  @map("post_url") @db.Text
+  postId        String?  @map("post_id") @db.VarChar(255)
   isPublic      Boolean  @default(true) @map("is_public")
-  favoriteCount Int      @default(0) @map("favorite_count")
+  // Mastodonのお気に入りキャッシュ（Mastodonが正データ）
+  favoriteCount     Int       @default(0) @map("favorite_count")
+  favoritersCache   Json?     @map("favoriters_cache")
+  favoritesSyncedAt DateTime? @map("favorites_synced_at")
+  postStatus        Int?      @map("post_status") // 最後のMastodon sync HTTP status（0=接続失敗、200=OK、4xx=失敗、5xx=サーバ不調）
   pinnedAt      DateTime? @map("pinned_at")
   createdAt     DateTime @default(now()) @map("created_at")
 
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  favorites Favorite[]
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@index([isPublic, createdAt])
   @@map("images")
-}
-
-// お気に入り
-model Favorite {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  imageId   String   @map("image_id")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  image Image @relation(fields: [imageId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, imageId])
-  @@index([userId, createdAt])
-  @@index([imageId])
-  @@map("favorites")
 }
 
 // Bot状態管理（シングルトン）
