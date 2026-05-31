@@ -4,6 +4,12 @@ export function Footer() {
   return (
     <footer className="mt-8 space-x-4">
       <Link
+        href="/announcements"
+        className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+      >
+        お知らせ
+      </Link>
+      <Link
         href="/license"
         className="text-sm text-muted-foreground hover:text-foreground hover:underline"
       >

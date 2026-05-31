@@ -25,6 +25,11 @@ function isWithinExpiryDays(createdAt: string): boolean {
   return diffDays <= ANNOUNCEMENT_EXPIRY_DAYS;
 }
 
+function formatDate(createdAt: string): string {
+  const [, m, d] = createdAt.split("-");
+  return `${parseInt(m, 10)}/${parseInt(d, 10)}`;
+}
+
 export function AnnouncementBar() {
   const [unreadAnnouncements, setUnreadAnnouncements] = useState<
     Announcement[]
@@ -67,16 +72,21 @@ export function AnnouncementBar() {
             ) : (
               <Info className="h-3 w-3 flex-shrink-0" />
             )}
-            {announcement.link ? (
-              <Link
-                href={announcement.link}
-                className="underline hover:no-underline"
-              >
-                {announcement.message}
-              </Link>
-            ) : (
-              <span>{announcement.message}</span>
-            )}
+            {(() => {
+              const href =
+                announcement.link ??
+                (announcement.detail
+                  ? `/announcements/${announcement.id}`
+                  : null);
+              const content = `(${formatDate(announcement.createdAt)}) ${announcement.message}`;
+              return href ? (
+                <Link href={href} className="underline hover:no-underline">
+                  {content}
+                </Link>
+              ) : (
+                <span>{content}</span>
+              );
+            })()}
           </div>
         ))}
       </div>
