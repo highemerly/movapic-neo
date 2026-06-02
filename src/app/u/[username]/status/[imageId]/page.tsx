@@ -5,6 +5,7 @@ import prisma from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth/session";
 import { DeleteButton } from "./DeleteButton";
+import { DeleteLocationButton } from "./DeleteLocationButton";
 import { ImageNavigation } from "./ImageNavigation";
 import { ImageOptionsButton } from "./ImageOptionsButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -17,7 +18,7 @@ import {
 import { PinButton } from "@/components/pin/PinButton";
 import { Footer } from "@/components/Footer";
 import { PostSuccessToast } from "./PostSuccessToast";
-import { User, CalendarDays, Globe, Heart } from "lucide-react";
+import { User, CalendarDays, Map as MapIcon, Globe, Heart } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -198,6 +199,13 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             >
               <CalendarDays className="w-4 h-4 text-muted-foreground" />
             </Link>
+            <Link
+              href={`/u/${username}/map`}
+              className="p-1.5 rounded-full hover:bg-background transition-colors"
+              title="地図"
+            >
+              <MapIcon className="w-4 h-4 text-muted-foreground" />
+            </Link>
           </div>
         </div>
 
@@ -263,18 +271,33 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           />
         </div>
 
-        {/* EXIF情報（カメラ機種・撮影場所） */}
-        {(image.cameraModel || image.locationCity) && (
-          <p className="mt-1 text-xs text-muted-foreground">
+        {/* EXIF情報（カメラ機種・撮影場所）。投稿者本人のみ撮影場所だけ削除可能。 */}
+        {(image.cameraModel || image.locationPrefecture) && (
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
             {image.cameraModel && (
               <span>
                 📷 {image.cameraMake && !image.cameraModel.startsWith(image.cameraMake) ? `${image.cameraMake} ` : ""}{image.cameraModel}
               </span>
             )}
-            {image.cameraModel && image.locationCity && <span className="mx-2">·</span>}
-            {image.locationCity && (
-              <span>
-                📍 {image.locationPrefecture ?? ""}{image.locationCity}
+            {image.cameraModel && image.locationPrefecture && <span aria-hidden>·</span>}
+            {image.locationPrefecture && (
+              <span className="inline-flex items-center gap-1">
+                <span>
+                  📍{" "}
+                  <Link
+                    href={`/u/${username}/map?prefecture=${encodeURIComponent(image.locationPrefecture)}`}
+                    className="hover:underline"
+                  >
+                    {image.locationPrefecture}
+                  </Link>
+                  {image.locationCity ?? ""}
+                </span>
+                {isOwner && (
+                  <DeleteLocationButton
+                    imageId={imageId}
+                    locationLabel={`${image.locationPrefecture}${image.locationCity ?? ""}`}
+                  />
+                )}
               </span>
             )}
           </p>

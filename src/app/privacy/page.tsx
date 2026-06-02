@@ -25,10 +25,10 @@ export default async function PrivacyPage() {
             </p>
 
             <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-3">収集する情報</p>
+              <p className="font-medium mb-3">収集する個人情報</p>
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium mb-1">Fediverse（Mastodon/Misskey）にログインした際にそのサーバーから取得する情報</p>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">Fediverse（Mastodon/Misskey）ログイン時にサーバーから取得する情報</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                     <li>ユーザーID</li>
                     <li>ユーザー名</li>
@@ -38,19 +38,30 @@ export default async function PrivacyPage() {
                   </ul>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium mb-1">ユーザーが入力することで取得する情報</p>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">HTTPアクセスにより機械的に収集される情報</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li>プロフィール説明</li>
-                    <li>画像および追加するテキスト</li>
+                    <li>IPアドレス</li>
+                    <li>IPアドレスから推定される接続元の国や地域の情報</li>
+                    <li>接続先ポート番号</li>
+                    <li>リクエスト日時</li>
+                    <li>リクエスト先URL</li>
+                    <li>TLSバージョン・暗号スイート</li>
+                    <li>ブラウザに関する情報（user-agent, referer, accept-languageヘッダ）</li>
                   </ul>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium mb-1">自動的に収集される情報</p>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">ユーザーが直接情報を入力することで取得する情報</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li>IPアドレス</li>
-                    <li>ログイン日時</li>
-                    <li>投稿日時</li>
-                    <li>ブラウザに関する情報（User-agentなど）</li>
+                    <li>プロフィール説明</li>
+                    <li>投稿する画像</li>
+                    <li>投稿する画像にオーバーレイ表示するテキスト</li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">ユーザーが投稿時に明示的に希望した場合のみ、画像のEXIF情報から取得する情報</p>
+                  <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                    <li>カメラのメーカー名とモデル名</li>
+                    <li>撮影場所（都道府県または都道府県+市区町村）<span className="text-xs">※詳細な位置情報（GPSの緯度経度）は保存されません。都道府県または市区町村レベルに変換した結果のみを取得します。</span></li>
                   </ul>
                 </div>
               </div>
@@ -59,25 +70,25 @@ export default async function PrivacyPage() {
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-3">Cookieの使用</p>
               <p className="text-sm text-muted-foreground mb-3">
-                本サービスでは以下の目的でCookieを使用しています。広告やトラッキング目的でのCookie使用は行っておりません。
+                本サービスでは以下の目的でのみCookieを使用しています。広告やトラッキング目的でのCookie使用は行っておりません。
               </p>
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium mb-1">セッションCookie（movapic_session）</p>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">セッションCookie（movapic_session）</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                     <li>目的：ログイン状態の維持</li>
                     <li>有効期限：7日間</li>
                   </ul>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium mb-1">OAuth認証用一時Cookie（oauth_session, oauth_state）</p>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">OAuth認証用一時Cookie（oauth_session, oauth_state）</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                     <li>目的：Fediverse認証プロセスの保護</li>
                     <li>有効期限：10分間</li>
                   </ul>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium mb-1">お知らせ既読管理Cookie（ann）</p>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">お知らせ既読管理Cookie（ann）</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                     <li>目的：お知らせの既読状態を記憶</li>
                     <li>有効期限：30日間</li>
@@ -101,18 +112,34 @@ export default async function PrivacyPage() {
               <p className="font-medium mb-2">セキュリティ対策、プライバシー保護</p>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                 <li>全ての通信はHTTPSで暗号化されています</li>
-                <li>アップロードされた画像のEXIF情報（GPS位置情報、カメラ情報等）は自動的に削除され、元画像のメタデータは保存されません</li>
-                <li>Fediverse（Mastodon/Misskey）の認証トークンなど重要な情報は暗号化して保存されます</li>
+                <li>アップロードされ生成された画像のEXIF情報（GPS位置情報、カメラ情報等）は常に削除され、出力画像にはメタデータが含まれません</li>
+                <li>カメラ機種名・撮影場所は、投稿時にユーザーが明示的に選択した場合に限り、選択範囲のみをサービスのデータベースに保存し、初期値では保存しません（「オプトイン」方式）</li>
+                <li>Fediverse（Mastodon/Misskey）の認証トークンなど重要な情報は暗号化したうえで保存されます</li>
               </ul>
             </div>
 
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-3">外部サービスへの情報提供</p>
-              <div>
-                <p className="text-xs text-muted-foreground font-medium mb-1">Fediverse（Mastodon/Misskey）</p>
-                <p className="text-sm text-muted-foreground">
-                  ユーザーが投稿を選択した場合、生成した画像とテキストが連携先のFediverseサーバーに投稿されます。
-                </p>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">Fediverse（Mastodon/Misskey）</p>
+                  <p className="text-sm text-muted-foreground">
+                    ユーザーが投稿を選択した場合、生成した画像とテキストが連携先のFediverseサーバーに投稿されます。
+                  </p>
+                </div>
+                <div>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">国土地理院 逆ジオコーディングAPI</p>
+                  <p className="text-sm text-muted-foreground">
+                    投稿時、ユーザーが撮影場所を投稿することを明示的に選択した場合に限り、写真のEXIF情報から抽出したGPS緯度経度を国土地理院の逆ジオコーディングAPIに送信し、市区町村コードを取得します。送信先には個人を特定しうる情報（ユーザー名、アカウントID、IPアドレス、画像等）は含めずに情報を送信します。撮影場所を投稿しない場合には送信されません。
+                  </p>
+                </div>
+                <div>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">Cloudflare Inc.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Cloudflare, Inc.のCDN・セキュリティサービスを利用しています。Cloudflareはサービス提供にあたり、アクセスログ（IPアドレス、User-Agent、アクセス日時等）を処理します。詳細はCloudflareのプライバシーポリシーをご参照ください。
+                    https://www.cloudflare.com/privacypolicy/
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -132,7 +159,7 @@ export default async function PrivacyPage() {
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">分析ツール</p>
               <p className="text-sm text-muted-foreground">
-                本サービスでは、Google Analyticsなどの外部分析ツールは使用しておりません。
+                本サービスでは、Google Analytics などの外部分析ツールは現時点で利用しておりません。
               </p>
             </div>
 
@@ -147,13 +174,6 @@ export default async function PrivacyPage() {
               </ul>
               <p className="text-sm text-muted-foreground mt-2">
                 これらの権利行使については、お問い合わせよりご連絡ください。
-              </p>
-            </div>
-
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-2">未成年の利用</p>
-              <p className="text-sm text-muted-foreground">
-                未成年の方が本サービスを利用する場合は、保護者の同意が必要です。
               </p>
             </div>
 
@@ -180,7 +200,7 @@ export default async function PrivacyPage() {
               </p>
             </div>
 
-            <p className="text-xs text-muted-foreground text-center">最終更新日：2026年3月18日</p>
+            <p className="text-xs text-muted-foreground text-center">最終更新日：2026年6月2日</p>
           </div>
         </section>
 

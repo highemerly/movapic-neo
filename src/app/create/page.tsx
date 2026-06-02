@@ -33,6 +33,7 @@ import {
 } from "@/types";
 import { parseApiError, formatErrorMessage, type ParsedApiError } from "@/lib/errors";
 import { extractExif, type ExtractedExif } from "@/lib/exif/parser";
+import { Label } from "@/components/ui/label";
 
 // 出力形式の表示名
 const OUTPUT_LABELS: Record<OutputFormat, string> = {
@@ -140,8 +141,15 @@ export default function CreatePage() {
   const [isSavingDefaults, setIsSavingDefaults] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [exif, setExif] = useState<ExtractedExif | null>(null);
-  // 位置情報は毎回明示的にオプトインしない限り保存しない
-  const [saveLocation, setSaveLocation] = useState(false);
+  // 撮影情報は「機種名」「撮影場所」を独立して毎回明示的に選択する
+  type CameraOption = "none" | "show";
+  type LocationOption = "none" | "pref" | "city";
+  const [cameraOption, setCameraOption] = useState<CameraOption>("none");
+  const [locationOption, setLocationOption] = useState<LocationOption>("none");
+  // 位置情報の解析結果（タップで1回だけ /api/v1/geocode を呼びキャッシュ、同じ画像内で再利用）
+  const [geocoded, setGeocoded] = useState<{ prefecture: string; city: string } | null>(null);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
 
   // 認証チェックとユーザー設定の読み込み
   useEffect(() => {
@@ -221,8 +229,11 @@ export default function CreatePage() {
     setHasGenerated(false);
     setResultUrl(null);
     setError(null);
-    // 位置情報のオプトインは画像ごとに毎回リセット（前回ONのまま流用されない）
-    setSaveLocation(false);
+    // 撮影情報の選択肢と位置情報の解析キャッシュは画像ごとに毎回リセット（初期は「表示しない」）
+    setCameraOption("none");
+    setLocationOption("none");
+    setGeocoded(null);
+    setGeocodeError(null);
     setExif(null);
     const extracted = await extractExif(file);
     setExif(extracted);
@@ -236,7 +247,10 @@ export default function CreatePage() {
     setResultBlob(null);
     setResultMimeType("image/jpeg");
     setExif(null);
-    setSaveLocation(false);
+    setCameraOption("none");
+    setLocationOption("none");
+    setGeocoded(null);
+    setGeocodeError(null);
     if (resultUrl) {
       URL.revokeObjectURL(resultUrl);
       setResultUrl(null);
@@ -405,11 +419,20 @@ export default function CreatePage() {
       formData.append("mimeType", mimeType);
       formData.append("visibility", visibility);
 
-      // EXIFメタデータ（カメラ・撮影日時は常に送信、位置情報はオプトイン時のみ）
-      if (exif?.cameraMake) formData.append("cameraMake", exif.cameraMake);
-      if (exif?.cameraModel) formData.append("cameraModel", exif.cameraModel);
-      if (exif?.capturedAt) formData.append("capturedAt", exif.capturedAt.toISOString());
-      if (saveLocation && exif?.gpsLatitude != null && exif?.gpsLongitude != null) {
+      // EXIFメタデータ: 表示オプションに従って送る内容を決める
+      // - none:         何も送らない
+      // 撮影情報: カメラ機種と撮影場所を独立に送る
+      // - cameraOption:   "none" | "show"
+      // - locationOption: "none" | "pref" | "city"
+      // 注: 撮影日時はプライバシー保護のため現在は送信しない（DBカラムは将来用に保持）
+      formData.append("cameraOption", cameraOption);
+      formData.append("locationOption", locationOption);
+      if (cameraOption === "show" && exif) {
+        if (exif.cameraMake) formData.append("cameraMake", exif.cameraMake);
+        if (exif.cameraModel) formData.append("cameraModel", exif.cameraModel);
+      }
+      if ((locationOption === "pref" || locationOption === "city") &&
+          exif?.gpsLatitude != null && exif?.gpsLongitude != null) {
         formData.append("gpsLatitude", String(exif.gpsLatitude));
         formData.append("gpsLongitude", String(exif.gpsLongitude));
       }
@@ -476,6 +499,37 @@ export default function CreatePage() {
     }
   };
 
+  // 撮影場所セグメント変更時のハンドラ。pref/city 選択時に未解析なら /api/v1/geocode を
+  // 1回だけ呼び結果をキャッシュする（プレビューのたびには呼ばない）。
+  const handleLocationOptionChange = async (next: LocationOption) => {
+    setLocationOption(next);
+    const needsGeo = next === "pref" || next === "city";
+    if (!needsGeo) return;
+    if (geocoded || isGeocoding) return;
+    if (exif?.gpsLatitude == null || exif?.gpsLongitude == null) return;
+
+    setIsGeocoding(true);
+    setGeocodeError(null);
+    try {
+      const res = await fetch("/api/v1/geocode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat: exif.gpsLatitude, lng: exif.gpsLongitude }),
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { prefecture: string; city: string };
+        setGeocoded(data);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setGeocodeError(data?.error || "撮影場所を取得できませんでした");
+      }
+    } catch {
+      setGeocodeError("撮影場所の取得に失敗しました");
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
+
   const canGenerate = formState.text.trim().length > 0 && formState.imageFile !== null;
 
   // 生成後に設定が変更されたかどうか
@@ -502,6 +556,7 @@ export default function CreatePage() {
     isPosting,
     onGenerate: handleGenerate,
     onPost: handlePost,
+    includesLocation: locationOption !== "none",
   };
 
   // 認証チェック中
@@ -561,34 +616,6 @@ export default function CreatePage() {
               disabled={isLoading || isPosting}
             />
           </div>
-
-          {/* EXIF情報: カメラは常時表示、撮影場所はチェックで毎回明示的にオプトイン */}
-          {formState.imageFile && exif && (exif.cameraModel || exif.gpsLatitude != null) && (
-            <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
-              {exif.cameraModel && (
-                <p className="text-xs text-muted-foreground">
-                  📷 <span className="font-medium text-foreground">{exif.cameraMake && !exif.cameraModel.startsWith(exif.cameraMake) ? `${exif.cameraMake} ` : ""}{exif.cameraModel}</span> を投稿に表示します
-                </p>
-              )}
-              {exif.gpsLatitude != null && exif.gpsLongitude != null && (
-                <label className="flex cursor-pointer items-start gap-2">
-                  <input
-                    type="checkbox"
-                    checked={saveLocation}
-                    onChange={(e) => setSaveLocation(e.target.checked)}
-                    disabled={isLoading || isPosting}
-                    className="mt-0.5"
-                  />
-                  <div className="text-xs">
-                    <p>📍 撮影場所（市区町村）も投稿に表示する</p>
-                    <p className="mt-0.5 text-muted-foreground">
-                      GPS座標は保存せず、市区町村名のみを記録します（ベータ機能）
-                    </p>
-                  </div>
-                </label>
-              )}
-            </div>
-          )}
 
           {/* 注意事項（①の時点から常に表示・公開範囲に応じて動的に変化） */}
           <PostVisibilityNotice
@@ -650,9 +677,102 @@ export default function CreatePage() {
                 />
               </div>
 
-              {/* ④ 写真を生成＆投稿 */}
+              {/* ④ 投稿したい写真の追加情報（EXIF撮影情報）
+                  カメラ機種名と撮影場所を独立したセグメントで毎回選ぶ。デザインは
+                  OptionsPanel の SegmentControl と揃える。位置情報のセグメントは
+                  pref/city を選んだ初回タップ時のみ /geocode を呼んで結果をキャッシュ。 */}
+              <div className="space-y-4">
+                <StepHeader num={4} label="投稿したい写真の追加情報を選択" />
+                {(() => {
+                  const cameraText = exif?.cameraModel
+                    ? exif.cameraMake && !exif.cameraModel.startsWith(exif.cameraMake)
+                      ? `${exif.cameraMake} ${exif.cameraModel}`
+                      : exif.cameraModel
+                    : null;
+                  const hasGps = !!(exif && exif.gpsLatitude != null && exif.gpsLongitude != null);
+                  const disabled = isLoading || isPosting;
+
+                  // EXIFが何も無い場合は何も選べない
+                  if (!cameraText && !hasGps) {
+                    return (
+                      <p className="text-xs text-muted-foreground">
+                        この画像には付与できる撮影情報（カメラ機種・GPS）がありません。
+                      </p>
+                    );
+                  }
+
+                  const segmentBtn = (
+                    selected: boolean,
+                    onClick: () => void,
+                    label: React.ReactNode,
+                    extraDisabled = false,
+                  ) => (
+                    <button
+                      type="button"
+                      onClick={onClick}
+                      disabled={disabled || extraDisabled}
+                      className={`min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                        selected
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      } ${disabled || extraDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      {label}
+                    </button>
+                  );
+
+                  // セグメントボタンのラベル: 機種名は実値、撮影場所は解析後は実値、未解析時はプレースホルダ
+                  const cameraShowLabel = cameraText ? `📷 ${cameraText}` : "(機種情報なし)";
+                  const prefLabel = geocoded ? `📍 ${geocoded.prefecture}` : "📍 都道府県のみ";
+                  const cityLabel = geocoded ? `📍 ${geocoded.prefecture}${geocoded.city}` : "📍 都道府県+市町村";
+
+                  return (
+                    <div className="space-y-5">
+                      {/* カメラ機種名 */}
+                      <div className="space-y-2">
+                        <Label>カメラの機種名</Label>
+                        <div className="flex rounded-lg border bg-muted p-1 gap-1">
+                          {segmentBtn(cameraOption === "none", () => setCameraOption("none"), "表示しない")}
+                          {segmentBtn(cameraOption === "show", () => setCameraOption("show"), cameraShowLabel, !cameraText)}
+                        </div>
+                        {!cameraText && (
+                          <p className="text-[11px] text-muted-foreground">この画像にはカメラ機種情報がありません。</p>
+                        )}
+                      </div>
+
+                      {/* 撮影場所 */}
+                      <div className="space-y-2">
+                        <Label>撮影場所</Label>
+                        <div className="flex rounded-lg border bg-muted p-1 gap-1">
+                          {segmentBtn(locationOption === "none", () => handleLocationOptionChange("none"), "表示しない")}
+                          {segmentBtn(locationOption === "pref", () => handleLocationOptionChange("pref"), prefLabel, !hasGps)}
+                          {segmentBtn(locationOption === "city", () => handleLocationOptionChange("city"), cityLabel, !hasGps)}
+                        </div>
+                        {!hasGps && (
+                          <p className="text-[11px] text-muted-foreground">
+                            この画像には位置情報がありません。iPhone から直接アップロードした写真はiOSの仕様で位置情報が含まれません。
+                          </p>
+                        )}
+                        {hasGps && locationOption !== "none" && !geocoded && (
+                          isGeocoding ? (
+                            <p className="text-[11px] text-muted-foreground">撮影場所を解析中…</p>
+                          ) : geocodeError ? (
+                            <p className="text-[11px] text-destructive">{geocodeError}</p>
+                          ) : null
+                        )}
+                      </div>
+
+                      <p className="text-[11px] text-muted-foreground">
+                        いかなる場合もサーバーには詳細な位置情報（GPS座標）は保存されず、都道府県名または市区町村名のみが保存されます。また、保存された情報は全ユーザーが閲覧できます。
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* ⑤ 写真を生成＆投稿 */}
               <div className="space-y-2">
-                <StepHeader num={4} label="写真を生成＆投稿" />
+                <StepHeader num={5} label="写真を生成＆投稿" />
                 <div ref={anchorRef}>
                   <ActionButtons {...actionButtonsProps} />
                 </div>

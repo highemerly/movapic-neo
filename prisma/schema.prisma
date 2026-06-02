@@ -46,6 +46,8 @@ model User {
   defaultVisibility  String?   @map("default_visibility") @db.VarChar(20)
   mentionVisibility  String    @default("public") @map("mention_visibility") @db.VarChar(20)
   mentionKeep        Boolean   @default(false) @map("mention_keep")
+  // 地図機能（ベータ）の公開オプトイン。デフォルトoff、自分の画像投稿の都道府県集計を地図で公開する
+  showLocationMap    Boolean   @default(false) @map("show_location_map")
 
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")

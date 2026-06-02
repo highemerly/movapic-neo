@@ -106,7 +106,12 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
 
     // 更新するフィールドを収集
-    const updateData: { bio?: string | null; mentionVisibility?: string; mentionKeep?: boolean } = {};
+    const updateData: {
+      bio?: string | null;
+      mentionVisibility?: string;
+      mentionKeep?: boolean;
+      showLocationMap?: boolean;
+    } = {};
 
     // bioの更新
     if (body.bio !== undefined) {
@@ -153,6 +158,17 @@ export async function PATCH(request: NextRequest) {
       updateData.mentionKeep = body.mentionKeep;
     }
 
+    // showLocationMapの更新（地図機能の公開オプトイン）
+    if (body.showLocationMap !== undefined) {
+      if (typeof body.showLocationMap !== "boolean") {
+        return NextResponse.json(
+          { error: "showLocationMapはboolean型である必要があります" },
+          { status: 400 }
+        );
+      }
+      updateData.showLocationMap = body.showLocationMap;
+    }
+
     // 更新するフィールドがない場合
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
@@ -168,6 +184,7 @@ export async function PATCH(request: NextRequest) {
         bio: true,
         mentionVisibility: true,
         mentionKeep: true,
+        showLocationMap: true,
       },
     });
 
@@ -176,6 +193,7 @@ export async function PATCH(request: NextRequest) {
       bio: updatedUser.bio,
       mentionVisibility: updatedUser.mentionVisibility,
       mentionKeep: updatedUser.mentionKeep,
+      showLocationMap: updatedUser.showLocationMap,
     });
   } catch (error) {
     console.error("Failed to update profile:", error);

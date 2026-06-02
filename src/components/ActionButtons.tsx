@@ -10,6 +10,8 @@ interface ActionButtonsProps {
   isPosting: boolean;
   onGenerate: () => void;
   onPost: () => void;
+  // 位置情報を含む選択中は投稿ボタンの文言で明示する
+  includesLocation?: boolean;
 }
 
 export function ActionButtons({
@@ -19,6 +21,7 @@ export function ActionButtons({
   isPosting,
   onGenerate,
   onPost,
+  includesLocation = false,
 }: ActionButtonsProps) {
   // プレビューボタン: 未プレビュー or 変更ありのときのみ活性
   const previewDisabled = isLoading || isPosting || !canGenerate || hasPreview;
@@ -61,6 +64,8 @@ export function ActionButtons({
             <Loader2 className="h-4 w-4 animate-spin" />
             投稿中...
           </span>
+        ) : includesLocation ? (
+          "📍付きで投稿"
         ) : (
           "投稿"
         )}

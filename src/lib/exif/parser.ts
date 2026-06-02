@@ -26,9 +26,12 @@ const EMPTY: ExtractedExif = {
 
 export async function extractExif(file: File): Promise<ExtractedExif> {
   try {
+    // 撮影日時はプライバシー保護のため抽出しない（DBカラムは将来用に保持）。
+    // pickに latitude/longitude を入れてもexifrがGPS IFDを自動で有効化しない事例が
+    // あるため、必要なIFDを明示的に有効化する。
     const parsed = await exifr.parse(file, {
-      pick: ["Make", "Model", "DateTimeOriginal", "latitude", "longitude"],
-      // exifrは latitude/longitude を10進数に変換した値として提供する
+      ifd0: { pick: ["Make", "Model"] },
+      gps: true,
     });
 
     if (!parsed) return EMPTY;
@@ -39,7 +42,7 @@ export async function extractExif(file: File): Promise<ExtractedExif> {
     return {
       cameraMake: typeof parsed.Make === "string" ? parsed.Make.trim() || null : null,
       cameraModel: typeof parsed.Model === "string" ? parsed.Model.trim() || null : null,
-      capturedAt: parsed.DateTimeOriginal instanceof Date ? parsed.DateTimeOriginal : null,
+      capturedAt: null,
       gpsLatitude: lat,
       gpsLongitude: lng,
     };
@@ -47,3 +50,4 @@ export async function extractExif(file: File): Promise<ExtractedExif> {
     return EMPTY;
   }
 }
+

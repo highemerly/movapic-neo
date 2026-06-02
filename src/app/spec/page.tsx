@@ -122,7 +122,50 @@ export default async function SpecPage() {
               <p className="font-medium mb-2">画像処理について</p>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                 <li>スマートフォン、特にiOSで撮影した画像は、向き（Orientation）を自動補正しています</li>
-                <li>プライバシー保護のため、GPS情報やカメラ情報などのメタデータは出力時に削除されます</li>
+                <li>プライバシー保護のため、GPS情報やカメラ情報などのメタデータは出力画像から常に削除されます</li>
+              </ul>
+            </div>
+
+            <div className="bg-muted rounded-lg p-4">
+              <p className="font-medium mb-3">撮影情報（EXIF）の取り扱い（ベータ）</p>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  Web投稿画面では、画像を選択した時点でブラウザ上でEXIFを解析します。出力画像からは常にEXIFを削除しますが、投稿時にユーザーが選択した範囲に限り、カメラ機種・撮影日時・撮影場所をサービスのデータベースに保存します。
+                </p>
+                <div>
+                  <p className="text-xs font-medium mb-1">選択肢（投稿ごとに毎回選択）</p>
+                  <ul className="list-disc list-inside space-y-1 ml-2">
+                    <li><strong>表示しない</strong>: 何も保存しません</li>
+                    <li><strong>📷 カメラ機種のみ</strong>（初期値）: メーカー名・モデル名・撮影日時を保存</li>
+                    <li><strong>📷 + 📍 都道府県</strong>: 上記に加え、撮影場所の都道府県を保存</li>
+                    <li><strong>📷 + 📍 都道府県+市区町村</strong>: 上記に加え、市区町村まで保存</li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-xs font-medium mb-1">位置情報の解析</p>
+                  <p>GPS緯度経度は<strong>サービスには保存しません</strong>。位置情報を含む選択肢を選んだ場合のみ、国土地理院（GSI）の逆ジオコーディングAPIにGPS座標を送信し、市区町村コードを取得して都道府県名・市区町村名に変換して保存します。</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium mb-1">投稿後の削除</p>
+                  <p>保存した撮影場所は、投稿者本人が画像詳細ページから単独で削除できます（カメラ機種・撮影日時は残ります）。</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium mb-1">iOSからの投稿について</p>
+                  <p>iOSのプライバシー保護により、Safari/Chromeなど全ブラウザで写真ピッカーから渡される画像はGPS情報が自動的に除去されます。iPhoneから直接アップロードした場合は撮影場所を保存できません（カメラ機種名は取得可能）。</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium mb-1">メール投稿・Bot投稿について</p>
+                  <p>現時点ではメール投稿・メンション（Bot）投稿経由ではEXIFは保存されません。</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-muted rounded-lg p-4">
+              <p className="font-medium mb-2">地図機能（ベータ）</p>
+              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                <li>ユーザーページに「地図」タブを追加し、都道府県別の投稿数をヒートマップ表示します</li>
+                <li>ダッシュボードで「地図を公開する（ベータ）」をオンにしたユーザーのみ公開されます（オフの場合は本人のみ閲覧可能）</li>
+                <li>位置情報を含めて投稿した画像のみが集計対象です</li>
               </ul>
             </div>
 

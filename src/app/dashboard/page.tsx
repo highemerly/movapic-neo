@@ -12,6 +12,7 @@ import { MentionSettingsForm } from "./MentionSettingsForm";
 import { EmailAddressDisplay } from "./EmailAddressDisplay";
 import { BioEditForm } from "./BioEditForm";
 import { PreferencesResetButton } from "./PreferencesResetButton";
+import { LocationMapToggle } from "./LocationMapToggle";
 import prisma from "@/lib/db";
 import {
   POSITION_LABELS,
@@ -52,6 +53,7 @@ export default async function DashboardPage() {
         defaultSize: true,
         defaultOutput: true,
         defaultArrangement: true,
+        showLocationMap: true,
       },
     }),
     prisma.image.count({
@@ -295,6 +297,15 @@ export default async function DashboardPage() {
                 未設定です。<Link href="/create" className="text-primary hover:underline">Web投稿画面</Link>で「初期値として保存」を押すと設定できます。
               </p>
             )}
+          </div>
+
+          {/* 地図機能（ベータ）の公開設定 */}
+          <div className="mt-4 bg-muted rounded-lg p-4">
+            <p className="text-sm font-medium mb-2">地図機能の公開</p>
+            <LocationMapToggle
+              initialEnabled={userWithPreferences?.showLocationMap ?? false}
+              username={user.username}
+            />
           </div>
         </section>
 

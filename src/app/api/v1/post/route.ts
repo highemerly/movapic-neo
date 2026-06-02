@@ -48,17 +48,20 @@ export async function POST(request: NextRequest) {
     const visibility = formData.get("visibility") as string | null;
 
     // EXIFメタデータ（クライアントが元画像から抽出したものを受け取る）
-    // カメラ・撮影日時は常に保存、位置情報はクライアントで明示オプトインされた時のみ送られてくる
-    const cameraMake = (formData.get("cameraMake") as string | null)?.slice(0, 100) || null;
-    const cameraModel = (formData.get("cameraModel") as string | null)?.slice(0, 100) || null;
-    const capturedAtRaw = formData.get("capturedAt") as string | null;
-    const gpsLatRaw = formData.get("gpsLatitude") as string | null;
-    const gpsLngRaw = formData.get("gpsLongitude") as string | null;
+    // カメラ機種と撮影場所は独立。各オプションごとに保存対象を決める。
+    // - cameraOption:   "none" | "show"
+    // - locationOption: "none" | "pref" | "city"
+    // 注: 撮影日時はプライバシー保護のため現在は取得しない（DBカラム capturedAt は将来用に保持）
+    const cameraOption = (formData.get("cameraOption") as string | null) ?? "none";
+    const locationOption = (formData.get("locationOption") as string | null) ?? "none";
 
-    const capturedAt = capturedAtRaw ? (() => {
-      const d = new Date(capturedAtRaw);
-      return isNaN(d.getTime()) ? null : d;
-    })() : null;
+    let cameraMake: string | null = null;
+    let cameraModel: string | null = null;
+    const capturedAt: Date | null = null;
+    if (cameraOption === "show") {
+      cameraMake = (formData.get("cameraMake") as string | null)?.slice(0, 100) || null;
+      cameraModel = (formData.get("cameraModel") as string | null)?.slice(0, 100) || null;
+    }
 
     // バリデーション
     if (!imageBlob || !text || !position || !font || !color || !size || !output || !mimeType) {
@@ -88,18 +91,25 @@ export async function POST(request: NextRequest) {
     // 画像メタデータを取得
     const metadata = await sharp(imageBuffer).metadata();
 
-    // 位置情報: クライアントがオプトインしてGPSを送った時だけ逆ジオコーディング
-    // 失敗時は location 系は null のまま保存（投稿自体は止めない）
+    // 位置情報: locationOption が pref / city の時だけサーバー側で再ジオコーディングして
+    // 保存（権威データをサーバー側で確定するため、クライアントからの prefecture/city 文字列は
+    // そのまま保存せず GPS座標から逆引きする）。
     let locationPrefecture: string | null = null;
     let locationCity: string | null = null;
-    if (gpsLatRaw != null && gpsLngRaw != null) {
-      const lat = parseFloat(gpsLatRaw);
-      const lng = parseFloat(gpsLngRaw);
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
-        const geo = await reverseGeocode(lat, lng);
-        if (geo) {
-          locationPrefecture = geo.prefecture;
-          locationCity = geo.city;
+    if (locationOption === "pref" || locationOption === "city") {
+      const gpsLatRaw = formData.get("gpsLatitude") as string | null;
+      const gpsLngRaw = formData.get("gpsLongitude") as string | null;
+      if (gpsLatRaw != null && gpsLngRaw != null) {
+        const lat = parseFloat(gpsLatRaw);
+        const lng = parseFloat(gpsLngRaw);
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          const geo = await reverseGeocode(lat, lng);
+          if (geo) {
+            locationPrefecture = geo.prefecture;
+            if (locationOption === "city") {
+              locationCity = geo.city;
+            }
+          }
         }
       }
     }

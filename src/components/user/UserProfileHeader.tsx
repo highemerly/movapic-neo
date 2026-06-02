@@ -1,9 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { Images, Calendar } from "lucide-react";
+import { Images, Calendar, Map as MapIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
+
+interface Tab {
+  key: "photos" | "calendar" | "map";
+  label: string;
+  icon: typeof Images;
+  href: string;
+  badge?: string;
+}
 
 interface UserProfileHeaderProps {
   user: {
@@ -17,7 +25,7 @@ interface UserProfileHeaderProps {
     };
   };
   imageCount: number;
-  activeTab: "photos" | "calendar";
+  activeTab: "photos" | "calendar" | "map";
 }
 
 export function UserProfileHeader({
@@ -25,18 +33,26 @@ export function UserProfileHeader({
   imageCount,
   activeTab,
 }: UserProfileHeaderProps) {
-  const tabs = [
+  // 地図タブは常に表示（オプトイン未済でも表示し、遷移先で公開設定の有無に応じた案内を出す）
+  const tabs: Tab[] = [
     {
-      key: "photos" as const,
-      label: "全ての写真",
+      key: "photos",
+      label: "一覧",
       icon: Images,
       href: `/u/${user.username}`,
     },
     {
-      key: "calendar" as const,
+      key: "calendar",
       label: "カレンダー",
       icon: Calendar,
       href: `/u/${user.username}/calendar`,
+    },
+    {
+      key: "map",
+      label: "地図",
+      icon: MapIcon,
+      href: `/u/${user.username}/map`,
+      badge: "BETA",
     },
   ];
 
@@ -100,6 +116,11 @@ export function UserProfileHeader({
               >
                 <Icon className="w-4 h-4" />
                 {tab.label}
+                {tab.badge && (
+                  <span className="ml-0.5 rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                    {tab.badge}
+                  </span>
+                )}
               </Link>
             );
           })}
