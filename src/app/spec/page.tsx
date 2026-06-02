@@ -26,7 +26,7 @@ export default async function SpecPage() {
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">画像</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li>対応フォーマット: JPEG, PNG, WebP, HEIC, AVIF</li>
+                    <li>対応フォーマット: JPEG, PNG, WebP, AVIF, HEIC（ベータ）</li>
                     <li>最大ファイルサイズ: 20MB</li>
                   </ul>
                 </div>
@@ -72,10 +72,12 @@ export default async function SpecPage() {
             </div>
 
             <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-2">レート制限</p>
-              <p className="text-sm text-muted-foreground">
-                画像生成APIに短時間に連続してリクエストを送信した場合、一時的に制限がかかります。
-              </p>
+              <p className="font-medium mb-2">その他の画像処理</p>
+              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                <li>スマートフォン、特にiOSで撮影した画像は、向き（Orientation）を自動補正しています</li>
+                <li>プライバシー保護のため、GPS情報やカメラ情報などのメタデータ（EXIF）は出力画像から常に削除されます</li>
+                <li>出力は原則AVIFフォーマットとなり、Cloudflare R2にアップロードされます</li>
+              </ul>
             </div>
 
             <div className="bg-muted rounded-lg p-4">
@@ -102,7 +104,7 @@ export default async function SpecPage() {
                       <td className="py-2">高圧縮・高画質。Misskeyの画像サイズ制限（50MB）に最適化</td>
                     </tr>
                     <tr>
-                      <td className="py-2 pr-4">なし</td>
+                      <td className="py-2 pr-4">その他</td>
                       <td className="py-2 pr-4">JPEG</td>
                       <td className="py-2">汎用性が高く、どの環境でも表示可能</td>
                     </tr>
@@ -112,50 +114,40 @@ export default async function SpecPage() {
             </div>
 
             <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-2">Bot投稿（メンション投稿）</p>
+              <p className="font-medium mb-2">レート制限</p>
               <p className="text-sm text-muted-foreground">
-                Botは3分に1回、メンションを定期的に確認して処理を実行します。
+                画像生成APIに短時間に連続してリクエストを送信した場合、一時的に制限がかかります。
               </p>
             </div>
 
             <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-2">画像処理について</p>
-              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                <li>スマートフォン、特にiOSで撮影した画像は、向き（Orientation）を自動補正しています</li>
-                <li>プライバシー保護のため、GPS情報やカメラ情報などのメタデータは出力画像から常に削除されます</li>
-              </ul>
+              <p className="font-medium mb-2">Bot投稿（メンション投稿）</p>
+              <p className="text-sm text-muted-foreground">
+                Bot宛てにメンション付きで画像とコメントを送信すると、文字を合成して投稿可能です。Botは約3分に1回メンションを確認して処理を実行しています。処理が正常に完了した場合、元投稿は削除する仕組みとなっています。
+              </p>
             </div>
 
             <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-3">撮影情報（EXIF）の取り扱い（ベータ）</p>
+              <p className="font-medium mb-3">撮影情報（EXIF）の取り扱い</p>
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  Web投稿画面では、画像を選択した時点でブラウザ上でEXIFを解析します。出力画像からは常にEXIFを削除しますが、投稿時にユーザーが選択した範囲に限り、カメラ機種・撮影日時・撮影場所をサービスのデータベースに保存します。
+                  Web投稿画面では、画像を選択した時点でブラウザ上でEXIFを解析します。出力画像からは常にEXIFを削除しますが、投稿時にユーザーが選択した範囲に限り、カメラ機種・撮影場所（都道府県または市町村のみ）をサービスのデータベースに保存します。
                 </p>
                 <div>
-                  <p className="text-xs font-medium mb-1">選択肢（投稿ごとに毎回選択）</p>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li><strong>表示しない</strong>: 何も保存しません</li>
-                    <li><strong>📷 カメラ機種のみ</strong>（初期値）: メーカー名・モデル名・撮影日時を保存</li>
-                    <li><strong>📷 + 📍 都道府県</strong>: 上記に加え、撮影場所の都道府県を保存</li>
-                    <li><strong>📷 + 📍 都道府県+市区町村</strong>: 上記に加え、市区町村まで保存</li>
-                  </ul>
-                </div>
-                <div>
-                  <p className="text-xs font-medium mb-1">位置情報の解析</p>
+                  <p className="text-xs font-medium mb-1">位置情報の解析（ベータ）</p>
                   <p>GPS緯度経度は<strong>サービスには保存しません</strong>。位置情報を含む選択肢を選んだ場合のみ、国土地理院（GSI）の逆ジオコーディングAPIにGPS座標を送信し、市区町村コードを取得して都道府県名・市区町村名に変換して保存します。</p>
                 </div>
                 <div>
                   <p className="text-xs font-medium mb-1">投稿後の削除</p>
-                  <p>保存した撮影場所は、投稿者本人が画像詳細ページから単独で削除できます（カメラ機種・撮影日時は残ります）。</p>
+                  <p>保存した撮影場所は、投稿者本人が画像詳細ページから単独で削除できます（カメラ機種はあとから削除できません）。</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium mb-1">iOSからの投稿について</p>
-                  <p>iOSのプライバシー保護により、Safari/Chromeなど全ブラウザで写真ピッカーから渡される画像はGPS情報が自動的に除去されます。iPhoneから直接アップロードした場合は撮影場所を保存できません（カメラ機種名は取得可能）。</p>
+                  <p className="text-xs font-medium mb-1">iOSからの投稿</p>
+                  <p>iOSのプライバシー保護により、Safari/Chromeなど全ブラウザで写真ピッカーから渡される画像はGPS情報が自動的に除去される場合があります。iPhone/iPadで直接アップロードする場合はGPS情報の送信を許可してください。</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium mb-1">メール投稿・Bot投稿について</p>
-                  <p>現時点ではメール投稿・メンション（Bot）投稿経由ではEXIFは保存されません。</p>
+                  <p className="text-xs font-medium mb-1">メール投稿・Bot投稿</p>
+                  <p>現時点ではメール投稿・メンション（Bot）投稿経由でEXIFは解析できません。</p>
                 </div>
               </div>
             </div>
@@ -163,8 +155,8 @@ export default async function SpecPage() {
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">地図機能（ベータ）</p>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                <li>ユーザーページに「地図」タブを追加し、都道府県別の投稿数をヒートマップ表示します</li>
-                <li>ダッシュボードで「地図を公開する（ベータ）」をオンにしたユーザーのみ公開されます（オフの場合は本人のみ閲覧可能）</li>
+                <li>ユーザーページに「地図」タブを追加し、都道府県別の投稿数をヒートマップ表示する機能です</li>
+                <li>ダッシュボードで「地図を公開する（ベータ）」をオンにしたユーザーのみ公開されます（オフの場合は本人のみ閲覧可能となっています）</li>
                 <li>位置情報を含めて投稿した画像のみが集計対象です</li>
               </ul>
             </div>
