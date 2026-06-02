@@ -31,6 +31,7 @@ interface ImageUploadProps {
   hasGenerated: boolean;
   resultInfo: ResultInfo | null;
   isLoading?: boolean;
+  isPosting?: boolean;
   loadingTime?: number;
   onImageSelect: (file: File, preview: string) => void;
   onReset: () => void;
@@ -50,11 +51,14 @@ export function ImageUpload({
   hasGenerated,
   resultInfo,
   isLoading,
+  isPosting,
   loadingTime,
   onImageSelect,
   onReset,
   disabled,
 }: ImageUploadProps) {
+  const isBusy = isLoading || isPosting;
+  const busyLabel = isPosting ? "投稿中..." : "生成中...";
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +117,14 @@ export function ImageUpload({
     }
   };
 
+  // ドラッグ操作のうち「ファイルを運んでいる」場合のみ反応する。
+  // iOS Safari ではリンク等のドラッグで spurious な dragover が飛び、
+  // 対応する dragleave が来ずに isDragging が居残ることがあるため。
+  const hasFiles = (e: React.DragEvent) =>
+    Array.from(e.dataTransfer.types || []).includes("Files");
+
   const handleDragOver = (e: React.DragEvent) => {
+    if (!hasFiles(e)) return;
     e.preventDefault();
     setIsDragging(true);
   };
@@ -162,20 +173,20 @@ export function ImageUpload({
               <img
                 src={displayUrl}
                 alt={hasGenerated ? "生成された画像" : "プレビュー"}
-                className={`w-full object-contain transition-opacity ${isLoading ? "opacity-50" : ""}`}
+                className={`w-full object-contain transition-opacity ${isBusy ? "opacity-50" : ""}`}
               />
-              {/* 生成中オーバーレイ */}
-              {isLoading && (
+              {/* 処理中オーバーレイ（プレビュー生成 / 投稿中の両方で表示） */}
+              {isBusy && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="mt-2 text-sm font-medium text-foreground">生成中...</p>
-                  {loadingTime !== undefined && loadingTime > 0 && (
+                  <p className="mt-2 text-sm font-medium text-foreground">{busyLabel}</p>
+                  {isLoading && loadingTime !== undefined && loadingTime > 0 && (
                     <p className="mt-1 text-xs text-muted-foreground">{loadingTime}秒</p>
                   )}
                 </div>
               )}
               {/* 右上の×ボタン */}
-              {!isLoading && (
+              {!isBusy && (
                 <button
                   type="button"
                   onClick={onReset}
@@ -187,7 +198,7 @@ export function ImageUpload({
                 </button>
               )}
               {/* 下部オーバーレイ: プレビュー + 生成情報（極小） */}
-              {hasGenerated && resultInfo && !isLoading && (
+              {hasGenerated && resultInfo && !isBusy && (
                 <div className="absolute inset-x-0 bottom-0 flex items-center gap-1.5 bg-black/55 px-2 py-1 leading-none text-white">
                   <Eye className="h-2.5 w-2.5 shrink-0" />
                   <span className="text-[10px] font-medium">プレビュー</span>
@@ -202,11 +213,11 @@ export function ImageUpload({
             </div>
           ) : (
             <div className="relative flex h-48 items-center justify-center rounded-lg border bg-muted">
-              {isLoading ? (
+              {isBusy ? (
                 <div className="flex flex-col items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="mt-2 text-sm font-medium text-foreground">生成中...</p>
-                  {loadingTime !== undefined && loadingTime > 0 && (
+                  <p className="mt-2 text-sm font-medium text-foreground">{busyLabel}</p>
+                  {isLoading && loadingTime !== undefined && loadingTime > 0 && (
                     <p className="mt-1 text-xs text-muted-foreground">{loadingTime}秒</p>
                   )}
                 </div>
@@ -216,7 +227,7 @@ export function ImageUpload({
                 </p>
               )}
               {/* 右上の×ボタン */}
-              {!isLoading && (
+              {!isBusy && (
                 <button
                   type="button"
                   onClick={onReset}

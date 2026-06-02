@@ -18,6 +18,7 @@ import { useStickyVisible } from "@/hooks/useStickyVisible";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { ResultDetails } from "@/components/ResultDetails";
+import { TopProgressBar } from "@/components/TopProgressBar";
 import {
   GenerateFormState,
   DEFAULT_POSITION,
@@ -601,8 +602,18 @@ export default function CreatePage() {
     );
   }
 
+  const isProcessing = isLoading || isPosting;
+  const progressLabel = isPosting
+    ? "投稿中..."
+    : isLoading
+      ? loadingTime > 0
+        ? `生成中... ${loadingTime}秒`
+        : "生成中..."
+      : undefined;
+
   return (
     <div className="min-h-screen bg-background">
+      <TopProgressBar active={isProcessing} label={progressLabel} />
       <SiteHeader user={user ? { username: user.username } : null} />
 
       {/* エラートースト（画面中央にフローティング・5秒で自動消滅） */}
@@ -643,6 +654,7 @@ export default function CreatePage() {
               hasGenerated={hasGenerated}
               resultInfo={resultInfo}
               isLoading={isLoading}
+              isPosting={isPosting}
               loadingTime={loadingTime}
               onImageSelect={handleImageSelect}
               onReset={handleReset}
