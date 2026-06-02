@@ -74,7 +74,7 @@ export default async function DashboardPage() {
   // メール設定コンテンツ
   const emailSettingsContent = (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground font-medium">準備中</p>
+      <p className="text-sm text-muted-foreground font-medium">＝＝準備中＝＝</p>
       <EmailAddressDisplay emailPrefix={user.emailPrefix} emailDomain={emailDomain} />
       <div className="text-sm text-muted-foreground">
         <p className="mb-2">このアドレスに画像を添付してメールを送信すると、画像が生成されるようになります（いまはされません）。</p>
@@ -242,8 +242,8 @@ export default async function DashboardPage() {
           <div className="mt-4 bg-muted rounded-lg p-4">
             <p className="text-sm font-medium mb-2">投稿のデフォルト設定</p>
             <p className="text-xs text-muted-foreground mb-4">
-              これらの設定はWeb投稿とBot投稿の両方に反映されます。
-              ただし、カメラ機種（EXIFから取得する撮影情報）はBot投稿に対応していないため反映されません。
+              これらの設定は全ての投稿方法（Web、Bot、メール）の全てで反映されます。ただし、Bot投稿はカメラ機種に対応していません。
+              また、プライバシー保護のため、位置情報の投稿設定は対象外です。
             </p>
             <DefaultsEditor
               initial={{
