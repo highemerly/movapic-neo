@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 
 interface LogoutButtonProps {
   className?: string;
+  variant?: "destructive" | "ghost" | "outline";
 }
 
-export function LogoutButton({ className }: LogoutButtonProps) {
+export function LogoutButton({ className, variant = "destructive" }: LogoutButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogout = async () => {
@@ -25,7 +26,7 @@ export function LogoutButton({ className }: LogoutButtonProps) {
 
   return (
     <Button
-      variant="destructive"
+      variant={variant}
       size="sm"
       onClick={handleLogout}
       disabled={isLoading}

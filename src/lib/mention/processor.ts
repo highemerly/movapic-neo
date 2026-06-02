@@ -37,7 +37,7 @@ interface UserWithInstance {
   id: string;
   username: string;
   accessToken: string;
-  mentionVisibility: string;
+  defaultVisibility: string;
   mentionKeep: boolean;
   instance: {
     domain: string;
@@ -48,6 +48,7 @@ interface UserWithInstance {
     font: string | null;
     color: string | null;
     size: string | null;
+    arrangement: string | null;
   };
 }
 
@@ -181,7 +182,7 @@ async function findUserByAcct(acct: string, botInstanceDomain: string): Promise<
     id: user.id,
     username: user.username,
     accessToken: decryptedToken,
-    mentionVisibility: user.mentionVisibility ?? "public",
+    defaultVisibility: user.defaultVisibility ?? "public",
     mentionKeep: user.mentionKeep ?? false,
     instance: {
       domain: user.instance.domain,
@@ -192,6 +193,7 @@ async function findUserByAcct(acct: string, botInstanceDomain: string): Promise<
       font: user.defaultFont,
       color: user.defaultColor,
       size: user.defaultSize,
+      arrangement: user.defaultArrangement,
     },
   };
 }
@@ -309,9 +311,9 @@ export async function processOneMention(
     return { statusId, success: false, skipped: false, error: errorMessage, errorCode };
   };
 
-  // 実際に使用するvisibilityを決定（コマンド指定 > ユーザー設定）
+  // 実際に使用するvisibilityを決定（コマンド指定 > Webデフォルト設定 > public）
   // ただし、コマンドでlocalは指定できない（public/unlistedのみ）
-  const effectiveVisibility = options.visibility || user.mentionVisibility;
+  const effectiveVisibility = options.visibility || user.defaultVisibility;
 
   // 実際に使用するkeepを決定（コマンド指定 > ユーザー設定）
   // options.keepはコマンドで[keep]指定時のみtrue、それ以外はユーザー設定を使用
@@ -319,7 +321,7 @@ export async function processOneMention(
 
   // STEP3: debug開始通知（ユーザー情報取得後に実行）
   if (options.debug) {
-    const optionsSummary = formatOptionsSummary(options, user.mentionVisibility);
+    const optionsSummary = formatOptionsSummary(options, user.defaultVisibility);
     await sendBotReply(
       statusId,
       replyToAcct,

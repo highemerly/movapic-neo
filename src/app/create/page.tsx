@@ -6,9 +6,14 @@ import { AlertCircle, X } from "lucide-react";
 import { TextInput } from "@/components/TextInput";
 import { ImageUpload } from "@/components/ImageUpload";
 import { OptionsPanel } from "@/components/OptionsPanel";
+import { VisibilityPicker } from "@/components/VisibilityPicker";
+import { SaveDefaultsSection } from "@/components/SaveDefaultsSection";
 import { OtherPostMethods } from "@/components/OtherPostMethods";
 import { ActionButtons } from "@/components/ActionButtons";
-import { PostVisibilityNotice } from "@/components/PostVisibilityNotice";
+import {
+  PostVisibilityNotice,
+  PostLocationNotice,
+} from "@/components/PostVisibilityNotice";
 import { useStickyVisible } from "@/hooks/useStickyVisible";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
@@ -82,7 +87,13 @@ interface UserSession {
     output: OutputFormat | null;
     arrangement: Arrangement | null;
     visibility: Visibility | null;
+    cameraOption: "none" | "show" | null;
   };
+}
+
+// インスタンス種別から出力形式を自動決定
+function outputFromInstanceType(instanceType: string | undefined): OutputFormat {
+  return instanceType === "misskey" ? "misskey" : "mastodon";
 }
 
 function StepHeader({
@@ -161,7 +172,10 @@ export default function CreatePage() {
           setIsAuthenticated(true);
           setUser(data);
 
-          // ユーザー設定を初期値に適用
+          // 出力形式は連携インスタンスの種別から自動決定し、UI ではなく formState に直接反映
+          const autoOutput = outputFromInstanceType(data.instance?.type);
+
+          // ユーザー設定を初期値に適用（output は preferences より instance.type を優先）
           if (data.preferences) {
             setFormState((prev) => ({
               ...prev,
@@ -169,12 +183,14 @@ export default function CreatePage() {
               font: data.preferences.font || DEFAULT_FONT,
               color: data.preferences.color || DEFAULT_COLOR,
               size: data.preferences.size || DEFAULT_SIZE,
-              output: data.preferences.output || DEFAULT_OUTPUT,
+              output: autoOutput,
               arrangement: data.preferences.arrangement || DEFAULT_ARRANGEMENT,
             }));
             if (data.preferences.visibility) {
               setVisibility(data.preferences.visibility);
             }
+          } else {
+            setFormState((prev) => ({ ...prev, output: autoOutput }));
           }
         } else {
           setIsAuthenticated(false);
@@ -229,7 +245,9 @@ export default function CreatePage() {
     setHasGenerated(false);
     setResultUrl(null);
     setError(null);
-    // 撮影情報の選択肢と位置情報の解析キャッシュは画像ごとに毎回リセット（初期は「表示しない」）
+    // 撮影情報の選択肢と位置情報の解析キャッシュは画像ごとに毎回リセット
+    // 撮影場所は毎回ユーザーに選択してもらう（保存対象外）。
+    // カメラ機種は EXIF が取れた後にユーザー初期値があれば "show" に復元する。
     setCameraOption("none");
     setLocationOption("none");
     setGeocoded(null);
@@ -237,10 +255,15 @@ export default function CreatePage() {
     setExif(null);
     const extracted = await extractExif(file);
     setExif(extracted);
-  }, []);
+    if (user?.preferences?.cameraOption === "show" && extracted?.cameraModel) {
+      setCameraOption("show");
+    }
+  }, [user]);
 
   const handleReset = useCallback(() => {
-    setFormState(initialState);
+    // 出力形式はインスタンス種別の自動値を保持
+    const autoOutput = outputFromInstanceType(user?.instance?.type);
+    setFormState({ ...initialState, output: autoOutput });
     setHasGenerated(false);
     setLastGeneratedState(null);
     setResultInfo(null);
@@ -256,7 +279,7 @@ export default function CreatePage() {
       setResultUrl(null);
     }
     setError(null);
-  }, [resultUrl]);
+  }, [resultUrl, user?.instance?.type]);
 
   // 生成APIを呼び出してblob・MIMEタイプ・元画像情報を返す（UI状態は更新しない）
   const callGenerate = async (): Promise<GenerateResult | null> => {
@@ -465,7 +488,8 @@ export default function CreatePage() {
     }
   };
 
-  // 設定を初期値として保存
+  // 設定を初期値として保存（文字入れオプション・同時投稿先・カメラ機種名表示）
+  // 撮影場所はプライバシー保護のため保存しない
   const handleSaveDefaults = async () => {
     setIsSavingDefaults(true);
     setSaveSuccess(false);
@@ -479,9 +503,9 @@ export default function CreatePage() {
           font: formState.font,
           color: formState.color,
           size: formState.size,
-          output: formState.output,
           arrangement: formState.arrangement,
           visibility,
+          cameraOption,
         }),
       });
 
@@ -559,6 +583,15 @@ export default function CreatePage() {
     includesLocation: locationOption !== "none",
   };
 
+  // 撮影場所の表示ラベル（注意文用）
+  const locationDisplayLabel = useMemo(() => {
+    if (locationOption === "none") return null;
+    if (!geocoded) return null;
+    return locationOption === "city"
+      ? `${geocoded.prefecture}${geocoded.city}`
+      : geocoded.prefecture;
+  }, [locationOption, geocoded]);
+
   // 認証チェック中
   if (isAuthenticated === null) {
     return (
@@ -617,13 +650,18 @@ export default function CreatePage() {
             />
           </div>
 
-          {/* 注意事項（①の時点から常に表示・公開範囲に応じて動的に変化） */}
-          <PostVisibilityNotice
-            visibility={visibility}
-            instanceDomain={user?.instance.domain}
-          />
+          {/* 注意事項（画像直下に常に表示・公開範囲と撮影場所に応じて動的に変化） */}
+          <div className="space-y-2">
+            <PostVisibilityNotice
+              visibility={visibility}
+              instanceDomain={user?.instance.domain}
+            />
+            {locationDisplayLabel && (
+              <PostLocationNotice locationLabel={locationDisplayLabel} />
+            )}
+          </div>
 
-          {/* ②コメント入力 → ③オプション → 投稿ボタン（画像選択後に表示） */}
+          {/* ②コメント入力 → ③オプション → ④追加情報 → ⑤同時投稿先 → ⑥投稿（画像選択後に表示） */}
           {formState.imageFile && (
             <>
               <div className="space-y-2">
@@ -639,18 +677,15 @@ export default function CreatePage() {
                 />
               </div>
 
-              {/* ③ オプションを変更 */}
+              {/* ③ コメント合成オプションを変更 */}
               <div className="space-y-4">
-                <StepHeader num={3} label="オプションを変更" />
+                <StepHeader num={3} label="コメント合成オプションを変更" />
                 <OptionsPanel
                   position={formState.position}
                   font={formState.font}
                   color={formState.color}
                   size={formState.size}
-                  output={formState.output}
                   arrangement={formState.arrangement}
-                  visibility={visibility}
-                  instanceDomain={user?.instance.domain}
                   onPositionChange={(position) =>
                     setFormState((prev) => ({ ...prev, position }))
                   }
@@ -663,26 +698,19 @@ export default function CreatePage() {
                   onSizeChange={(size) =>
                     setFormState((prev) => ({ ...prev, size }))
                   }
-                  onOutputChange={(output) =>
-                    setFormState((prev) => ({ ...prev, output }))
-                  }
                   onArrangementChange={(arrangement) =>
                     setFormState((prev) => ({ ...prev, arrangement }))
                   }
-                  onVisibilityChange={setVisibility}
                   disabled={isLoading || isPosting}
-                  onSaveDefaults={handleSaveDefaults}
-                  isSavingDefaults={isSavingDefaults}
-                  saveSuccess={saveSuccess}
                 />
               </div>
 
-              {/* ④ 投稿したい写真の追加情報（EXIF撮影情報）
+              {/* ④ 投稿する情報を追加（EXIF撮影情報）
                   カメラ機種名と撮影場所を独立したセグメントで毎回選ぶ。デザインは
                   OptionsPanel の SegmentControl と揃える。位置情報のセグメントは
                   pref/city を選んだ初回タップ時のみ /geocode を呼んで結果をキャッシュ。 */}
               <div className="space-y-4">
-                <StepHeader num={4} label="投稿したい写真の追加情報を選択" />
+                <StepHeader num={4} label="投稿する情報を追加" />
                 {(() => {
                   const cameraText = exif?.cameraModel
                     ? exif.cameraMake && !exif.cameraModel.startsWith(exif.cameraMake)
@@ -750,7 +778,7 @@ export default function CreatePage() {
                         </div>
                         {!hasGps && (
                           <p className="text-[11px] text-muted-foreground">
-                            この画像には位置情報がありません。iPhone から直接アップロードした写真はiOSの仕様で位置情報が含まれません。
+                            この画像には位置情報がありません。iPhone から直接アップロードした写真はiOSの仕様で位置情報が含まれないことがあります。
                           </p>
                         )}
                         {hasGps && locationOption !== "none" && !geocoded && (
@@ -763,16 +791,37 @@ export default function CreatePage() {
                       </div>
 
                       <p className="text-[11px] text-muted-foreground">
-                        いかなる場合もサーバーには詳細な位置情報（GPS座標）は保存されず、都道府県名または市区町村名のみが保存されます。また、保存された情報は全ユーザーが閲覧できます。
+                        いかなる場合もサーバーには詳細な位置情報（座標）は保存されず、都道府県名または市区町村名のみが保存されます。
                       </p>
                     </div>
                   );
                 })()}
               </div>
 
-              {/* ⑤ 写真を生成＆投稿 */}
+              {/* ⑤ 同時投稿先（連携サーバーへの公開範囲） */}
               <div className="space-y-2">
-                <StepHeader num={5} label="写真を生成＆投稿" />
+                <StepHeader
+                  num={5}
+                  label={`${user?.instance.domain || "連携サーバー"} への同時投稿`}
+                />
+                <VisibilityPicker
+                  value={visibility}
+                  onChange={setVisibility}
+                  disabled={isLoading || isPosting}
+                />
+              </div>
+
+              {/* ⑥ 設定保存・投稿 */}
+              <div className="space-y-3">
+                <StepHeader num={6} label="設定保存・投稿" />
+                {/* 現在の設定を初期値として保存（プレビュー/投稿ボタンの上に配置） */}
+                <SaveDefaultsSection
+                  onSave={handleSaveDefaults}
+                  isSaving={isSavingDefaults}
+                  saveSuccess={saveSuccess}
+                  disabled={isLoading || isPosting}
+                  instanceDomain={user?.instance.domain}
+                />
                 <div ref={anchorRef}>
                   <ActionButtons {...actionButtonsProps} />
                 </div>
@@ -780,13 +829,13 @@ export default function CreatePage() {
             </>
           )}
 
-          {/* 他の投稿方法 */}
-          <OtherPostMethods />
-
           {/* 生成結果の詳細情報 */}
           {hasGenerated && resultInfo && !isLoading && (
             <ResultDetails resultInfo={resultInfo} />
           )}
+
+          {/* 他の投稿方法 */}
+          <OtherPostMethods />
         </div>
 
         {/* フッター */}

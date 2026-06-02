@@ -44,7 +44,8 @@ model User {
   defaultOutput      String?   @map("default_output") @db.VarChar(20)
   defaultArrangement String?   @map("default_arrangement") @db.VarChar(20)
   defaultVisibility  String?   @map("default_visibility") @db.VarChar(20)
-  mentionVisibility  String    @default("public") @map("mention_visibility") @db.VarChar(20)
+  // 投稿時の追加情報のデフォルト: カメラ機種名の表示 ("none" | "show")
+  defaultCameraOption String?  @map("default_camera_option") @db.VarChar(20)
   mentionKeep        Boolean   @default(false) @map("mention_keep")
   // 地図機能（ベータ）の公開オプトイン。デフォルトoff、自分の画像投稿の都道府県集計を地図で公開する
   showLocationMap    Boolean   @default(false) @map("show_location_map")
@@ -53,12 +54,30 @@ model User {
   updatedAt    DateTime  @updatedAt @map("updated_at")
   lastLoginAt  DateTime? @map("last_login_at")
 
-  instance Instance @relation(fields: [instanceId], references: [id])
-  images   Image[]
+  instance      Instance       @relation(fields: [instanceId], references: [id])
+  images        Image[]
+  loginSessions LoginSession[]
 
   @@unique([instanceId, remoteId])
   @@unique([instanceId, username])
   @@map("users")
+}
+
+// ログイン履歴（セッション単位の記録、本人の自己検出用）
+// プライバシーポリシーに従い、作成から90日経過した行はログイン時に自動削除
+model LoginSession {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  jti       String   @unique
+  ipAddress String   @map("ip_address") @db.VarChar(45)
+  userAgent String?  @map("user_agent") @db.VarChar(500)
+  country   String?  @db.VarChar(2)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("login_sessions")
 }
 
 // 画像

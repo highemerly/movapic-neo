@@ -9,6 +9,7 @@ import { checkMisskeySession } from "@/lib/auth/fediverse";
 import { verifyMiAuthSignature, sanitizeRedirectUrl } from "@/lib/auth/crypto";
 import { encryptToken } from "@/lib/auth/tokens";
 import { createSession } from "@/lib/auth/session";
+import { extractLoginRequestInfo } from "@/lib/auth/requestInfo";
 import prisma from "@/lib/db";
 
 export async function GET(request: NextRequest) {
@@ -99,8 +100,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // JWTセッション作成
-    await createSession(user.id, instance.id);
+    // JWTセッション作成（ログイン履歴に記録）
+    await createSession(user.id, instance.id, extractLoginRequestInfo(request));
 
     // リダイレクト
     return NextResponse.redirect(new URL(redirectTo, baseUrl));

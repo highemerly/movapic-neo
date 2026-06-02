@@ -4,8 +4,11 @@
 
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
+import { randomUUID } from "crypto";
 import prisma from "@/lib/db";
 import type { Prisma } from "@prisma/client";
+
+const LOGIN_SESSION_RETENTION_DAYS = 90;
 
 // Prismaから生成されたInstance型を取得
 type Instance = Prisma.InstanceGetPayload<object>;
@@ -23,10 +26,19 @@ function getJWTSecret(): Uint8Array {
 }
 
 // JWTペイロードの型定義（認証に必要な最小限の情報のみ）
+// jti は LoginSession.jti と照合して「現在のセッション」を識別するために使う
 interface SessionPayload extends JWTPayload {
   userId: string;
   instanceId: string;
+  jti: string;
 }
+
+// ログイン時に呼び出し元から受け取るリクエスト情報
+export type LoginRequestInfo = {
+  ipAddress: string;
+  userAgent: string | null;
+  country: string | null;
+};
 
 // getCurrentUserの戻り値の型
 export type SessionUser = {
@@ -46,14 +58,19 @@ export type SessionUserWithToken = SessionUser & {
 
 /**
  * JWTを作成してCookieに設定
+ * 同時に LoginSession を1件INSERTし、同ユーザーの90日超の履歴を削除する
  */
 export async function createSession(
   userId: string,
-  instanceId: string
+  instanceId: string,
+  requestInfo: LoginRequestInfo
 ): Promise<void> {
+  const jti = randomUUID();
+
   const payload: SessionPayload = {
     userId,
     instanceId,
+    jti,
   };
 
   const token = await new SignJWT(payload)
@@ -69,6 +86,28 @@ export async function createSession(
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_DURATION_SECONDS,
+  });
+
+  // ログイン履歴を記録
+  await prisma.loginSession.create({
+    data: {
+      userId,
+      jti,
+      ipAddress: requestInfo.ipAddress,
+      userAgent: requestInfo.userAgent,
+      country: requestInfo.country,
+    },
+  });
+
+  // 保持期間を超えた履歴を削除（同ユーザー分のみなので軽量）
+  const cutoff = new Date(
+    Date.now() - LOGIN_SESSION_RETENTION_DAYS * 24 * 60 * 60 * 1000
+  );
+  await prisma.loginSession.deleteMany({
+    where: {
+      userId,
+      createdAt: { lt: cutoff },
+    },
   });
 }
 
@@ -175,4 +214,13 @@ export async function getCurrentUserWithValidation(): Promise<SessionUserWithTok
 export async function getCurrentUserId(): Promise<string | null> {
   const payload = await getSessionPayload();
   return payload?.userId ?? null;
+}
+
+/**
+ * 現在のセッションのjtiを取得（DB問い合わせなし）
+ * /dashboard/sessions で「これは現在のセッション」を示すために使う
+ */
+export async function getCurrentSessionJti(): Promise<string | null> {
+  const payload = await getSessionPayload();
+  return payload?.jti ?? null;
 }

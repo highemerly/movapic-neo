@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Check, Loader2 } from "lucide-react";
 
 interface LocationMapToggleProps {
   initialEnabled: boolean;
   username: string;
 }
+
+type SaveState = "idle" | "saving" | "saved" | "error";
 
 /**
  * 地図機能（ベータ）の公開オプトイントグル。
@@ -16,13 +19,16 @@ interface LocationMapToggleProps {
 export function LocationMapToggle({ initialEnabled, username }: LocationMapToggleProps) {
   const router = useRouter();
   const [enabled, setEnabled] = useState(initialEnabled);
-  const [isSaving, setIsSaving] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const savedClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isSaving = saveState === "saving";
 
   const handleToggle = async () => {
     const next = !enabled;
     setEnabled(next);
-    setIsSaving(true);
+    setSaveState("saving");
     setError(null);
     try {
       const res = await fetch("/api/v1/me", {
@@ -35,11 +41,13 @@ export function LocationMapToggle({ initialEnabled, username }: LocationMapToggl
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.error || "保存に失敗しました");
       }
+      setSaveState("saved");
       router.refresh();
+      if (savedClearRef.current) clearTimeout(savedClearRef.current);
+      savedClearRef.current = setTimeout(() => setSaveState("idle"), 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存に失敗しました");
-    } finally {
-      setIsSaving(false);
+      setSaveState("error");
     }
   };
 
@@ -84,7 +92,23 @@ export function LocationMapToggle({ initialEnabled, username }: LocationMapToggl
           className="sr-only"
         />
       </label>
-      {error && <p className="px-3 text-xs text-destructive">{error}</p>}
+      <div className="flex items-center gap-2 px-3 text-xs min-h-4">
+        {saveState === "saving" && (
+          <>
+            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+            <span className="text-muted-foreground">保存中...</span>
+          </>
+        )}
+        {saveState === "saved" && (
+          <>
+            <Check className="h-3 w-3 text-green-600" />
+            <span className="text-green-600">保存しました</span>
+          </>
+        )}
+        {saveState === "error" && error && (
+          <span className="text-destructive">{error}</span>
+        )}
+      </div>
     </div>
   );
 }

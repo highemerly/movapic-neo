@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAvatarUrl } from "@/lib/avatar";
-import { Globe, User, Heart } from "lucide-react";
+import { Globe, User, Heart, ChevronRight } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/auth/LogoutButton";
@@ -11,22 +11,16 @@ import { PostMethodTabs } from "./PostMethodTabs";
 import { MentionSettingsForm } from "./MentionSettingsForm";
 import { EmailAddressDisplay } from "./EmailAddressDisplay";
 import { BioEditForm } from "./BioEditForm";
-import { PreferencesResetButton } from "./PreferencesResetButton";
+import { DefaultsEditor } from "./DefaultsEditor";
 import { LocationMapToggle } from "./LocationMapToggle";
 import prisma from "@/lib/db";
 import {
-  POSITION_LABELS,
-  FONT_LABELS,
-  COLOR_LABELS,
-  SIZE_LABELS,
-  OUTPUT_LABELS,
-  ARRANGEMENT_LABELS,
   Position,
   FontFamily,
   Color,
   Size,
-  OutputFormat,
   Arrangement,
+  Visibility,
 } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -45,14 +39,14 @@ export default async function DashboardPage() {
       select: {
         createdAt: true,
         bio: true,
-        mentionVisibility: true,
         mentionKeep: true,
         defaultPosition: true,
         defaultFont: true,
         defaultColor: true,
         defaultSize: true,
-        defaultOutput: true,
         defaultArrangement: true,
+        defaultVisibility: true,
+        defaultCameraOption: true,
         showLocationMap: true,
       },
     }),
@@ -66,21 +60,11 @@ export default async function DashboardPage() {
   const botDomain = process.env.MASTODON_BOT_INSTANCE_DOMAIN || "handon.club";
   const botAcct = `${botUsername}@${botDomain}`;
 
-  const hasPreferences = userWithPreferences && (
-    userWithPreferences.defaultPosition ||
-    userWithPreferences.defaultFont ||
-    userWithPreferences.defaultColor ||
-    userWithPreferences.defaultSize ||
-    userWithPreferences.defaultOutput ||
-    userWithPreferences.defaultArrangement
-  );
-
   const emailDomain = "pic-dev.handon.club";
 
   // メンション設定コンテンツ
   const mentionSettingsContent = (
     <MentionSettingsForm
-      initialVisibility={userWithPreferences?.mentionVisibility as "public" | "unlisted" | "local" ?? "public"}
       initialKeep={userWithPreferences?.mentionKeep ?? false}
       botAcct={botAcct}
       userInstanceDomain={user.instance.domain}
@@ -176,10 +160,14 @@ export default async function DashboardPage() {
         {/* セクション3: アカウント */}
         <section className="mb-8">
           <h2 className="text-lg font-semibold mb-2">アカウント</h2>
-          <div className="bg-muted rounded-lg p-4">
-            <div className="flex items-center gap-4">
+          <div className="relative bg-muted rounded-lg p-4">
+            <LogoutButton
+              variant="ghost"
+              className="absolute top-2 right-2 text-destructive hover:text-destructive"
+            />
+            <div className="flex items-center gap-4 pr-20">
               {user.avatarUrl && (
-                <Link href={`/u/${user.username}`}>
+                <Link href={`/u/${user.username}`} className="flex-shrink-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={getAvatarUrl(user.avatarUrl) ?? user.avatarUrl}
@@ -196,7 +184,7 @@ export default async function DashboardPage() {
                   href={`https://${user.instance.domain}/@${user.username}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:underline"
+                  className="block text-xs text-muted-foreground hover:underline truncate"
                 >
                   @{user.username}@{user.instance.domain}
                 </a>
@@ -221,90 +209,52 @@ export default async function DashboardPage() {
                 </div>
               )}
             </div>
-            <div className="mt-4">
-              <LogoutButton />
-            </div>
-            <div className="mt-4 pt-4 border-t border-border">
-              <BioEditForm initialBio={userWithPreferences?.bio ?? null} />
-            </div>
           </div>
         </section>
 
         {/* セクション4: 設定 */}
         <section className="mb-8">
           <h2 className="text-lg font-semibold mb-4">設定</h2>
+
+          {/* アカウント設定 */}
           <div className="bg-muted rounded-lg p-4">
-            <p className="text-sm font-medium mb-3">投稿のデフォルト設定</p>
-            {hasPreferences ? (
-              <div className="space-y-4">
-                <dl className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <dt className="text-muted-foreground text-xs">位置</dt>
-                    <dd className="font-medium">
-                      {userWithPreferences.defaultPosition
-                        ? POSITION_LABELS[userWithPreferences.defaultPosition as Position]
-                        : "システム標準"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground text-xs">フォント</dt>
-                    <dd className="font-medium">
-                      {userWithPreferences.defaultFont
-                        ? FONT_LABELS[userWithPreferences.defaultFont as FontFamily]
-                        : "システム標準"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground text-xs">色</dt>
-                    <dd className="font-medium">
-                      {userWithPreferences.defaultColor
-                        ? COLOR_LABELS[userWithPreferences.defaultColor as Color]
-                        : "システム標準"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground text-xs">サイズ</dt>
-                    <dd className="font-medium">
-                      {userWithPreferences.defaultSize
-                        ? SIZE_LABELS[userWithPreferences.defaultSize as Size]
-                        : "システム標準"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground text-xs">出力形式</dt>
-                    <dd className="font-medium">
-                      {userWithPreferences.defaultOutput
-                        ? OUTPUT_LABELS[userWithPreferences.defaultOutput as OutputFormat]
-                        : "システム標準"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-muted-foreground text-xs">アレンジ</dt>
-                    <dd className="font-medium">
-                      {userWithPreferences.defaultArrangement
-                        ? ARRANGEMENT_LABELS[userWithPreferences.defaultArrangement as Arrangement]
-                        : "システム標準"}
-                    </dd>
-                  </div>
-                </dl>
-                <p className="text-xs text-muted-foreground">
-                  変更は<Link href="/create" className="text-primary hover:underline">Web投稿画面</Link>から
-                </p>
-                <PreferencesResetButton />
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                未設定です。<Link href="/create" className="text-primary hover:underline">Web投稿画面</Link>で「初期値として保存」を押すと設定できます。
-              </p>
-            )}
+            <p className="text-sm font-medium mb-3">アカウント設定</p>
+            <BioEditForm initialBio={userWithPreferences?.bio ?? null} />
           </div>
 
-          {/* 地図機能（ベータ）の公開設定 */}
+          {/* プライバシー＆セキュリティ */}
           <div className="mt-4 bg-muted rounded-lg p-4">
-            <p className="text-sm font-medium mb-2">地図機能の公開</p>
+            <p className="text-sm font-medium mb-2">プライバシー＆セキュリティ</p>
             <LocationMapToggle
               initialEnabled={userWithPreferences?.showLocationMap ?? false}
               username={user.username}
+            />
+            <Link
+              href="/dashboard/sessions"
+              className="mt-3 flex items-center justify-between rounded-md bg-background px-3 py-2 text-sm hover:bg-background/70 transition-colors"
+            >
+              <span>ログイン履歴を確認する</span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </Link>
+          </div>
+
+          {/* 投稿のデフォルト設定 */}
+          <div className="mt-4 bg-muted rounded-lg p-4">
+            <p className="text-sm font-medium mb-2">投稿のデフォルト設定</p>
+            <p className="text-xs text-muted-foreground mb-4">
+              これらの設定はWeb投稿とBot投稿の両方に反映されます。
+              ただし、カメラ機種（EXIFから取得する撮影情報）はBot投稿に対応していないため反映されません。
+            </p>
+            <DefaultsEditor
+              initial={{
+                position: userWithPreferences?.defaultPosition as Position | null ?? null,
+                font: userWithPreferences?.defaultFont as FontFamily | null ?? null,
+                color: userWithPreferences?.defaultColor as Color | null ?? null,
+                size: userWithPreferences?.defaultSize as Size | null ?? null,
+                arrangement: userWithPreferences?.defaultArrangement as Arrangement | null ?? null,
+                visibility: userWithPreferences?.defaultVisibility as Visibility | null ?? null,
+                cameraOption: (userWithPreferences?.defaultCameraOption as "none" | "show" | null | undefined) ?? null,
+              }}
             />
           </div>
         </section>

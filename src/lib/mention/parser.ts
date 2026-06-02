@@ -43,6 +43,7 @@ export interface UserDefaults {
   font?: string | null;
   color?: string | null;
   size?: string | null;
+  arrangement?: string | null;
 }
 
 // オプションのマッピング（email parserと同じ）
@@ -107,7 +108,7 @@ function buildDefaultOptions(userDefaults?: UserDefaults): ParsedMentionOptions 
     font: (userDefaults?.font as FontFamily) || FALLBACK_OPTIONS.font,
     color: (userDefaults?.color as Color) || FALLBACK_OPTIONS.color,
     size: (userDefaults?.size as Size) || FALLBACK_OPTIONS.size,
-    arrangement: FALLBACK_OPTIONS.arrangement,
+    arrangement: (userDefaults?.arrangement as Arrangement) || FALLBACK_OPTIONS.arrangement,
     debug: FALLBACK_OPTIONS.debug,
     keep: FALLBACK_OPTIONS.keep,
   };

@@ -17,6 +17,7 @@ import {
 } from "@/lib/auth/crypto";
 import { encryptToken } from "@/lib/auth/tokens";
 import { createSession } from "@/lib/auth/session";
+import { extractLoginRequestInfo } from "@/lib/auth/requestInfo";
 import prisma from "@/lib/db";
 
 const OAUTH_SESSION_COOKIE = "oauth_session";
@@ -144,8 +145,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // JWTセッション作成
-    await createSession(user.id, instance.id);
+    // JWTセッション作成（ログイン履歴に記録）
+    await createSession(user.id, instance.id, extractLoginRequestInfo(request));
 
     // コールバックURLにリダイレクト（安全なパスのみ許可）
     const redirectTo = sanitizeRedirectUrl(stateData.callbackUrl);

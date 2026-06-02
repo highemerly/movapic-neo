@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
+import { version } from "../../../package.json";
 
 export const metadata: Metadata = {
   title: "技術仕様",
@@ -17,7 +18,10 @@ export default async function SpecPage() {
       <div className="container mx-auto px-4 py-8 max-w-2xl">
 
         <section className="mb-8">
-          <h2 className="text-lg font-semibold mb-4">技術仕様</h2>
+          <div className="flex items-baseline gap-2 mb-4">
+            <h2 className="text-lg font-semibold">技術仕様</h2>
+            <span className="text-xs text-muted-foreground">v{version}</span>
+          </div>
           <div className="space-y-4">
 
             <div className="bg-muted rounded-lg p-4">

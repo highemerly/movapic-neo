@@ -25,7 +25,7 @@ export default async function PrivacyPage() {
             </p>
 
             <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-3">収集する個人情報</p>
+              <p className="font-medium mb-3">収集する個人情報とその収集方法</p>
               <div className="space-y-3">
                 <div>
                   <p className="text-ms text-muted-foreground font-medium mb-1">Fediverse（Mastodon/Misskey）ログイン時にサーバーから取得する情報</p>
@@ -38,6 +38,15 @@ export default async function PrivacyPage() {
                   </ul>
                 </div>
                 <div>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">ログイン時にセッション履歴として保存する情報</p>
+                  <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                    <li>IPアドレス</li>
+                    <li>User-Agent（ブラウザ・OSの識別情報）</li>
+                    <li>IPアドレスから推定される接続元の国コード</li>
+                  </ul>
+                  <p className="text-xs text-muted-foreground mt-1">※ ユーザー自身が不審なログインを確認できるようダッシュボードに表示するために保存します。最終ログインから90日経過した履歴は自動的に削除されます。</p>
+                </div>
+                <div>
                   <p className="text-ms text-muted-foreground font-medium mb-1">HTTPアクセスにより機械的に収集される情報</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                     <li>IPアドレス</li>
@@ -46,7 +55,7 @@ export default async function PrivacyPage() {
                     <li>リクエスト日時</li>
                     <li>リクエスト先URL</li>
                     <li>TLSバージョン・暗号スイート</li>
-                    <li>ブラウザに関する情報（user-agent, referer, accept-languageヘッダ）</li>
+                    <li>ブラウザに関する情報（User-Agent, Referer, Accept-Languageヘッダ）</li>
                   </ul>
                 </div>
                 <div>
@@ -189,7 +198,7 @@ export default async function PrivacyPage() {
               <p className="text-sm text-muted-foreground">
                 プライバシーに関するお問い合わせは、
                 <a
-                  href="https://handon.club/@highemerly"
+                  href="https://highemerly.net/contact.html"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-primary hover:underline"

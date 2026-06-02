@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    const { position, font, color, size, output, arrangement, visibility } = body;
+    const { position, font, color, size, output, arrangement, visibility, cameraOption } = body;
 
     // バリデーション（値が指定されている場合のみチェック）
     if (position && !isValidPosition(position)) {
@@ -51,6 +51,9 @@ export async function POST(request: NextRequest) {
     if (visibility && !["public", "unlisted", "local"].includes(visibility)) {
       return errorResponse(ErrorCodes.VALIDATION_INVALID, "無効な公開範囲です", 400);
     }
+    if (cameraOption && !["none", "show"].includes(cameraOption)) {
+      return errorResponse(ErrorCodes.VALIDATION_INVALID, "無効なカメラ機種設定です", 400);
+    }
 
     // 更新
     await prisma.user.update({
@@ -63,6 +66,7 @@ export async function POST(request: NextRequest) {
         defaultOutput: output || null,
         defaultArrangement: arrangement || null,
         defaultVisibility: visibility || null,
+        defaultCameraOption: cameraOption || null,
       },
     });
 
@@ -76,6 +80,7 @@ export async function POST(request: NextRequest) {
         output: output || null,
         arrangement: arrangement || null,
         visibility: visibility || null,
+        cameraOption: cameraOption || null,
       },
     });
   } catch (error) {
@@ -106,6 +111,7 @@ export async function DELETE() {
         defaultOutput: null,
         defaultArrangement: null,
         defaultVisibility: null,
+        defaultCameraOption: null,
       },
     });
 

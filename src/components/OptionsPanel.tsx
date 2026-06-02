@@ -1,22 +1,18 @@
 "use client";
 
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import {
   Position,
   FontFamily,
   Color,
   Size,
-  OutputFormat,
   Arrangement,
-  Visibility,
   POSITION_LABELS,
   FONT_LABELS,
   COLORS,
   STROKE_COLORS,
   COLOR_LABELS,
   ARRANGEMENT_LABELS,
-  VISIBILITY_LABELS,
 } from "@/types";
 
 interface OptionsPanelProps {
@@ -24,24 +20,15 @@ interface OptionsPanelProps {
   font: FontFamily;
   color: Color;
   size: Size;
-  output: OutputFormat;
   arrangement: Arrangement;
-  visibility: Visibility;
-  instanceDomain?: string;
   onPositionChange: (value: Position) => void;
   onFontChange: (value: FontFamily) => void;
   onColorChange: (value: Color) => void;
   onSizeChange: (value: Size) => void;
-  onOutputChange: (value: OutputFormat) => void;
   onArrangementChange: (value: Arrangement) => void;
-  onVisibilityChange: (value: Visibility) => void;
   disabled?: boolean;
-  onSaveDefaults?: () => void;
-  isSavingDefaults?: boolean;
-  saveSuccess?: boolean;
 }
 
-// セグメントコントロール用コンポーネント
 function SegmentControl<T extends string>({
   value,
   options,
@@ -76,7 +63,6 @@ function SegmentControl<T extends string>({
   );
 }
 
-// 2行セグメントコントロール（色用）
 function TwoRowSegmentControl<T extends string>({
   value,
   options,
@@ -138,29 +124,19 @@ export function OptionsPanel({
   font,
   color,
   size,
-  output,
   arrangement,
-  visibility,
-  instanceDomain,
   onPositionChange,
   onFontChange,
   onColorChange,
   onSizeChange,
-  onOutputChange,
   onArrangementChange,
-  onVisibilityChange,
   disabled,
-  onSaveDefaults,
-  isSavingDefaults,
-  saveSuccess,
 }: OptionsPanelProps) {
   const positions: Position[] = ["top", "bottom", "left", "right"];
   const colors: Color[] = ["white", "red", "blue", "green", "yellow", "brown", "pink", "orange"];
   const sizes: Size[] = ["small", "medium", "large", "extra-large"];
   const fonts: FontFamily[] = ["hui-font", "noto-sans-jp", "light-novel-pop"];
-  const outputs: OutputFormat[] = ["mastodon", "misskey", "none"];
   const arrangements: Arrangement[] = ["none", "neon", "stamp"];
-  const visibilities: Visibility[] = ["public", "unlisted", "local"];
 
   return (
     <div className="space-y-5">
@@ -277,61 +253,6 @@ export function OptionsPanel({
           }
         />
       </div>
-
-      {/* 出力形式 */}
-      <div className="space-y-2">
-        <Label>形式</Label>
-        <SegmentControl
-          value={output}
-          options={outputs}
-          onChange={onOutputChange}
-          disabled={disabled}
-          renderOption={(o) => (
-            <span className="flex flex-col items-center text-sm">
-              <span>{o === "none" ? "なし" : o === "mastodon" ? "Mastodon" : "Misskey"}</span>
-              <span className="text-xs text-muted-foreground">
-                {o === "none" ? "(JPEG)" : "(AVIF)"}
-              </span>
-            </span>
-          )}
-        />
-      </div>
-
-      {/* 連携先への同時投稿 */}
-      <div className="space-y-2">
-        <Label>{instanceDomain || "連携サーバー"} への同時投稿</Label>
-        <SegmentControl
-          value={visibility}
-          options={visibilities}
-          onChange={onVisibilityChange}
-          disabled={disabled}
-          renderOption={(v) => (
-            <span className="text-sm">{VISIBILITY_LABELS[v]}</span>
-          )}
-        />
-      </div>
-
-      {/* 初期値保存 */}
-      {onSaveDefaults && (
-        <Button
-          type="button"
-          onClick={onSaveDefaults}
-          disabled={disabled || isSavingDefaults}
-          variant="outline"
-          size="lg"
-          className={`w-full ${
-            saveSuccess
-              ? "border-green-500/50 text-green-600 dark:text-green-400"
-              : ""
-          }`}
-        >
-          {isSavingDefaults
-            ? "保存中..."
-            : saveSuccess
-              ? "保存しました"
-              : "このオプションを初期値として保存"}
-        </Button>
-      )}
     </div>
   );
 }

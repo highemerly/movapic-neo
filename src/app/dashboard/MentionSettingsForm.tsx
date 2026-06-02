@@ -1,34 +1,29 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-
-const VISIBILITY_OPTIONS = ["public", "unlisted", "local"] as const;
-
-type Visibility = typeof VISIBILITY_OPTIONS[number];
+import { Check, Loader2 } from "lucide-react";
 
 interface MentionSettingsFormProps {
-  initialVisibility: Visibility;
   initialKeep: boolean;
   botAcct: string;
   userInstanceDomain: string;
 }
 
+type SaveState = "idle" | "saving" | "saved" | "error";
+
 export function MentionSettingsForm({
-  initialVisibility,
   initialKeep,
   botAcct,
   userInstanceDomain,
 }: MentionSettingsFormProps) {
   const router = useRouter();
-  const [visibility, setVisibility] = useState<Visibility>(initialVisibility);
   const [keep, setKeep] = useState(initialKeep);
-  const [isSaving, setIsSaving] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const savedClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const hasChanges = visibility !== initialVisibility || keep !== initialKeep;
+  const isSaving = saveState === "saving";
 
   // botAcctからユーザーページURLを生成
   // botAcct: "pic@handon.club" -> "https://handon.club/@pic"
@@ -37,32 +32,29 @@ export function MentionSettingsForm({
     return `https://${domain}/@${username}`;
   })();
 
-  const handleSave = async () => {
-    setIsSaving(true);
+  const handleToggle = async () => {
+    const next = !keep;
+    setKeep(next);
+    setSaveState("saving");
     setError(null);
-    setSuccess(false);
-
     try {
       const response = await fetch("/api/v1/me", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ mentionVisibility: visibility, mentionKeep: keep }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mentionKeep: next }),
       });
-
       if (!response.ok) {
-        const data = await response.json();
+        setKeep(!next); // ロールバック
+        const data = await response.json().catch(() => ({}));
         throw new Error(data.error || "保存に失敗しました");
       }
-
-      setSuccess(true);
+      setSaveState("saved");
       router.refresh();
-      setTimeout(() => setSuccess(false), 2000);
+      if (savedClearRef.current) clearTimeout(savedClearRef.current);
+      savedClearRef.current = setTimeout(() => setSaveState("idle"), 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存に失敗しました");
-    } finally {
-      setIsSaving(false);
+      setSaveState("error");
     }
   };
 
@@ -144,94 +136,54 @@ export function MentionSettingsForm({
         </div>
       </div>
 
-      <details className="border-t pt-4">
-        <summary className="text-sm font-medium cursor-pointer hover:text-primary transition-colors">
-          Bot投稿のデフォルト設定
-        </summary>
-
-        <div className="mt-4 space-y-4">
-          {/* 投稿先の選択 */}
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">{userInstanceDomain}への同時投稿</p>
-            <div className="space-y-2">
-              {VISIBILITY_OPTIONS.map((v) => (
-                <label
-                  key={v}
-                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                    visibility === v
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:bg-muted/50"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="visibility"
-                    value={v}
-                    checked={visibility === v}
-                    onChange={(e) => setVisibility(e.target.value as Visibility)}
-                    className="sr-only"
-                  />
-                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                    visibility === v ? "border-primary" : "border-muted-foreground"
-                  }`}>
-                    {visibility === v && (
-                      <div className="w-2 h-2 rounded-full bg-primary" />
-                    )}
-                  </div>
-                  <p className="text-sm">
-                    {v === "local"
-                      ? "しない"
-                      : v === "public"
-                        ? "する（公開）"
-                        : "する（非収載）"}
-                  </p>
-                </label>
-              ))}
-            </div>
+      <div className="text-sm space-y-3">
+        <p className="font-medium">元投稿の扱い:</p>
+        <p className="text-muted-foreground">
+        </p>
+        <label className="flex items-center justify-between gap-4 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm">
+              元投稿を残す
+              <span className="ml-2 text-xs text-muted-foreground">（非推奨）</span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Bot宛の元投稿は通常不要なので、デフォルトでは自動で削除されます。ただし、このオプションを有効にすれば、元投稿を削除せずに残すこともできます。
+            </p>
           </div>
-
-          {/* 元投稿を残すオプション */}
-          <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">{userInstanceDomain}の元投稿</p>
-            <label className="flex items-center justify-between gap-4 p-3 cursor-pointer">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm">
-                  元投稿を残す
-                  <span className="ml-2 text-xs text-muted-foreground">（非推奨）</span>
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  元画像が添付されているBot宛投稿は、通常は不要なので、自動で削除されます。このオプションが有効な場合に限り、削除せずに残します。
-                </p>
-              </div>
-              <div className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors ${
-                keep ? "bg-primary" : "bg-muted"
-              }`}>
-                <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                  keep ? "translate-x-6" : "translate-x-1"
-                }`} />
-              </div>
-              <input
-                type="checkbox"
-                checked={keep}
-                onChange={(e) => setKeep(e.target.checked)}
-                className="sr-only"
-              />
-            </label>
+          <div className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors ${
+            keep ? "bg-primary" : "bg-muted"
+          } ${isSaving ? "opacity-60" : ""}`}>
+            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+              keep ? "translate-x-6" : "translate-x-1"
+            }`} />
           </div>
+          <input
+            type="checkbox"
+            checked={keep}
+            onChange={handleToggle}
+            disabled={isSaving}
+            className="sr-only"
+          />
+        </label>
 
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={handleSave}
-              disabled={!hasChanges || isSaving}
-              size="sm"
-            >
-              {isSaving ? "保存中..." : "設定を保存"}
-            </Button>
-            {error && <span className="text-sm text-destructive">{error}</span>}
-            {success && <span className="text-sm text-green-600">保存しました</span>}
-          </div>
+        <div className="flex items-center gap-2 px-3 text-xs min-h-4">
+          {saveState === "saving" && (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+              <span className="text-muted-foreground">保存中...</span>
+            </>
+          )}
+          {saveState === "saved" && (
+            <>
+              <Check className="h-3 w-3 text-green-600" />
+              <span className="text-green-600">保存しました</span>
+            </>
+          )}
+          {saveState === "error" && error && (
+            <span className="text-destructive">{error}</span>
+          )}
         </div>
-      </details>
+      </div>
     </div>
   );
 }

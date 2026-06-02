@@ -34,7 +34,7 @@ export function Footer() {
         技術仕様
       </Link>
       <a
-        href="https://handon.club/@highemerly"
+        href="https://highemerly.net/contact.html"
         target="_blank"
         rel="noopener noreferrer"
         className="text-sm text-muted-foreground hover:text-foreground hover:underline"

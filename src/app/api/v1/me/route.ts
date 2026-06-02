@@ -48,6 +48,7 @@ export async function GET() {
         defaultOutput: true,
         defaultArrangement: true,
         defaultVisibility: true,
+        defaultCameraOption: true,
         instance: {
           select: {
             domain: true,
@@ -80,6 +81,7 @@ export async function GET() {
         output: user.defaultOutput,
         arrangement: user.defaultArrangement,
         visibility: user.defaultVisibility,
+        cameraOption: user.defaultCameraOption,
       },
     });
   } catch (error) {
@@ -92,8 +94,6 @@ export async function GET() {
 }
 
 const BIO_MAX_LENGTH = 40;
-const VALID_VISIBILITIES = ["public", "unlisted", "local"] as const;
-type Visibility = typeof VALID_VISIBILITIES[number];
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -108,7 +108,6 @@ export async function PATCH(request: NextRequest) {
     // 更新するフィールドを収集
     const updateData: {
       bio?: string | null;
-      mentionVisibility?: string;
       mentionKeep?: boolean;
       showLocationMap?: boolean;
     } = {};
@@ -134,17 +133,6 @@ export async function PATCH(request: NextRequest) {
 
       // 空文字の場合はnullとして保存
       updateData.bio = sanitizedBio.length === 0 ? null : sanitizedBio;
-    }
-
-    // mentionVisibilityの更新
-    if (body.mentionVisibility !== undefined) {
-      if (!VALID_VISIBILITIES.includes(body.mentionVisibility as Visibility)) {
-        return NextResponse.json(
-          { error: "無効な公開設定です" },
-          { status: 400 }
-        );
-      }
-      updateData.mentionVisibility = body.mentionVisibility;
     }
 
     // mentionKeepの更新
@@ -182,7 +170,6 @@ export async function PATCH(request: NextRequest) {
       data: updateData,
       select: {
         bio: true,
-        mentionVisibility: true,
         mentionKeep: true,
         showLocationMap: true,
       },
@@ -191,7 +178,6 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({
       success: true,
       bio: updatedUser.bio,
-      mentionVisibility: updatedUser.mentionVisibility,
       mentionKeep: updatedUser.mentionKeep,
       showLocationMap: updatedUser.showLocationMap,
     });
