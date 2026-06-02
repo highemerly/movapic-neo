@@ -1,9 +1,12 @@
+import Link from "next/link";
+import { ImagePlus } from "lucide-react";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getAvatarUrl } from "@/lib/avatar";
 import { PublicTimelineClient } from "./PublicTimelineClient";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
+import { Button } from "@/components/ui/button";
 
 // 動的レンダリングを強制
 export const dynamic = "force-dynamic";
@@ -46,7 +49,15 @@ export default async function PublicTimelinePage() {
     <>
       <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
       <div className="container mx-auto px-4 pt-4 pb-8 max-w-6xl">
-        <h1 className="text-2xl font-bold mb-4">みんなの写真</h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-bold">みんなの写真</h1>
+          <Link href="/create">
+            <Button size="sm">
+              <ImagePlus className="h-4 w-4" />
+              写真を投稿
+            </Button>
+          </Link>
+        </div>
 
         <PublicTimelineClient
           initialImages={images.map((img: (typeof images)[number]) => ({

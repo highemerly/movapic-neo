@@ -109,7 +109,7 @@ export function FavoriteButton({
   return (
     <div>
       <div className="flex items-center gap-2">
-        <div className="relative">
+        <div className="relative shrink-0">
           <button
             onClick={handleFavorite}
             disabled={!canFavorite || isLoading}
@@ -136,38 +136,41 @@ export function FavoriteButton({
 
         {/* お気に入りした人（Mastodon、外部プロフィールへリンク） */}
         {favoriters.length > 0 && (
-          <div className="flex items-center gap-1">
-            {favoriters.slice(0, 5).map((favoriter) => {
-              const label = favoriter.displayName || favoriter.acct;
-              const avatar = favoriter.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={favoriter.avatarUrl}
-                  alt={label}
-                  className="w-6 h-6 rounded-full hover:opacity-80 transition-opacity"
-                />
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-muted-foreground/20 flex items-center justify-center text-xs text-muted-foreground hover:opacity-80 transition-opacity">
-                  {label.charAt(0)}
-                </div>
-              );
+          <div className="flex-1 min-w-0 overflow-x-auto">
+            <div className="flex items-center gap-1 w-max">
+              {favoriters.map((favoriter) => {
+                const label = favoriter.displayName || favoriter.acct;
+                const avatar = favoriter.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={favoriter.avatarUrl}
+                    alt={label}
+                    className="w-6 h-6 rounded-full hover:opacity-80 transition-opacity"
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-muted-foreground/20 flex items-center justify-center text-xs text-muted-foreground hover:opacity-80 transition-opacity">
+                    {label.charAt(0)}
+                  </div>
+                );
 
-              return favoriter.profileUrl ? (
-                <a
-                  key={favoriter.acct}
-                  href={favoriter.profileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={label}
-                >
-                  {avatar}
-                </a>
-              ) : (
-                <span key={favoriter.acct} title={label}>
-                  {avatar}
-                </span>
-              );
-            })}
+                return favoriter.profileUrl ? (
+                  <a
+                    key={favoriter.acct}
+                    href={favoriter.profileUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={label}
+                    className="shrink-0"
+                  >
+                    {avatar}
+                  </a>
+                ) : (
+                  <span key={favoriter.acct} title={label} className="shrink-0">
+                    {avatar}
+                  </span>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

@@ -18,7 +18,7 @@ import {
 import { PinButton } from "@/components/pin/PinButton";
 import { Footer } from "@/components/Footer";
 import { PostSuccessToast } from "./PostSuccessToast";
-import { User, CalendarDays, Map as MapIcon, Globe, Heart } from "lucide-react";
+import { User, CalendarDays, Map as MapIcon, Globe, Heart, ImagePlus } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -129,6 +129,9 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   // 自分の画像かどうか
   const isOwner = currentUser?.id === image.userId;
 
+  // 地図マークの表示判定（投稿者が地図を公開している、または本人が見ている）
+  const showMapIcon = image.user.showLocationMap || isOwner;
+
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
@@ -199,13 +202,15 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             >
               <CalendarDays className="w-4 h-4 text-muted-foreground" />
             </Link>
-            <Link
-              href={`/u/${username}/map`}
-              className="p-1.5 rounded-full hover:bg-background transition-colors"
-              title="地図"
-            >
-              <MapIcon className="w-4 h-4 text-muted-foreground" />
-            </Link>
+            {showMapIcon && (
+              <Link
+                href={`/u/${username}/map`}
+                className="p-1.5 rounded-full hover:bg-background transition-colors"
+                title="地図"
+              >
+                <MapIcon className="w-4 h-4 text-muted-foreground" />
+              </Link>
+            )}
           </div>
         </div>
 
@@ -352,11 +357,14 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         </div>
 
         {/* アクションボタン */}
-        <div className="mt-8 space-y-3">
-          <Link href="/create" className="block">
-            <Button variant="default" className="w-full">写真を投稿する</Button>
-          </Link>
-          <div className="bg-muted rounded-lg p-3">
+        <div className="mt-8">
+          <div className="bg-muted rounded-lg p-3 space-y-3">
+            <Link href="/create" className="block">
+              <Button variant="default" className="w-full">
+                <ImagePlus className="h-4 w-4" />
+                写真を投稿する
+              </Button>
+            </Link>
             <div className={`grid gap-3 ${currentUser ? "grid-cols-3" : "grid-cols-1"}`}>
               <Link href="/public">
                 <Button variant="outline" className="w-full h-auto py-3 flex flex-col gap-1.5">
