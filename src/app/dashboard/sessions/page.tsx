@@ -15,6 +15,7 @@ const dateFormatter = new Intl.DateTimeFormat("ja-JP", {
   day: "2-digit",
   hour: "2-digit",
   minute: "2-digit",
+  timeZone: "Asia/Tokyo",
 });
 
 export default async function SessionsPage() {

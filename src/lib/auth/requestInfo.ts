@@ -16,8 +16,10 @@ export function extractLoginRequestInfo(request: NextRequest): LoginRequestInfo 
   const userAgent = ua ? ua.slice(0, MAX_UA_LENGTH) : null;
 
   const cfCountry = headers.get("cf-ipcountry");
+  const normalized = cfCountry?.trim().toUpperCase() ?? null;
+  // ISO 3166-1 alpha-2 のほか、Cloudflareの "XX"(unknown) / "T1"(Tor) なども英数2文字
   const country =
-    cfCountry && /^[A-Z]{2}$/.test(cfCountry) ? cfCountry : null;
+    normalized && /^[A-Z0-9]{2}$/.test(normalized) ? normalized : null;
 
   return { ipAddress, userAgent, country };
 }
