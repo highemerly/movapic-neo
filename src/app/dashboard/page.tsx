@@ -13,6 +13,7 @@ import { EmailAddressDisplay } from "./EmailAddressDisplay";
 import { BioEditForm } from "./BioEditForm";
 import { DefaultsEditor } from "./DefaultsEditor";
 import { LocationMapToggle } from "./LocationMapToggle";
+import { DisplayModeSelector } from "./DisplayModeSelector";
 import prisma from "@/lib/db";
 import {
   Position,
@@ -48,6 +49,7 @@ export default async function DashboardPage() {
         defaultVisibility: true,
         defaultCameraOption: true,
         showLocationMap: true,
+        displayMode: true,
       },
     }),
     prisma.image.count({
@@ -217,9 +219,14 @@ export default async function DashboardPage() {
           <h2 className="text-lg font-semibold mb-4">設定</h2>
 
           {/* アカウント設定 */}
-          <div className="bg-muted rounded-lg p-4">
-            <p className="text-sm font-medium mb-3">アカウント設定</p>
+          <div className="bg-muted rounded-lg p-4 space-y-4">
+            <p className="text-sm font-medium">アカウント設定</p>
             <BioEditForm initialBio={userWithPreferences?.bio ?? null} />
+            <DisplayModeSelector
+              initialMode={
+                (userWithPreferences?.displayMode as "system" | "light" | "dark" | null | undefined) ?? "system"
+              }
+            />
           </div>
 
           {/* プライバシー＆セキュリティ */}

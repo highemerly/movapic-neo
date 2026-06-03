@@ -226,7 +226,7 @@ export function OptionsPanel({
             <img
               src={`/fonts/${f}.png`}
               alt={FONT_LABELS[f]}
-              className="h-8 mx-auto object-contain"
+              className="h-8 mx-auto object-contain dark:invert"
             />
           )}
         />

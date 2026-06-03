@@ -49,6 +49,7 @@ export type SessionUser = {
   emailPrefix: string;
   instanceId: string;
   instance: Instance;
+  displayMode: string | null;
 };
 
 // getCurrentUserWithValidationの戻り値の型（accessToken含む）
@@ -170,6 +171,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     emailPrefix: user.emailPrefix,
     instanceId: user.instanceId,
     instance: user.instance,
+    displayMode: user.displayMode,
   };
 }
 
@@ -203,6 +205,7 @@ export async function getCurrentUserWithValidation(): Promise<SessionUserWithTok
     emailPrefix: user.emailPrefix,
     instanceId: user.instanceId,
     instance: user.instance,
+    displayMode: user.displayMode,
     accessToken: user.accessToken,
   };
 }

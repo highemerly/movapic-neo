@@ -150,8 +150,8 @@ export function MentionSettingsForm({
               Bot宛の元投稿は通常不要なので、デフォルトでは自動で削除されます。ただし、このオプションを有効にすれば、元投稿を削除せずに残すこともできます。
             </p>
           </div>
-          <div className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors ${
-            keep ? "bg-primary" : "bg-muted"
+          <div className={`relative flex-shrink-0 w-11 h-6 rounded-full border transition-colors ${
+            keep ? "bg-primary border-primary" : "bg-input border-border"
           } ${isSaving ? "opacity-60" : ""}`}>
             <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
               keep ? "translate-x-6" : "translate-x-1"

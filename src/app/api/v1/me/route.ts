@@ -49,6 +49,7 @@ export async function GET() {
         defaultArrangement: true,
         defaultVisibility: true,
         defaultCameraOption: true,
+        displayMode: true,
         instance: {
           select: {
             domain: true,
@@ -69,6 +70,7 @@ export async function GET() {
       avatarUrl: user.avatarUrl,
       emailPrefix: user.emailPrefix,
       bio: user.bio,
+      displayMode: user.displayMode ?? "system",
       instance: {
         domain: user.instance.domain,
         type: user.instance.type,
@@ -110,6 +112,7 @@ export async function PATCH(request: NextRequest) {
       bio?: string | null;
       mentionKeep?: boolean;
       showLocationMap?: boolean;
+      displayMode?: string | null;
     } = {};
 
     // bioの更新
@@ -157,6 +160,18 @@ export async function PATCH(request: NextRequest) {
       updateData.showLocationMap = body.showLocationMap;
     }
 
+    // displayModeの更新（表示モード: system | light | dark）
+    if (body.displayMode !== undefined) {
+      if (body.displayMode !== null && !["system", "light", "dark"].includes(body.displayMode)) {
+        return NextResponse.json(
+          { error: "displayModeはsystem/light/darkのいずれかである必要があります" },
+          { status: 400 }
+        );
+      }
+      // "system" はnull保存（デフォルト扱い）
+      updateData.displayMode = body.displayMode === "system" ? null : body.displayMode;
+    }
+
     // 更新するフィールドがない場合
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
@@ -172,6 +187,7 @@ export async function PATCH(request: NextRequest) {
         bio: true,
         mentionKeep: true,
         showLocationMap: true,
+        displayMode: true,
       },
     });
 
@@ -180,6 +196,7 @@ export async function PATCH(request: NextRequest) {
       bio: updatedUser.bio,
       mentionKeep: updatedUser.mentionKeep,
       showLocationMap: updatedUser.showLocationMap,
+      displayMode: updatedUser.displayMode ?? "system",
     });
   } catch (error) {
     console.error("Failed to update profile:", error);

@@ -55,7 +55,7 @@ export function ImageCard({ image, publicUrl, username, showDelete, onDelete, is
         <button
           onClick={handleDelete}
           disabled={isDeleting}
-          className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+          className="absolute top-2 right-2 bg-destructive text-white hover:bg-destructive/90 rounded-full w-8 h-8 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
           aria-label="削除"
         >
           {isDeleting ? "..." : "×"}

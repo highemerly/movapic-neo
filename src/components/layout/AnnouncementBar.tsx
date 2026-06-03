@@ -63,8 +63,8 @@ export function AnnouncementBar() {
             key={announcement.id}
             className={`px-3 py-1 text-xs flex items-center gap-1.5 ${
               announcement.type === "warning"
-                ? "bg-red-50 text-red-800"
-                : "bg-blue-50 text-blue-800"
+                ? "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
+                : "bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200"
             } ${index > 0 ? "border-t border-inherit" : ""}`}
           >
             {announcement.type === "warning" ? (

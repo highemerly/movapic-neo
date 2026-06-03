@@ -22,6 +22,7 @@ export async function GET() {
         displayName: user.displayName,
         avatarUrl: user.avatarUrl,
         emailPrefix: user.emailPrefix,
+        displayMode: user.displayMode ?? "system",
         instance: {
           domain: user.instance.domain,
           type: user.instance.type,

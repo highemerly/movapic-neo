@@ -74,8 +74,8 @@ export function LocationMapToggle({ initialEnabled, username }: LocationMapToggl
           )}
         </div>
         <div
-          className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors ${
-            enabled ? "bg-primary" : "bg-muted"
+          className={`relative flex-shrink-0 w-11 h-6 rounded-full border transition-colors ${
+            enabled ? "bg-primary border-primary" : "bg-input border-border"
           } ${isSaving ? "opacity-60" : ""}`}
         >
           <div
