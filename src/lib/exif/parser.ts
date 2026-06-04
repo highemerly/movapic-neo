@@ -36,8 +36,12 @@ export async function extractExif(file: File): Promise<ExtractedExif> {
 
     if (!parsed) return EMPTY;
 
-    const lat = typeof parsed.latitude === "number" ? parsed.latitude : null;
-    const lng = typeof parsed.longitude === "number" ? parsed.longitude : null;
+    // Android Chrome では GPSLatitudeRef/GPSLongitudeRef が欠落するケースがあり、
+    // exifr が NaN を返すことがある。typeof NaN === "number" のため typeof チェックでは
+    // 弾けず、結果として /api/v1/geocode に lat=null（JSON.stringify(NaN)→null）が送られて
+    // 400 になっていた。Number.isFinite で有限値のみ採用する。
+    const lat = Number.isFinite(parsed.latitude) ? (parsed.latitude as number) : null;
+    const lng = Number.isFinite(parsed.longitude) ? (parsed.longitude as number) : null;
 
     return {
       cameraMake: typeof parsed.Make === "string" ? parsed.Make.trim() || null : null,

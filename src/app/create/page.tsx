@@ -790,7 +790,7 @@ export default function CreatePage() {
                         </div>
                         {!hasGps && (
                           <p className="text-[11px] text-muted-foreground">
-                            この画像には位置情報がありません。iPhone から直接アップロードした写真はiOSの仕様で位置情報が含まれないことがあります。
+                            この画像には位置情報がありません。特定のブラウザからアップロードした写真はブラウザの仕様により位置情報が削除されることがあります。
                           </p>
                         )}
                         {hasGps && locationOption !== "none" && !geocoded && (
@@ -802,9 +802,11 @@ export default function CreatePage() {
                         )}
                       </div>
 
-                      <p className="text-[11px] text-muted-foreground">
-                        いかなる場合もサーバーには詳細な位置情報（座標）は保存されず、都道府県名または市区町村名のみが保存されます。
-                      </p>
+                      {hasGps && (
+                        <p className="text-[11px] text-muted-foreground">
+                          いかなる場合もサーバーには詳細な位置情報（座標）は保存されず、都道府県名または市区町村名のみが保存されます。
+                        </p>
+                      )}
                     </div>
                   );
                 })()}
