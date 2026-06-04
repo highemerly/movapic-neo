@@ -14,6 +14,19 @@ const nextConfig: NextConfig = {
     // Route Handler（API）のボディサイズ制限
     proxyClientMaxBodySize: "20mb",
   },
+  async headers() {
+    return [
+      {
+        source: "/:path*.:ext(svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|otf)",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
