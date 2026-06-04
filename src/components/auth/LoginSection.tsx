@@ -1,19 +1,40 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Lock } from "lucide-react";
+import { Lock, AlertCircle } from "lucide-react";
 import { LoginButton } from "./LoginButton";
 
 interface LoginSectionProps {
   allowedServers?: string[];
 }
 
-function getBannerMessage(returnTo: string): string {
+function getLoginRequiredMessage(returnTo: string): string {
   if (returnTo === "/create") return "写真を投稿するにはログインが必要です";
   if (returnTo === "/favorite") return "お気に入りを見るにはログインが必要です";
   if (returnTo === "/dashboard") return "ダッシュボードを見るにはログインが必要です";
   if (returnTo === "/settings") return "設定を変更するにはログインが必要です";
   return "このページを使うにはログインが必要です";
+}
+
+function getErrorMessage(code: string): string {
+  switch (code) {
+    case "oauth_denied":
+      return "ログインがキャンセルされました";
+    case "invalid_request":
+      return "不正なリクエストです。もう一度お試しください";
+    case "invalid_state":
+    case "invalid_signature":
+      return "認証情報が無効です。もう一度お試しください";
+    case "expired_state":
+    case "session_expired":
+      return "認証セッションの有効期限が切れました。もう一度お試しください";
+    case "invalid_session":
+      return "認証セッションが無効です。もう一度お試しください";
+    case "auth_failed":
+      return "認証に失敗しました。もう一度お試しください";
+    default:
+      return "ログイン中にエラーが発生しました。もう一度お試しください";
+  }
 }
 
 function sanitizeReturnTo(value: string | null): string | undefined {
@@ -28,19 +49,27 @@ function sanitizeReturnTo(value: string | null): string | undefined {
 export function LoginSection({ allowedServers }: LoginSectionProps) {
   const params = useSearchParams();
   const reason = params.get("reason");
+  const errorCode = params.get("error");
   const returnTo = sanitizeReturnTo(params.get("returnTo"));
-  const showBanner = reason === "login_required" && !!returnTo;
+  const showLoginRequired = reason === "login_required" && !!returnTo;
 
   return (
     <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden text-center">
-      {showBanner && (
+      {errorCode ? (
+        <div className="bg-destructive/10 px-5 py-3 flex items-start justify-center gap-2.5 border-b border-border">
+          <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
+          <p className="text-sm font-semibold leading-snug text-destructive">
+            {getErrorMessage(errorCode)}
+          </p>
+        </div>
+      ) : showLoginRequired ? (
         <div className="bg-primary/5 px-5 py-3 flex items-start justify-center gap-2.5 border-b border-border">
           <Lock className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
           <p className="text-sm font-semibold leading-snug">
-            {getBannerMessage(returnTo!)}
+            {getLoginRequiredMessage(returnTo!)}
           </p>
         </div>
-      )}
+      ) : null}
       <div className="px-5 py-5">
         <LoginButton allowedServers={allowedServers} callbackUrl={returnTo} />
       </div>
