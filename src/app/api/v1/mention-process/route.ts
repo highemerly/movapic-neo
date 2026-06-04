@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import {
   fetchMentionNotifications,
   updateLastNotificationId,
@@ -33,7 +34,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (apiKey !== expectedApiKey) {
+  // タイミング攻撃対策のため、長さチェック + timingSafeEqual で比較
+  const apiKeyBuf = Buffer.from(apiKey ?? "");
+  const expectedApiKeyBuf = Buffer.from(expectedApiKey);
+  if (
+    apiKeyBuf.length !== expectedApiKeyBuf.length ||
+    !timingSafeEqual(apiKeyBuf, expectedApiKeyBuf)
+  ) {
     console.error("[mention-process] Invalid API key");
     return NextResponse.json(
       { success: false, error: "Unauthorized" },
