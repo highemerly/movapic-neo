@@ -15,9 +15,14 @@ interface LoginButtonProps {
    * undefinedの場合: 自由入力
    */
   allowedServers?: string[];
+  /**
+   * ログイン成功後の遷移先パス（省略時は /dashboard）
+   */
+  callbackUrl?: string;
 }
 
-export function LoginButton({ allowedServers }: LoginButtonProps) {
+export function LoginButton({ allowedServers, callbackUrl }: LoginButtonProps) {
+  const targetUrl = callbackUrl || "/dashboard";
   const router = useRouter();
   const [server, setServer] = useState(
     allowedServers?.length === 1 ? allowedServers[0] : ""
@@ -46,9 +51,9 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
   const handleLogin = async (e?: React.FormEvent) => {
     e?.preventDefault();
 
-    // ログイン済みの場合はダッシュボードへ
+    // ログイン済みの場合はコールバック先（または既定の /dashboard）へ
     if (isLoggedIn) {
-      router.push("/dashboard");
+      router.push(targetUrl);
       return;
     }
 
@@ -56,6 +61,11 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
 
     if (!targetServer) {
       setError("サーバー名を入力してください");
+      return;
+    }
+
+    if (!agreed) {
+      setError("利用規約・プライバシーポリシーへの同意が必要です");
       return;
     }
 
@@ -70,7 +80,7 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
         },
         body: JSON.stringify({
           server: targetServer,
-          callbackUrl: "/dashboard",
+          callbackUrl: targetUrl,
         }),
       });
 
@@ -89,7 +99,7 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
   };
 
   const agreementCheckbox = (
-    <div className="flex items-start gap-2">
+    <div className="flex items-start justify-center gap-2">
       <Checkbox
         id="agree"
         checked={agreed}
@@ -98,33 +108,36 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
       />
       <label htmlFor="agree" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
         <Link href="/terms" className="underline hover:text-foreground">利用規約</Link>
-        {" "}および{" "}
+        および
         <Link href="/privacy" className="underline hover:text-foreground">プライバシーポリシー</Link>
-        に同意してログインします
+        に同意します
       </label>
     </div>
   );
 
   // 単一サーバー限定モード: シンプルなボタン
   if (singleServerMode) {
+    const loggedInLabel = callbackUrl ? "戻る" : "ダッシュボードへ";
     const buttonLabel = isLoggedIn
-      ? "ダッシュボードへ"
+      ? loggedInLabel
       : isLoading
         ? "処理中..."
         : `${allowedServers[0]} でログイン`;
 
+    const needsAgreement = !isLoggedIn && !agreed;
     return (
       <div className="space-y-4">
         {!isLoggedIn && agreementCheckbox}
+        {error && <p className="text-sm text-destructive">{error}</p>}
         <Button
           onClick={() => handleLogin()}
-          disabled={isLoading || isLoggedIn === null || (!isLoggedIn && !agreed)}
-          className="w-full py-6 text-lg"
+          disabled={isLoading || isLoggedIn === null}
+          aria-disabled={needsAgreement || undefined}
+          className={`w-full py-6 text-lg ${needsAgreement ? "opacity-50" : ""}`}
           size="lg"
         >
           {isLoggedIn === null ? "読み込み中..." : buttonLabel}
         </Button>
-        {error && <p className="text-sm text-destructive">{error}</p>}
         {!isLoggedIn && (
           <p className="text-xs text-muted-foreground">
             他のサーバーでは現在利用できません
@@ -139,11 +152,11 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
     return (
       <div className="space-y-4">
         <Button
-          onClick={() => router.push("/dashboard")}
+          onClick={() => router.push(targetUrl)}
           className="w-full py-6 text-lg"
           size="lg"
         >
-          ダッシュボードへ
+          {callbackUrl ? "戻る" : "ダッシュボードへ"}
         </Button>
       </div>
     );
@@ -159,6 +172,7 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
       ) : (
         <>
           {agreementCheckbox}
+          {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex gap-2">
             <Input
               type="text"
@@ -170,14 +184,14 @@ export function LoginButton({ allowedServers }: LoginButtonProps) {
             />
             <Button
               type="submit"
-              disabled={isLoading || !server.trim() || !agreed}
-              className="py-6 text-lg"
+              disabled={isLoading}
+              aria-disabled={(!server.trim() || !agreed) || undefined}
+              className={`py-6 text-lg ${(!server.trim() || !agreed) ? "opacity-50" : ""}`}
               size="lg"
             >
               {isLoading ? "処理中..." : "ログイン"}
             </Button>
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
           <p className="text-xs text-muted-foreground">
             Mastodon または Misskey サーバーのドメインを入力してください
           </p>

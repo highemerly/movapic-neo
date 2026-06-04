@@ -31,7 +31,7 @@ export default async function DashboardPage() {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect("/");
+    redirect("/?reason=login_required&returnTo=%2Fdashboard");
   }
 
   // ユーザーのデフォルト設定、bio、統計情報を取得

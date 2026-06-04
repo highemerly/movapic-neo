@@ -18,7 +18,7 @@ export default async function FavoritePage() {
   const currentUser = await getCurrentUser();
 
   if (!currentUser) {
-    redirect("/");
+    redirect("/?reason=login_required&returnTo=%2Ffavorite");
   }
 
   // best-effort: favoritersCache に自分のacctが含まれる画像を一覧

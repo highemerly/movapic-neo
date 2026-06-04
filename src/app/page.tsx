@@ -1,7 +1,9 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import prisma from "@/lib/db";
 import { LoginButton } from "@/components/auth/LoginButton";
+import { LoginSection } from "@/components/auth/LoginSection";
 import { Button } from "@/components/ui/button";
 import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
 import { Footer } from "@/components/Footer";
@@ -49,9 +51,19 @@ export default async function HomePage() {
             <Image src="/shamezo_logo_with_tagline.svg" alt="SHAMEZO" width={340} height={76} className="h-auto w-auto max-w-full" priority />
           </div>
 
-          {/* ログインボタン */}
+          {/* ログインボタン（保護ページからのリダイレクト時はバナー表示） */}
           <div className="max-w-sm mx-auto mt-6 mb-8">
-            <LoginButton allowedServers={allowedServers} />
+            <Suspense
+              fallback={
+                <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden text-center">
+                  <div className="px-5 py-5">
+                    <LoginButton allowedServers={allowedServers} />
+                  </div>
+                </div>
+              }
+            >
+              <LoginSection allowedServers={allowedServers} />
+            </Suspense>
           </div>
         </div>
 

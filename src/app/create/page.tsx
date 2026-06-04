@@ -195,11 +195,11 @@ export default function CreatePage() {
           }
         } else {
           setIsAuthenticated(false);
-          router.push("/");
+          router.push("/?reason=login_required&returnTo=%2Fcreate");
         }
       } catch {
         setIsAuthenticated(false);
-        router.push("/");
+        router.push("/?reason=login_required&returnTo=%2Fcreate");
       }
     };
     checkAuth();
