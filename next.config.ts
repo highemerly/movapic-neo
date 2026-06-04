@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // 開発時に許可するクロスオリジン（LAN内のスマホ等からアクセスする用）
+  allowedDevOrigins: ["192.168.110.136"],
   // ネイティブモジュールをサーバーサイドでのみ使用（バンドルから除外）
   serverExternalPackages: ["skia-canvas", "sharp"],
   experimental: {

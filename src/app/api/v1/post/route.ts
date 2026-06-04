@@ -20,7 +20,22 @@ import {
   Size,
   OutputFormat,
   Arrangement,
+  MAX_FILE_SIZE,
 } from "@/types";
+
+/**
+ * sharp で検出した画像メタデータから、R2 に保存して良い Content-Type を返す。
+ * /api/v1/generate の出力（JPEG / AVIF）のみ許可。
+ * sharp 0.30+ は AVIF を format='heif', compression='av1' として返す（libheif 経由）。
+ */
+function detectSafeMimeType(metadata: sharp.Metadata): string | undefined {
+  if (metadata.format === "jpeg") return "image/jpeg";
+  if (metadata.format === "avif") return "image/avif";
+  if (metadata.format === "heif" && metadata.compression === "av1") {
+    return "image/avif";
+  }
+  return undefined;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,7 +59,6 @@ export async function POST(request: NextRequest) {
     const size = formData.get("size") as Size | null;
     const output = formData.get("output") as OutputFormat | null;
     const arrangement = (formData.get("arrangement") as Arrangement | null) || "none";
-    const mimeType = formData.get("mimeType") as string | null;
     const visibility = formData.get("visibility") as string | null;
 
     // EXIFメタデータ（クライアントが元画像から抽出したものを受け取る）
@@ -64,15 +78,43 @@ export async function POST(request: NextRequest) {
     }
 
     // バリデーション
-    if (!imageBlob || !text || !position || !font || !color || !size || !output || !mimeType) {
+    if (!imageBlob || !text || !position || !font || !color || !size || !output) {
       return NextResponse.json(
         { error: "必須パラメータが不足しています" },
         { status: 400 }
       );
     }
 
+    // ファイルサイズ上限
+    if (imageBlob.size > MAX_FILE_SIZE) {
+      return NextResponse.json(
+        { error: `ファイルサイズが${MAX_FILE_SIZE / 1024 / 1024}MBを超えています` },
+        { status: 400 }
+      );
+    }
+
     // 画像バッファを取得
     const imageBuffer = Buffer.from(await imageBlob.arrayBuffer());
+
+    // sharp で実フォーマットを検出（クライアント送信の mimeType は信任しない）
+    // R2 が任意の Content-Type で任意コンテンツを配信することを防ぐため、
+    // /api/v1/generate の出力形式 (JPEG/AVIF) のみ許可する。
+    let metadata: sharp.Metadata;
+    try {
+      metadata = await sharp(imageBuffer).metadata();
+    } catch {
+      return NextResponse.json(
+        { error: "画像の解析に失敗しました" },
+        { status: 400 }
+      );
+    }
+    const mimeType = detectSafeMimeType(metadata);
+    if (!mimeType) {
+      return NextResponse.json(
+        { error: "サポートされていない画像形式です" },
+        { status: 400 }
+      );
+    }
 
     // 画像IDを生成
     const imageId = randomUUID();
@@ -87,9 +129,6 @@ export async function POST(request: NextRequest) {
     const thumbnailKey = generateThumbnailKey(storageKey);
     const thumbnailBuffer = await generateThumbnail(imageBuffer, position);
     await uploadImage(thumbnailBuffer, thumbnailKey, "image/webp");
-
-    // 画像メタデータを取得
-    const metadata = await sharp(imageBuffer).metadata();
 
     // 位置情報: locationOption が pref / city の時だけサーバー側で再ジオコーディングして
     // 保存（権威データをサーバー側で確定するため、クライアントからの prefecture/city 文字列は
