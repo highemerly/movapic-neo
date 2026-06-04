@@ -46,7 +46,7 @@ export default async function HomePage() {
         {/* ヘッダー */}
         <div className="text-center mb-6">
           <div className="flex justify-center mb-4">
-            <Image src="/shamezo_logo_with_tagline.svg" alt="SHAMEZO" width={340} height={76} priority />
+            <Image src="/shamezo_logo_with_tagline.svg" alt="SHAMEZO" width={340} height={76} className="h-auto w-auto max-w-full" priority />
           </div>
 
           {/* ログインボタン */}
