@@ -6,6 +6,7 @@ import { UserGalleryClient } from "./UserGalleryClient";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
+import { calculateStreak } from "@/lib/streak";
 
 export const dynamic = "force-dynamic";
 
@@ -84,13 +85,17 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
 
   const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
-  // 総画像数を取得
-  const totalImageCount = await prisma.image.count({
-    where: {
-      userId: user.id,
-      isPublic: true,
-    },
-  });
+  // 総画像数と連続投稿日数の算出データを取得
+  const [totalImageCount, postDates] = await Promise.all([
+    prisma.image.count({
+      where: { userId: user.id, isPublic: true },
+    }),
+    prisma.image.findMany({
+      where: { userId: user.id, isPublic: true },
+      select: { createdAt: true },
+    }),
+  ]);
+  const streak = calculateStreak(postDates.map((p) => p.createdAt));
 
   return (
     <>
@@ -106,6 +111,7 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
             instance: { domain: user.instance.domain },
           }}
           imageCount={totalImageCount}
+          streak={streak}
           activeTab="photos"
         />
 

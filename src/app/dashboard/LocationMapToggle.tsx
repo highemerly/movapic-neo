@@ -53,7 +53,7 @@ export function LocationMapToggle({ initialEnabled, username }: LocationMapToggl
 
   return (
     <div className="space-y-2">
-      <label className="flex cursor-pointer items-center justify-between gap-4 p-3">
+      <label className="flex items-center justify-between gap-4 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
         <div className="flex-1 min-w-0">
           <p className="text-sm">
             地図を公開する

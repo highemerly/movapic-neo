@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAvatarUrl } from "@/lib/avatar";
-import { Globe, User, Heart, ChevronRight } from "lucide-react";
+import { Globe, User, Heart, ChevronRight, Flame } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/auth/LogoutButton";
@@ -15,6 +15,7 @@ import { DefaultsEditor } from "./DefaultsEditor";
 import { LocationMapToggle } from "./LocationMapToggle";
 import { DisplayModeSelector } from "./DisplayModeSelector";
 import prisma from "@/lib/db";
+import { calculateStreak } from "@/lib/streak";
 import {
   Position,
   FontFamily,
@@ -34,7 +35,7 @@ export default async function DashboardPage() {
   }
 
   // ユーザーのデフォルト設定、bio、統計情報を取得
-  const [userWithPreferences, imageCount] = await Promise.all([
+  const [userWithPreferences, imageCount, postDates, favoritesAgg, topFavoriteImage] = await Promise.all([
     prisma.user.findUnique({
       where: { id: user.id },
       select: {
@@ -55,7 +56,30 @@ export default async function DashboardPage() {
     prisma.image.count({
       where: { userId: user.id },
     }),
+    prisma.image.findMany({
+      where: { userId: user.id },
+      select: { createdAt: true },
+    }),
+    prisma.image.aggregate({
+      where: { userId: user.id },
+      _sum: { favoriteCount: true },
+    }),
+    prisma.image.findFirst({
+      where: { userId: user.id, favoriteCount: { gt: 0 } },
+      orderBy: { favoriteCount: "desc" },
+      select: {
+        id: true,
+        thumbnailKey: true,
+        storageKey: true,
+        overlayText: true,
+        favoriteCount: true,
+      },
+    }),
   ]);
+
+  const streak = calculateStreak(postDates.map((p) => p.createdAt));
+  const totalFavorites = favoritesAgg._sum.favoriteCount ?? 0;
+  const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
   // Bot設定を環境変数から取得
   const botUsername = process.env.MASTODON_BOT_ACCT || "pic";
@@ -67,7 +91,6 @@ export default async function DashboardPage() {
   // メンション設定コンテンツ
   const mentionSettingsContent = (
     <MentionSettingsForm
-      initialKeep={userWithPreferences?.mentionKeep ?? false}
       botAcct={botAcct}
       userInstanceDomain={user.instance.domain}
     />
@@ -121,24 +144,24 @@ export default async function DashboardPage() {
       <div className="container mx-auto px-4 py-8 max-w-2xl">
 
         {/* セクション1: みる */}
-        <section className="mb-8">
+        <section className="mb-4">
           <h2 className="text-lg font-semibold mb-2">みる</h2>
           <div className="bg-muted rounded-lg p-4">
             <div className="grid grid-cols-3 gap-3">
             <Link href="/public">
-              <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
+              <Button variant="outline" className="w-full h-auto py-3 flex flex-col gap-1.5">
                 <Globe className="h-5 w-5" />
                 <span className="text-sm">みんなの写真</span>
               </Button>
             </Link>
             <Link href={`/u/${user.username}`}>
-              <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
+              <Button variant="outline" className="w-full h-auto py-3 flex flex-col gap-1.5">
                 <User className="h-5 w-5" />
                 <span className="text-sm">プロフィール</span>
               </Button>
             </Link>
             <Link href="/favorite">
-              <Button variant="outline" className="w-full h-auto py-4 flex flex-col gap-2">
+              <Button variant="outline" className="w-full h-auto py-3 flex flex-col gap-1.5">
                 <Heart className="h-5 w-5" />
                 <span className="text-sm">お気に入り</span>
               </Button>
@@ -148,7 +171,7 @@ export default async function DashboardPage() {
         </section>
 
         {/* セクション2: 投稿する */}
-        <section className="mb-8">
+        <section className="mb-4">
           <h2 className="text-lg font-semibold mb-2">投稿する</h2>
           <div className="bg-muted rounded-lg p-4">
             <PostMethodTabs
@@ -160,7 +183,7 @@ export default async function DashboardPage() {
         </section>
 
         {/* セクション3: アカウント */}
-        <section className="mb-8">
+        <section className="mb-4">
           <h2 className="text-lg font-semibold mb-2">アカウント</h2>
           <div className="relative bg-muted rounded-lg p-4">
             <LogoutButton
@@ -197,61 +220,101 @@ export default async function DashboardPage() {
                 アイコンが表示されていない場合は、ログインし直すと反映されます。
               </p>
             )}
-            <div className="mt-4 flex gap-6 text-sm">
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 text-sm">
               <div>
                 <p className="text-muted-foreground text-xs">投稿数</p>
                 <p className="font-medium">{imageCount}件</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs flex items-center gap-1">
+                  <Flame className="h-3 w-3" />
+                  連続投稿
+                </p>
+                <p className="font-medium">{streak}日</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs flex items-center gap-1">
+                  <Heart className="h-3 w-3" />
+                  獲得お気に入り
+                </p>
+                <p className="font-medium">{totalFavorites}</p>
               </div>
               {userWithPreferences?.createdAt && (
                 <div>
                   <p className="text-muted-foreground text-xs">登録日</p>
                   <p className="font-medium">
-                    {userWithPreferences.createdAt.toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" })}
+                    {userWithPreferences.createdAt.toLocaleDateString("ja-JP", { year: "numeric", month: "numeric", day: "numeric" })}
                   </p>
                 </div>
               )}
             </div>
+            {topFavoriteImage && (
+              <Link
+                href={`/u/${user.username}/status/${topFavoriteImage.id}`}
+                className="mt-4 flex items-center gap-3 p-2 rounded-lg border hover:bg-muted/50 transition-colors group"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`${publicUrl}/${topFavoriteImage.thumbnailKey || topFavoriteImage.storageKey}`}
+                  alt={topFavoriteImage.overlayText}
+                  className="w-12 h-12 rounded-md object-cover flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">最も人気の投稿</p>
+                  <p className="text-sm truncate group-hover:underline">{topFavoriteImage.overlayText}</p>
+                </div>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+                  <Heart className="h-3 w-3 fill-current" />
+                  <span className="font-medium">{topFavoriteImage.favoriteCount}</span>
+                </div>
+              </Link>
+            )}
           </div>
         </section>
 
         {/* セクション4: 設定 */}
-        <section className="mb-8">
+        <section className="mb-4">
           <h2 className="text-lg font-semibold mb-4">設定</h2>
 
-          {/* アカウント設定 */}
-          <div className="bg-muted rounded-lg p-4 space-y-4">
-            <p className="text-sm font-medium">アカウント設定</p>
-            <BioEditForm initialBio={userWithPreferences?.bio ?? null} />
-            <DisplayModeSelector
-              initialMode={
-                (userWithPreferences?.displayMode as "system" | "light" | "dark" | null | undefined) ?? "system"
-              }
-            />
+          {/* 一般 */}
+          <div className="bg-muted rounded-lg p-4">
+            <p className="text-sm font-medium mb-2">一般</p>
+            <div className="space-y-4">
+              <BioEditForm initialBio={userWithPreferences?.bio ?? null} />
+              <DisplayModeSelector
+                initialMode={
+                  (userWithPreferences?.displayMode as "system" | "light" | "dark" | null | undefined) ?? "system"
+                }
+              />
+            </div>
           </div>
 
-          {/* プライバシー＆セキュリティ */}
+          {/* プライバシー・セキュリティ */}
           <div className="mt-4 bg-muted rounded-lg p-4">
-            <p className="text-sm font-medium mb-2">プライバシー＆セキュリティ</p>
-            <LocationMapToggle
-              initialEnabled={userWithPreferences?.showLocationMap ?? false}
-              username={user.username}
-            />
-            <Link
-              href="/dashboard/sessions"
-              className="mt-3 flex items-center justify-between rounded-md bg-background px-3 py-2 text-sm hover:bg-background/70 transition-colors"
-            >
-              <span>ログイン履歴を確認する</span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </Link>
+            <p className="text-sm font-medium mb-2">プライバシー・セキュリティ</p>
+            <div className="space-y-4">
+              <Link
+                href="/dashboard/sessions"
+                className="flex items-center justify-between gap-4 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm">ログイン履歴を確認する</p>
+                  <p className="text-xs text-muted-foreground">
+                    過去のログインセッションを一覧で表示します。
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+              </Link>
+              <LocationMapToggle
+                initialEnabled={userWithPreferences?.showLocationMap ?? false}
+                username={user.username}
+              />
+            </div>
           </div>
 
-          {/* 投稿のデフォルト設定 */}
+          {/* 投稿の初期設定 */}
           <div className="mt-4 bg-muted rounded-lg p-4">
-            <p className="text-sm font-medium mb-2">投稿のデフォルト設定</p>
-            <p className="text-xs text-muted-foreground mb-4">
-              これらの設定は全ての投稿方法（Web、Bot、メール）の全てで反映されます。ただし、Bot投稿はカメラ機種に対応していません。
-              また、プライバシー保護のため、位置情報の投稿設定は対象外です。
-            </p>
+            <p className="text-sm font-medium mb-2">投稿の初期設定</p>
             <DefaultsEditor
               initial={{
                 position: userWithPreferences?.defaultPosition as Position | null ?? null,
@@ -261,7 +324,9 @@ export default async function DashboardPage() {
                 arrangement: userWithPreferences?.defaultArrangement as Arrangement | null ?? null,
                 visibility: userWithPreferences?.defaultVisibility as Visibility | null ?? null,
                 cameraOption: (userWithPreferences?.defaultCameraOption as "none" | "show" | null | undefined) ?? null,
+                mentionKeep: userWithPreferences?.mentionKeep ?? false,
               }}
+              instanceDomain={user.instance.domain}
             />
           </div>
         </section>

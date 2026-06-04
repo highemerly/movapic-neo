@@ -6,6 +6,7 @@ import { CalendarView } from "@/components/calendar/CalendarView";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
+import { calculateStreak } from "@/lib/streak";
 
 export const dynamic = "force-dynamic";
 
@@ -53,13 +54,17 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
   const initialYear = isValidYear ? queryYear : now.getFullYear();
   const initialMonth = isValidMonth ? queryMonth : now.getMonth() + 1;
 
-  // 総画像数を取得
-  const totalImageCount = await prisma.image.count({
-    where: {
-      userId: user.id,
-      isPublic: true,
-    },
-  });
+  // 総画像数と連続投稿日数の算出データを取得
+  const [totalImageCount, postDates] = await Promise.all([
+    prisma.image.count({
+      where: { userId: user.id, isPublic: true },
+    }),
+    prisma.image.findMany({
+      where: { userId: user.id, isPublic: true },
+      select: { createdAt: true },
+    }),
+  ]);
+  const streak = calculateStreak(postDates.map((p) => p.createdAt));
 
   return (
     <>
@@ -75,6 +80,7 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
             instance: { domain: user.instance.domain },
           }}
           imageCount={totalImageCount}
+          streak={streak}
           activeTab="calendar"
         />
 

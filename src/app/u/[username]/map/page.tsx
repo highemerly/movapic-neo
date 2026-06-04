@@ -6,6 +6,7 @@ import { getAvatarUrl } from "@/lib/avatar";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
+import { calculateStreak } from "@/lib/streak";
 import { PrefectureHeatmap, type PrefectureMapData } from "@/components/map/PrefectureHeatmap";
 import { ImageCard } from "@/components/gallery/ImageCard";
 
@@ -38,9 +39,16 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
   const isOwner = currentUser?.id === user.id;
   const isOptedIn = user.showLocationMap;
 
-  const totalImageCount = await prisma.image.count({
-    where: { userId: user.id, isPublic: true },
-  });
+  const [totalImageCount, postDates] = await Promise.all([
+    prisma.image.count({
+      where: { userId: user.id, isPublic: true },
+    }),
+    prisma.image.findMany({
+      where: { userId: user.id, isPublic: true },
+      select: { createdAt: true },
+    }),
+  ]);
+  const streak = calculateStreak(postDates.map((p) => p.createdAt));
 
   const profileHeader = (
     <UserProfileHeader
@@ -53,6 +61,7 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
         instance: { domain: user.instance.domain },
       }}
       imageCount={totalImageCount}
+      streak={streak}
       activeTab="map"
     />
   );

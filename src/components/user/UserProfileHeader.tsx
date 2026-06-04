@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Images, Calendar, Map as MapIcon } from "lucide-react";
+import { Images, Calendar, Map as MapIcon, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 
@@ -25,12 +25,14 @@ interface UserProfileHeaderProps {
     };
   };
   imageCount: number;
+  streak?: number;
   activeTab: "photos" | "calendar" | "map";
 }
 
 export function UserProfileHeader({
   user,
   imageCount,
+  streak = 0,
   activeTab,
 }: UserProfileHeaderProps) {
   // 地図タブは常に表示（オプトイン未済でも表示し、遷移先で公開設定の有無に応じた案内を出す）
@@ -86,14 +88,25 @@ export function UserProfileHeader({
           {user.bio && (
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{user.bio}</p>
           )}
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {new Date(user.createdAt).toLocaleDateString("ja-JP", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-            に登録 · {imageCount}枚の画像
-          </p>
+          <div className="text-[11px] text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-1">
+            <span>
+              {new Date(user.createdAt).toLocaleDateString("ja-JP", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+              に登録
+            </span>
+            <span>·</span>
+            <span>{imageCount}枚の画像</span>
+            {streak > 0 && (
+              <>
+                <span>·</span>
+                <Flame className="w-3 h-3 -translate-y-px" />
+                <span>連続{streak}日</span>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
