@@ -139,7 +139,7 @@ export async function registerMastodonApp(
       "User-Agent": USER_AGENT,
     },
     body: JSON.stringify({
-      client_name: "movapic",
+      client_name: "SHAMEZO",
       redirect_uris: redirectUri,
       scopes: "read write:statuses write:media write:favourites",
       website: process.env.NEXT_PUBLIC_APP_URL,
@@ -303,7 +303,7 @@ export function getMisskeyAuthorizationUrl(
   callbackUrl: string
 ): string {
   const params = new URLSearchParams({
-    name: "movapic",
+    name: "SHAMEZO",
     callback: callbackUrl,
     permission: "read:account,write:notes,drive:write",
   });
