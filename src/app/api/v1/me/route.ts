@@ -9,6 +9,22 @@ import { getCurrentUser } from "@/lib/auth/session";
 import prisma from "@/lib/db";
 
 /**
+ * 認証済みユーザー向けレスポンス用ヘルパー。
+ * 共有キャッシュ・ブラウザバックでの他ユーザーへの混入を防ぐため、
+ * すべての応答に Cache-Control: private, no-store を付与する。
+ */
+function jsonNoStore(body: unknown, init?: ResponseInit): NextResponse {
+  const json = NextResponse.json;
+  return json(body, {
+    ...init,
+    headers: {
+      ...(init?.headers ?? {}),
+      "Cache-Control": "private, no-store",
+    },
+  });
+}
+
+/**
  * HTMLタグと制御文字を除去してサニタイズ
  */
 function sanitizeBio(input: string): string {
@@ -28,7 +44,7 @@ export async function GET() {
     const sessionUser = await getCurrentUser();
 
     if (!sessionUser) {
-      return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+      return jsonNoStore({ error: "認証が必要です" }, { status: 401 });
     }
 
     // preferencesを含むユーザー情報を取得
@@ -60,10 +76,10 @@ export async function GET() {
     });
 
     if (!user) {
-      return NextResponse.json({ error: "ユーザーが見つかりません" }, { status: 404 });
+      return jsonNoStore({ error: "ユーザーが見つかりません" }, { status: 404 });
     }
 
-    return NextResponse.json({
+    return jsonNoStore({
       id: user.id,
       username: user.username,
       displayName: user.displayName,
@@ -88,7 +104,7 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Failed to fetch profile:", error);
-    return NextResponse.json(
+    return jsonNoStore(
       { error: "プロフィールの取得に失敗しました" },
       { status: 500 }
     );
@@ -102,7 +118,7 @@ export async function PATCH(request: NextRequest) {
     const sessionUser = await getCurrentUser();
 
     if (!sessionUser) {
-      return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+      return jsonNoStore({ error: "認証が必要です" }, { status: 401 });
     }
 
     const body = await request.json();
@@ -118,7 +134,7 @@ export async function PATCH(request: NextRequest) {
     // bioの更新
     if (body.bio !== undefined) {
       if (typeof body.bio !== "string") {
-        return NextResponse.json(
+        return jsonNoStore(
           { error: "bioは文字列である必要があります" },
           { status: 400 }
         );
@@ -128,7 +144,7 @@ export async function PATCH(request: NextRequest) {
       const sanitizedBio = sanitizeBio(body.bio);
 
       if (sanitizedBio.length > BIO_MAX_LENGTH) {
-        return NextResponse.json(
+        return jsonNoStore(
           { error: `プロフィールは${BIO_MAX_LENGTH}文字以内で入力してください` },
           { status: 400 }
         );
@@ -141,7 +157,7 @@ export async function PATCH(request: NextRequest) {
     // mentionKeepの更新
     if (body.mentionKeep !== undefined) {
       if (typeof body.mentionKeep !== "boolean") {
-        return NextResponse.json(
+        return jsonNoStore(
           { error: "mentionKeepはboolean型である必要があります" },
           { status: 400 }
         );
@@ -152,7 +168,7 @@ export async function PATCH(request: NextRequest) {
     // showLocationMapの更新（地図機能の公開オプトイン）
     if (body.showLocationMap !== undefined) {
       if (typeof body.showLocationMap !== "boolean") {
-        return NextResponse.json(
+        return jsonNoStore(
           { error: "showLocationMapはboolean型である必要があります" },
           { status: 400 }
         );
@@ -163,7 +179,7 @@ export async function PATCH(request: NextRequest) {
     // displayModeの更新（表示モード: system | light | dark）
     if (body.displayMode !== undefined) {
       if (body.displayMode !== null && !["system", "light", "dark"].includes(body.displayMode)) {
-        return NextResponse.json(
+        return jsonNoStore(
           { error: "displayModeはsystem/light/darkのいずれかである必要があります" },
           { status: 400 }
         );
@@ -174,7 +190,7 @@ export async function PATCH(request: NextRequest) {
 
     // 更新するフィールドがない場合
     if (Object.keys(updateData).length === 0) {
-      return NextResponse.json(
+      return jsonNoStore(
         { error: "更新するフィールドがありません" },
         { status: 400 }
       );
@@ -191,7 +207,7 @@ export async function PATCH(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({
+    return jsonNoStore({
       success: true,
       bio: updatedUser.bio,
       mentionKeep: updatedUser.mentionKeep,
@@ -200,7 +216,7 @@ export async function PATCH(request: NextRequest) {
     });
   } catch (error) {
     console.error("Failed to update profile:", error);
-    return NextResponse.json(
+    return jsonNoStore(
       { error: "プロフィールの更新に失敗しました" },
       { status: 500 }
     );
