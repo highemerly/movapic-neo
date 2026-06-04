@@ -2,7 +2,8 @@
  * Fediverse（Mastodon/Misskey）インスタンスとの通信
  */
 
-const USER_AGENT = "movapic/1.0";
+import { USER_AGENT } from "@/lib/userAgent";
+
 const REQUEST_TIMEOUT = 15000; // 15秒
 
 /**

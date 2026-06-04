@@ -14,8 +14,8 @@ import { MastodonNotification } from "./fetcher";
 import { parseMentionContent, formatOptionsSummary, ParsedMentionOptions } from "./parser";
 import { OutputFormat, MAX_TEXT_LENGTH } from "@/types";
 import { ErrorCodes } from "@/lib/errors";
+import { USER_AGENT } from "@/lib/userAgent";
 
-const USER_AGENT = "movapic/1.0";
 const REQUEST_TIMEOUT = 30000;
 const MAX_RETRY_COUNT = 2;
 

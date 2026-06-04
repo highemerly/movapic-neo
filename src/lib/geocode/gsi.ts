@@ -11,6 +11,7 @@
  */
 
 import muniCodes from "./muni-codes.json";
+import { USER_AGENT } from "@/lib/userAgent";
 
 const ENDPOINT = "https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress";
 
@@ -35,7 +36,6 @@ export async function reverseGeocode(
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
   const url = `${ENDPOINT}?lat=${lat}&lon=${lng}`;
-  const contact = process.env.NEXT_PUBLIC_APP_URL || "movapic-neo";
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -43,7 +43,7 @@ export async function reverseGeocode(
   let muniCd: string | null = null;
   try {
     const res = await fetch(url, {
-      headers: { "User-Agent": `movapic-neo (${contact})` },
+      headers: { "User-Agent": USER_AGENT },
       signal: controller.signal,
     });
     if (!res.ok) return null;

@@ -3,8 +3,8 @@
  */
 
 import { prisma } from "@/lib/db";
+import { USER_AGENT } from "@/lib/userAgent";
 
-const USER_AGENT = "movapic/1.0";
 const REQUEST_TIMEOUT = 30000;
 
 export interface MastodonAccount {

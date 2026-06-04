@@ -7,8 +7,8 @@
  * Mastodonの状態次第で遅延・失敗しうるため、短めのタイムアウトで呼び出すこと。
  */
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL;
-const USER_AGENT = APP_URL ? `movapic/1.0 (+${APP_URL})` : "movapic/1.0";
+import { USER_AGENT } from "@/lib/userAgent";
+
 const SHORT_TIMEOUT = 4000; // 4秒
 
 // お気に入り取得・操作の失敗理由
