@@ -7,7 +7,7 @@ import sharp from "sharp";
 import { Position } from "@/types";
 
 const THUMBNAIL_SIZE = 64;
-const THUMBNAIL_QUALITY = 60;
+const THUMBNAIL_QUALITY = 75;
 
 /**
  * 文字位置に応じたクロップ位置を決定
