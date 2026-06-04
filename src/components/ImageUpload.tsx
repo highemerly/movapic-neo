@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
-import { X, Loader2, ImagePlus, Eye } from "lucide-react";
+import { useRef, useState, useCallback, useEffect } from "react";
+import { X, Loader2, ImagePlus, Eye, Camera } from "lucide-react";
 import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from "@/types";
 
 interface ResultInfo {
@@ -60,8 +60,19 @@ export function ImageUpload({
   const isBusy = isLoading || isPosting;
   const busyLabel = isPosting ? "投稿中..." : "生成中...";
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Android Chrome のフォトピッカーはカメラ起動ボタンを持たないため、専用の
+  // capture="environment" な input をボタンで呼び出して撮影できるようにする。
+  // SSR/初回client renderは false（=ボタン非表示）で揃え、mount 後に判定して
+  // 更新するので hydration mismatch は発生しない。
+  const [isAndroid, setIsAndroid] = useState(false);
+  useEffect(() => {
+    if (typeof navigator !== "undefined") {
+      setIsAndroid(/Android/i.test(navigator.userAgent));
+    }
+  }, []);
 
   const validateFile = (file: File): string | null => {
     // HEICファイルの場合は拡張子で判定（MIMEタイプが空や不正な場合がある）
@@ -164,6 +175,18 @@ export function ImageUpload({
         className="hidden"
         disabled={disabled}
       />
+      {/* Android Chrome のフォトピッカーはカメラを起動できないため、撮影専用の
+          input を用意してボタン経由で呼び出す。iOS では既存 input のアクション
+          シートにカメラが含まれるので不要。 */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleInputChange}
+        className="hidden"
+        disabled={disabled}
+      />
 
       {/* 画像がある場合（プレビューまたは生成結果） */}
       {imageFile ? (
@@ -242,25 +265,49 @@ export function ImageUpload({
           )}
         </div>
       ) : (
-        /* 画像がない場合はドロップゾーンを表示 */
+        /* 画像がない場合はドロップゾーンを表示。Android のときはカメラボタンを下に
+            並べる分、ファーストビューがずれないように高さを少し詰める。 */
         <div
           onClick={handleClick}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`flex h-64 cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed transition-colors ${
+          className={`flex ${isAndroid ? "h-40" : "h-64"} cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed transition-colors ${
             isDragging
               ? "border-primary bg-primary/5"
               : "border-muted-foreground/25 hover:border-primary/50"
           } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
         >
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-            <ImagePlus className="h-7 w-7 text-primary" />
+          <div className={`flex ${isAndroid ? "h-12 w-12" : "h-14 w-14"} items-center justify-center rounded-full bg-primary/10`}>
+            <ImagePlus className={`${isAndroid ? "h-6 w-6" : "h-7 w-7"} text-primary`} />
           </div>
           <p className="text-base font-medium text-foreground">
             タップして写真をアップロード
           </p>
         </div>
+      )}
+      {!imageFile && isAndroid && (
+        <>
+          {/* 「または」: 2つの選択肢が並列であることを視覚的に示す */}
+          <div className="flex items-center gap-3 text-[11px] uppercase tracking-wider text-muted-foreground">
+            <div className="h-px flex-1 bg-border" />
+            <span>または</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            disabled={disabled}
+            className={`flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-3 text-base font-medium text-foreground transition-colors ${
+              disabled
+                ? "cursor-not-allowed border-muted-foreground/25 opacity-50"
+                : "border-muted-foreground/25 hover:border-primary/50"
+            }`}
+          >
+            <Camera className="h-5 w-5 text-primary" />
+            タップして写真を撮る
+          </button>
+        </>
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
