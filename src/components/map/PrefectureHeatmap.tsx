@@ -199,7 +199,7 @@ function TileGrid({
           let inner: React.ReactNode;
           if (entry) {
             inner = (
-              <div className={`relative aspect-square overflow-hidden rounded ${ring}`}>
+              <div className={`relative h-full w-full overflow-hidden rounded ${ring}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={thumbnailUrl(publicUrl, entry.latest)}
@@ -216,15 +216,20 @@ function TileGrid({
           } else {
             const tone = heatmapTextClass(count, max);
             inner = (
-              <div className={`flex aspect-square min-h-[36px] flex-col items-center justify-center rounded p-0.5 text-center text-[10px] leading-tight ${tone}`}>
+              <div className={`flex h-full w-full flex-col items-center justify-center rounded p-0.5 text-center text-[10px] leading-tight ${tone}`}>
                 <span className="font-medium">{shortName(pref.name)}</span>
                 <span className="text-[9px] opacity-90">{count}</span>
               </div>
             );
           }
 
+          // サイズ制約はラッパに集約: inner に置くと狭幅モバイルで thumbnail セルだけ縮む
           return (
-            <div key={`${rIdx}-${cIdx}`} title={title}>
+            <div
+              key={`${rIdx}-${cIdx}`}
+              title={title}
+              className="aspect-square min-h-[36px]"
+            >
               {entry ? (
                 // iOS Safari でセル幅が潰れないよう Link を block 化
                 <Link href={hrefFor(pref.name)} className="block h-full w-full">
