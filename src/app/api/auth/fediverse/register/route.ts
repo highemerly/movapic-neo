@@ -26,6 +26,7 @@ import { ErrorCodes, errorResponse, handleUnknownError } from "@/lib/errors";
 
 const OAUTH_SESSION_COOKIE = "oauth_session";
 const OAUTH_STATE_COOKIE = "oauth_state";
+const MIAUTH_STATE_COOKIE = "miauth_state";
 const COOKIE_MAX_AGE = 10 * 60; // 10分
 
 // 許可されたサーバーリスト（カンマ区切り、空の場合は全て許可）
@@ -127,6 +128,16 @@ export async function POST(request: NextRequest) {
       const sessionId = generateMiAuthSessionId();
       const timestamp = Date.now();
       const signature = generateMiAuthSignature(normalizedServer, sessionId, timestamp);
+
+      // ログインCSRF対策: sessionIdをHttpOnlyクッキーに保存し、
+      // コールバック時にURLパラメータと照合してブラウザバインドを行う
+      cookieStore.set(MIAUTH_STATE_COOKIE, sessionId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: COOKIE_MAX_AGE,
+      });
 
       // コールバックURLを構築
       const callbackParams = new URLSearchParams({

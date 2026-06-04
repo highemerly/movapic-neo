@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { nanoid } from "nanoid";
 import { checkMisskeySession } from "@/lib/auth/fediverse";
 import { verifyMiAuthSignature, sanitizeRedirectUrl } from "@/lib/auth/crypto";
@@ -11,6 +12,8 @@ import { encryptToken } from "@/lib/auth/tokens";
 import { createSession } from "@/lib/auth/session";
 import { extractLoginRequestInfo } from "@/lib/auth/requestInfo";
 import prisma from "@/lib/db";
+
+const MIAUTH_STATE_COOKIE = "miauth_state";
 
 export async function GET(request: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "";
@@ -42,6 +45,15 @@ export async function GET(request: NextRequest) {
     if (!verifyMiAuthSignature(server, sessionId, ts, signature)) {
       return NextResponse.redirect(new URL("/?error=invalid_signature", baseUrl));
     }
+
+    // ログインCSRF対策: register時にセットしたクッキーとURLのsessionIdを照合し、
+    // フローを開始した本人のブラウザであることを確認する
+    const cookieStore = await cookies();
+    const savedSessionId = cookieStore.get(MIAUTH_STATE_COOKIE)?.value;
+    if (!savedSessionId || savedSessionId !== sessionId) {
+      return NextResponse.redirect(new URL("/?error=invalid_state", baseUrl));
+    }
+    cookieStore.delete(MIAUTH_STATE_COOKIE);
 
     // MiAuthセッションを確認してトークン取得
     const { token, user: misskeyUser } = await checkMisskeySession(server, sessionId);
