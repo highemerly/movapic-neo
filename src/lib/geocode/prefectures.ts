@@ -60,14 +60,14 @@ export const PREFECTURES: Prefecture[] = [
 ];
 
 /**
- * 地図ヒートマップのタイルカルトグラム配置。13列 × 12行。各セルは prefecture code か null。
+ * 地図ヒートマップのタイルカルトグラム配置。13列 × 11行。各セルは prefecture code か null。
  * 厳密な地理ではなく、おおまかに日本列島の形を再現したレイアウト（やや反時計回りに回し、
- * 九州が縦一直線にならないよう row 9-10 に横展開している）。
+ * 九州が縦一直線にならないよう row 8-9 に横展開している）。
+ * 東北はファーストビュー高さを抑えるため、青森を秋田-岩手の間に押し込んで1行に集約している。
  */
 export const JAPAN_TILE_GRID: (string | null)[][] = [
   [null, null, null, null, null, null, null, null, null, null, null, "01", null],
-  [null, null, null, null, null, null, null, null, null, null, "02", null, null],
-  [null, null, null, null, null, null, null, null, null, null, "05", "03", null],
+  [null, null, null, null, null, null, null, null, null, null, "05", "02", "03"],
   [null, null, null, null, null, null, null, null, null, null, "06", "04", null],
   [null, null, null, null, null, null, null, null, null, "15", "07", null, null],
   [null, null, null, null, null, null, null, null, "17", "16", "10", "09", "08"],
