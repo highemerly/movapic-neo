@@ -15,6 +15,7 @@ import { parseMentionContent, formatOptionsSummary, ParsedMentionOptions } from 
 import { OutputFormat, MAX_TEXT_LENGTH } from "@/types";
 import { ErrorCodes } from "@/lib/errors";
 import { USER_AGENT } from "@/lib/userAgent";
+import { assertSafeRemoteUrl } from "@/lib/security/ssrf";
 
 const REQUEST_TIMEOUT = 30000;
 const MAX_RETRY_COUNT = 2;
@@ -93,9 +94,15 @@ async function sendBotReply(
 
 /**
  * 画像をfetch
+ *
+ * media_attachments[].url は外部インスタンス由来の任意URLになりうるため、
+ * fetch前に解決先IPを検証して内部アドレスへのSSRFを防ぐ。
  */
 async function fetchImage(url: string): Promise<Buffer> {
-  const response = await fetch(url, {
+  // 解決先IPが内部・予約済みアドレスでないことを検証（SSRF対策）
+  const safeUrl = await assertSafeRemoteUrl(url);
+
+  const response = await fetch(safeUrl, {
     headers: { "User-Agent": USER_AGENT },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT),
   });

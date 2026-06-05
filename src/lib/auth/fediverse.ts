@@ -3,6 +3,7 @@
  */
 
 import { USER_AGENT } from "@/lib/userAgent";
+import { assertSafeRemoteHost } from "@/lib/security/ssrf";
 
 const REQUEST_TIMEOUT = 15000; // 15秒
 
@@ -16,32 +17,6 @@ export interface InstanceInfo {
   domain: string;
   title?: string;
   version?: string;
-}
-
-/**
- * プライベートIPアドレスをチェック
- */
-function isPrivateIP(hostname: string): boolean {
-  // localhost
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return true;
-  }
-
-  // IPv4プライベートアドレス
-  const privateRanges = [
-    /^10\./,
-    /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
-    /^192\.168\./,
-    /^127\./,
-  ];
-
-  for (const range of privateRanges) {
-    if (range.test(hostname)) {
-      return true;
-    }
-  }
-
-  return false;
 }
 
 /**
@@ -63,9 +38,15 @@ export function normalizeServer(server: string): string {
 export async function detectInstanceType(server: string): Promise<InstanceInfo> {
   const normalizedServer = normalizeServer(server);
 
-  if (isPrivateIP(normalizedServer)) {
-    throw new Error("プライベートIPアドレスは許可されていません");
+  // 解決先IPが内部・予約済みアドレスでないことを検証（SSRF対策）
+  // normalizedServer は "host" または "host:port" 形式なのでURL経由でホスト名を抽出
+  let hostname: string;
+  try {
+    hostname = new URL(`https://${normalizedServer}`).hostname;
+  } catch {
+    throw new Error("サーバー名が不正です");
   }
+  await assertSafeRemoteHost(hostname);
 
   // Mastodonの場合
   try {
