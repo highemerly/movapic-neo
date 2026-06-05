@@ -48,7 +48,7 @@ export default async function SessionsPage() {
 
         <h1 className="text-lg font-semibold mb-2">ログイン履歴</h1>
         <p className="text-xs text-muted-foreground mb-6">
-          直近90日間のログイン履歴を表示しています。これより古い履歴は自動的に削除されます。身に覚えのないログインは「失効させる」でそのセッションを無効化できます。あわせてFediverseの連携アプリ・アクセストークンの無効化もご検討ください。
+          直近90日間のログイン履歴を表示しています。これより古い履歴は自動的に削除されます。身に覚えのないログインは「失効させる」でそのセッションを無効化できます。なお「都市（推定）」はIPアドレスからのおおまかな推定で、実際の所在地とは大きくずれることがあります。
         </p>
 
         {sessions.length === 0 ? (
@@ -98,8 +98,18 @@ export default async function SessionsPage() {
                     </dd>
                     {session.country && (
                       <>
-                        <dt>接続元</dt>
+                        <dt>国・地域</dt>
                         <dd className="text-foreground">{session.country}</dd>
+                      </>
+                    )}
+                    {(session.city || session.region) && (
+                      <>
+                        <dt>都市（推定）</dt>
+                        <dd className="text-foreground">
+                          {[session.city, session.region]
+                            .filter(Boolean)
+                            .join(", ")}
+                        </dd>
                       </>
                     )}
                   </dl>

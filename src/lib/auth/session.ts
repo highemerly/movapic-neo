@@ -38,6 +38,9 @@ export type LoginRequestInfo = {
   ipAddress: string;
   userAgent: string | null;
   country: string | null;
+  // CloudflareによるIP推定の地域（精度は低くズレる前提）
+  region: string | null;
+  city: string | null;
 };
 
 // getCurrentUserの戻り値の型
@@ -97,6 +100,8 @@ export async function createSession(
       ipAddress: requestInfo.ipAddress,
       userAgent: requestInfo.userAgent,
       country: requestInfo.country,
+      region: requestInfo.region,
+      city: requestInfo.city,
     },
   });
 

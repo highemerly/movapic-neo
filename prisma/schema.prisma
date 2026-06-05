@@ -74,6 +74,9 @@ model LoginSession {
   ipAddress String   @map("ip_address") @db.VarChar(45)
   userAgent String?  @map("user_agent") @db.VarChar(500)
   country   String?  @db.VarChar(2)
+  // Cloudflareの「Add visitor location headers」によるIP推定の地域。精度は低くズレる前提
+  region    String?  @db.VarChar(100)
+  city      String?  @db.VarChar(100)
   createdAt DateTime @default(now()) @map("created_at")
   // 失効日時。nullなら有効。本人がセッションを失効させると設定される
   revokedAt DateTime? @map("revoked_at")
