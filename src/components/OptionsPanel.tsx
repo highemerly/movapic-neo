@@ -198,7 +198,7 @@ export function OptionsPanel({
           disabled={disabled}
           renderOption={(s) => (
             <span
-              className={
+              className={`leading-none ${
                 s === "small"
                   ? "text-xs"
                   : s === "medium"
@@ -206,7 +206,7 @@ export function OptionsPanel({
                     : s === "large"
                       ? "text-lg"
                       : "text-xl"
-              }
+              }`}
             >
               {s === "small" ? "小" : s === "medium" ? "中" : s === "large" ? "大" : "特大"}
             </span>
@@ -226,7 +226,7 @@ export function OptionsPanel({
             <img
               src={`/fonts/${f}.png`}
               alt={FONT_LABELS[f]}
-              className="h-8 mx-auto object-contain dark:invert"
+              className="h-5 mx-auto object-contain dark:invert"
             />
           )}
         />
@@ -247,7 +247,7 @@ export function OptionsPanel({
               <img
                 src={`/arrangements/${a}.png`}
                 alt={ARRANGEMENT_LABELS[a]}
-                className="h-8 mx-auto object-contain"
+                className="h-5 mx-auto object-contain"
               />
             )
           }

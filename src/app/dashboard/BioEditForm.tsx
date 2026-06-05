@@ -63,9 +63,29 @@ export function BioEditForm({ initialBio }: BioEditFormProps) {
 
   return (
     <div className="space-y-2">
-      <div className="flex justify-between items-center">
-        <Label htmlFor="bio-input">プロフィール</Label>
-        <span className={`text-xs ${isOverLimit ? "text-destructive" : "text-muted-foreground"}`}>
+      <div className="flex justify-between items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <Label htmlFor="bio-input">プロフィール</Label>
+          {isOverLimit && (
+            <span className="text-xs text-destructive truncate">{BIO_MAX_LENGTH}文字以内で入力してください</span>
+          )}
+          {!isOverLimit && saveState === "saving" && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              保存中...
+            </span>
+          )}
+          {!isOverLimit && saveState === "saved" && (
+            <span className="flex items-center gap-1 text-xs text-green-600">
+              <Check className="h-3 w-3" />
+              保存しました
+            </span>
+          )}
+          {!isOverLimit && saveState === "error" && error && (
+            <span className="text-xs text-destructive truncate">{error}</span>
+          )}
+        </div>
+        <span className={`text-xs flex-shrink-0 ${isOverLimit ? "text-destructive" : "text-muted-foreground"}`}>
           {bio.length}/{BIO_MAX_LENGTH}
         </span>
       </div>
@@ -77,26 +97,6 @@ export function BioEditForm({ initialBio }: BioEditFormProps) {
         placeholder="プロフィールを入力"
         maxLength={BIO_MAX_LENGTH + 10}
       />
-      <div className="flex items-center gap-2 text-xs min-h-4">
-        {isOverLimit && (
-          <span className="text-destructive">{BIO_MAX_LENGTH}文字以内で入力してください</span>
-        )}
-        {!isOverLimit && saveState === "saving" && (
-          <>
-            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-            <span className="text-muted-foreground">保存中...</span>
-          </>
-        )}
-        {!isOverLimit && saveState === "saved" && (
-          <>
-            <Check className="h-3 w-3 text-green-600" />
-            <span className="text-green-600">保存しました</span>
-          </>
-        )}
-        {!isOverLimit && saveState === "error" && error && (
-          <span className="text-destructive">{error}</span>
-        )}
-      </div>
     </div>
   );
 }

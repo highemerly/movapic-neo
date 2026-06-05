@@ -43,40 +43,9 @@ export function SaveDefaultsSection({
             ? "保存中..."
             : saveSuccess
               ? "保存しました"
-              : "現在の設定を初期値として保存"}
+              : "現在の設定を初期値として保存（位置情報は除く）"}
         </span>
       </button>
-      <div>
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-          aria-expanded={open}
-        >
-          <ChevronDown
-            className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`}
-          />
-          保存される項目を確認
-        </button>
-      </div>
-      {open && (
-        <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground space-y-2">
-          <div>
-            <p className="font-medium text-foreground">保存される項目</p>
-            <ul className="mt-1 list-disc list-inside space-y-0.5">
-              <li>3. コメント合成オプション</li>
-              <li>4. カメラの機種名の表示</li>
-              <li>5. {domain} への同時投稿</li>
-            </ul>
-          </div>
-          <div>
-            <p className="font-medium text-foreground">保存されない項目</p>
-            <ul className="mt-1 list-disc list-inside space-y-0.5">
-              <li>4. 撮影場所 ※プライバシー保護のため毎回明示的な選択が必要</li>
-            </ul>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

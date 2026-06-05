@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAvatarUrl } from "@/lib/avatar";
-import { Globe, User, Heart, ChevronRight, Flame } from "lucide-react";
+import { Globe, User, Heart, ChevronRight } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/auth/LogoutButton";
@@ -141,7 +141,7 @@ export default async function DashboardPage() {
   return (
     <>
       <SiteHeader user={user ? { username: user.username } : null} />
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="container mx-auto px-4 pt-2 pb-8 max-w-2xl">
 
         {/* セクション1: みる */}
         <section className="mb-4">
@@ -149,19 +149,19 @@ export default async function DashboardPage() {
           <div className="bg-muted rounded-lg p-4">
             <div className="grid grid-cols-3 gap-3">
             <Link href="/public">
-              <Button variant="outline" className="w-full h-auto py-3 flex flex-col gap-1.5">
+              <Button variant="outline" className="w-full h-auto py-2 flex flex-col gap-0.5">
                 <Globe className="h-5 w-5" />
                 <span className="text-sm">みんなの写真</span>
               </Button>
             </Link>
             <Link href={`/u/${user.username}`}>
-              <Button variant="outline" className="w-full h-auto py-3 flex flex-col gap-1.5">
+              <Button variant="outline" className="w-full h-auto py-2 flex flex-col gap-0.5">
                 <User className="h-5 w-5" />
                 <span className="text-sm">プロフィール</span>
               </Button>
             </Link>
             <Link href="/favorite">
-              <Button variant="outline" className="w-full h-auto py-3 flex flex-col gap-1.5">
+              <Button variant="outline" className="w-full h-auto py-2 flex flex-col gap-0.5">
                 <Heart className="h-5 w-5" />
                 <span className="text-sm">お気に入り</span>
               </Button>
@@ -176,6 +176,7 @@ export default async function DashboardPage() {
           <div className="bg-muted rounded-lg p-4">
             <PostMethodTabs
               instanceDomain={user.instance.domain}
+              instanceType={user.instance.type}
               mentionSettingsContent={mentionSettingsContent}
               emailSettingsContent={emailSettingsContent}
             />
@@ -220,23 +221,17 @@ export default async function DashboardPage() {
                 アイコンが表示されていない場合は、ログインし直すと反映されます。
               </p>
             )}
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 text-sm">
+            <div className="mt-3 grid grid-cols-4 gap-x-3 text-sm">
               <div>
                 <p className="text-muted-foreground text-xs">投稿数</p>
                 <p className="font-medium">{imageCount}件</p>
               </div>
               <div>
-                <p className="text-muted-foreground text-xs flex items-center gap-1">
-                  <Flame className="h-3 w-3" />
-                  連続投稿
-                </p>
+                <p className="text-muted-foreground text-xs">連続投稿</p>
                 <p className="font-medium">{streak}日</p>
               </div>
               <div>
-                <p className="text-muted-foreground text-xs flex items-center gap-1">
-                  <Heart className="h-3 w-3" />
-                  獲得お気に入り
-                </p>
+                <p className="text-muted-foreground text-xs">獲得ふぁぼ</p>
                 <p className="font-medium">{totalFavorites}</p>
               </div>
               {userWithPreferences?.createdAt && (
@@ -251,19 +246,19 @@ export default async function DashboardPage() {
             {topFavoriteImage && (
               <Link
                 href={`/u/${user.username}/status/${topFavoriteImage.id}`}
-                className="mt-4 flex items-center gap-3 p-2 rounded-lg border hover:bg-muted/50 transition-colors group"
+                className="mt-3 flex items-center gap-3 rounded-lg border overflow-hidden hover:bg-muted/50 transition-colors group"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`${publicUrl}/${topFavoriteImage.thumbnailKey || topFavoriteImage.storageKey}`}
                   alt={topFavoriteImage.overlayText}
-                  className="w-12 h-12 rounded-md object-cover flex-shrink-0"
+                  className="w-12 h-12 object-cover flex-shrink-0"
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-muted-foreground">最も人気の投稿</p>
                   <p className="text-sm truncate group-hover:underline">{topFavoriteImage.overlayText}</p>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0 pr-3">
                   <Heart className="h-3 w-3 fill-current" />
                   <span className="font-medium">{topFavoriteImage.favoriteCount}</span>
                 </div>

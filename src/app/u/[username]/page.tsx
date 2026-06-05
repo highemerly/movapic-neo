@@ -100,7 +100,7 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
   return (
     <>
       <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="container mx-auto px-4 pt-4 pb-8 max-w-4xl">
         <UserProfileHeader
           user={{
             username: cleanUsername,

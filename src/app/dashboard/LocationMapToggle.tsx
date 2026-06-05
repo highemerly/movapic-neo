@@ -52,14 +52,29 @@ export function LocationMapToggle({ initialEnabled, username }: LocationMapToggl
   };
 
   return (
-    <div className="space-y-2">
+    <div>
       <label className="flex items-center justify-between gap-4 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
         <div className="flex-1 min-w-0">
-          <p className="text-sm">
+          <p className="text-sm flex items-center flex-wrap gap-x-2">
             地図を公開する
-            <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
               BETA
             </span>
+            {saveState === "saving" && (
+              <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                保存中...
+              </span>
+            )}
+            {saveState === "saved" && (
+              <span className="flex items-center gap-1 text-xs font-normal text-green-600">
+                <Check className="h-3 w-3" />
+                保存しました
+              </span>
+            )}
+            {saveState === "error" && error && (
+              <span className="text-xs font-normal text-destructive">{error}</span>
+            )}
           </p>
           <p className="text-xs text-muted-foreground">
             ユーザーページに「地図」タブを表示し、都道府県別の投稿数を他のユーザーにも公開します。投稿時に位置情報を含めた画像のみが集計対象です。
@@ -92,23 +107,6 @@ export function LocationMapToggle({ initialEnabled, username }: LocationMapToggl
           className="sr-only"
         />
       </label>
-      <div className="flex items-center gap-2 px-3 text-xs min-h-4">
-        {saveState === "saving" && (
-          <>
-            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-            <span className="text-muted-foreground">保存中...</span>
-          </>
-        )}
-        {saveState === "saved" && (
-          <>
-            <Check className="h-3 w-3 text-green-600" />
-            <span className="text-green-600">保存しました</span>
-          </>
-        )}
-        {saveState === "error" && error && (
-          <span className="text-destructive">{error}</span>
-        )}
-      </div>
     </div>
   );
 }

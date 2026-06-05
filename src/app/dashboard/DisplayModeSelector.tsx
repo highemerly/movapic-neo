@@ -64,7 +64,24 @@ export function DisplayModeSelector({ initialMode }: DisplayModeSelectorProps) {
 
   return (
     <div className="space-y-2">
-      <Label>表示モード</Label>
+      <div className="flex items-center gap-2 flex-wrap">
+        <Label>表示モード</Label>
+        {saveState === "saving" && (
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            保存中...
+          </span>
+        )}
+        {saveState === "saved" && (
+          <span className="flex items-center gap-1 text-xs text-green-600">
+            <Check className="h-3 w-3" />
+            保存しました
+          </span>
+        )}
+        {saveState === "error" && error && (
+          <span className="text-xs text-destructive">{error}</span>
+        )}
+      </div>
       <div role="radiogroup" className="flex rounded-lg border bg-muted p-1 gap-1">
         {OPTIONS.map(({ value, label, icon: Icon }) => {
           const selected = mode === value;
@@ -88,23 +105,6 @@ export function DisplayModeSelector({ initialMode }: DisplayModeSelectorProps) {
             </button>
           );
         })}
-      </div>
-      <div className="flex items-center gap-2 text-xs min-h-4">
-        {saveState === "saving" && (
-          <>
-            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-            <span className="text-muted-foreground">保存中...</span>
-          </>
-        )}
-        {saveState === "saved" && (
-          <>
-            <Check className="h-3 w-3 text-green-600" />
-            <span className="text-green-600">保存しました</span>
-          </>
-        )}
-        {saveState === "error" && error && (
-          <span className="text-destructive">{error}</span>
-        )}
       </div>
     </div>
   );

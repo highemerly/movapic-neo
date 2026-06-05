@@ -61,7 +61,7 @@ export function UserProfileHeader({
   return (
     <div className="mb-4">
       {/* ユーザー情報 */}
-      <div className="flex items-start gap-3 mb-3">
+      <div className="flex items-start gap-3 mb-2">
         {user.avatarUrl && (
           <Link href={`/u/${user.username}`}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -80,15 +80,15 @@ export function UserProfileHeader({
             href={`https://${user.instance.domain}/@${user.username}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+            className="flex w-fit items-center gap-1 mt-1 text-[11px] leading-none text-muted-foreground hover:underline"
           >
-            <MastodonIcon className="w-3 h-3" />
+            <MastodonIcon className="w-2.5 h-2.5" />
             @{user.username}@{user.instance.domain}
           </a>
           {user.bio && (
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{user.bio}</p>
+            <p className="text-[11px] leading-tight text-muted-foreground mt-0.5 line-clamp-2">{user.bio}</p>
           )}
-          <div className="text-[11px] text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-1">
+          <div className="text-[11px] leading-tight text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-1">
             <span>
               {new Date(user.createdAt).toLocaleDateString("ja-JP", {
                 year: "numeric",

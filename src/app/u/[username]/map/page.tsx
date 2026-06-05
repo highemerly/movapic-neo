@@ -71,7 +71,7 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
     return (
       <>
         <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
-        <div className="container mx-auto max-w-4xl px-4 py-8">
+        <div className="container mx-auto max-w-4xl px-4 pt-4 pb-8">
           {profileHeader}
           <div className="rounded-lg border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
             このユーザーは地図機能を公開していません。
@@ -149,7 +149,7 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
   return (
     <>
       <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
-      <div className="container mx-auto max-w-4xl px-4 py-8">
+      <div className="container mx-auto max-w-4xl px-4 pt-4 pb-8">
         {profileHeader}
 
         <div className="mb-3 flex items-center justify-between">

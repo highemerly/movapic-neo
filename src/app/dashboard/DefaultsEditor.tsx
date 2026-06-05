@@ -65,6 +65,8 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
 
   const [mentionKeep, setMentionKeep] = useState(initial.mentionKeep);
   const [isMentionKeepSaving, setIsMentionKeepSaving] = useState(false);
+  const [mentionKeepSaveState, setMentionKeepSaveState] = useState<SaveState>("idle");
+  const [mentionKeepError, setMentionKeepError] = useState<string | null>(null);
 
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -73,11 +75,18 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
   const isFirstRender = useRef(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mentionKeepSavedClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flashSaved = () => {
     setSaveState("saved");
     if (savedClearRef.current) clearTimeout(savedClearRef.current);
     savedClearRef.current = setTimeout(() => setSaveState("idle"), 1500);
+  };
+
+  const flashMentionKeepSaved = () => {
+    setMentionKeepSaveState("saved");
+    if (mentionKeepSavedClearRef.current) clearTimeout(mentionKeepSavedClearRef.current);
+    mentionKeepSavedClearRef.current = setTimeout(() => setMentionKeepSaveState("idle"), 1500);
   };
 
   useEffect(() => {
@@ -128,8 +137,8 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
     const next = !mentionKeep;
     setMentionKeep(next);
     setIsMentionKeepSaving(true);
-    setSaveState("saving");
-    setError(null);
+    setMentionKeepSaveState("saving");
+    setMentionKeepError(null);
     try {
       const response = await fetch("/api/v1/me", {
         method: "PATCH",
@@ -142,10 +151,10 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
         throw new Error(data?.error || "保存に失敗しました");
       }
       router.refresh();
-      flashSaved();
+      flashMentionKeepSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "保存に失敗しました");
-      setSaveState("error");
+      setMentionKeepError(err instanceof Error ? err.message : "保存に失敗しました");
+      setMentionKeepSaveState("error");
     } finally {
       setIsMentionKeepSaving(false);
     }
@@ -217,7 +226,24 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
     <div className="space-y-4">
       <label className="flex items-center justify-between gap-4 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
         <div className="flex-1 min-w-0">
-          <p className="text-sm">設定を保存する</p>
+          <p className="text-sm flex items-center flex-wrap gap-x-2">
+            設定を保存する
+            {saveState === "saving" && (
+              <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                保存中...
+              </span>
+            )}
+            {saveState === "saved" && (
+              <span className="flex items-center gap-1 text-xs font-normal text-green-600">
+                <Check className="h-3 w-3" />
+                保存しました
+              </span>
+            )}
+            {saveState === "error" && error && (
+              <span className="text-xs font-normal text-destructive">{error}</span>
+            )}
+          </p>
           <p className="text-xs text-muted-foreground">
             文字の合成オプションなど好みの設定を保存しておき、その設定を投稿時に初期値として読み込みます。保存の有無によらず、投稿時に上書きも可能です。原則、全ての投稿方法（Web、Bot、メール）が対象です。
           </p>
@@ -294,9 +320,24 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
 
       <label className="flex items-center justify-between gap-4 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
         <div className="flex-1 min-w-0">
-          <p className="text-sm">
+          <p className="text-sm flex items-center flex-wrap gap-x-2">
             元投稿を残す
-            <span className="ml-2 text-xs text-muted-foreground">※Bot投稿のみ</span>
+            <span className="text-xs font-normal text-muted-foreground">※Bot投稿のみ</span>
+            {mentionKeepSaveState === "saving" && (
+              <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                保存中...
+              </span>
+            )}
+            {mentionKeepSaveState === "saved" && (
+              <span className="flex items-center gap-1 text-xs font-normal text-green-600">
+                <Check className="h-3 w-3" />
+                保存しました
+              </span>
+            )}
+            {mentionKeepSaveState === "error" && mentionKeepError && (
+              <span className="text-xs font-normal text-destructive">{mentionKeepError}</span>
+            )}
           </p>
           <p className="text-xs text-muted-foreground">
             初期設定では、Botにメンションを送って投稿した時、その投稿は自動で削除され、新しい投稿で上書きされます。このオプションが有効であれば、元の投稿を自動で削除しません。
@@ -321,24 +362,6 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
           className="sr-only"
         />
       </label>
-
-      <div className="flex items-center gap-2 text-xs text-muted-foreground min-h-4">
-        {saveState === "saving" && (
-          <>
-            <Loader2 className="h-3 w-3 animate-spin" />
-            <span>保存中...</span>
-          </>
-        )}
-        {saveState === "saved" && (
-          <>
-            <Check className="h-3 w-3 text-green-600" />
-            <span className="text-green-600">保存しました</span>
-          </>
-        )}
-        {saveState === "error" && error && (
-          <span className="text-destructive">{error}</span>
-        )}
-      </div>
     </div>
   );
 }
