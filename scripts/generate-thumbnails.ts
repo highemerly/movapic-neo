@@ -27,8 +27,8 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 const BATCH_SIZE = 100;
-const THUMBNAIL_SIZE = 64;
-const THUMBNAIL_QUALITY = 60;
+const THUMBNAIL_SIZE = 96;
+const THUMBNAIL_QUALITY = 75;
 
 // クロップ位置を決定
 function getCropPosition(
