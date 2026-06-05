@@ -148,8 +148,8 @@ jobs:
             ${{ needs.build-and-push.outputs.has_migration == 'true' && '### マイグレーション実行手順' || '' }}
             ${{ needs.build-and-push.outputs.has_migration == 'true' && '```bash' || '' }}
             ${{ needs.build-and-push.outputs.has_migration == 'true' && 'kubectl port-forward -n shared-postgres-prd svc/postgres-rw 15432:5432' || '' }}
-            ${{ needs.build-and-push.outputs.has_migration == 'true' && 'DATABASE_URL="postgresql://<username>:<password>@localhost:15433/movapic?sslmode=disable&schema=public" npx prisma migrate status' || '' }}
-            ${{ needs.build-and-push.outputs.has_migration == 'true' && 'DATABASE_URL="postgresql://<username>:<password>@localhost:15433/movapic?sslmode=disable&schema=public" npx prisma migrate deploy' || '' }}
+            ${{ needs.build-and-push.outputs.has_migration == 'true' && 'DATABASE_URL="postgresql://<username>:<password>@localhost:15432/movapic?sslmode=disable&schema=public" npx prisma migrate status' || '' }}
+            ${{ needs.build-and-push.outputs.has_migration == 'true' && 'DATABASE_URL="postgresql://<username>:<password>@localhost:15432/movapic?sslmode=disable&schema=public" npx prisma migrate deploy' || '' }}
             ${{ needs.build-and-push.outputs.has_migration == 'true' && '```' || '' }}
 
             ---
