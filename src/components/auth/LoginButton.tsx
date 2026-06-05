@@ -99,18 +99,18 @@ export function LoginButton({ allowedServers, callbackUrl }: LoginButtonProps) {
   };
 
   const agreementCheckbox = (
-    <div className="flex items-start justify-center gap-2">
+    <div className="flex items-center justify-center gap-2.5">
       <Checkbox
         id="agree"
         checked={agreed}
         onCheckedChange={(checked) => setAgreed(checked === true)}
-        className="mt-0.5"
+        className="size-5"
       />
-      <label htmlFor="agree" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+      <label htmlFor="agree" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
         <Link href="/terms" className="underline hover:text-foreground">利用規約</Link>
-        および
+        ・
         <Link href="/privacy" className="underline hover:text-foreground">プライバシーポリシー</Link>
-        に同意します
+        に同意する
       </label>
     </div>
   );
