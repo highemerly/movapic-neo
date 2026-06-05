@@ -75,6 +75,8 @@ model LoginSession {
   userAgent String?  @map("user_agent") @db.VarChar(500)
   country   String?  @db.VarChar(2)
   createdAt DateTime @default(now()) @map("created_at")
+  // 失効日時。nullなら有効。本人がセッションを失効させると設定される
+  revokedAt DateTime? @map("revoked_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

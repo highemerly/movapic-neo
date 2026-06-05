@@ -152,14 +152,19 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     return null;
   }
 
-  // ユーザーとインスタンスをDBから取得
-  const user = await prisma.user.findUnique({
-    where: { id: payload.userId },
+  // ユーザー存在 + セッション未失効 を1クエリで検証（EXISTSサブクエリ）。
+  // jti は @unique インデックスのため追加クエリ・追加負荷なし。
+  // fail-closed: 対応する LoginSession が無い/失効済みなら未認証扱い。
+  const user = await prisma.user.findFirst({
+    where: {
+      id: payload.userId,
+      loginSessions: { some: { jti: payload.jti, revokedAt: null } },
+    },
     include: { instance: true },
   });
 
   if (!user) {
-    // ユーザーが削除されている場合はセッション無効
+    // ユーザーが削除された / セッションが失効した場合はセッション無効
     return null;
   }
 
@@ -186,14 +191,17 @@ export async function getCurrentUserWithValidation(): Promise<SessionUserWithTok
     return null;
   }
 
-  // ユーザーとインスタンスをDBから取得して存在確認
-  const user = await prisma.user.findUnique({
-    where: { id: payload.userId },
+  // ユーザー存在 + セッション未失効 を1クエリで検証（getCurrentUserと同様）
+  const user = await prisma.user.findFirst({
+    where: {
+      id: payload.userId,
+      loginSessions: { some: { jti: payload.jti, revokedAt: null } },
+    },
     include: { instance: true },
   });
 
   if (!user) {
-    // ユーザーが削除されている場合
+    // ユーザーが削除された / セッションが失効した場合
     return null;
   }
 
@@ -226,4 +234,20 @@ export async function getCurrentUserId(): Promise<string | null> {
 export async function getCurrentSessionJti(): Promise<string | null> {
   const payload = await getSessionPayload();
   return payload?.jti ?? null;
+}
+
+/**
+ * 指定したセッションを失効させる（本人のもののみ）
+ * userId で絞ることで他人のセッションを失効できないようにする（IDOR対策）。
+ * @returns 失効に成功したら true、対象が見つからない/他人のものなら false
+ */
+export async function revokeSession(
+  userId: string,
+  sessionId: string
+): Promise<boolean> {
+  const result = await prisma.loginSession.updateMany({
+    where: { id: sessionId, userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  return result.count > 0;
 }

@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { parseUserAgent } from "@/lib/auth/uaParser";
 import prisma from "@/lib/db";
+import { RevokeSessionButton } from "./RevokeSessionButton";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,7 @@ export default async function SessionsPage() {
 
         <h1 className="text-lg font-semibold mb-2">ログイン履歴</h1>
         <p className="text-xs text-muted-foreground mb-6">
-          直近90日間のログイン履歴を表示しています。これより古い履歴は自動的に削除されます。身に覚えのないログインがある場合は、Fediverseの連携アプリ・アクセストークンを無効化してください。
+          直近90日間のログイン履歴を表示しています。これより古い履歴は自動的に削除されます。身に覚えのないログインは「失効させる」でそのセッションを無効化できます。あわせてFediverseの連携アプリ・アクセストークンの無効化もご検討ください。
         </p>
 
         {sessions.length === 0 ? (
@@ -59,10 +60,13 @@ export default async function SessionsPage() {
             {sessions.map((session) => {
               const { browser, os } = parseUserAgent(session.userAgent);
               const isCurrent = session.jti === currentJti;
+              const isRevoked = session.revokedAt !== null;
               return (
                 <li
                   key={session.id}
-                  className="bg-muted rounded-lg p-4 text-sm"
+                  className={`bg-muted rounded-lg p-4 text-sm ${
+                    isRevoked ? "opacity-60" : ""
+                  }`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <time
@@ -71,10 +75,16 @@ export default async function SessionsPage() {
                     >
                       {dateFormatter.format(session.createdAt)}
                     </time>
-                    {isCurrent && (
+                    {isCurrent ? (
                       <span className="text-xs bg-primary text-primary-foreground rounded-full px-2 py-0.5">
                         現在のセッション
                       </span>
+                    ) : isRevoked ? (
+                      <span className="text-xs bg-muted-foreground/20 text-muted-foreground rounded-full px-2 py-0.5">
+                        失効済み
+                      </span>
+                    ) : (
+                      <RevokeSessionButton sessionId={session.id} />
                     )}
                   </div>
                   <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs text-muted-foreground">
