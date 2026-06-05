@@ -39,9 +39,9 @@ function LogoutMenuItem() {
     <DropdownMenuItem
       onClick={handleLogout}
       disabled={isLoading}
-      className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
+      className="flex items-center gap-3 cursor-pointer text-destructive focus:text-destructive py-3 text-base"
     >
-      <LogOut className="h-4 w-4" />
+      <LogOut className="h-5 w-5" />
       {isLoading ? "処理中..." : "ログアウト"}
     </DropdownMenuItem>
   );
@@ -64,39 +64,39 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
                 <span className="sr-only">メニューを開く</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-56">
               {user && (
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard" className="flex items-center gap-2 cursor-pointer">
-                    <LayoutDashboard className="h-4 w-4" />
+                <DropdownMenuItem asChild className="py-3 text-base">
+                  <Link href="/dashboard" className="flex items-center gap-3 cursor-pointer">
+                    <LayoutDashboard className="h-5 w-5" />
                     ダッシュボード
                   </Link>
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem asChild>
-                <Link href="/create" className="flex items-center gap-2 cursor-pointer font-semibold">
-                  <ImagePlus className="h-4 w-4" />
+              <DropdownMenuItem asChild className="py-3 text-base">
+                <Link href="/create" className="flex items-center gap-3 cursor-pointer font-semibold">
+                  <ImagePlus className="h-5 w-5" />
                   写真を投稿
                 </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/public" className="flex items-center gap-2 cursor-pointer">
-                  <Globe className="h-4 w-4" />
+              <DropdownMenuItem asChild className="py-3 text-base">
+                <Link href="/public" className="flex items-center gap-3 cursor-pointer">
+                  <Globe className="h-5 w-5" />
                   みんなの投稿
                 </Link>
               </DropdownMenuItem>
               {user && (
-                <DropdownMenuItem asChild>
-                  <Link href={`/u/${user.username}`} className="flex items-center gap-2 cursor-pointer">
-                    <Images className="h-4 w-4" />
+                <DropdownMenuItem asChild className="py-3 text-base">
+                  <Link href={`/u/${user.username}`} className="flex items-center gap-3 cursor-pointer">
+                    <Images className="h-5 w-5" />
                     プロフィール
                   </Link>
                 </DropdownMenuItem>
               )}
               {user && (
-                <DropdownMenuItem asChild>
-                  <Link href="/favorite" className="flex items-center gap-2 cursor-pointer">
-                    <Heart className="h-4 w-4" />
+                <DropdownMenuItem asChild className="py-3 text-base">
+                  <Link href="/favorite" className="flex items-center gap-3 cursor-pointer">
+                    <Heart className="h-5 w-5" />
                     お気に入り
                   </Link>
                 </DropdownMenuItem>
