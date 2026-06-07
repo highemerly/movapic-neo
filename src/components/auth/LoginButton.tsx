@@ -110,7 +110,7 @@ export function LoginButton({ allowedServers, callbackUrl }: LoginButtonProps) {
         <Link href="/terms" className="underline hover:text-foreground">利用規約</Link>
         ・
         <Link href="/privacy" className="underline hover:text-foreground">プライバシーポリシー</Link>
-        に同意する
+        に同意
       </label>
     </div>
   );

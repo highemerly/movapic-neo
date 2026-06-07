@@ -16,7 +16,7 @@ import {
   sanitizeRedirectUrl,
 } from "@/lib/auth/crypto";
 import { encryptToken } from "@/lib/auth/tokens";
-import { createSession } from "@/lib/auth/session";
+import { createSession, getCurrentUser } from "@/lib/auth/session";
 import { extractLoginRequestInfo } from "@/lib/auth/requestInfo";
 import prisma from "@/lib/db";
 
@@ -47,6 +47,19 @@ export async function GET(request: NextRequest) {
     // State検証
     const savedState = cookieStore.get(OAUTH_STATE_COOKIE)?.value;
     if (!savedState || savedState !== state) {
+      // 重複コールバック対策: 1回目の成功でstate/sessionクッキーは削除されるため、
+      // 同じコールバックが二重に来ると2回目はここで弾かれてしまう。
+      // 既にログイン済みなら直前の成功の重複とみなし、成功先へ送る。
+      // （このフォールバックではセッションを新規作成しないためログインCSRFは防げる）
+      const existingUser = await getCurrentUser();
+      if (existingUser) {
+        console.warn("[oauth] duplicate mastodon callback detected; treating as success");
+        const stateData = verifyOAuthState(state);
+        const redirectTo = stateData
+          ? sanitizeRedirectUrl(stateData.callbackUrl)
+          : "/dashboard";
+        return NextResponse.redirect(new URL(redirectTo, baseUrl));
+      }
       return NextResponse.redirect(new URL("/?error=invalid_state", baseUrl));
     }
 
