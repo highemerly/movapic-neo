@@ -15,7 +15,8 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   K8S_REPO: highemerly/k8sg1-repo
-  K8S_MANIFEST_PATH: manifests/movapic-neo/prd/web.yaml
+  # web と worker は同一イメージ・同一タグ。両方のマニフェストを更新する（スペース区切り）。
+  K8S_MANIFEST_PATHS: "manifests/movapic-neo/prd/web.yaml manifests/movapic-neo/prd/worker.yaml"
 
 jobs:
   build-and-push:
@@ -128,7 +129,9 @@ jobs:
       - name: Update image tag
         run: |
           cd k8s-repo
-          sed -i "s|image: ghcr.io/highemerly/movapic-neo:.*|image: ghcr.io/highemerly/movapic-neo:${{ needs.build-and-push.outputs.version }}|" ${{ env.K8S_MANIFEST_PATH }}
+          for p in ${{ env.K8S_MANIFEST_PATHS }}; do
+            sed -i "s|image: ghcr.io/highemerly/movapic-neo:.*|image: ghcr.io/highemerly/movapic-neo:${{ needs.build-and-push.outputs.version }}|" "$p"
+          done
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v6

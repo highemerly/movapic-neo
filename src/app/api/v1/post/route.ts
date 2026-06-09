@@ -4,15 +4,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "crypto";
 import sharp from "sharp";
 import { getCurrentUserWithValidation } from "@/lib/auth/session";
 import { decryptToken } from "@/lib/auth/tokens";
-import { uploadImage, generateStorageKey, getExtensionFromMimeType } from "@/lib/storage/storage";
-import { postToMastodon, postToMisskey, MastodonVisibility, MisskeyVisibility } from "@/lib/fediverse/post";
-import { generateThumbnail, generateThumbnailKey } from "@/lib/thumbnail";
 import { reverseGeocode } from "@/lib/geocode/gsi";
-import prisma from "@/lib/db";
+import { publishImage, PublishVisibility } from "@/lib/publish/publishImage";
 import {
   Position,
   FontFamily,
@@ -116,20 +112,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 画像IDを生成
-    const imageId = randomUUID();
-    const extension = getExtensionFromMimeType(mimeType);
-    const storageKey = generateStorageKey(imageId, extension);
-    const filename = `movapic-${imageId}.${extension}`;
-
-    // R2にアップロード
-    await uploadImage(imageBuffer, storageKey, mimeType);
-
-    // サムネイルを生成してR2にアップロード
-    const thumbnailKey = generateThumbnailKey(storageKey);
-    const thumbnailBuffer = await generateThumbnail(imageBuffer, position);
-    await uploadImage(thumbnailBuffer, thumbnailKey, "image/webp");
-
     // 位置情報: locationOption が pref / city の時だけサーバー側で再ジオコーディングして
     // 保存（権威データをサーバー側で確定するため、クライアントからの prefecture/city 文字列は
     // そのまま保存せず GPS座標から逆引きする）。
@@ -153,112 +135,46 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // DBに保存
-    const image = await prisma.image.create({
-      data: {
-        id: imageId,
-        userId: user.id,
-        storageKey,
-        filename,
-        mimeType,
-        fileSize: imageBuffer.length,
-        width: metadata.width || 0,
-        height: metadata.height || 0,
-        overlayText: text,
-        position,
-        font,
-        color,
-        size,
-        outputFormat: output,
-        arrangement,
-        thumbnailKey,
-        source: "web",
-        isPublic: true,
-        cameraMake,
-        cameraModel,
-        capturedAt,
-        locationPrefecture,
-        locationCity,
+    // 公開範囲を正規化（フォーム値は null や任意文字列になりうる）
+    const publishVisibility: PublishVisibility =
+      visibility === "local" ? "local" : visibility === "unlisted" ? "unlisted" : "public";
+
+    // 保存→投稿（投稿失敗でも画像は残す＝web/email共通ポリシー）
+    const result = await publishImage({
+      buffer: imageBuffer,
+      contentType: mimeType,
+      user: {
+        id: user.id,
+        username: user.username,
+        accessToken: decryptToken(user.accessToken),
+        instance: { domain: user.instance.domain, type: user.instance.type },
       },
+      text,
+      options: { position, font, color, size, outputFormat: output, arrangement },
+      source: "web",
+      visibility: publishVisibility,
+      persistOnPostFailure: true,
+      dimensions: { width: metadata.width || 0, height: metadata.height || 0 },
+      extras: { cameraMake, cameraModel, capturedAt, locationPrefecture, locationCity },
     });
 
-    // 画像の詳細ページURL
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-    const imagePageUrl = `${appUrl}/u/${user.username}/status/${imageId}`;
-
-    // localの場合はFediverseに投稿しない（サービス内保存のみ）
-    if (visibility === "local") {
-      return NextResponse.json({
-        success: true,
-        imageId: image.id,
-        imagePageUrl,
-      });
-    }
-
-    // アクセストークンを復号化
-    const accessToken = decryptToken(user.accessToken);
-
-    // Fediverseに投稿
-    let postResult;
-    if (user.instance.type === "mastodon") {
-      // MastodonのvisibilityはUIと同じ（public, unlisted）
-      const mastodonVisibility: MastodonVisibility = visibility === "unlisted" ? "unlisted" : "public";
-      postResult = await postToMastodon(
-        user.instance.domain,
-        accessToken,
-        imageBuffer,
-        mimeType,
-        filename,
-        text,
-        imagePageUrl,
-        mastodonVisibility
-      );
-    } else if (user.instance.type === "misskey") {
-      // Misskeyではunlistedがhomeに相当
-      const misskeyVisibility: MisskeyVisibility = visibility === "unlisted" ? "home" : "public";
-      postResult = await postToMisskey(
-        user.instance.domain,
-        accessToken,
-        imageBuffer,
-        mimeType,
-        filename,
-        text,
-        imagePageUrl,
-        misskeyVisibility
-      );
-    } else {
-      return NextResponse.json(
-        { error: "サポートされていないプラットフォームです" },
-        { status: 400 }
-      );
-    }
-
-    if (!postResult.success) {
-      // 投稿に失敗した場合、保存した画像を削除（オプション）
-      // ここでは保存は維持して、エラーメッセージを返す
+    if (result.postError) {
+      // 投稿に失敗した場合も画像は保存済み。エラーメッセージとともに imageId を返す。
       return NextResponse.json(
         {
-          error: postResult.error || "投稿に失敗しました",
-          imageId: image.id,
-          imagePageUrl,
+          error: result.postError,
+          imageId: result.imageId,
+          imagePageUrl: result.imagePageUrl,
         },
         { status: 500 }
       );
     }
 
-    // postUrl/postIdをDBに保存（postIdはMastodonお気に入り連携で使用）
-    if (postResult.postUrl) {
-      await prisma.image.update({
-        where: { id: image.id },
-        data: { postUrl: postResult.postUrl, postId: postResult.postId },
-      });
-    }
-
     return NextResponse.json({
       success: true,
-      imageId: image.id,
-      imagePageUrl,
-      postUrl: postResult.postUrl,
+      imageId: result.imageId,
+      imagePageUrl: result.imagePageUrl,
+      postUrl: result.postUrl,
     });
   } catch (error) {
     console.error("Post error:", error);

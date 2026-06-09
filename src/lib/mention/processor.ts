@@ -3,12 +3,10 @@
  */
 
 import { randomUUID } from "crypto";
-import sharp from "sharp";
 import { prisma } from "@/lib/db";
 import { processImage } from "@/lib/imageProcessor";
-import { uploadImage, generateStorageKey } from "@/lib/storage/storage";
-import { generateThumbnail, generateThumbnailKey } from "@/lib/thumbnail";
-import { postToMastodon, MastodonVisibility } from "@/lib/fediverse/post";
+import { publishImage, PublishVisibility } from "@/lib/publish/publishImage";
+import { MastodonVisibility } from "@/lib/fediverse/post";
 import { decryptToken } from "@/lib/auth/tokens";
 import { MastodonNotification } from "./fetcher";
 import { parseMentionContent, formatOptionsSummary, ParsedMentionOptions } from "./parser";
@@ -213,20 +211,6 @@ function determineOutputFormat(instanceType: string): OutputFormat {
 }
 
 /**
- * DBのvisibility値をMastodon APIのvisibilityに変換
- */
-function convertToMastodonVisibility(visibility: string): MastodonVisibility {
-  // local の場合はFediverseに投稿しないので、ここでは public として扱う
-  if (visibility === "local") {
-    return "public";
-  }
-  if (visibility === "unlisted" || visibility === "private" || visibility === "direct") {
-    return visibility;
-  }
-  return "public";
-}
-
-/**
  * 1件のメンションを処理
  */
 export async function processOneMention(
@@ -410,59 +394,43 @@ export async function processOneMention(
     );
   }
 
-  // STEP8: R2にアップロード
-  const imageId = randomUUID();
-  const storageKey = generateStorageKey(imageId, processedImage.extension);
-  let thumbnailKey: string;
+  // STEP8-11: 保存→投稿（共通パイプライン）。
+  // mention は投稿成功時のみ保存し、失敗時はリトライさせる（persistOnPostFailure: false）。
+  let published;
   try {
-    await uploadImage(processedImage.buffer, storageKey, processedImage.contentType);
-
-    // サムネイルを生成してR2にアップロード
-    thumbnailKey = generateThumbnailKey(storageKey);
-    const thumbnailBuffer = await generateThumbnail(processedImage.buffer, options.position);
-    await uploadImage(thumbnailBuffer, thumbnailKey, "image/webp");
+    published = await publishImage({
+      buffer: processedImage.buffer,
+      contentType: processedImage.contentType,
+      user: {
+        id: user.id,
+        username: user.username,
+        accessToken: user.accessToken, // findUserByAcct で復号済み
+        instance: { domain: user.instance.domain, type: user.instance.type },
+      },
+      text,
+      options: {
+        position: options.position,
+        font: options.font,
+        color: options.color,
+        size: options.size,
+        outputFormat,
+        arrangement: options.arrangement,
+      },
+      source: "mention",
+      visibility: effectiveVisibility as PublishVisibility,
+      persistOnPostFailure: false,
+    });
   } catch (error) {
-    console.error(`[mention] R2アップロード失敗:`, error);
-    return handleError(
-      ErrorCodes.INTERNAL_ERROR,
-      "画像の保存に失敗しました。",
-      true
-    );
+    console.error(`[mention] 保存/投稿失敗:`, error);
+    return handleError(ErrorCodes.INTERNAL_ERROR, "画像の保存に失敗しました。", true);
   }
 
-  // 画像ページURL（Web版と共通の形式）
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-  const imagePageUrl = `${appUrl}/u/${user.username}/status/${imageId}`;
-
-  // STEP9: 再投稿（localの場合はスキップ）
-  const postVisibility = convertToMastodonVisibility(effectiveVisibility);
-  const shouldPostToFediverse = effectiveVisibility !== "local";
-  let postResult;
-
-  if (shouldPostToFediverse) {
-    try {
-      postResult = await postToMastodon(
-        user.instance.domain,
-        user.accessToken,
-        processedImage.buffer,
-        processedImage.contentType,
-        `movapic-${imageId}.${processedImage.extension}`,
-        text,
-        imagePageUrl,
-        postVisibility
-      );
-      if (!postResult.success) {
-        throw new Error(postResult.error);
-      }
-    } catch (error) {
-      console.error(`[mention] 再投稿失敗:`, error);
-      return handleError(
-        ErrorCodes.INTERNAL_ERROR,
-        "投稿に失敗しました。",
-        true
-      );
-    }
+  if (published.postError) {
+    console.error(`[mention] 再投稿失敗: ${published.postError}`);
+    return handleError(ErrorCodes.INTERNAL_ERROR, "投稿に失敗しました。", true);
   }
+
+  const imageId = published.imageId;
 
   // STEP10: 元投稿削除（effectiveKeepがfalseの場合のみ）
   if (!effectiveKeep) {
@@ -479,33 +447,6 @@ export async function processOneMention(
       console.warn(`[mention] URIからステータスIDを抽出できませんでした: ${notification.status!.uri}`);
     }
   }
-
-  // STEP11: DB保存
-  const metadata = await sharp(processedImage.buffer).metadata();
-  await prisma.image.create({
-    data: {
-      id: imageId,
-      userId: user.id,
-      storageKey,
-      filename: `movapic-${imageId}.${processedImage.extension}`,
-      mimeType: processedImage.contentType,
-      fileSize: processedImage.buffer.length,
-      width: metadata.width || 0,
-      height: metadata.height || 0,
-      overlayText: text,
-      position: options.position,
-      font: options.font,
-      color: options.color,
-      size: options.size,
-      outputFormat,
-      arrangement: options.arrangement,
-      thumbnailKey,
-      source: "mention",
-      isPublic: effectiveVisibility !== "local",
-      postUrl: postResult?.postUrl,
-      postId: postResult?.postId,
-    },
-  });
 
   // ProcessedMentionをsuccessに更新
   await prisma.processedMention.update({

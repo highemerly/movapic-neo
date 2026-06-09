@@ -1,0 +1,109 @@
+# =============================================================================
+# worker Deployment（雛形 / リファレンス）
+#
+# 注意: 本番の Deployment / Service / Ingress は外部の K8S_REPO 管理。
+#       このファイルは「workers tier をどう足すか」の参照テンプレート。
+#       実運用では K8S_REPO 側に取り込むこと。
+#
+# 設計:
+#   - web pod と「同一イメージ」を使う（画像加工の重い依存は1イメージに集約）。
+#   - workers pod は通常どおり Next.js サーバを起動し /api/v1/generate・/api/v1/post を
+#     HTTP 配信しつつ、RUN_WORKER=true により instrumentation.ts が Graphile Worker
+#     ランナーを in-process で起動して mail/bot ジョブをドレインする。
+#   - web pod 側は RUN_WORKER を設定しない（enqueue のみ／画像加工はしない）。
+#   - Traefik で /api/v1/generate と /api/v1/post を workers Service へ、
+#     それ以外を web Service へ振り分ける（末尾のIngressRoute例を参照）。
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: movapic-neo-worker
+  labels:
+    app: movapic-neo
+    component: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: movapic-neo
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: movapic-neo
+        component: worker
+    spec:
+      containers:
+        - name: worker
+          image: ghcr.io/highemerly/movapic-neo:latest # CIがタグ更新（web と同一イメージ）
+          ports:
+            - containerPort: 3000
+          env:
+            - name: RUN_WORKER
+              value: "true"
+            - name: WORKER_CONCURRENCY
+              value: "3"
+          # DATABASE_URL / R2(S3) 資格情報 / 暗号化キー / NEXT_PUBLIC_APP_URL /
+          # MASTODON_BOT_*（botリプライ用）など、web と同じ env を共有する。
+          envFrom:
+            - secretRef:
+                name: movapic-neo-secret
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            # 画像処理（libvips/skia）のピークに合わせて web より厚めに確保する。
+            limits:
+              cpu: "2"
+              memory: "1536Mi"
+          readinessProbe:
+            httpGet:
+              path: /api/auth/session
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/auth/session
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: movapic-neo-worker
+  labels:
+    app: movapic-neo
+    component: worker
+spec:
+  selector:
+    app: movapic-neo
+    component: worker
+  ports:
+    - port: 80
+      targetPort: 3000
+# =============================================================================
+# Traefik IngressRoute（例）— 画像加工エンドポイントだけ workers へ振り分ける。
+# 実際は K8S_REPO の既存 IngressRoute に統合すること。
+#
+# apiVersion: traefik.io/v1alpha1
+# kind: IngressRoute
+# metadata:
+#   name: movapic-neo
+# spec:
+#   entryPoints: [websecure]
+#   routes:
+#     # 画像加工（重い）→ workers
+#     - match: Host(`pic.handon.club`) && (PathPrefix(`/api/v1/generate`) || PathPrefix(`/api/v1/post`))
+#       kind: Rule
+#       services:
+#         - name: movapic-neo-worker
+#           port: 80
+#     # それ以外（ページ・読み取りAPI・producer受付）→ web
+#     - match: Host(`pic.handon.club`)
+#       kind: Rule
+#       services:
+#         - name: movapic-neo-web
+#           port: 80
+# =============================================================================

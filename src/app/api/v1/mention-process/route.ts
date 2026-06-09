@@ -1,6 +1,9 @@
 /**
- * メンション処理APIエンドポイント
- * CronJobから定期的に呼び出される
+ * メンション取り込みエンドポイント（producer）
+ * CronJobから定期的に呼び出される。
+ *
+ * ここでは Mastodon 通知を fetch して Graphile Worker に enqueue するだけ。
+ * 実際の画像処理・投稿は worker pod 側の process-mention タスクで実行される。
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -10,14 +13,11 @@ import {
   updateLastNotificationId,
   cleanupOldProcessedMentions,
 } from "@/lib/mention/fetcher";
-import { processOneMention } from "@/lib/mention/processor";
+import { enqueueMention } from "@/lib/queue";
 
 const getBotInstanceUrl = () => process.env.MASTODON_BOT_INSTANCE_URL || "https://handon.club";
 const getBotAccessToken = () => process.env.MASTODON_BOT_ACCESS_TOKEN || "";
 const getMentionProcessApiKey = () => process.env.MENTION_PROCESS_API_KEY || "";
-
-// 1回のCronJobにつき、ユーザーあたりの最大処理数
-const MAX_MENTIONS_PER_USER = 3;
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -64,17 +64,13 @@ export async function POST(request: NextRequest) {
     const notifications = await fetchMentionNotifications(botInstanceUrl, botAccessToken, 10);
 
     if (notifications.length === 0) {
-      // クリーンアップは実行
       const cleanedCount = await cleanupOldProcessedMentions();
       if (cleanedCount > 0) {
         console.log(`[mention-process] Cleaned up ${cleanedCount} old records`);
       }
-
       return NextResponse.json({
         success: true,
-        processed: 0,
-        skipped: 0,
-        failed: 0,
+        enqueued: 0,
         duration: Date.now() - startTime,
       });
     }
@@ -83,64 +79,32 @@ export async function POST(request: NextRequest) {
     // 通知は新しい順で返されるので、最初の要素が最新
     const latestNotificationId = notifications[0].id;
     await updateLastNotificationId(latestNotificationId);
-    console.log(`[mention-process] Updated lastNotificationId to ${latestNotificationId}`);
 
-    // 各通知を処理（古い順に処理するため逆順）
-    let processed = 0;
-    let skipped = 0;
+    // 古い順に enqueue（dedup は jobKey=mention:statusId で担保）
+    let enqueued = 0;
     let failed = 0;
-    let rateLimited = 0;
-
-    // ユーザーごとの処理数をカウント
-    const userProcessCount = new Map<string, number>();
-
     for (const notification of notifications.reverse()) {
-      const userAcct = notification.account.acct;
-
-      // ユーザーごとの制限をチェック
-      const currentCount = userProcessCount.get(userAcct) || 0;
-      if (currentCount >= MAX_MENTIONS_PER_USER) {
-        rateLimited++;
-        console.log(`[mention-process] Rate limited ${notification.id}: user @${userAcct} exceeded ${MAX_MENTIONS_PER_USER} mentions per batch`);
-        continue;
-      }
-
       try {
-        console.log(`[mention-process] Processing notification ${notification.id} from @${userAcct}`);
-        const result = await processOneMention(notification);
-
-        if (result.skipped) {
-          skipped++;
-          console.log(`[mention-process] Skipped ${notification.id}: already processed`);
-        } else if (result.success) {
-          processed++;
-          userProcessCount.set(userAcct, currentCount + 1);
-          console.log(`[mention-process] Success ${notification.id}`);
-        } else {
-          failed++;
-          console.log(`[mention-process] Failed ${notification.id}: ${result.error}`);
-        }
+        await enqueueMention({ notification });
+        enqueued++;
       } catch (error) {
         failed++;
-        console.error(`[mention-process] Error processing ${notification.id}:`, error);
+        console.error(`[mention-process] enqueue failed for ${notification.id}:`, error);
       }
     }
 
-    // 古いProcessedMentionをクリーンアップ
     const cleanedCount = await cleanupOldProcessedMentions();
     if (cleanedCount > 0) {
       console.log(`[mention-process] Cleaned up ${cleanedCount} old records`);
     }
 
     const duration = Date.now() - startTime;
-    console.log(`[mention-process] Done: processed=${processed}, skipped=${skipped}, failed=${failed}, rateLimited=${rateLimited}, duration=${duration}ms`);
+    console.log(`[mention-process] Done: enqueued=${enqueued}, failed=${failed}, duration=${duration}ms`);
 
     return NextResponse.json({
       success: true,
-      processed,
-      skipped,
+      enqueued,
       failed,
-      rateLimited,
       duration,
     });
   } catch (error) {

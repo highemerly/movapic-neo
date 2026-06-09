@@ -7,33 +7,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import sharp from "sharp";
 import { parseEmail } from "@/lib/email/parser";
-import { processImage } from "@/lib/imageProcessor";
-import { uploadImage, generateStorageKey, getExtensionFromMimeType } from "@/lib/storage/storage";
-import { generateThumbnail, generateThumbnailKey } from "@/lib/thumbnail";
+import { uploadImage } from "@/lib/storage/storage";
+import { enqueueEmail } from "@/lib/queue";
 import { verifyRequestSignature, hashRequestBody } from "@/lib/auth/crypto";
 import prisma from "@/lib/db";
 import { MAX_TEXT_LENGTH, MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from "@/types";
-import {
-  ErrorCodes,
-  ImageProcessError,
-  errorResponse,
-  handleImageProcessError,
-  handleUnknownError,
-} from "@/lib/errors";
-
-// 処理タイムアウト
-const PROCESS_TIMEOUT_MS = 15000;
-
-function withTimeout<T>(promise: Promise<T>, ms: number, requestId: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new ImageProcessError("タイムアウト", "composite", requestId)), ms)
-    ),
-  ]);
-}
+import { ErrorCodes, errorResponse, handleUnknownError } from "@/lib/errors";
 
 export async function POST(request: NextRequest) {
   const requestId = `email-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -169,112 +149,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 出力形式をインスタンスタイプから決定
-    const outputFormat = user.instance.type === "misskey" ? "misskey" : "mastodon";
+    // 元画像を R2 一時領域へ保存し、文字入れ〜投稿は worker に委譲する（producer は受付のみ）。
+    const ext = contentType.split("/")[1]?.replace(/[^a-z0-9]/gi, "") || "bin";
+    const sourceStorageKey = `tmp/email/${randomUUID()}.${ext}`;
+    await uploadImage(parsed.image.buffer, sourceStorageKey, parsed.image.contentType);
 
-    // 画像処理
-    const result = await withTimeout(
-      processImage({
-        imageBuffer: parsed.image.buffer,
-        text: parsed.text,
-        position: parsed.options.position,
-        color: parsed.options.color,
-        size: parsed.options.size,
-        font: parsed.options.font,
-        output: outputFormat,
-        arrangement: parsed.options.arrangement,
-        requestId,
-      }),
-      PROCESS_TIMEOUT_MS,
-      requestId
-    );
-
-    // R2にアップロード
-    const imageId = randomUUID();
-    const extension = getExtensionFromMimeType(result.contentType);
-    const storageKey = generateStorageKey(imageId, extension);
-
-    await uploadImage(result.buffer, storageKey, result.contentType);
-
-    // サムネイルを生成してR2にアップロード
-    const thumbnailKey = generateThumbnailKey(storageKey);
-    const thumbnailBuffer = await generateThumbnail(result.buffer, parsed.options.position);
-    await uploadImage(thumbnailBuffer, thumbnailKey, "image/webp");
-
-    // 画像メタデータを取得
-    const metadata = await sharp(result.buffer).metadata();
-
-    // Fediverseに投稿
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-    const imagePageUrl = `${appUrl}/u/${user.username}/status/${imageId}`;
-    const { postToMastodon, postToMisskey } = await import("@/lib/fediverse/post");
-    const { decryptToken } = await import("@/lib/auth/tokens");
-    const accessToken = decryptToken(user.accessToken);
-
-    let postUrl: string | undefined;
-    if (user.instance.type === "mastodon") {
-      const postResult = await postToMastodon(
-        user.instance.domain,
-        accessToken,
-        result.buffer,
-        result.contentType,
-        `movapic-${imageId}.${extension}`,
-        parsed.text,
-        imagePageUrl,
-        "public"
-      );
-      postUrl = postResult.postUrl;
-    } else if (user.instance.type === "misskey") {
-      const postResult = await postToMisskey(
-        user.instance.domain,
-        accessToken,
-        result.buffer,
-        result.contentType,
-        `movapic-${imageId}.${extension}`,
-        parsed.text,
-        imagePageUrl,
-        "public"
-      );
-      postUrl = postResult.postUrl;
-    }
-
-    // DBに保存
-    await prisma.image.create({
-      data: {
-        id: imageId,
-        userId: user.id,
-        storageKey,
-        filename: `movapic-${imageId}.${extension}`,
-        mimeType: result.contentType,
-        fileSize: result.buffer.length,
-        width: metadata.width || 0,
-        height: metadata.height || 0,
-        overlayText: parsed.text,
+    await enqueueEmail({
+      userId: user.id,
+      text: parsed.text,
+      options: {
         position: parsed.options.position,
         font: parsed.options.font,
         color: parsed.options.color,
         size: parsed.options.size,
-        outputFormat,
         arrangement: parsed.options.arrangement,
-        thumbnailKey,
-        source: "email",
-        isPublic: true,
-        postUrl,
       },
+      sourceStorageKey,
+      sourceContentType: parsed.image.contentType,
     });
 
-    return NextResponse.json({
-      success: true,
-      imageId,
-      storageKey,
-    });
+    return NextResponse.json({ success: true, queued: true }, { status: 202 });
   } catch (error) {
-    // 画像処理エラー（ステージ別）
-    if (error instanceof ImageProcessError) {
-      console.error(`[email-generate] rid=${requestId} IMAGE_PROCESS_ERROR: stage=${error.stage}, message=${error.message}`);
-      return handleImageProcessError(error);
-    }
-
     return handleUnknownError(error, requestId);
   }
 }
