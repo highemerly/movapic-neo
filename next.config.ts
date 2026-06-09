@@ -31,4 +31,9 @@ const nextConfig: NextConfig = {
 
 export default nextConfig;
 
-import('@opennextjs/cloudflare').then(m => m.initOpenNextCloudflareForDev());
+// OpenNext の Cloudflare バインディング初期化は開発時のみ実行する。
+// 本番ビルド（next build / Docker standalone）では workerd を起動しようとして ENOENT で失敗するため、
+// NODE_ENV が development のときに限定する。
+if (process.env.NODE_ENV === "development") {
+  void import('@opennextjs/cloudflare').then(m => m.initOpenNextCloudflareForDev());
+}
