@@ -21,7 +21,7 @@ export default async function PrivacyPage() {
           <div className="space-y-4">
 
             <p className="text-sm text-muted-foreground">
-              本サービス（以下「SHAMEZO」）は、個人情報保護法をはじめとする関連法令を遵守し、ユーザーの個人情報を適切に取り扱います。
+              SHAMEZO（以下「本サービス」）は、個人情報保護法をはじめとする関連法令を遵守し、ユーザーの個人情報を適切に取り扱います。そのために、以下のとおりプライバシーポリシーを定めます。
             </p>
 
             <div className="bg-muted rounded-lg p-4">
@@ -47,7 +47,7 @@ export default async function PrivacyPage() {
                   <p className="text-xs text-muted-foreground mt-1">※ ユーザー自身が不審なログインを確認できるようダッシュボードに表示するために保存します。最終ログインから90日経過した履歴は自動的に削除されます。</p>
                 </div>
                 <div>
-                  <p className="text-ms text-muted-foreground font-medium mb-1">HTTPアクセスにより機械的に収集される情報</p>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">HTTPアクセスにより収集される情報</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                     <li>IPアドレス</li>
                     <li>IPアドレスから推定される接続元の国や地域の情報</li>
@@ -73,13 +73,19 @@ export default async function PrivacyPage() {
                     <li>撮影場所（都道府県または都道府県+市区町村）<span className="text-xs">※詳細な位置情報（GPSの緯度経度）は保存されません。都道府県または市区町村レベルに変換した結果のみを取得します。</span></li>
                   </ul>
                 </div>
+                <div>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">メール投稿機能を利用した場合にメールから取得する情報</p>
+                  <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                    <li>送信元メールアドレス（エンベロープ送信者およびFromヘッダ）</li>
+                  </ul>
+                </div>
               </div>
             </div>
 
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-3">Cookieの使用</p>
               <p className="text-sm text-muted-foreground mb-3">
-                本サービスでは以下の目的でのみCookieを使用しています。広告やトラッキング目的でのCookie使用は行っておりません。
+              本サービスでは基本的なサービスを提供するため、以下の用途でCookieを使用しています（広告やトラッキング目的でのCookie使用は行っておりません）。
               </p>
               <div className="space-y-3">
                 <div>
@@ -109,21 +115,25 @@ export default async function PrivacyPage() {
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">情報の利用目的</p>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                <li>画像生成・投稿サービスの提供</li>
-                <li>ユーザー認証およびセッション管理</li>
-                <li>Fediverseへの投稿機能の提供</li>
-                <li>サービスの改善・開発</li>
-                <li>不正利用防止・セキュリティ対策</li>
-              </ul>
+                <li>画像の生成サービス、画像およびコメントの投稿・閲覧サービス、Fediverseサーバーへの投稿サービス、それらを核としたソーシャルネットワーキングサービスの提供（サービス提供に必要なユーザー認証およびセッション管理を含む）</li>
+                <li>ユーザー自身が各種情報を確認する機能の提供</li>
+                <li>ユーザーからの問い合わせへの回答（本人確認を含む）</li>
+                <li>利用規約ユーザーや不正利用ユーザーの特定および利用停止</li>
+                <li>技術的不具合の原因解析（ただし、ブラウザ情報など、やむを得ず必要となる場合に限る）</li>
+              </ul>          
             </div>
 
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">セキュリティ対策、プライバシー保護</p>
+              <p className="text-sm text-muted-foreground mb-3">
+              本サービスの管理者は、取り扱う個人情報の漏えい・滅失・毀損を防止し、安全に管理するために必要かつ適切な安全管理措置を講じるものとします。
+              </p>              
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                <li>全ての通信はHTTPSで暗号化されています</li>
-                <li>アップロードされ生成された画像のEXIF情報（GPS位置情報、カメラ情報等）は常に削除され、出力画像にはメタデータが含まれません</li>
+                <li>全ての通信はHTTPSで暗号化します</li>
+                <li>アップロードされ生成された画像のEXIF情報（GPS位置情報、カメラ情報等）は常に削除し、出力画像にはメタデータが含まれないようにします</li>
                 <li>カメラ機種名・撮影場所は、投稿時にユーザーが明示的に選択した場合に限り、選択範囲のみをサービスのデータベースに保存し、初期値では保存しません（「オプトイン」方式）</li>
-                <li>Fediverse（Mastodon/Misskey）の認証トークンなど重要な情報は暗号化したうえで保存されます</li>
+                <li>Fediverse（Mastodon/Misskey）の認証トークンなど重要な情報は暗号化したうえで保存します</li>
+                <li>重要なデータやアクセスログはバックアップを取得し適切に保管します</li>
               </ul>
             </div>
 
@@ -133,19 +143,20 @@ export default async function PrivacyPage() {
                 <div>
                   <p className="text-ms text-muted-foreground font-medium mb-1">Fediverse（Mastodon/Misskey）</p>
                   <p className="text-sm text-muted-foreground">
-                    ユーザーが投稿を選択した場合、生成した画像とテキストが連携先のFediverseサーバーに投稿されます。
+                    ユーザーが投稿する際、生成した画像・テキストは連携先のFediverseサーバーに投稿されます。各サーバーのプライバシーポリシーもご参照ください。
                   </p>
                 </div>
                 <div>
-                  <p className="text-ms text-muted-foreground font-medium mb-1">国土地理院 逆ジオコーディングAPI</p>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">国土地理院</p>
                   <p className="text-sm text-muted-foreground">
-                    投稿時、ユーザーが撮影場所を投稿することを明示的に選択した場合に限り、写真のEXIF情報から抽出したGPS緯度経度を国土地理院の逆ジオコーディングAPIに送信し、市区町村コードを取得します。送信先には個人を特定しうる情報（ユーザー名、アカウントID、IPアドレス、画像等）は含めずに情報を送信します。撮影場所を投稿しない場合には送信されません。
+                    国土地理院の逆ジオコーディングAPIを利用しています。ユーザーが撮影場所を投稿することを明示的に選択した場合に限り、市区町村コードを取得するために、写真のEXIF情報から抽出したGPS緯度経度を送信します（ユーザーの明示的な選択がない場合には送信されません）。送信する場合、個人を特定しうる情報（ユーザー名、アカウントID、IPアドレス、画像等）は含めずに情報を送信します。国土地理院のプライバシーポリシーもご参照ください。
+                    https://www.gsi.go.jp/GSI/puraibasi-porisi.htm
                   </p>
                 </div>
                 <div>
                   <p className="text-ms text-muted-foreground font-medium mb-1">Cloudflare Inc.</p>
                   <p className="text-sm text-muted-foreground">
-                    Cloudflare, Inc.のCDN・セキュリティサービスを利用しています。Cloudflareはサービス提供にあたり、アクセスログ（IPアドレス、User-Agent、アクセス日時等）を処理します。詳細はCloudflareのプライバシーポリシーをご参照ください。
+                    Cloudflare, Inc.のCDN・セキュリティサービス、およびメール受信サービス（Email Routing）を利用しています。Cloudflareはサービス提供にあたり、アクセスログ（IPアドレス、User-Agent、アクセス日時等）を処理します。Cloudflareのプライバシーポリシーもご参照ください。
                     https://www.cloudflare.com/privacypolicy/
                   </p>
                 </div>
@@ -168,7 +179,7 @@ export default async function PrivacyPage() {
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">分析ツール</p>
               <p className="text-sm text-muted-foreground">
-                本サービスでは、Google Analytics などの外部分析ツールは現時点で利用しておりません。
+                本サービスでは、Google Analytics などの外部分析ツールは利用しません。内部ツール（rum.piyo.me）へビーコン情報を送信することがありますが、「収集する個人情報とその収集方法」の範疇を超えた個人情報を送信することは決してありません。また、このビーコン情報は個人を特定できない形に加工されて保管され、サービスの向上やモニタリングのみに利用されます（広告やトラッキングを目的としたものではありません）。
               </p>
             </div>
 
@@ -182,7 +193,7 @@ export default async function PrivacyPage() {
                 <li>アカウントの削除</li>
               </ul>
               <p className="text-sm text-muted-foreground mt-2">
-                これらの権利行使については、お問い合わせよりご連絡ください。
+                これらの権利行使については、お問い合わせよりご連絡ください。遅延なく対応することとします。なお、個人情報の開示請求については、1件あたり1,000円の手数料を申し受けます。
               </p>
             </div>
 
@@ -209,7 +220,7 @@ export default async function PrivacyPage() {
               </p>
             </div>
 
-            <p className="text-xs text-muted-foreground text-center">最終更新日：2026年6月2日</p>
+            <p className="text-xs text-muted-foreground text-center">最終更新日：2026年6月9日</p>
           </div>
         </section>
 

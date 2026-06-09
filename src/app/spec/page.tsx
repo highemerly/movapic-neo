@@ -80,7 +80,7 @@ export default async function SpecPage() {
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                 <li>スマートフォン、特にiOSで撮影した画像は、向き（Orientation）を自動補正しています</li>
                 <li>プライバシー保護のため、GPS情報やカメラ情報などのメタデータ（EXIF）は出力画像から常に削除されます</li>
-                <li>出力は原則AVIFフォーマットとなり、Cloudflare R2にアップロードされます</li>
+                <li>出力は原則AVIFフォーマットとなり、高解像度画像とサムネイル画像がいずれもCloudflare R2にアップロードされます</li>
               </ul>
             </div>
 
@@ -120,21 +120,21 @@ export default async function SpecPage() {
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">レート制限</p>
               <p className="text-sm text-muted-foreground">
-                画像生成APIに短時間に連続してリクエストを送信した場合、一時的に制限がかかります。
+                画像生成を短時間に連続して行った場合や、投稿数が普段より急増した場合など、いくつかのレート制限を設けています。詳細はセキュリティ上の理由から非開示とします。
               </p>
             </div>
 
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">Bot投稿（メンション投稿）</p>
               <p className="text-sm text-muted-foreground">
-                Bot宛てにメンション付きで画像とコメントを送信すると、文字を合成して投稿可能です。Botは約3分に1回メンションを確認して処理を実行しています。処理が正常に完了した場合、元投稿は削除する仕組みとなっています。
+                Bot宛てにメンション付きで画像とコメントを送信すると、文字を合成して投稿可能です。Botは約3分に1回メンションを確認して処理を実行しています。処理が正常に完了した場合、元投稿は削除される仕組みとなっています。
               </p>
             </div>
 
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">メール投稿</p>
               <p className="text-sm text-muted-foreground">
-                Bot宛てにメンション付きで画像とコメントを送信すると、文字を合成して投稿可能です。Botは約3分に1回メンションを確認して処理を実行しています。処理が正常に完了した場合、元投稿は削除する仕組みとなっています。
+                ダッシュボードで確認できる専用のメールアドレスに画像を添付して送信すると、文字を合成して投稿可能です。メールは Cloudflare Email Routing により Cloudflare Workers で処理されます。セキュリティ対策（リスト型攻撃対策・MTAのバウンス防止）のため、投稿の成功・失敗によらず、サービスからは一切の返信を行いません。
               </p>
             </div>            
 
@@ -161,6 +161,13 @@ export default async function SpecPage() {
                   <p>現時点ではメール投稿・メンション（Bot）投稿経由でEXIFは解析できません。</p>
                 </div>
               </div>
+            </div>
+
+            <div className="bg-muted rounded-lg p-4">
+              <p className="font-medium mb-2">お気に入り</p>
+              <p className="text-sm text-muted-foreground">
+                Mastodonサーバーでのお気に入りとSHAMEZOのお気に入りは同期します。Mastodonサーバーでのお気に入り情報が元データとなっており、SHAMEZO側からは定期的に情報を取得して同期しています。SHAMEZO側でお気に入り登録をした場合は、バックエンドでMastodonサーバーにお気に入り登録リクエストを送信しています。投稿直後は頻繁に同期されますが、1日以上前の投稿はあまり同期されません。そのため、最新の情報ではない可能性があります。
+              </p>
             </div>
 
             <div className="bg-muted rounded-lg p-4">
