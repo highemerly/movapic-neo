@@ -51,6 +51,28 @@ async function generateSignature(
   return signatureArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/**
+ * メールヘッダから接続元IPをベストエフォートで抽出する。
+ * Cloudflareが付与する Authentication-Results / Received-SPF の client-ip を優先し、
+ * 無ければ Received ヘッダ内の [IP] / (IP) を拾う。取れなければ "unknown"。
+ */
+function extractClientIp(headers: Headers): string {
+  const candidates = [
+    headers.get("authentication-results"),
+    headers.get("received-spf"),
+    headers.get("received"),
+  ];
+  for (const h of candidates) {
+    if (!h) continue;
+    const match =
+      h.match(/client-ip=([0-9a-fA-F:.]+)/i) ||
+      h.match(/[[(]([0-9]{1,3}(?:\.[0-9]{1,3}){3})[\])]/) ||
+      h.match(/[[(]([0-9a-fA-F:]*:[0-9a-fA-F:]+)[\])]/);
+    if (match) return match[1];
+  }
+  return "unknown";
+}
+
 const emailWorker = {
   async email(message: EmailMessage, env: Env): Promise<void> {
     try {
@@ -60,6 +82,20 @@ const emailWorker = {
       // 宛先からemailPrefixを抽出
       const toAddress = message.to;
       const emailPrefix = toAddress.split("@")[0];
+
+      // 受信ログ（観測用）。リスト型攻撃の発信元IP/Fromを把握するため、
+      // prefixの有効・無効に関わらず全受信メールについて記録する。
+      console.log(
+        JSON.stringify({
+          event: "email_received",
+          envelopeFrom: message.from,
+          fromHeader: message.headers.get("from") ?? "",
+          to: message.to,
+          emailPrefix,
+          clientIp: extractClientIp(message.headers),
+          rawSize: message.rawSize,
+        })
+      );
 
       // リクエスト署名を生成
       const timestamp = Date.now();

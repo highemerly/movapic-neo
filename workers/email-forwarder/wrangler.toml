@@ -5,5 +5,9 @@ compatibility_date = "2024-01-01"
 [vars]
 API_URL = "https://pic.handon.club"
 
+# ダッシュボードでログを永続保存・検索できるようにする（wrangler tailのライブ表示に加えて履歴が残る）
+[observability]
+enabled = true
+
 # INTERNAL_API_KEY はシークレットとして設定
 # wrangler secret put INTERNAL_API_KEY

@@ -132,6 +132,13 @@ export default async function SpecPage() {
             </div>
 
             <div className="bg-muted rounded-lg p-4">
+              <p className="font-medium mb-2">メール投稿</p>
+              <p className="text-sm text-muted-foreground">
+                Bot宛てにメンション付きで画像とコメントを送信すると、文字を合成して投稿可能です。Botは約3分に1回メンションを確認して処理を実行しています。処理が正常に完了した場合、元投稿は削除する仕組みとなっています。
+              </p>
+            </div>            
+
+            <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-3">撮影情報（EXIF）の取り扱い</p>
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>
