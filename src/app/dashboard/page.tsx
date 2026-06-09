@@ -10,6 +10,7 @@ import { Footer } from "@/components/Footer";
 import { PostMethodTabs } from "./PostMethodTabs";
 import { MentionSettingsForm } from "./MentionSettingsForm";
 import { EmailAddressDisplay } from "./EmailAddressDisplay";
+import { EmailPrefixRegenerate } from "./EmailPrefixRegenerate";
 import { BioEditForm } from "./BioEditForm";
 import { DefaultsEditor } from "./DefaultsEditor";
 import { LocationMapToggle } from "./LocationMapToggle";
@@ -86,7 +87,10 @@ export default async function DashboardPage() {
   const botDomain = process.env.MASTODON_BOT_INSTANCE_DOMAIN || "handon.club";
   const botAcct = `${botUsername}@${botDomain}`;
 
-  const emailDomain = "pic-dev.handon.club";
+  const emailDomain = process.env.EMAIL_DOMAIN || "pic.handon.club";
+  const emailAddress = `${user.emailPrefix}@${emailDomain}`;
+  const mailtoPlain = `mailto:${emailAddress}?body=${encodeURIComponent("マックチキン！")}`;
+  const mailtoWithOptions = `mailto:${emailAddress}?subject=${encodeURIComponent("下 赤 大")}&body=${encodeURIComponent("マックチキン！")}`;
 
   // メンション設定コンテンツ
   const mentionSettingsContent = (
@@ -99,40 +103,62 @@ export default async function DashboardPage() {
   // メール設定コンテンツ
   const emailSettingsContent = (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground font-medium">＝＝準備中＝＝</p>
+      <p className="text-sm text-muted-foreground">
+        あなた専用に発行された以下のメールアドレスに画像を添付して送信するだけで、コメントを合成した写真が投稿されます。
+      </p>
+
       <EmailAddressDisplay emailPrefix={user.emailPrefix} emailDomain={emailDomain} />
-      <div className="text-sm text-muted-foreground">
-        <p className="mb-2">このアドレスに画像を添付してメールを送信すると、画像が生成されるようになります（いまはされません）。</p>
-        <p className="mb-2 font-medium">メールの形式:</p>
-        <ul className="list-disc list-inside space-y-1 ml-2">
+
+      <div className="text-sm space-y-3">
+        <p className="font-medium">メールの形式:</p>
+        <ul className="list-disc list-inside space-y-2 ml-2">
           <li>
-            <strong>件名:</strong> オプションをスペース区切りで指定
-            <br />
-            <span className="text-xs">例: 「下 赤 大 ラノベ」</span>
+            <strong>本文:</strong> 画像に入れるテキスト（〜140文字）
           </li>
           <li>
-            <strong>本文:</strong> 画像に入れるテキスト（1〜140文字）
-          </li>
-          <li>
-            <strong>添付:</strong> 画像ファイル（JPEG/PNG/WebP/HEIC/AVIF）
+            <strong>添付:</strong> 画像ファイル1枚
           </li>
         </ul>
+        <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+          <code className="block text-xs bg-background p-2 rounded border whitespace-pre-line">
+            {"本文：マックチキン！"}
+          </code>
+          <a
+            href={mailtoPlain}
+            className="inline-block text-xs text-primary hover:underline"
+          >
+            → メールアプリで作成する
+          </a>
+        </div>
       </div>
-      <div className="text-sm">
-        <p className="font-medium mb-2">利用可能なオプション:</p>
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <div>
-            <span className="font-medium">位置:</span> 上 下 左 右
-          </div>
-          <div>
-            <span className="font-medium">色:</span> 白 赤 青 緑 黄 茶 桃 橙
-          </div>
-          <div>
-            <span className="font-medium">サイズ:</span> 小 中 大
-          </div>
-          <div>
-            <span className="font-medium">フォント:</span> ふい字 ゴシック ラノベ
-          </div>
+
+      <div className="text-sm space-y-3">
+        <p className="font-medium">オプション:</p>
+        <p className="text-muted-foreground">件名にスペース区切りでオプションを指定することもできます。</p>
+        <ul className="list-disc list-inside space-y-2 ml-2">
+          <li>
+            <strong>位置:</strong> 上 下 左 右
+          </li>
+          <li>
+            <strong>色:</strong> 白 赤 青 緑 黄 茶 桃 橙
+          </li>
+          <li>
+            <strong>サイズ:</strong> 小 中 大 特大
+          </li>
+          <li>
+            <strong>フォント:</strong> ふい字 ゴシック ラノベ
+          </li>
+        </ul>
+        <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+          <code className="block text-xs bg-background p-2 rounded border whitespace-pre-line">
+            {"件名：下 赤 大\n本文：マックチキン！"}
+          </code>
+          <a
+            href={mailtoWithOptions}
+            className="inline-block text-xs text-primary hover:underline"
+          >
+            → メールアプリで作成する
+          </a>
         </div>
       </div>
     </div>
@@ -300,6 +326,7 @@ export default async function DashboardPage() {
                 </div>
                 <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
               </Link>
+              <EmailPrefixRegenerate />
               <LocationMapToggle
                 initialEnabled={userWithPreferences?.showLocationMap ?? false}
                 username={user.username}
