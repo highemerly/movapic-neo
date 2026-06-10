@@ -8,8 +8,10 @@
 import type { Task, TaskList } from "graphile-worker";
 import { prisma } from "@/lib/db";
 import { processImage } from "@/lib/imageProcessor";
-import { publishImage } from "@/lib/publish/publishImage";
+import { publishImage, PublishVisibility } from "@/lib/publish/publishImage";
 import { getImage, deleteImage } from "@/lib/storage/storage";
+import { extractExif } from "@/lib/exif/parser";
+import { reverseGeocode } from "@/lib/geocode/gsi";
 import { decryptToken } from "@/lib/auth/tokens";
 import { processOneMention } from "@/lib/mention/processor";
 import type { MastodonNotification } from "@/lib/mention/fetcher";
@@ -38,6 +40,12 @@ export interface ProcessEmailPayload {
     color: Color;
     size: Size;
     arrangement: Arrangement;
+    /** 公開範囲（件名コマンド > ユーザー設定 > public で解決済み） */
+    visibility: PublishVisibility;
+    /** カメラ機種を保存するか（件名コマンド > ユーザー設定で解決済み） */
+    cameraOption: "none" | "show";
+    /** 件名コマンドで指定された位置情報の保存範囲（none=保存しない） */
+    locationOption: "none" | "pref" | "city";
   };
   /** producer が R2 一時領域にアップロードした元画像のキー */
   sourceStorageKey: string;
@@ -78,6 +86,36 @@ const processEmailTask: Task = async (payload) => {
   const outputFormat: OutputFormat =
     user.instance.type === "misskey" ? "misskey" : "mastodon";
 
+  // 元画像からEXIFを抽出し、解決済みオプションに応じて撮影情報を保存する。
+  // cameraOption / locationOption は parser で「件名コマンド > ユーザー設定」を解決済み。
+  // - カメラ機種: cameraOption が "show" のときだけ Make/Model を保存（Web投稿と同方針）
+  // - 撮影場所:   locationOption が pref/city のときだけ GPS から逆引きして保存
+  const wantCamera = p.options.cameraOption === "show";
+  const wantLocation = p.options.locationOption !== "none";
+
+  let cameraMake: string | null = null;
+  let cameraModel: string | null = null;
+  let locationPrefecture: string | null = null;
+  let locationCity: string | null = null;
+
+  if (wantCamera || wantLocation) {
+    const exif = await extractExif(sourceBuffer);
+    if (wantCamera) {
+      cameraMake = exif.cameraMake?.slice(0, 100) ?? null;
+      cameraModel = exif.cameraModel?.slice(0, 100) ?? null;
+    }
+    if (wantLocation && exif.gpsLatitude != null && exif.gpsLongitude != null) {
+      // GPS座標自体は保存せず、逆ジオコーディングした都道府県/市区町村のみ保存する（Web投稿と同方針）
+      const geo = await reverseGeocode(exif.gpsLatitude, exif.gpsLongitude);
+      if (geo) {
+        locationPrefecture = geo.prefecture;
+        if (p.options.locationOption === "city") {
+          locationCity = geo.city;
+        }
+      }
+    }
+  }
+
   const result = await processImage({
     imageBuffer: sourceBuffer,
     text: p.text,
@@ -108,8 +146,9 @@ const processEmailTask: Task = async (payload) => {
       arrangement: p.options.arrangement,
     },
     source: "email",
-    visibility: "public",
+    visibility: p.options.visibility,
     persistOnPostFailure: true,
+    extras: { cameraMake, cameraModel, locationPrefecture, locationCity },
   });
 
   // 成功時のみ一時画像を削除（失敗時はリトライで再利用するため残す）

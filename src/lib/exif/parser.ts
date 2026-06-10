@@ -1,9 +1,11 @@
 /**
- * クライアント側でアップロード前の画像からEXIFを抽出する。
+ * 画像からEXIFを抽出する（クライアント/サーバー共通）。
  *
- * 用途: /create で画像選択時にカメラ情報・撮影日時・GPSを取り出し、
- * 投稿時に /api/v1/post へ別フィールドで送る。出力画像のEXIFは
- * 既存どおりサーバー側で常に除去される。
+ * 用途:
+ * - クライアント: /create で画像選択時（File）にカメラ情報・GPSを取り出し /api/v1/post へ送る
+ * - サーバー: メール投稿の worker で元画像（Buffer）から取り出し、ユーザー設定・件名コマンドに応じて保存
+ * exifr.parse は File / Buffer / Uint8Array のいずれも受け取れる。
+ * 出力画像のEXIFは既存どおりサーバー側で常に除去される。
  */
 
 import exifr from "exifr";
@@ -24,12 +26,14 @@ const EMPTY: ExtractedExif = {
   gpsLongitude: null,
 };
 
-export async function extractExif(file: File): Promise<ExtractedExif> {
+export async function extractExif(
+  input: File | Buffer | Uint8Array
+): Promise<ExtractedExif> {
   try {
     // 撮影日時はプライバシー保護のため抽出しない（DBカラムは将来用に保持）。
     // pickに latitude/longitude を入れてもexifrがGPS IFDを自動で有効化しない事例が
     // あるため、必要なIFDを明示的に有効化する。
-    const parsed = await exifr.parse(file, {
+    const parsed = await exifr.parse(input, {
       ifd0: { pick: ["Make", "Model"] },
       gps: true,
     });

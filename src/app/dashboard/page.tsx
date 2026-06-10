@@ -90,7 +90,7 @@ export default async function DashboardPage() {
   const emailDomain = process.env.EMAIL_DOMAIN || "pic.handon.club";
   const emailAddress = `${user.emailPrefix}@${emailDomain}`;
   const mailtoPlain = `mailto:${emailAddress}?body=${encodeURIComponent("マックチキン！")}`;
-  const mailtoWithOptions = `mailto:${emailAddress}?subject=${encodeURIComponent("下 赤 大")}&body=${encodeURIComponent("マックチキン！")}`;
+  const mailtoWithOptions = `mailto:${emailAddress}?subject=${encodeURIComponent("下 赤 大 都道府県")}&body=${encodeURIComponent("マックチキン！")}`;
 
   // メンション設定コンテンツ
   const mentionSettingsContent = (
@@ -127,14 +127,14 @@ export default async function DashboardPage() {
             href={mailtoPlain}
             className="inline-block text-xs text-primary hover:underline"
           >
-            → メールアプリで作成する
+            → メールアプリで送信する
           </a>
         </div>
       </div>
 
       <div className="text-sm space-y-3">
         <p className="font-medium">オプション:</p>
-        <p className="text-muted-foreground">件名にスペース区切りでオプションを指定することもできます。</p>
+        <p className="text-muted-foreground">件名にスペース区切りでオプションを指定することもできます（指定がない場合は「投稿の初期設定」に従います）。</p>
         <ul className="list-disc list-inside space-y-2 ml-2">
           <li>
             <strong>位置:</strong> 上 下 左 右
@@ -148,16 +148,28 @@ export default async function DashboardPage() {
           <li>
             <strong>フォント:</strong> ふい字 ゴシック ラノベ
           </li>
+          <li>
+            <strong>アレンジ:</strong> ネオン ハンコ
+          </li>
+          <li>
+            <strong>公開範囲:</strong> public unlisted
+          </li>
+          <li>
+            <strong>カメラ機種:</strong> カメラ カメラなし
+          </li>
+          <li>
+            <strong>位置情報:</strong> 都道府県 市町村
+          </li>
         </ul>
         <div className="p-3 bg-muted/50 rounded-lg space-y-2">
           <code className="block text-xs bg-background p-2 rounded border whitespace-pre-line">
-            {"件名：下 赤 大\n本文：マックチキン！"}
+            {"件名：下 赤 大 都道府県\n本文：マックチキン！"}
           </code>
           <a
             href={mailtoWithOptions}
             className="inline-block text-xs text-primary hover:underline"
           >
-            → メールアプリで作成する
+            → メールアプリで送信する
           </a>
         </div>
       </div>

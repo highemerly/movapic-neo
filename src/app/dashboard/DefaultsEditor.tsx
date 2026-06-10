@@ -291,7 +291,7 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
           <div className="space-y-2">
             <Label>
               カメラ機種
-              <span className="ml-2 text-xs text-muted-foreground">（Web投稿のみ対応）</span>
+              <span className="ml-2 text-xs text-muted-foreground">（Web投稿・メール投稿のみ）</span>
             </Label>
             <div className="flex rounded-lg border bg-muted p-1 gap-1">
               {(["none", "show"] as CameraOption[]).map((opt) => (
@@ -322,7 +322,7 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
         <div className="flex-1 min-w-0">
           <p className="text-sm flex items-center flex-wrap gap-x-2">
             元投稿を残す
-            <span className="text-xs font-normal text-muted-foreground">※Bot投稿のみ</span>
+            <span className="text-xs font-normal text-muted-foreground">（Bot投稿のみ）</span>
             {mentionKeepSaveState === "saving" && (
               <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />

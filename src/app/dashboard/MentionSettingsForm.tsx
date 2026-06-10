@@ -58,7 +58,7 @@ export function MentionSettingsForm({
 
       <div className="text-sm space-y-3">
         <p className="font-medium">オプション:</p>
-        <p className="text-muted-foreground">本文の前に [上 赤 大] のように角括弧で指定できます。</p>
+        <p className="text-muted-foreground">本文の前に [上 赤 大] のように角括弧＋スペース区切りで指定することもできます（指定がない場合は「投稿の初期設定」に従います）。</p>
         <ul className="list-disc list-inside space-y-2 ml-2">
           <li>
             <strong>位置:</strong> 上 下 左 右
@@ -79,6 +79,7 @@ export function MentionSettingsForm({
             <strong>公開範囲:</strong> public unlisted
           </li>
         </ul>
+        <p className="text-muted-foreground text-xs">※カメラ機種および位置情報には非対応です</p>        
         <div className="p-3 bg-muted/50 rounded-lg space-y-2">
           <code className="block text-xs bg-background p-2 rounded border">
             @{botAcct} [右 赤 ネオン] マックチキン！

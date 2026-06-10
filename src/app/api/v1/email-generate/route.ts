@@ -92,8 +92,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // raw emailをパース
-    const parsed = await parseEmail(rawEmail);
+    // raw emailをパース（ユーザーのWeb初期設定をデフォルトに適用。件名指定があれば上書き）
+    const parsed = await parseEmail(rawEmail, {
+      position: user.defaultPosition,
+      font: user.defaultFont,
+      color: user.defaultColor,
+      size: user.defaultSize,
+      arrangement: user.defaultArrangement,
+      visibility: user.defaultVisibility,
+      cameraOption: user.defaultCameraOption,
+    });
 
     // バリデーション
     if (!parsed.image) {
@@ -163,6 +171,9 @@ export async function POST(request: NextRequest) {
         color: parsed.options.color,
         size: parsed.options.size,
         arrangement: parsed.options.arrangement,
+        visibility: parsed.options.visibility,
+        cameraOption: parsed.options.cameraOption,
+        locationOption: parsed.options.locationOption,
       },
       sourceStorageKey,
       sourceContentType: parsed.image.contentType,

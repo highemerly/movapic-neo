@@ -157,8 +157,12 @@ export default async function SpecPage() {
                   <p>iOSのプライバシー保護により、Safari/Chromeなど全ブラウザで写真ピッカーから渡される画像はGPS情報が自動的に除去される場合があります。iPhone/iPadで直接アップロードする場合はGPS情報の送信を許可してください。</p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium mb-1">メール投稿・Bot投稿</p>
-                  <p>現時点ではメール投稿・メンション（Bot）投稿経由でEXIFは解析できません。</p>
+                  <p className="text-xs font-medium mb-1">メール投稿</p>
+                  <p>メール投稿では、サーバー側で元画像のEXIFを解析します。カメラ機種は、ダッシュボードの初期設定で「機種名を表示」にしているか、件名に「カメラ」と入力した場合に保存します（「カメラなし」で無効化）。撮影場所は、件名に「都道府県」または「市町村」と入力した場合のみ、GPS座標から逆ジオコーディングして保存します（GPS座標自体は保存しません）。</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium mb-1">Bot投稿</p>
+                  <p>メンション（Bot）投稿では、画像が一度Fediverseサーバーを経由する際にEXIFが除去されるため、撮影情報は解析できません。</p>
                 </div>
               </div>
             </div>
