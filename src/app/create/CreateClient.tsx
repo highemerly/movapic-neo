@@ -41,6 +41,9 @@ import { parseApiError, formatErrorMessage, type ParsedApiError } from "@/lib/er
 import { extractExif, type ExtractedExif } from "@/lib/exif/parser";
 import { Label } from "@/components/ui/label";
 
+// エラートーストのフェードアウト時間（ms）。CSSの duration と揃える
+const ERROR_FADE_MS = 300;
+
 // 出力形式の表示名
 const OUTPUT_LABELS: Record<OutputFormat, string> = {
   mastodon: "AVIF",
@@ -158,6 +161,7 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
   const [isPosting, setIsPosting] = useState(false);
   const [loadingTime, setLoadingTime] = useState(0);
   const [error, setError] = useState<ParsedApiError | null>(null);
+  const [errorLeaving, setErrorLeaving] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
   const [lastGeneratedState, setLastGeneratedState] =
     useState<GenerateFormState | null>(null);
@@ -186,13 +190,29 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
     return () => clearInterval(interval);
   }, [isLoading]);
 
-  // エラートーストの自動消滅: 429(レート制限)は再試行可能になる秒数後、それ以外は5秒後
+  // エラートーストの自動消滅: 通常は8秒。429(レート制限)は再試行可能秒数+1秒（3〜10秒にクランプ）
+  // 消えるときは突然ではなくフェードアウトさせる（FADE_MS かけてから unmount）
   useEffect(() => {
     if (!error) return;
-    const ms = error.retryAfterSeconds ? error.retryAfterSeconds * 1000 : 5000;
-    const timer = setTimeout(() => setError(null), ms);
-    return () => clearTimeout(timer);
+    setErrorLeaving(false); // 新しいエラーは入場アニメーションから始める
+    let ms = 8000;
+    if (error.retryAfterSeconds) {
+      const seconds = Math.min(10, Math.max(3, error.retryAfterSeconds + 1));
+      ms = seconds * 1000;
+    }
+    const startFade = setTimeout(() => setErrorLeaving(true), ms);
+    const remove = setTimeout(() => setError(null), ms + ERROR_FADE_MS);
+    return () => {
+      clearTimeout(startFade);
+      clearTimeout(remove);
+    };
   }, [error]);
+
+  // 閉じるボタン等から手動で消す: フェードアウトしてから unmount
+  const dismissError = () => {
+    setErrorLeaving(true);
+    setTimeout(() => setError(null), ERROR_FADE_MS);
+  };
 
   // BlobURLのクリーンアップ
   useEffect(() => {
@@ -573,11 +593,17 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
       <TopProgressBar active={isProcessing} label={progressLabel} />
       <SiteHeader user={{ username: user.username }} />
 
-      {/* エラートースト（画面中央にフローティング・5秒で自動消滅） */}
+      {/* エラートースト（成功トーストと同じ画面上部・目立つよう大きめ＋スライドイン・5秒で自動消滅） */}
       {error && (
-        <div className="pointer-events-none fixed inset-0 z-[60] flex items-center justify-center px-4">
-          <div className="pointer-events-auto flex w-full max-w-md items-start gap-2 rounded-lg bg-destructive px-4 py-3 text-white shadow-xl">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="pointer-events-none fixed inset-x-0 top-14 z-[60] flex justify-center px-4">
+          <div
+            className={`pointer-events-auto flex w-full max-w-md items-start gap-2.5 rounded-lg bg-destructive px-5 py-4 text-white shadow-xl ring-2 ring-white/40 duration-300 ${
+              errorLeaving
+                ? "animate-out fade-out slide-out-to-top-4"
+                : "animate-in fade-in slide-in-from-top-4"
+            }`}
+          >
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">{formatErrorMessage(error)}</p>
               {error.supportInfo && (
@@ -586,7 +612,7 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
             </div>
             <button
               type="button"
-              onClick={() => setError(null)}
+              onClick={dismissError}
               className="shrink-0 text-white/70 transition-colors hover:text-white"
               aria-label="エラーを閉じる"
             >

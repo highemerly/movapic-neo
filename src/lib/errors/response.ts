@@ -61,34 +61,34 @@ export function handleImageProcessError(error: ImageProcessError) {
       rotate: {
         code: ErrorCodes.TIMEOUT_ROTATE,
         message: "画像の回転処理がタイムアウトしました",
-        suggestion: "別の画像形式で再試行してください",
+        suggestion: "別の画像で再度試してみてください",
       },
       resize: {
         code: ErrorCodes.TIMEOUT_RESIZE,
         message: "画像のリサイズ処理がタイムアウトしました",
-        suggestion: "画像サイズを小さくして再試行してください",
+        suggestion: "画像サイズを小さくして再度試してみてください",
       },
       overlay: {
         code: ErrorCodes.TIMEOUT_OVERLAY,
         message: "テキスト描画がタイムアウトしました",
-        suggestion: "テキストを短くして再試行してください",
+        suggestion: "画像サイズを小さくするか、テキストを短くして再度試してみてください",
       },
       composite: {
         code: ErrorCodes.TIMEOUT_PROCESSING,
         message: "画像の合成処理がタイムアウトしました",
-        suggestion: "画像サイズを小さくして再試行してください",
+        suggestion: "画像サイズを小さくして再度試してみてください",
       },
       convert: {
         code: ErrorCodes.TIMEOUT_CONVERT,
         message: "出力形式の変換がタイムアウトしました",
-        suggestion: "「なし（JPEG）」形式で再試行してください",
+        suggestion: "画像サイズを小さくして再度試してみてください",
       },
     };
 
     const info = timeoutInfo[error.stage] || {
       code: ErrorCodes.TIMEOUT_PROCESSING,
       message: "画像の処理に時間がかかりすぎました",
-      suggestion: "画像サイズを小さくして再試行してください",
+      suggestion: "画像サイズを小さくして再度試してみてください",
     };
 
     return errorResponse(info.code, info.message, 504, {
@@ -103,7 +103,7 @@ export function handleImageProcessError(error: ImageProcessError) {
     error.message, // "画像の読み込みに失敗しました" など
     500,
     {
-      suggestion: "別の画像で再試行してください",
+      suggestion: "別の画像で再度試してみてください",
       requestId: error.requestId,
     }
   );
@@ -119,7 +119,7 @@ export function handleUnknownError(error: unknown, requestId?: string) {
     "処理中にエラーが発生しました",
     500,
     {
-      suggestion: "しばらく経ってから再試行してください",
+      suggestion: "時間をおいて再試行し、解決しない場合は管理者へお問い合わせください",
       requestId,
     }
   );

@@ -20,6 +20,26 @@ interface ApiErrorResponse {
 }
 
 /**
+ * 正常なJSONエラーボディを持たない応答（ゲートウェイ/インフラ由来の50x等）の
+ * フォールバックメッセージをステータスコードから決める
+ */
+function statusFallback(status: number): { message: string; suggestion?: string } {
+  if (status === 500) {
+    return {
+      message: "サーバーでエラーが発生しました",
+      suggestion: "時間をおいて再試行し、解決しない場合は管理者へお問い合わせください",
+    };
+  }
+  if (status === 501 || status === 503 || status === 504) {
+    return {
+      message: "サーバーが混み合っています",
+      suggestion: "しばらく待ってから再試行してください",
+    };
+  }
+  return { message: "エラーが発生しました" };
+}
+
+/**
  * APIレスポンスからエラー情報をパース
  */
 export async function parseApiError(
@@ -64,14 +84,16 @@ export async function parseApiError(
 
     // 想定外の形式
     return {
-      message: "エラーが発生しました",
+      ...statusFallback(status),
       supportInfo: `Error code: ${status}`,
+      retryAfterSeconds,
     };
   } catch {
-    // JSONパース失敗
+    // JSONパース失敗（ボディなし/HTMLなど。インフラ由来の50xを想定）
     return {
-      message: "エラーが発生しました",
+      ...statusFallback(status),
       supportInfo: `Error code: ${status}`,
+      retryAfterSeconds,
     };
   }
 }
