@@ -82,14 +82,14 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
               <DropdownMenuItem asChild className="py-3 text-base">
                 <Link href="/public" className="flex items-center gap-3 cursor-pointer">
                   <Globe className="h-5 w-5" />
-                  みんなの投稿
+                  みんなの写真
                 </Link>
               </DropdownMenuItem>
               {user && (
                 <DropdownMenuItem asChild className="py-3 text-base">
                   <Link href={`/u/${user.username}`} className="flex items-center gap-3 cursor-pointer">
                     <Images className="h-5 w-5" />
-                    プロフィール
+                    自分の写真
                   </Link>
                 </DropdownMenuItem>
               )}

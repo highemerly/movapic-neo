@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAvatarUrl } from "@/lib/avatar";
-import { Globe, User, Heart, ChevronRight } from "lucide-react";
+import { Globe, User, Heart, ChevronRight, Settings2, ShieldCheck, SlidersHorizontal } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/auth/LogoutButton";
@@ -194,7 +194,7 @@ export default async function DashboardPage() {
             <Link href={`/u/${user.username}`}>
               <Button variant="outline" className="w-full h-auto py-2 flex flex-col gap-0.5">
                 <User className="h-5 w-5" />
-                <span className="text-sm">プロフィール</span>
+                <span className="text-sm">自分の写真</span>
               </Button>
             </Link>
             <Link href="/favorite">
@@ -220,9 +220,9 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* セクション3: アカウント */}
+        {/* セクション3: 自分の情報を確認する */}
         <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-2">アカウント</h2>
+          <h2 className="text-lg font-semibold mb-2">自分の情報を確認する</h2>
           <div className="relative bg-muted rounded-lg p-4">
             <LogoutButton
               variant="ghost"
@@ -304,13 +304,16 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* セクション4: 設定 */}
+        {/* セクション4: 設定を確認・変更する */}
         <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-4">設定</h2>
+          <h2 className="text-lg font-semibold mb-2">設定を確認・変更する</h2>
 
           {/* 一般 */}
           <div className="bg-muted rounded-lg p-4">
-            <p className="text-sm font-medium mb-2">一般</p>
+            <p className="text-sm font-bold mb-4 flex items-center gap-1.5">
+              <Settings2 className="h-4 w-4 text-muted-foreground" />
+              一般
+            </p>
             <div className="space-y-4">
               <BioEditForm initialBio={userWithPreferences?.bio ?? null} />
               <DisplayModeSelector />
@@ -319,7 +322,10 @@ export default async function DashboardPage() {
 
           {/* プライバシー・セキュリティ */}
           <div className="mt-4 bg-muted rounded-lg p-4">
-            <p className="text-sm font-medium mb-2">プライバシー・セキュリティ</p>
+            <p className="text-sm font-bold mb-4 flex items-center gap-1.5">
+              <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+              プライバシー・セキュリティ
+            </p>
             <div className="space-y-4">
               <Link
                 href="/dashboard/sessions"
@@ -343,7 +349,10 @@ export default async function DashboardPage() {
 
           {/* 投稿の初期設定 */}
           <div className="mt-4 bg-muted rounded-lg p-4">
-            <p className="text-sm font-medium mb-2">投稿の初期設定</p>
+            <p className="text-sm font-bold mb-4 flex items-center gap-1.5">
+              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+              投稿の初期設定
+            </p>
             <DefaultsEditor
               initial={{
                 position: userWithPreferences?.defaultPosition as Position | null ?? null,
