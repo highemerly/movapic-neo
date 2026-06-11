@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // OpenNext のビルド生成物（.gitignore 済み）。バンドル済みコードなので lint 対象外。
+    ".open-next/**",
   ]),
 ]);
 
