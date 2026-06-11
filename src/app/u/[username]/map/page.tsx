@@ -161,7 +161,7 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
         {/* オプトイン未済の本人 → 案内 */}
         {!isOptedIn && isOwner && (
           <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
-            この地図はまだ公開されていません。<Link href="/dashboard" className="font-medium underline">メニュー</Link>で「地図を公開する（ベータ）」をONにすると、ユーザーページの「地図」タブを訪問者にも見せられるようになります。現在の表示は本人のみのプレビューです。
+            この地図はまだ公開されていません。<Link href="/dashboard" className="font-medium underline">メニュー</Link>で「地図を公開する」をONにすると、ユーザーページの「地図」タブを訪問者にも見せられるようになります。現在の表示は本人のみのプレビューです。
           </div>
         )}
 

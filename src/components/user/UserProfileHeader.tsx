@@ -54,7 +54,6 @@ export function UserProfileHeader({
       label: "地図",
       icon: MapIcon,
       href: `/u/${user.username}/map`,
-      badge: "BETA",
     },
   ];
 

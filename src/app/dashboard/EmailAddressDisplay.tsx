@@ -21,17 +21,17 @@ export function EmailAddressDisplay({ emailPrefix, emailDomain }: EmailAddressDi
   };
 
   return (
-    <div>
-      <dt className="text-sm font-medium">投稿用メールアドレス:</dt>
-      <dd className="mt-1 flex flex-wrap items-center gap-2">
-        <code className="basis-full sm:basis-0 sm:flex-1 min-w-0 bg-background px-2 py-1 rounded text-sm break-all">
+    <li>
+      <strong>宛先:</strong>
+      <span className="mt-1 ml-[1.5em] flex items-center gap-2 sm:mt-0 sm:ml-2 sm:inline-flex sm:align-middle">
+        <code className="flex-1 min-w-0 bg-background px-2 py-1 rounded text-xs break-all sm:flex-none">
           {isVisible ? (
             fullEmail
           ) : (
             <span className="blur-sm select-none" aria-hidden="true">{fullEmail}</span>
           )}
         </code>
-        <div className="flex gap-1">
+        <div className="flex gap-1 shrink-0">
           <button
             type="button"
             onClick={handleCopy}
@@ -58,7 +58,7 @@ export function EmailAddressDisplay({ emailPrefix, emailDomain }: EmailAddressDi
             )}
           </button>
         </div>
-      </dd>
-    </div>
+      </span>
+    </li>
   );
 }

@@ -12,7 +12,7 @@ interface LocationMapToggleProps {
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 /**
- * 地図機能（ベータ）の公開オプトイントグル。
+ * 地図機能の公開オプトイントグル。
  * ON → ユーザーページに「地図」タブが他人にも表示され、都道府県別投稿数が公開される。
  * OFF（デフォルト） → 本人にしか地図が見えない。
  */
@@ -57,9 +57,6 @@ export function LocationMapToggle({ initialEnabled, username }: LocationMapToggl
         <div className="flex-1 min-w-0">
           <p className="text-sm flex items-center flex-wrap gap-x-2">
             地図を公開する
-            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-              BETA
-            </span>
             {saveState === "saving" && (
               <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -77,7 +74,7 @@ export function LocationMapToggle({ initialEnabled, username }: LocationMapToggl
             )}
           </p>
           <p className="text-xs text-muted-foreground">
-            ユーザーページに「地図」タブを表示し、都道府県別の投稿数を他のユーザーにも公開します。投稿時に位置情報を含めた画像のみが集計対象です。
+            都道府県別の投稿数をユーザーページで他のユーザーに公開します（投稿時に位置情報を明示的に含めた画像のみが集計対象です）。
           </p>
           {enabled && (
             <a

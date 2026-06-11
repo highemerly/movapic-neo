@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { Copy, Check } from "lucide-react";
+
 interface MentionSettingsFormProps {
   botAcct: string;
   userInstanceDomain: string;
@@ -9,31 +12,56 @@ export function MentionSettingsForm({
   botAcct,
   userInstanceDomain,
 }: MentionSettingsFormProps) {
-  // botAcctからユーザーページURLを生成
+  const [isCopied, setIsCopied] = useState(false);
+
+  const botMention = `@${botAcct}`;
+
   // botAcct: "pic@handon.club" -> "https://handon.club/@pic"
   const botProfileUrl = (() => {
     const [username, domain] = botAcct.split("@");
     return `https://${domain}/@${username}`;
   })();
 
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(botMention);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        投稿用のBotアカウント（
-        <a
-          href={botProfileUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-primary hover:underline"
-        >
-          @{botAcct}
-        </a>
-        ）にメンションで画像を送信するだけで、数分後にコメントを合成した写真が投稿されます。
+        投稿用のBotアカウントにメンションで画像を送信するだけで、即座にコメントを合成した写真が投稿されます。
       </p>
 
       <div className="text-sm space-y-3">
         <p className="font-medium">投稿の形式:</p>
         <ul className="list-disc list-inside space-y-2 ml-2">
+          <li>
+            <strong>宛先:</strong>
+            <span className="inline-flex items-center gap-2 align-middle ml-2">
+              <a
+                href={botProfileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="break-all text-primary hover:underline"
+              >
+                {botMention}
+              </a>
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                title="コピー"
+              >
+                {isCopied ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </button>
+            </span>
+          </li>
           <li>
             <strong>本文:</strong> 画像に入れるテキスト（〜140文字）
           </li>

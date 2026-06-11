@@ -49,9 +49,6 @@ export function EmailPrefixRegenerate() {
     >
       <div className="flex-1 min-w-0">
         <p className="text-sm">投稿用メールアドレスを再生成する</p>
-        <p className="text-xs text-muted-foreground">
-          現在のアドレスは無効になり、新しいアドレスが発行されます。
-        </p>
       </div>
       <RefreshCw
         className={`h-4 w-4 flex-shrink-0 text-muted-foreground ${isRegenerating ? "animate-spin" : ""}`}

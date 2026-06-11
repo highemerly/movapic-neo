@@ -245,7 +245,7 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
             )}
           </p>
           <p className="text-xs text-muted-foreground">
-            文字の合成オプションなど好みの設定を保存しておき、その設定を投稿時に初期値として読み込みます。保存の有無によらず、投稿時に上書きも可能です。原則、全ての投稿方法（Web、Bot、メール）が対象です。
+            文字の合成オプションなど好みの設定を保存しておき、初期値として読み込みます。投稿時に変更可能です。原則、全ての投稿方法（Web、Bot、メール）が対象となります。
           </p>
         </div>
         <div
@@ -340,7 +340,7 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
             )}
           </p>
           <p className="text-xs text-muted-foreground">
-            初期設定では、Botにメンションを送って投稿した時、その投稿は自動で削除され、新しい投稿で上書きされます。このオプションが有効であれば、元の投稿を自動で削除しません。
+            Botにメンションを送って投稿したとき、写真の投稿が正常に完了しても、元の投稿を自動で削除しません。
           </p>
         </div>
         <div

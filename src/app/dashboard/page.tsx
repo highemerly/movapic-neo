@@ -103,14 +103,13 @@ export default async function DashboardPage() {
   const emailSettingsContent = (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        あなた専用に発行された以下のメールアドレスに画像を添付して送信するだけで、コメントを合成した写真が投稿されます。
+        あなた専用に発行されたメールアドレスに画像を添付して送信するだけで、コメントを合成した写真が投稿されます。
       </p>
-
-      <EmailAddressDisplay emailPrefix={user.emailPrefix} emailDomain={emailDomain} />
 
       <div className="text-sm space-y-3">
         <p className="font-medium">メールの形式:</p>
         <ul className="list-disc list-inside space-y-2 ml-2">
+          <EmailAddressDisplay emailPrefix={user.emailPrefix} emailDomain={emailDomain} />
           <li>
             <strong>本文:</strong> 画像に入れるテキスト（〜140文字）
           </li>
@@ -333,9 +332,6 @@ export default async function DashboardPage() {
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm">ログイン履歴を確認する</p>
-                  <p className="text-xs text-muted-foreground">
-                    過去のログインセッションを一覧で表示します。
-                  </p>
                 </div>
                 <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
               </Link>

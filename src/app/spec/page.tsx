@@ -127,7 +127,7 @@ export default async function SpecPage() {
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">Bot投稿（メンション投稿）</p>
               <p className="text-sm text-muted-foreground">
-                Bot宛てにメンション付きで画像とコメントを送信すると、文字を合成して投稿可能です。Botは約3分に1回メンションを確認して処理を実行しています。処理が正常に完了した場合、元投稿は削除される仕組みとなっています。
+                Bot宛にメンション付きで画像とコメントを送信すると、文字を合成して投稿可能です。BotはWebsocketを利用してメンションを確認しているため、ほぼ即座に処理されるはずです。処理が正常に完了した場合、元投稿は削除される仕組みとなっています（設定で変更可能）。
               </p>
             </div>
 
@@ -145,7 +145,7 @@ export default async function SpecPage() {
                   Web投稿画面では、画像を選択した時点でブラウザ上でEXIFを解析します。出力画像からは常にEXIFを削除しますが、投稿時にユーザーが選択した範囲に限り、カメラ機種・撮影場所（都道府県または市町村のみ）をサービスのデータベースに保存します。
                 </p>
                 <div>
-                  <p className="text-xs font-medium mb-1">位置情報の解析（ベータ）</p>
+                  <p className="text-xs font-medium mb-1">位置情報の解析</p>
                   <p>GPS緯度経度は<strong>サービスには保存しません</strong>。位置情報を含む選択肢を選んだ場合のみ、国土地理院（GSI）の逆ジオコーディングAPIにGPS座標を送信し、市区町村コードを取得して都道府県名・市区町村名に変換して保存します。</p>
                 </div>
                 <div>
@@ -175,10 +175,10 @@ export default async function SpecPage() {
             </div>
 
             <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-2">地図機能（ベータ）</p>
+              <p className="font-medium mb-2">地図機能</p>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                 <li>ユーザーページに「地図」タブを追加し、都道府県別の投稿数をヒートマップ表示する機能です</li>
-                <li>メニューで「地図を公開する（ベータ）」をオンにしたユーザーのみ公開されます（オフの場合は本人のみ閲覧可能となっています）</li>
+                <li>メニューで「地図を公開する」をオンにしたユーザーのみ公開されます（オフの場合は本人のみ閲覧可能となっています）</li>
                 <li>位置情報を含めて投稿した画像のみが集計対象です</li>
               </ul>
             </div>
