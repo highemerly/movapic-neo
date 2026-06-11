@@ -63,6 +63,9 @@ export function CalendarView({
   }, [username, year, month]);
 
   useEffect(() => {
+    // year/month/username 変更時にサーバーからカレンダーを再取得する正当なデータフェッチ。
+    // 先頭の setLoading(true) を同期 setState と見なす誤検知のため、この行のみ無効化する。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchCalendarData();
   }, [fetchCalendarData]);
 

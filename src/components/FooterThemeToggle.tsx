@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Monitor, Moon, Sun } from "lucide-react";
+import { useIsHydrated } from "@/hooks/useIsHydrated";
 
 type Mode = "system" | "light" | "dark";
 
@@ -14,11 +14,8 @@ const OPTIONS: { value: Mode; label: string; Icon: typeof Monitor }[] = [
 
 export function FooterThemeToggle() {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // SSR と初回クライアント描画の不一致（ハイドレーション）を避けるため hydration ガード
+  const mounted = useIsHydrated();
 
   const handleChange = (next: Mode) => {
     // テーマは localStorage 一本化（next-themes）。DB同期は廃止。

@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback } from "react";
 import { X, Loader2, ImagePlus, Eye, Camera } from "lucide-react";
 import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from "@/types";
+import { useIsHydrated } from "@/hooks/useIsHydrated";
 
 interface ResultInfo {
   fileSize: number;
@@ -67,12 +68,12 @@ export function ImageUpload({
   // capture="environment" な input をボタンで呼び出して撮影できるようにする。
   // SSR/初回client renderは false（=ボタン非表示）で揃え、mount 後に判定して
   // 更新するので hydration mismatch は発生しない。
-  const [isAndroid, setIsAndroid] = useState(false);
-  useEffect(() => {
-    if (typeof navigator !== "undefined") {
-      setIsAndroid(/Android/i.test(navigator.userAgent));
-    }
-  }, []);
+  // hydration 後にのみ navigator を参照（SSR/初回 client render は false で揃える）
+  const hydrated = useIsHydrated();
+  const isAndroid =
+    hydrated &&
+    typeof navigator !== "undefined" &&
+    /Android/i.test(navigator.userAgent);
 
   const validateFile = (file: File): string | null => {
     // HEICファイルの場合は拡張子で判定（MIMEタイプが空や不正な場合がある）

@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { X, Info, AlertTriangle } from "lucide-react";
 import {
   announcements,
   ANNOUNCEMENT_EXPIRY_DAYS,
-  type Announcement,
 } from "@/data/announcements";
 import { dismissAnnouncements } from "@/app/actions/announcements";
+import { useIsHydrated } from "@/hooks/useIsHydrated";
 
 const COOKIE_NAME = "ann";
 
@@ -31,17 +31,17 @@ function formatDate(createdAt: string): string {
 }
 
 export function AnnouncementBar() {
-  const [unreadAnnouncements, setUnreadAnnouncements] = useState<
-    Announcement[]
-  >([]);
+  // cookie はクライアント専用のため hydration 後にのみ読む（SSR/初回 render は空）。
+  const hydrated = useIsHydrated();
+  const [dismissed, setDismissed] = useState(false);
 
-  useEffect(() => {
+  const unreadAnnouncements = useMemo(() => {
+    if (!hydrated || dismissed) return [];
     const lastReadId = parseInt(getCookie(COOKIE_NAME) || "0", 10);
-    const unread = announcements
+    return announcements
       .filter((a) => a.id > lastReadId && isWithinExpiryDays(a.createdAt))
       .sort((a, b) => b.id - a.id);
-    setUnreadAnnouncements(unread);
-  }, []);
+  }, [hydrated, dismissed]);
 
   const handleDismissAll = async () => {
     const validAnnouncements = announcements.filter((a) =>
@@ -50,7 +50,7 @@ export function AnnouncementBar() {
     if (validAnnouncements.length === 0) return;
     const maxId = Math.max(...validAnnouncements.map((a) => a.id));
     await dismissAnnouncements(maxId);
-    setUnreadAnnouncements([]);
+    setDismissed(true);
   };
 
   if (unreadAnnouncements.length === 0) return null;

@@ -177,17 +177,12 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [geocodeError, setGeocodeError] = useState<string | null>(null);
 
-  // ローディング中の経過時間を更新
+  // ローディング中の経過時間を更新（リセットは生成開始時に行う＝effect内での同期setStateを避ける）
   useEffect(() => {
-    if (!isLoading) {
-      setLoadingTime(0);
-      return;
-    }
-
+    if (!isLoading) return;
     const interval = setInterval(() => {
       setLoadingTime((prev) => prev + 1);
     }, 1000);
-
     return () => clearInterval(interval);
   }, [isLoading]);
 
@@ -355,6 +350,7 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
       return;
     }
 
+    setLoadingTime(0);
     setIsLoading(true);
     setError(null);
 
@@ -529,19 +525,17 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
 
   const canGenerate = formState.text.trim().length > 0 && formState.imageFile !== null;
 
-  // 生成後に設定が変更されたかどうか
-  const hasChangedSinceGeneration = useMemo(() => {
-    if (!hasGenerated || !lastGeneratedState) return false;
-    return (
-      formState.text !== lastGeneratedState.text ||
-      formState.position !== lastGeneratedState.position ||
-      formState.font !== lastGeneratedState.font ||
-      formState.color !== lastGeneratedState.color ||
-      formState.size !== lastGeneratedState.size ||
-      formState.output !== lastGeneratedState.output ||
-      formState.arrangement !== lastGeneratedState.arrangement
-    );
-  }, [formState, lastGeneratedState, hasGenerated]);
+  // 生成後に設定が変更されたかどうか（安価な比較のため useMemo は不要）
+  const hasChangedSinceGeneration =
+    hasGenerated && lastGeneratedState
+      ? formState.text !== lastGeneratedState.text ||
+        formState.position !== lastGeneratedState.position ||
+        formState.font !== lastGeneratedState.font ||
+        formState.color !== lastGeneratedState.color ||
+        formState.size !== lastGeneratedState.size ||
+        formState.output !== lastGeneratedState.output ||
+        formState.arrangement !== lastGeneratedState.arrangement
+      : false;
 
   // アクションボタンが画面外に出たら下部固定表示
   const { anchorRef, showSticky } = useStickyVisible<HTMLDivElement>();

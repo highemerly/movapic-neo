@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { useIsHydrated } from "@/hooks/useIsHydrated";
 
 type DisplayMode = "system" | "light" | "dark";
 
@@ -16,9 +16,8 @@ const OPTIONS: { value: DisplayMode; label: string; icon: typeof Monitor }[] = [
 export function DisplayModeSelector() {
   // テーマは localStorage 一本化（next-themes）。DB同期は廃止。
   const { theme, setTheme } = useTheme();
-  // SSR と初回クライアント描画の不一致（ハイドレーション）を避けるため mounted ガード
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // SSR と初回クライアント描画の不一致（ハイドレーション）を避けるため hydration ガード
+  const mounted = useIsHydrated();
 
   return (
     <div className="space-y-2">
