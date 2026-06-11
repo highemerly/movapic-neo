@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getAvatarUrl } from "@/lib/avatar";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
+import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { calculateStreak } from "@/lib/streak";
 import { PrefectureHeatmap, type PrefectureMapData } from "@/components/map/PrefectureHeatmap";
@@ -70,7 +71,7 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
   if (!isOptedIn && !isOwner) {
     return (
       <>
-        <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
+        <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain } : null} />
         <div className="container mx-auto max-w-4xl px-4 pt-4 pb-8">
           {profileHeader}
           <div className="rounded-lg border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
@@ -78,6 +79,7 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
           </div>
           <Footer />
         </div>
+        <FloatingPostButton />
       </>
     );
   }
@@ -148,7 +150,7 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
 
   return (
     <>
-      <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
+      <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain } : null} />
       <div className="container mx-auto max-w-4xl px-4 pt-4 pb-8">
         {profileHeader}
 
@@ -224,6 +226,7 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
 
         <Footer />
       </div>
+      <FloatingPostButton />
     </>
   );
 }

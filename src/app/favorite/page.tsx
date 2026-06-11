@@ -1,14 +1,12 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
-import { ImagePlus } from "lucide-react";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getAvatarUrl } from "@/lib/avatar";
 import { FavoritesClient } from "./FavoritesClient";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
-import { Button } from "@/components/ui/button";
+import { FloatingPostButton } from "@/components/FloatingPostButton";
 
 export const dynamic = "force-dynamic";
 
@@ -56,16 +54,10 @@ export default async function FavoritePage() {
 
   return (
     <>
-      <SiteHeader user={{ username: currentUser.username }} />
+      <SiteHeader user={{ username: currentUser.username, instanceDomain: currentUser.instance.domain }} />
       <div className="container mx-auto px-4 py-8 max-w-6xl">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center mb-8">
           <h1 className="text-2xl font-bold">お気に入り</h1>
-          <Link href="/create">
-            <Button size="sm">
-              <ImagePlus className="h-4 w-4" />
-              写真を投稿
-            </Button>
-          </Link>
         </div>
 
         <FavoritesClient
@@ -91,6 +83,7 @@ export default async function FavoritePage() {
 
         <Footer />
       </div>
+      <FloatingPostButton />
     </>
   );
 }

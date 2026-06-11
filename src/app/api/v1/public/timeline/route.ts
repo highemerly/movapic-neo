@@ -20,8 +20,19 @@ export async function GET(request: NextRequest) {
       MAX_LIMIT
     );
 
+    // サーバー（インスタンス）絞り込み。カンマ区切りで複数指定可。
+    const instancesParam = searchParams.get("instances");
+    const instanceDomains = instancesParam
+      ? instancesParam.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+
     const images = await prisma.image.findMany({
-      where: { isPublic: true },
+      where: {
+        isPublic: true,
+        ...(instanceDomains.length > 0 && {
+          user: { instance: { domain: { in: instanceDomains } } },
+        }),
+      },
       orderBy: { createdAt: "desc" },
       take: limit + 1,
       ...(cursor && {

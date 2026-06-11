@@ -134,7 +134,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
 
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
+      <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain } : null} />
       {justPosted && <PostSuccessToast />}
       <main className="container mx-auto max-w-2xl px-4 py-2">
         {/* ヘッダー */}

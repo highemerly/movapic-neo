@@ -591,7 +591,7 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
   return (
     <div className="min-h-screen bg-background">
       <TopProgressBar active={isProcessing} label={progressLabel} />
-      <SiteHeader user={{ username: user.username }} />
+      <SiteHeader user={{ username: user.username, instanceDomain: user.instance.domain }} />
 
       {/* エラートースト（成功トーストと同じ画面上部・目立つよう大きめ＋スライドイン・5秒で自動消滅） */}
       {error && (

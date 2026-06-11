@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Menu, ImagePlus, Images, Globe, LayoutDashboard, Heart, LogOut } from "lucide-react";
+import { Menu, ImagePlus, Images, Globe, Server, LayoutDashboard, Heart, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -16,6 +16,8 @@ import { AnnouncementBar } from "./AnnouncementBar";
 type SiteHeaderProps = {
   user?: {
     username: string;
+    /** ログインユーザーの所属サーバードメイン。「あなたのサーバー」リンク用 */
+    instanceDomain?: string;
   } | null;
 };
 
@@ -85,6 +87,17 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
                   みんなの写真
                 </Link>
               </DropdownMenuItem>
+              {user?.instanceDomain && (
+                <DropdownMenuItem asChild className="py-3 text-base">
+                  <Link
+                    href={`/public?instances=${encodeURIComponent(user.instanceDomain)}`}
+                    className="flex items-center gap-3 cursor-pointer"
+                  >
+                    <Server className="h-5 w-5" />
+                    所属サーバーの写真
+                  </Link>
+                </DropdownMenuItem>
+              )}
               {user && (
                 <DropdownMenuItem asChild className="py-3 text-base">
                   <Link href={`/u/${user.username}`} className="flex items-center gap-3 cursor-pointer">

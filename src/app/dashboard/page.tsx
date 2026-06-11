@@ -176,7 +176,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <SiteHeader user={user ? { username: user.username } : null} />
+      <SiteHeader user={user ? { username: user.username, instanceDomain: user.instance.domain } : null} />
       <div className="container mx-auto px-4 pt-2 pb-8 max-w-2xl">
 
         {/* セクション1: みる */}

@@ -35,7 +35,7 @@ export default async function SessionsPage() {
 
   return (
     <>
-      <SiteHeader user={{ username: user.username }} />
+      <SiteHeader user={{ username: user.username, instanceDomain: user.instance.domain }} />
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         <div className="mb-4">
           <Link

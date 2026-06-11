@@ -25,11 +25,14 @@ interface TimelineImage {
 interface PublicTimelineClientProps {
   initialImages: TimelineImage[];
   publicUrl: string;
+  /** サーバー絞り込みパラメータ（カンマ区切り）。未指定なら null */
+  instancesParam: string | null;
 }
 
 export function PublicTimelineClient({
   initialImages,
   publicUrl,
+  instancesParam,
 }: PublicTimelineClientProps) {
   const [images, setImages] = useState(initialImages);
   const [isLoading, setIsLoading] = useState(false);
@@ -43,9 +46,9 @@ export function PublicTimelineClient({
 
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `/api/v1/public/timeline?cursor=${nextCursor}&limit=20`
-      );
+      const params = new URLSearchParams({ cursor: nextCursor, limit: "20" });
+      if (instancesParam) params.set("instances", instancesParam);
+      const response = await fetch(`/api/v1/public/timeline?${params.toString()}`);
       if (!response.ok) throw new Error("Failed to load more");
 
       const data = await response.json();
@@ -56,7 +59,7 @@ export function PublicTimelineClient({
     } finally {
       setIsLoading(false);
     }
-  }, [nextCursor, isLoading]);
+  }, [nextCursor, isLoading, instancesParam]);
 
   useEffect(() => {
     const loader = loaderRef.current;

@@ -5,6 +5,7 @@ import { getAvatarUrl } from "@/lib/avatar";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
+import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { calculateStreak } from "@/lib/streak";
 
@@ -68,7 +69,7 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
 
   return (
     <>
-      <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
+      <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain } : null} />
       <div className="container mx-auto px-4 pt-4 pb-8 max-w-4xl">
         <UserProfileHeader
           user={{
@@ -94,6 +95,7 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
 
         <Footer />
       </div>
+      <FloatingPostButton />
     </>
   );
 }

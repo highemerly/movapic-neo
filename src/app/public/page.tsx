@@ -1,22 +1,36 @@
-import Link from "next/link";
-import { ImagePlus } from "lucide-react";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getAvatarUrl } from "@/lib/avatar";
 import { PublicTimelineClient } from "./PublicTimelineClient";
+import { InstanceFilterBar } from "./InstanceFilterBar";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
-import { Button } from "@/components/ui/button";
+import { FloatingPostButton } from "@/components/FloatingPostButton";
 
 // 動的レンダリングを強制
 export const dynamic = "force-dynamic";
 
-export default async function PublicTimelinePage() {
+export default async function PublicTimelinePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ instances?: string }>;
+}) {
   const currentUser = await getCurrentUser();
+
+  // サーバー（インスタンス）絞り込み。カンマ区切りで複数指定可。
+  const { instances: instancesParam } = await searchParams;
+  const instanceDomains = instancesParam
+    ? instancesParam.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
 
   // 最新の公開画像を取得
   const images = await prisma.image.findMany({
-    where: { isPublic: true },
+    where: {
+      isPublic: true,
+      ...(instanceDomains.length > 0 && {
+        user: { instance: { domain: { in: instanceDomains } } },
+      }),
+    },
     orderBy: { createdAt: "desc" },
     take: 20,
     select: {
@@ -47,16 +61,14 @@ export default async function PublicTimelinePage() {
 
   return (
     <>
-      <SiteHeader user={currentUser ? { username: currentUser.username } : null} />
+      <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain } : null} />
       <div className="container mx-auto px-4 pt-4 pb-8 max-w-6xl">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">みんなの写真</h1>
-          <Link href="/create">
-            <Button size="sm">
-              <ImagePlus className="h-4 w-4" />
-              写真を投稿
-            </Button>
-          </Link>
+        <div className="flex items-center gap-3 mb-4">
+          <h1 className="text-2xl font-bold shrink-0">みんなの写真</h1>
+          <InstanceFilterBar
+            ownInstance={currentUser?.instance.domain ?? null}
+            selected={instanceDomains[0] ?? null}
+          />
         </div>
 
         <PublicTimelineClient
@@ -77,10 +89,12 @@ export default async function PublicTimelinePage() {
             },
           }))}
           publicUrl={publicUrl}
+          instancesParam={instancesParam ?? null}
         />
 
         <Footer />
       </div>
+      <FloatingPostButton />
     </>
   );
 }

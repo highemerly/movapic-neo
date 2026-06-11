@@ -76,7 +76,7 @@ export default async function AnnouncementDetailPage({
 
   return (
     <>
-      <SiteHeader user={user ? { username: user.username } : null} />
+      <SiteHeader user={user ? { username: user.username, instanceDomain: user.instance.domain } : null} />
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         <Link
           href="/announcements"
