@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID } from "crypto";
+import { randomUUID, timingSafeEqual } from "crypto";
 import { parseEmail } from "@/lib/email/parser";
 import { uploadImage } from "@/lib/storage/storage";
 import { enqueueEmail } from "@/lib/queue";
@@ -23,9 +23,16 @@ export async function POST(request: NextRequest) {
     // リクエストボディを取得
     const rawEmail = Buffer.from(await request.arrayBuffer());
 
-    // 内部APIキー検証
+    // 内部APIキー検証（タイミング攻撃対策: 長さチェック + timingSafeEqual）
     const apiKey = request.headers.get("X-API-Key");
-    if (apiKey !== process.env.INTERNAL_API_KEY) {
+    const expectedApiKey = process.env.INTERNAL_API_KEY ?? "";
+    const apiKeyBuf = Buffer.from(apiKey ?? "");
+    const expectedApiKeyBuf = Buffer.from(expectedApiKey);
+    if (
+      !expectedApiKey ||
+      apiKeyBuf.length !== expectedApiKeyBuf.length ||
+      !timingSafeEqual(apiKeyBuf, expectedApiKeyBuf)
+    ) {
       return errorResponse(
         ErrorCodes.AUTH_INVALID,
         "認証に失敗しました",
@@ -58,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     const bodyHash = hashRequestBody(rawEmail);
-    if (!verifyRequestSignature(ts, bodyHash, signature, process.env.INTERNAL_API_KEY!)) {
+    if (!verifyRequestSignature(ts, bodyHash, signature, expectedApiKey)) {
       return errorResponse(
         ErrorCodes.AUTH_INVALID,
         "署名の検証に失敗しました",
