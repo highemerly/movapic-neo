@@ -76,6 +76,18 @@ export function generateStorageKey(imageId: string, extension: string): string {
 }
 
 /**
+ * サムネイル用のストレージキーを生成（元キーから派生・純粋な文字列処理）
+ * 例: 2025/03/14/uuid.jpg → 2025/03/14/uuid_thumb.webp
+ *
+ * sharp に依存しないよう thumbnail.ts ではなくここに置く（worker-front は本関数のみ使う）。
+ */
+export function generateThumbnailKey(storageKey: string): string {
+  const lastDot = storageKey.lastIndexOf(".");
+  const basePath = lastDot > 0 ? storageKey.substring(0, lastDot) : storageKey;
+  return `${basePath}_thumb.webp`;
+}
+
+/**
  * 末尾スラッシュを正規化した公開URLのベース部分を取得
  */
 export function getPublicUrlBase(): string {

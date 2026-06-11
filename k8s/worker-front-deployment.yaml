@@ -1,0 +1,112 @@
+# =============================================================================
+# worker-front Deployment（雛形 / リファレンス）
+#
+# 注意: 本番の Deployment / Service / Ingress は外部の K8S_REPO 管理。
+#       このファイルは「3-tier をどう足すか」の参照テンプレート。
+#
+# 設計（3-tier: web / worker-front / compute）:
+#   - 全 pod「同一イメージ」。役割は COMPONENT_ROLE で起動時に確定する。
+#   - worker-front は COMPONENT_ROLE=worker-front:
+#       * /api/v1/generate・/api/v1/post・/api/v1/ingest/* を HTTP 配信
+#       * instrumentation.ts が Graphile Worker ランナー（キュー consumer）を起動
+#       * 重い画像処理は compute サービス（/api/internal/*）へ委譲（自身は sharp/skia を呼ばない）
+#   - レート制限（generate の IP単位8s/1req インメモリ）のため当面 replicas: 1。
+#   - Traefik で generate/post/ingest を worker-front へ、それ以外を web へ振り分ける（末尾の例参照）。
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: movapic-neo-worker-front
+  labels:
+    app: movapic-neo
+    component: worker-front
+spec:
+  replicas: 1 # generate の in-memory レート制限のため当面 1 固定
+  selector:
+    matchLabels:
+      app: movapic-neo
+      component: worker-front
+  template:
+    metadata:
+      labels:
+        app: movapic-neo
+        component: worker-front
+    spec:
+      containers:
+        - name: worker-front
+          image: ghcr.io/highemerly/movapic-neo:latest # CIがタグ更新（全tier同一イメージ）
+          ports:
+            - containerPort: 3000
+          env:
+            - name: COMPONENT_ROLE
+              value: "worker-front"
+            - name: WORKER_CONCURRENCY
+              value: "3"
+            # compute サービスへの内部呼び出し先（ClusterIP）。
+            - name: COMPUTE_SERVICE_URL
+              value: "http://movapic-neo-compute"
+          # DATABASE_URL / R2(S3) 資格情報 / 暗号化キー / NEXT_PUBLIC_APP_URL /
+          # MASTODON_BOT_*（botリプライ用）/ COMPUTE_API_KEY など、web と同じ env を共有する。
+          envFrom:
+            - secretRef:
+                name: movapic-neo-secret
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "384Mi"
+            # 画像処理は compute に委譲したため web 並みで足りる（I/O中心）。
+            limits:
+              cpu: "1"
+              memory: "768Mi"
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: movapic-neo-worker-front
+  labels:
+    app: movapic-neo
+    component: worker-front
+spec:
+  selector:
+    app: movapic-neo
+    component: worker-front
+  ports:
+    - port: 80
+      targetPort: 3000
+# =============================================================================
+# Traefik IngressRoute（例）— generate/post/ingest を worker-front へ振り分ける。
+# 実際は K8S_REPO の既存 IngressRoute に統合すること。compute は外部公開しない。
+#
+# apiVersion: traefik.io/v1alpha1
+# kind: IngressRoute
+# metadata:
+#   name: movapic-neo
+# spec:
+#   entryPoints: [websecure]
+#   routes:
+#     # 画像生成・投稿・取り込み → worker-front
+#     - match: Host(`pic.handon.club`) && (PathPrefix(`/api/v1/generate`) || PathPrefix(`/api/v1/post`) || PathPrefix(`/api/v1/ingest`))
+#       kind: Rule
+#       services:
+#         - name: movapic-neo-worker-front
+#           port: 80
+#     # それ以外（ページ・読み取りAPI）→ web
+#     - match: Host(`pic.handon.club`)
+#       kind: Rule
+#       services:
+#         - name: movapic-neo-web
+#           port: 80
+#   # 注: /api/internal/* は Ingress に載せない（compute だけが ClusterIP 経由で提供）。
+# =============================================================================

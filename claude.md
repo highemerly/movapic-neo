@@ -3,6 +3,13 @@
 ## 概要
 画像に文字を入れて生成するWebアプリ。
 
+## ⚠️ リリース後クリーンアップ（一時メモ）
+3-tier移行が本番で安定稼働したら以下を削除し、この節自体も削除すること:
+- **旧エンドポイントの後方互換エイリアス**（cronjob と Cloudflare email worker が新パスを叩いていることを確認後）:
+  - `src/app/api/v1/mention-process/route.ts` →（正規: `/api/v1/ingest/mention`）
+  - `src/app/api/v1/email-generate/route.ts` →（正規: `/api/v1/ingest/email`）
+- **`users.display_mode` カラム**（テーマlocalStorage一本化でコード参照は全除去済み・休眠中）: `prisma migrate` で drop ＋ `npx prisma generate`
+
 ## ページ名称
 - `/` → **トップページ**
 - `/dashboard` → **ダッシュボード**
@@ -21,6 +28,14 @@
 - **UI**: Tailwind CSS + shadcn/ui
 - **画像処理**: sharp + skia-canvas + heic-convert（サーバーサイド）
 - **言語**: TypeScript
+
+## アーキテクチャ（コンポーネント構成）
+同一Dockerイメージを `COMPONENT_ROLE`（`web` | `worker-front` | `compute`、未設定=ローカルall-in-one）で起動分離する3-tier。
+- **web**: ページ＋軽量API（producer）。
+- **worker-front**: `/api/v1/generate`・`/api/v1/post`・`/api/v1/ingest/*` を配信＋Graphile Worker consumer（bot/emailジョブ）。重い画像処理は compute に委譲し**自身は sharp/skia を呼ばない**。レート制限（generate のIP単位8s/1req インメモリ）のため当面1pod。
+- **compute**: 画像生成専用の**ステートレス内部サービス**。外部Ingressなし（ClusterIP＋NetworkPolicy）、秘密情報を持たない（`COMPUTE_API_KEY` のみ）。内部API: `POST /api/internal/render`（文字入れ生成＝processImage）/ `POST /api/internal/finalize`（mime判定＋寸法＋サムネ）。worker-front は `src/lib/compute/client.ts` 経由で呼ぶ。
+- `src/middleware.ts` が role でルート境界を強制（compute は `/api/internal/*`＋`/api/health` のみ／非compute は `/api/internal/*` を404）。
+- 全pod の k8s probe は `/api/health`。`instrumentation.ts` が role で sharp ロードと consumer 起動をゲート。
 
 ## 主な機能
 
@@ -99,8 +114,9 @@
 - **処理**: R2アップロード → DB保存 → Fediverse投稿（localの場合はスキップ）
 - **レスポンス**: `{ success, imageId, imagePageUrl, postUrl? }`
 
-### POST /api/v1/email-generate（内部API）
-- Cloudflare Email Workerから転送されたraw emailを処理
+### POST /api/v1/ingest/email（内部API・旧 `/api/v1/email-generate`）
+- worker-front が配信。旧パスは後方互換エイリアスとして当面存置（「リリース後クリーンアップ」参照）
+- Cloudflare Email Workerから転送されたraw emailを処理（元画像をR2一時領域へ置き、生成〜投稿は worker(consumer) へ enqueue）
 - `X-API-Key`ヘッダーで認証、`X-Email-Prefix`でユーザー特定
 - 件名からオプション解析（例: "上 赤 大"）、本文がテキスト、添付が画像
 - オプション・公開範囲のデフォルトはユーザーのWeb初期設定を使用（件名指定 > ユーザー設定 > ハードコード）

@@ -79,14 +79,5 @@ export async function generateThumbnail(
   return thumbnail;
 }
 
-/**
- * サムネイル用のストレージキーを生成
- * 元のストレージキーから派生させる
- * 例: 2025/03/14/uuid.jpg → 2025/03/14/uuid_thumb.webp
- */
-export function generateThumbnailKey(storageKey: string): string {
-  // 拡張子を除去して_thumb.webpを追加
-  const lastDot = storageKey.lastIndexOf(".");
-  const basePath = lastDot > 0 ? storageKey.substring(0, lastDot) : storageKey;
-  return `${basePath}_thumb.webp`;
-}
+// generateThumbnailKey は sharp 非依存のため storage.ts へ移設した（worker-front が
+// 本モジュール=sharp を読み込まずに済むようにするため）。

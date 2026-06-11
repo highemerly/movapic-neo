@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { processImage } from "@/lib/imageProcessor";
+import { renderImage } from "@/lib/compute/client";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
 import {
   Position,
@@ -193,8 +193,9 @@ export async function POST(request: NextRequest) {
     console.log(`[generate] rid=${requestId} REQUEST: file=${fileName}, size=${fileSizeKB}KB, ext=${fileExt}, mimeType=${image.type || 'empty'}`);
 
     const startTime = performance.now();
+    // 画像生成は compute サービスへ委譲（worker-front は sharp/skia を呼ばない）
     const result = await withTimeout(
-      processImage({
+      renderImage({
         imageBuffer,
         text,
         position,

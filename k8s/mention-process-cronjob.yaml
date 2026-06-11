@@ -32,15 +32,16 @@ spec:
                 -H "X-API-Key: ${MENTION_PROCESS_API_KEY}" \
                 -H "Content-Type: application/json" \
                 --max-time 50 \
-                "${SERVICE_URL}/api/v1/mention-process"
+                "${SERVICE_URL}/api/v1/ingest/mention"
             env:
             - name: MENTION_PROCESS_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: movapic-neo-secret
                   key: MENTION_PROCESS_API_KEY
+            # 取り込み(ingest)は worker-front が提供する。
             - name: SERVICE_URL
-              value: "http://movapic-neo-service"  # クラスタ内部のService名
+              value: "http://movapic-neo-worker-front"  # クラスタ内部のService名
             resources:
               requests:
                 cpu: "10m"

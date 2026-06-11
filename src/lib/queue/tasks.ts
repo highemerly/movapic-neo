@@ -7,7 +7,7 @@
 
 import type { Task, TaskList } from "graphile-worker";
 import { prisma } from "@/lib/db";
-import { processImage } from "@/lib/imageProcessor";
+import { renderImage, finalizeImage } from "@/lib/compute/client";
 import { publishImage, PublishVisibility } from "@/lib/publish/publishImage";
 import { getImage, deleteImage } from "@/lib/storage/storage";
 import { extractExif } from "@/lib/exif/parser";
@@ -116,7 +116,8 @@ const processEmailTask: Task = async (payload) => {
     }
   }
 
-  const result = await processImage({
+  // 文字入れは compute へ委譲（worker は sharp/skia を呼ばない）
+  const result = await renderImage({
     imageBuffer: sourceBuffer,
     text: p.text,
     position: p.options.position,
@@ -148,6 +149,10 @@ const processEmailTask: Task = async (payload) => {
     source: "email",
     visibility: p.options.visibility,
     persistOnPostFailure: true,
+    getThumbnailAndDimensions: async () => {
+      const f = await finalizeImage(result.buffer, p.options.position);
+      return { thumbnail: f.thumbnail, width: f.width, height: f.height };
+    },
     extras: { cameraMake, cameraModel, locationPrefecture, locationCity },
   });
 

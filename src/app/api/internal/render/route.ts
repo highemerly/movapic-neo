@@ -1,0 +1,86 @@
+/**
+ * 内部API: 文字入れ画像の生成（compute 専用・外部Ingressなし）
+ * POST /api/internal/render
+ *
+ * worker-front から呼ばれる。skia/sharp による重い処理はここ（compute）でのみ実行する。
+ * in: multipart（image + text/position/color/size/font/output/arrangement[+requestId]）
+ * out: 生成画像 binary ＋ メタはヘッダ（Content-Type / X-Extension / X-Original-Width/Height）
+ */
+
+import { NextRequest, NextResponse } from "next/server";
+import { processImage } from "@/lib/imageProcessor";
+import { verifyComputeApiKey } from "@/lib/compute/internalAuth";
+import {
+  Position,
+  FontFamily,
+  Color,
+  Size,
+  OutputFormat,
+  Arrangement,
+  isValidPosition,
+  isValidFont,
+  isValidColor,
+  isValidSize,
+  isValidOutput,
+  isValidArrangement,
+} from "@/types";
+
+export async function POST(request: NextRequest) {
+  if (!verifyComputeApiKey(request)) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const form = await request.formData();
+  const image = form.get("image") as File | null;
+  const text = form.get("text") as string | null;
+  const position = form.get("position") as Position | null;
+  const color = form.get("color") as Color | null;
+  const size = form.get("size") as Size | null;
+  const font = form.get("font") as FontFamily | null;
+  const output = form.get("output") as OutputFormat | null;
+  const arrangement = (form.get("arrangement") as Arrangement | null) || "none";
+  const requestId = (form.get("requestId") as string | null) || undefined;
+
+  if (
+    !image ||
+    !text ||
+    !isValidPosition(position) ||
+    !isValidColor(color) ||
+    !isValidSize(size) ||
+    !isValidFont(font) ||
+    !isValidOutput(output) ||
+    !isValidArrangement(arrangement)
+  ) {
+    return NextResponse.json({ error: "invalid parameters" }, { status: 400 });
+  }
+
+  const imageBuffer = Buffer.from(await image.arrayBuffer());
+
+  try {
+    const result = await processImage({
+      imageBuffer,
+      text,
+      position,
+      color,
+      size,
+      font,
+      output,
+      arrangement,
+      requestId,
+    });
+
+    return new NextResponse(new Uint8Array(result.buffer), {
+      status: 200,
+      headers: {
+        "Content-Type": result.contentType,
+        "X-Extension": result.extension,
+        "X-Original-Width": String(result.originalWidth || 0),
+        "X-Original-Height": String(result.originalHeight || 0),
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (error) {
+    console.error("[internal/render] failed:", error);
+    return NextResponse.json({ error: "render failed" }, { status: 500 });
+  }
+}

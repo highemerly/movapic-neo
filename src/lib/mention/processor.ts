@@ -4,7 +4,7 @@
 
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db";
-import { processImage } from "@/lib/imageProcessor";
+import { renderImage, finalizeImage } from "@/lib/compute/client";
 import { publishImage, PublishVisibility } from "@/lib/publish/publishImage";
 import { MastodonVisibility } from "@/lib/fediverse/post";
 import { decryptToken } from "@/lib/auth/tokens";
@@ -374,7 +374,8 @@ export async function processOneMention(
   const outputFormat = determineOutputFormat(user.instance.type);
   let processedImage: { buffer: Buffer; contentType: string; extension: string };
   try {
-    processedImage = await processImage({
+    // 文字入れは compute へ委譲（worker は sharp/skia を呼ばない）
+    processedImage = await renderImage({
       imageBuffer,
       text,
       position: options.position,
@@ -419,6 +420,11 @@ export async function processOneMention(
       source: "mention",
       visibility: effectiveVisibility as PublishVisibility,
       persistOnPostFailure: false,
+      // 投稿成功時にだけ呼ばれる＝失敗時は compute(finalize)を呼ばない
+      getThumbnailAndDimensions: async () => {
+        const f = await finalizeImage(processedImage.buffer, options.position);
+        return { thumbnail: f.thumbnail, width: f.width, height: f.height };
+      },
     });
   } catch (error) {
     console.error(`[mention] 保存/投稿失敗:`, error);

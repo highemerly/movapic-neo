@@ -4,10 +4,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import sharp from "sharp";
 import { getCurrentUserWithValidation } from "@/lib/auth/session";
 import { decryptToken } from "@/lib/auth/tokens";
 import { reverseGeocode } from "@/lib/geocode/gsi";
+import { finalizeImage } from "@/lib/compute/client";
 import { publishImage, PublishVisibility } from "@/lib/publish/publishImage";
 import {
   Position,
@@ -18,20 +18,6 @@ import {
   Arrangement,
   MAX_FILE_SIZE,
 } from "@/types";
-
-/**
- * sharp で検出した画像メタデータから、R2 に保存して良い Content-Type を返す。
- * /api/v1/generate の出力（JPEG / AVIF）のみ許可。
- * sharp 0.30+ は AVIF を format='heif', compression='av1' として返す（libheif 経由）。
- */
-function detectSafeMimeType(metadata: sharp.Metadata): string | undefined {
-  if (metadata.format === "jpeg") return "image/jpeg";
-  if (metadata.format === "avif") return "image/avif";
-  if (metadata.format === "heif" && metadata.compression === "av1") {
-    return "image/avif";
-  }
-  return undefined;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -92,19 +78,19 @@ export async function POST(request: NextRequest) {
     // 画像バッファを取得
     const imageBuffer = Buffer.from(await imageBlob.arrayBuffer());
 
-    // sharp で実フォーマットを検出（クライアント送信の mimeType は信任しない）
+    // compute で実フォーマット検出＋寸法＋サムネを取得（クライアント送信の mimeType は信任しない）。
     // R2 が任意の Content-Type で任意コンテンツを配信することを防ぐため、
     // /api/v1/generate の出力形式 (JPEG/AVIF) のみ許可する。
-    let metadata: sharp.Metadata;
+    let finalized;
     try {
-      metadata = await sharp(imageBuffer).metadata();
+      finalized = await finalizeImage(imageBuffer, position);
     } catch {
       return NextResponse.json(
         { error: "画像の解析に失敗しました" },
         { status: 400 }
       );
     }
-    const mimeType = detectSafeMimeType(metadata);
+    const mimeType = finalized.detectedMime;
     if (!mimeType) {
       return NextResponse.json(
         { error: "サポートされていない画像形式です" },
@@ -154,7 +140,11 @@ export async function POST(request: NextRequest) {
       source: "web",
       visibility: publishVisibility,
       persistOnPostFailure: true,
-      dimensions: { width: metadata.width || 0, height: metadata.height || 0 },
+      getThumbnailAndDimensions: async () => ({
+        thumbnail: finalized.thumbnail,
+        width: finalized.width,
+        height: finalized.height,
+      }),
       extras: { cameraMake, cameraModel, capturedAt, locationPrefecture, locationCity },
     });
 

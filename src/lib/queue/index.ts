@@ -2,7 +2,7 @@
  * Graphile Worker の enqueue / runner ラッパ
  *
  * - producer（web/cron）: getWorkerUtils() 経由で enqueue するだけ
- * - worker プロセス: runWorker() で常駐ランナーを起動（instrumentation.ts から RUN_WORKER 時のみ）
+ * - worker-front: runWorker() で常駐ランナーを起動（instrumentation.ts が COMPONENT_ROLE=worker-front 時に呼ぶ）
  *
  * Redis 不要。キュー管理は Postgres（graphile_worker スキーマ）のみで完結する。
  * SKIP LOCKED / LISTEN-NOTIFY / リトライ / backoff / reaper は Graphile Worker が担う。
@@ -66,8 +66,9 @@ export async function enqueueEmail(payload: ProcessEmailPayload): Promise<void> 
 let runner: Runner | null = null;
 
 /**
- * worker ランナーを起動する。RUN_WORKER=true の pod でのみ呼ばれる。
- * 対話的 /api/v1/generate と同居するため、concurrency は控えめ（既定 3）。
+ * worker ランナーを起動する。COMPONENT_ROLE=worker-front の pod でのみ呼ばれる。
+ * 重い画像処理は compute へ委譲するが、bot/email ジョブの compute への同時負荷を
+ * 律速するため concurrency は控えめ（既定 3）。
  */
 export async function runWorker(): Promise<void> {
   if (runner) return;

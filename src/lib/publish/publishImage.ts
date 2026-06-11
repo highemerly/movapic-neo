@@ -1,7 +1,7 @@
 /**
  * 投稿パイプラインの共通処理
  *
- * web経由(/api/v1/post) / mail経由(/api/v1/email-generate) / bot経由(mention/processor)
+ * web経由(/api/v1/post) / mail経由(/api/v1/ingest/email) / bot経由(mention/processor)
  * の3経路で重複していた「保存→サムネ→メタ→DB保存→Fediverse投稿」を一本化する。
  *
  * 経路ごとに異なるのは「投稿失敗時に画像を保存するか（persistOnPostFailure）」の
@@ -10,14 +10,13 @@
  */
 
 import { randomUUID } from "crypto";
-import sharp from "sharp";
 import prisma from "@/lib/db";
 import {
   uploadImage,
   generateStorageKey,
+  generateThumbnailKey,
   getExtensionFromMimeType,
 } from "@/lib/storage/storage";
-import { generateThumbnail, generateThumbnailKey } from "@/lib/thumbnail";
 import {
   postToMastodon,
   postToMisskey,
@@ -75,8 +74,17 @@ export interface PublishImageInput {
     locationPrefecture?: string | null;
     locationCity?: string | null;
   };
-  /** 呼び出し側が既に width/height を持っている場合に渡す（無ければ sharp で取得） */
-  dimensions?: { width: number; height: number };
+  /**
+   * 保存直前にだけ呼ばれ、サムネ（webp）と寸法を返す。
+   * compute(/api/internal/finalize) への委譲を内側に閉じ込めるためのコールバック。
+   * publishImage 自身は sharp を読み込まない（worker-front を native フリーに保つ）。
+   * mention（persistOnPostFailure:false）では投稿成功時のみ呼ばれる＝失敗時は compute を呼ばない。
+   */
+  getThumbnailAndDimensions: () => Promise<{
+    thumbnail: Buffer;
+    width: number;
+    height: number;
+  }>;
 }
 
 export interface PublishImageResult {
@@ -164,22 +172,10 @@ async function storeAndRecord(
   // 本体をR2へ
   await uploadImage(input.buffer, storageKey, input.contentType);
 
-  // サムネイル生成 → R2へ
+  // サムネ＋寸法は compute から取得（保存直前にだけ呼ぶ）→ R2へ
   const thumbnailKey = generateThumbnailKey(storageKey);
-  const thumbnailBuffer = await generateThumbnail(
-    input.buffer,
-    input.options.position
-  );
-  await uploadImage(thumbnailBuffer, thumbnailKey, "image/webp");
-
-  // 寸法（呼び出し側が持っていればそれを使う）
-  let width = input.dimensions?.width;
-  let height = input.dimensions?.height;
-  if (width == null || height == null) {
-    const metadata = await sharp(input.buffer).metadata();
-    width = metadata.width || 0;
-    height = metadata.height || 0;
-  }
+  const { thumbnail, width, height } = await input.getThumbnailAndDimensions();
+  await uploadImage(thumbnail, thumbnailKey, "image/webp");
 
   await prisma.image.create({
     data: {

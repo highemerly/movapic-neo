@@ -2,10 +2,28 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * セキュリティヘッダーを追加するmiddleware
+ * COMPONENT_ROLE によるルート境界の強制 ＋ セキュリティヘッダー付与。
+ *
+ * ルート境界（NetworkPolicy に加えた多層防御）:
+ * - compute: /api/internal/* と /api/health 以外は 404（アプリ/秘密情報ルートを compute 上で動かさない）
+ * - web / worker-front: /api/internal/* を 404（内部APIは compute だけが提供）
+ * - 未設定(dev all-in-one): 制限なし
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function middleware(_request: NextRequest) {
+export function middleware(request: NextRequest) {
+  const role = process.env.COMPONENT_ROLE;
+  const path = request.nextUrl.pathname;
+  const isInternal = path.startsWith("/api/internal");
+
+  if (role === "compute") {
+    if (!isInternal && path !== "/api/health") {
+      return new NextResponse(null, { status: 404 });
+    }
+  } else if (role === "web" || role === "worker-front") {
+    if (isInternal) {
+      return new NextResponse(null, { status: 404 });
+    }
+  }
+
   const response = NextResponse.next();
 
   // X-Content-Type-Options: MIMEタイプスニッフィング防止

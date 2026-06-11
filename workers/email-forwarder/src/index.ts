@@ -102,8 +102,8 @@ const emailWorker = {
       const bodyHash = await sha256(rawEmail);
       const signature = await generateSignature(timestamp, bodyHash, env.INTERNAL_API_KEY);
 
-      // Next.js APIへ転送
-      const response = await fetch(`${env.API_URL}/api/v1/email-generate`, {
+      // Next.js APIへ転送（正規パス: /api/v1/ingest/email）
+      const response = await fetch(`${env.API_URL}/api/v1/ingest/email`, {
         method: "POST",
         headers: {
           "Content-Type": "application/octet-stream",
