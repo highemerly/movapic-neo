@@ -22,6 +22,9 @@ export function DisplayModeSelector() {
   return (
     <div className="space-y-2">
       <Label>表示モード</Label>
+      <p className="text-xs text-muted-foreground">
+        この設定はお使いのブラウザにのみ反映されます（別のブラウザや端末には影響しません）。
+      </p>
       <div role="radiogroup" className="flex rounded-lg border bg-muted p-1 gap-1">
         {OPTIONS.map(({ value, label, icon: Icon }) => {
           const selected = mounted && theme === value;
@@ -32,10 +35,10 @@ export function DisplayModeSelector() {
               role="radio"
               aria-checked={selected}
               onClick={() => setTheme(value)}
-              className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
+              className={`flex-1 rounded-md border px-2 py-1.5 text-sm font-medium transition-colors ${
                 selected
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "border-border bg-background text-foreground shadow-sm"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               <span className="flex items-center justify-center gap-1">
