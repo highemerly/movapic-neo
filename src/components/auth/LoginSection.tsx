@@ -6,6 +6,7 @@ import { LoginButton } from "./LoginButton";
 
 interface LoginSectionProps {
   allowedServers?: string[];
+  initialIsLoggedIn?: boolean;
 }
 
 function getLoginRequiredMessage(returnTo: string): string {
@@ -46,7 +47,7 @@ function sanitizeReturnTo(value: string | null): string | undefined {
   return value;
 }
 
-export function LoginSection({ allowedServers }: LoginSectionProps) {
+export function LoginSection({ allowedServers, initialIsLoggedIn }: LoginSectionProps) {
   const params = useSearchParams();
   const reason = params.get("reason");
   const errorCode = params.get("error");
@@ -71,7 +72,7 @@ export function LoginSection({ allowedServers }: LoginSectionProps) {
         </div>
       ) : null}
       <div className="px-5 py-5">
-        <LoginButton allowedServers={allowedServers} callbackUrl={returnTo} />
+        <LoginButton allowedServers={allowedServers} callbackUrl={returnTo} initialIsLoggedIn={initialIsLoggedIn} />
       </div>
     </div>
   );

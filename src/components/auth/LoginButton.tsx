@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -19,9 +19,15 @@ interface LoginButtonProps {
    * ログイン成功後の遷移先パス（省略時は /dashboard）
    */
   callbackUrl?: string;
+  /**
+   * ログイン済みか（サーバーで JWT 検証して渡す）。
+   * 旧来のクライアント側 fetch("/api/v1/me") を廃止し、初回描画時点で確定させる。
+   * 省略時は未ログイン扱い。
+   */
+  initialIsLoggedIn?: boolean;
 }
 
-export function LoginButton({ allowedServers, callbackUrl }: LoginButtonProps) {
+export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: LoginButtonProps) {
   const targetUrl = callbackUrl || "/dashboard";
   const router = useRouter();
   const [server, setServer] = useState(
@@ -29,24 +35,13 @@ export function LoginButton({ allowedServers, callbackUrl }: LoginButtonProps) {
   );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
   const [agreed, setAgreed] = useState(false);
+
+  // ログイン状態はサーバーから受け取った値で確定（クライアント fetch なし）
+  const isLoggedIn = initialIsLoggedIn ?? false;
 
   // 単一サーバー限定モード
   const singleServerMode = allowedServers?.length === 1;
-
-  // ログイン状態をチェック
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await fetch("/api/v1/me");
-        setIsLoggedIn(response.ok);
-      } catch {
-        setIsLoggedIn(false);
-      }
-    };
-    checkAuth();
-  }, []);
 
   const handleLogin = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -131,12 +126,12 @@ export function LoginButton({ allowedServers, callbackUrl }: LoginButtonProps) {
         {error && <p className="text-sm text-destructive">{error}</p>}
         <Button
           onClick={() => handleLogin()}
-          disabled={isLoading || isLoggedIn === null}
+          disabled={isLoading}
           aria-disabled={needsAgreement || undefined}
           className={`w-full py-6 text-lg ${needsAgreement ? "opacity-50" : ""}`}
           size="lg"
         >
-          {isLoggedIn === null ? "読み込み中..." : buttonLabel}
+          {buttonLabel}
         </Button>
         {!isLoggedIn && (
           <p className="text-xs text-muted-foreground">
@@ -165,38 +160,30 @@ export function LoginButton({ allowedServers, callbackUrl }: LoginButtonProps) {
   // 自由入力モード
   return (
     <form onSubmit={handleLogin} className="space-y-4">
-      {isLoggedIn === null ? (
-        <Button disabled className="w-full py-6 text-lg" size="lg">
-          読み込み中...
+      {agreementCheckbox}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      <div className="flex gap-2">
+        <Input
+          type="text"
+          value={server}
+          onChange={(e) => setServer(e.target.value)}
+          placeholder="mastodon.social"
+          disabled={isLoading}
+          className="flex-1 py-6 text-lg"
+        />
+        <Button
+          type="submit"
+          disabled={isLoading}
+          aria-disabled={(!server.trim() || !agreed) || undefined}
+          className={`py-6 text-lg ${(!server.trim() || !agreed) ? "opacity-50" : ""}`}
+          size="lg"
+        >
+          {isLoading ? "処理中..." : "ログイン"}
         </Button>
-      ) : (
-        <>
-          {agreementCheckbox}
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <div className="flex gap-2">
-            <Input
-              type="text"
-              value={server}
-              onChange={(e) => setServer(e.target.value)}
-              placeholder="mastodon.social"
-              disabled={isLoading}
-              className="flex-1 py-6 text-lg"
-            />
-            <Button
-              type="submit"
-              disabled={isLoading}
-              aria-disabled={(!server.trim() || !agreed) || undefined}
-              className={`py-6 text-lg ${(!server.trim() || !agreed) ? "opacity-50" : ""}`}
-              size="lg"
-            >
-              {isLoading ? "処理中..." : "ログイン"}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Mastodon または Misskey サーバーのドメインを入力してください
-          </p>
-        </>
-      )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Mastodon または Misskey サーバーのドメインを入力してください
+      </p>
     </form>
   );
 }

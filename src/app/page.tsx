@@ -1,15 +1,39 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { unstable_cache } from "next/cache";
 import prisma from "@/lib/db";
+import { getSessionClaims } from "@/lib/auth/session";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { LoginSection } from "@/components/auth/LoginSection";
 import { Button } from "@/components/ui/button";
 import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
 import { Footer } from "@/components/Footer";
 
-// ISR: 5分ごとに再生成
-export const revalidate = 300;
+// ログイン判定（getSessionClaims）で cookie を読むためページは動的になる。
+// 公開ギャラリーのクエリは unstable_cache で 5 分キャッシュし、全訪問者で共有する。
+// （cacheComponents 未有効のため 'use cache' は使えず unstable_cache が正解）
+const getFeaturedImages = unstable_cache(
+  async () =>
+    prisma.image.findMany({
+      where: { isPublic: true },
+      orderBy: { createdAt: "desc" },
+      take: 6,
+      select: {
+        id: true,
+        storageKey: true,
+        overlayText: true,
+        user: {
+          select: {
+            username: true,
+            displayName: true,
+          },
+        },
+      },
+    }),
+  ["home-featured-images"],
+  { revalidate: 300, tags: ["featured-images"] }
+);
 
 // 許可サーバーを取得
 function getAllowedServers(): string[] | undefined {
@@ -24,23 +48,11 @@ export default async function HomePage() {
   const allowedServers = getAllowedServers();
   const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
-  // フィーチャー画像を取得（最新6件）
-  const featuredImages = await prisma.image.findMany({
-    where: { isPublic: true },
-    orderBy: { createdAt: "desc" },
-    take: 6,
-    select: {
-      id: true,
-      storageKey: true,
-      overlayText: true,
-      user: {
-        select: {
-          username: true,
-          displayName: true,
-        },
-      },
-    },
-  });
+  // ログイン状態は JWT（署名+exp検証のみ）で判定＝DBアクセスなし
+  const isLoggedIn = (await getSessionClaims()) !== null;
+
+  // フィーチャー画像を取得（最新6件・5分キャッシュ）
+  const featuredImages = await getFeaturedImages();
 
   return (
     <div className="min-h-screen bg-background">
@@ -57,12 +69,12 @@ export default async function HomePage() {
               fallback={
                 <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden text-center">
                   <div className="px-5 py-5">
-                    <LoginButton allowedServers={allowedServers} />
+                    <LoginButton allowedServers={allowedServers} initialIsLoggedIn={isLoggedIn} />
                   </div>
                 </div>
               }
             >
-              <LoginSection allowedServers={allowedServers} />
+              <LoginSection allowedServers={allowedServers} initialIsLoggedIn={isLoggedIn} />
             </Suspense>
           </div>
         </div>

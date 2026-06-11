@@ -25,13 +25,43 @@ function getJWTSecret(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
-// JWTペイロードの型定義（認証に必要な最小限の情報のみ）
-// jti は LoginSession.jti と照合して「現在のセッション」を識別するために使う
+// JWTペイロードの型定義
+// jti は LoginSession.jti と照合して「現在のセッション」を識別するために使う。
+// username/displayName/avatarUrl/instance* は「ログイン時にしか変わらない or 不変」な
+// 識別・表示用フィールド（コールバックが毎ログインで同期）。DBと鮮度差がないため埋め込み、
+// ヘッダー等の表示をDBアクセスなしで行えるようにする。
+// ※ Fediverse認証トークンなど「アプリ内で変わる機密/可変値」は絶対に入れない。
 interface SessionPayload extends JWTPayload {
   userId: string;
   instanceId: string;
   jti: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  instanceDomain: string;
+  instanceType: string;
 }
+
+// createSession に渡す識別フィールド（ログイン時に手元の user/instance から渡す）
+export type SessionIdentity = {
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  instanceDomain: string;
+  instanceType: string;
+};
+
+// getSessionClaims の戻り値（DBアクセスなしで得られる識別/表示情報）
+export type SessionClaims = {
+  userId: string;
+  instanceId: string;
+  jti: string;
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  instanceDomain: string;
+  instanceType: string;
+};
 
 // ログイン時に呼び出し元から受け取るリクエスト情報
 export type LoginRequestInfo = {
@@ -52,7 +82,6 @@ export type SessionUser = {
   emailPrefix: string;
   instanceId: string;
   instance: Instance;
-  displayMode: string | null;
 };
 
 // getCurrentUserWithValidationの戻り値の型（accessToken含む）
@@ -67,6 +96,7 @@ export type SessionUserWithToken = SessionUser & {
 export async function createSession(
   userId: string,
   instanceId: string,
+  identity: SessionIdentity,
   requestInfo: LoginRequestInfo
 ): Promise<void> {
   const jti = randomUUID();
@@ -75,6 +105,11 @@ export async function createSession(
     userId,
     instanceId,
     jti,
+    username: identity.username,
+    displayName: identity.displayName,
+    avatarUrl: identity.avatarUrl,
+    instanceDomain: identity.instanceDomain,
+    instanceType: identity.instanceType,
   };
 
   const token = await new SignJWT(payload)
@@ -147,6 +182,33 @@ async function getSessionPayload(): Promise<SessionPayload | null> {
 }
 
 /**
+ * セッションの識別/表示情報を取得（DBアクセスなし）
+ * 署名と有効期限のみ検証し、失効チェックは行わない。
+ * 「ログイン中か」の判定や、ヘッダー等の表示（username/avatar等）に使う。
+ * ※ 失効を即時に反映する必要がある機密操作には getCurrentUser を使うこと。
+ *
+ * 後方互換: 新フィールド導入前に発行された既存JWTには表示用フィールドが無いため、
+ * username 等は undefined になりうる（Cookieは7日で自然失効＝自己修復）。
+ * 表示用途の呼び出し側は値の欠落を許容すること。ログイン判定（戻り値の有無）は旧JWTでも有効。
+ */
+export async function getSessionClaims(): Promise<SessionClaims | null> {
+  const payload = await getSessionPayload();
+  if (!payload) {
+    return null;
+  }
+  return {
+    userId: payload.userId,
+    instanceId: payload.instanceId,
+    jti: payload.jti,
+    username: payload.username,
+    displayName: payload.displayName,
+    avatarUrl: payload.avatarUrl,
+    instanceDomain: payload.instanceDomain,
+    instanceType: payload.instanceType,
+  };
+}
+
+/**
  * 現在のユーザーを取得（セッションがない場合はnull）
  * JWTからユーザーIDを取得し、DBからユーザー情報を取得して返す
  */
@@ -181,7 +243,6 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     emailPrefix: user.emailPrefix,
     instanceId: user.instanceId,
     instance: user.instance,
-    displayMode: user.displayMode,
   };
 }
 
@@ -218,8 +279,71 @@ export async function getCurrentUserWithValidation(): Promise<SessionUserWithTok
     emailPrefix: user.emailPrefix,
     instanceId: user.instanceId,
     instance: user.instance,
-    displayMode: user.displayMode,
     accessToken: user.accessToken,
+  };
+}
+
+// getCurrentUserWithPreferences の戻り値の型（投稿ページのフォーム初期値用）
+// preferences の各値は DB のスカラー（string | null）のまま返し、
+// UI の union 型へのキャストは呼び出し側で行う（session.ts に @/types を持ち込まない）。
+export type SessionUserWithPreferences = SessionUser & {
+  instanceDomain: string;
+  instanceType: string;
+  preferences: {
+    position: string | null;
+    font: string | null;
+    color: string | null;
+    size: string | null;
+    arrangement: string | null;
+    visibility: string | null;
+    cameraOption: string | null;
+  };
+};
+
+/**
+ * 現在のユーザーを preferences 付きで取得（失効チェック付き・1クエリ）
+ * 投稿ページ（/create）のサーバーシェルでフォーム初期値をseedするために使う。
+ * getCurrentUser と同じEXISTSサブクエリ検証なので、同一 user 行から
+ * defaultX スカラーを追加で読むだけ＝追加の往復なし。
+ */
+export async function getCurrentUserWithPreferences(): Promise<SessionUserWithPreferences | null> {
+  const payload = await getSessionPayload();
+
+  if (!payload) {
+    return null;
+  }
+
+  const user = await prisma.user.findFirst({
+    where: {
+      id: payload.userId,
+      loginSessions: { some: { jti: payload.jti, revokedAt: null } },
+    },
+    include: { instance: true },
+  });
+
+  if (!user) {
+    return null;
+  }
+
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+    emailPrefix: user.emailPrefix,
+    instanceId: user.instanceId,
+    instance: user.instance,
+    instanceDomain: user.instance.domain,
+    instanceType: user.instance.type,
+    preferences: {
+      position: user.defaultPosition,
+      font: user.defaultFont,
+      color: user.defaultColor,
+      size: user.defaultSize,
+      arrangement: user.defaultArrangement,
+      visibility: user.defaultVisibility,
+      cameraOption: user.defaultCameraOption,
+    },
   };
 }
 

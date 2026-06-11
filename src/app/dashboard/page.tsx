@@ -51,7 +51,6 @@ export default async function DashboardPage() {
         defaultVisibility: true,
         defaultCameraOption: true,
         showLocationMap: true,
-        displayMode: true,
       },
     }),
     prisma.image.count({
@@ -314,11 +313,7 @@ export default async function DashboardPage() {
             <p className="text-sm font-medium mb-2">一般</p>
             <div className="space-y-4">
               <BioEditForm initialBio={userWithPreferences?.bio ?? null} />
-              <DisplayModeSelector
-                initialMode={
-                  (userWithPreferences?.displayMode as "system" | "light" | "dark" | null | undefined) ?? "system"
-                }
-              />
+              <DisplayModeSelector />
             </div>
           </div>
 

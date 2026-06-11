@@ -21,13 +21,8 @@ export function FooterThemeToggle() {
   }, []);
 
   const handleChange = (next: Mode) => {
+    // テーマは localStorage 一本化（next-themes）。DB同期は廃止。
     setTheme(next);
-    // ログイン中なら DB へも反映（未ログイン時の 401 はサイレント）
-    fetch("/api/v1/me", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ displayMode: next }),
-    }).catch(() => {});
   };
 
   return (

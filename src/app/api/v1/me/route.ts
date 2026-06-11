@@ -1,7 +1,10 @@
 /**
- * プロフィール取得・更新エンドポイント
- * GET /api/v1/me
+ * プロフィール更新エンドポイント
  * PATCH /api/v1/me
+ *
+ * 旧 GET /api/v1/me は廃止（クライアントの自己セッションfetchを全廃したため）。
+ * 表示用の識別情報は JWT（getSessionClaims）から、フォーム初期値はサーバー側で
+ * getCurrentUserWithPreferences から取得する。
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -39,78 +42,6 @@ function sanitizeBio(input: string): string {
     .trim();
 }
 
-export async function GET() {
-  try {
-    const sessionUser = await getCurrentUser();
-
-    if (!sessionUser) {
-      return jsonNoStore({ error: "認証が必要です" }, { status: 401 });
-    }
-
-    // preferencesを含むユーザー情報を取得
-    const user = await prisma.user.findUnique({
-      where: { id: sessionUser.id },
-      select: {
-        id: true,
-        username: true,
-        displayName: true,
-        avatarUrl: true,
-        emailPrefix: true,
-        bio: true,
-        defaultPosition: true,
-        defaultFont: true,
-        defaultColor: true,
-        defaultSize: true,
-        defaultOutput: true,
-        defaultArrangement: true,
-        defaultVisibility: true,
-        defaultCameraOption: true,
-        displayMode: true,
-        instance: {
-          select: {
-            domain: true,
-            type: true,
-          },
-        },
-      },
-    });
-
-    if (!user) {
-      return jsonNoStore({ error: "ユーザーが見つかりません" }, { status: 404 });
-    }
-
-    return jsonNoStore({
-      id: user.id,
-      username: user.username,
-      displayName: user.displayName,
-      avatarUrl: user.avatarUrl,
-      emailPrefix: user.emailPrefix,
-      bio: user.bio,
-      displayMode: user.displayMode ?? "system",
-      instance: {
-        domain: user.instance.domain,
-        type: user.instance.type,
-      },
-      preferences: {
-        position: user.defaultPosition,
-        font: user.defaultFont,
-        color: user.defaultColor,
-        size: user.defaultSize,
-        output: user.defaultOutput,
-        arrangement: user.defaultArrangement,
-        visibility: user.defaultVisibility,
-        cameraOption: user.defaultCameraOption,
-      },
-    });
-  } catch (error) {
-    console.error("Failed to fetch profile:", error);
-    return jsonNoStore(
-      { error: "プロフィールの取得に失敗しました" },
-      { status: 500 }
-    );
-  }
-}
-
 const BIO_MAX_LENGTH = 40;
 
 export async function PATCH(request: NextRequest) {
@@ -128,7 +59,6 @@ export async function PATCH(request: NextRequest) {
       bio?: string | null;
       mentionKeep?: boolean;
       showLocationMap?: boolean;
-      displayMode?: string | null;
     } = {};
 
     // bioの更新
@@ -176,18 +106,6 @@ export async function PATCH(request: NextRequest) {
       updateData.showLocationMap = body.showLocationMap;
     }
 
-    // displayModeの更新（表示モード: system | light | dark）
-    if (body.displayMode !== undefined) {
-      if (body.displayMode !== null && !["system", "light", "dark"].includes(body.displayMode)) {
-        return jsonNoStore(
-          { error: "displayModeはsystem/light/darkのいずれかである必要があります" },
-          { status: 400 }
-        );
-      }
-      // "system" はnull保存（デフォルト扱い）
-      updateData.displayMode = body.displayMode === "system" ? null : body.displayMode;
-    }
-
     // 更新するフィールドがない場合
     if (Object.keys(updateData).length === 0) {
       return jsonNoStore(
@@ -203,7 +121,6 @@ export async function PATCH(request: NextRequest) {
         bio: true,
         mentionKeep: true,
         showLocationMap: true,
-        displayMode: true,
       },
     });
 
@@ -212,7 +129,6 @@ export async function PATCH(request: NextRequest) {
       bio: updatedUser.bio,
       mentionKeep: updatedUser.mentionKeep,
       showLocationMap: updatedUser.showLocationMap,
-      displayMode: updatedUser.displayMode ?? "system",
     });
   } catch (error) {
     console.error("Failed to update profile:", error);
