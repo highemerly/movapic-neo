@@ -63,9 +63,9 @@ export function PostMethodTabs({
       <div>
         {activeTab === "web" && (
           <Link href="/create">
-            <Button className="w-full h-auto py-2 flex flex-col gap-0.5" size="lg">
+            <Button className="mt-6 w-full h-auto py-2 flex flex-col gap-0.5" size="lg">
               <ImagePlus className="h-6 w-6" />
-              <span>写真をアップロード</span>
+              <span>Webブラウザから写真を投稿する</span>
             </Button>
           </Link>
         )}

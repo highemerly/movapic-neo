@@ -220,9 +220,9 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* セクション3: 自分の情報を確認する */}
+        {/* セクション3: アカウント */}
         <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-2">自分の情報を確認する</h2>
+          <h2 className="text-lg font-semibold mb-2">アカウント</h2>
           <div className="relative bg-muted rounded-lg p-4">
             <LogoutButton
               variant="ghost"
@@ -304,9 +304,9 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* セクション4: 設定を確認・変更する */}
+        {/* セクション4: 設定を変更する */}
         <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-2">設定を確認・変更する</h2>
+          <h2 className="text-lg font-semibold mb-2">設定を変更する</h2>
 
           {/* 一般 */}
           <div className="bg-muted rounded-lg p-4">
