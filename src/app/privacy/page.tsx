@@ -78,7 +78,7 @@ export default async function PrivacyPage() {
                 <div>
                   <p className="text-ms text-muted-foreground font-medium mb-2">ユーザーがメール投稿機能を利用した場合に限り、メールから収集する情報</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li>送信元メールアドレス（エンベロープ送信者およびFromヘッダ）</li>
+                    <li>送信元メールアドレス（エンベロープFrom）および差出人（ヘッダFrom）</li>
                   </ul>
                 </div>
               </div>
@@ -235,7 +235,7 @@ export default async function PrivacyPage() {
               </p>
             </div>
 
-            <p className="text-xs text-muted-foreground text-center">最終更新日：2026年6月9日</p>
+            <p className="text-xs text-muted-foreground text-center">最終更新日：2026年6月11日</p>
           </div>
         </section>
 
