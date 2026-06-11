@@ -112,7 +112,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
 
   // 単一サーバー限定モード: シンプルなボタン
   if (singleServerMode) {
-    const loggedInLabel = callbackUrl ? "戻る" : "ダッシュボードへ";
+    const loggedInLabel = callbackUrl ? "戻る" : "メニューへ";
     const buttonLabel = isLoggedIn
       ? loggedInLabel
       : isLoading
@@ -151,7 +151,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
           className="w-full py-6 text-lg"
           size="lg"
         >
-          {callbackUrl ? "戻る" : "ダッシュボードへ"}
+          {callbackUrl ? "戻る" : "メニューへ"}
         </Button>
       </div>
     );

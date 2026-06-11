@@ -45,7 +45,7 @@ export default async function PrivacyPage() {
                     <li>User-Agent（ブラウザ・OSの識別情報）</li>
                     <li>IPアドレスから推定される接続元の国コード</li>
                   </ul>
-                  <p className="text-xs text-muted-foreground mt-2">※ ユーザーが不審なログインを確認できるようダッシュボードに表示するために保存します。</p>
+                  <p className="text-xs text-muted-foreground mt-2">※ ユーザーが不審なログインを確認できるようメニューに表示するために保存します。</p>
                 </div>
                 <div>
                   <p className="text-ms text-muted-foreground font-medium mb-2">HTTPアクセスによって収集する情報</p>

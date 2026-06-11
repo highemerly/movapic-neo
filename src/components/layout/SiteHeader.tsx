@@ -69,7 +69,7 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
                 <DropdownMenuItem asChild className="py-3 text-base">
                   <Link href="/dashboard" className="flex items-center gap-3 cursor-pointer">
                     <LayoutDashboard className="h-5 w-5" />
-                    ダッシュボード
+                    メニュー
                   </Link>
                 </DropdownMenuItem>
               )}

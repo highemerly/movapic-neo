@@ -43,7 +43,7 @@ export default async function SessionsPage() {
             className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
-            ダッシュボード
+            メニュー
           </Link>
         </div>
 

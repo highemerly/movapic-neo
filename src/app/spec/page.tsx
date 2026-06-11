@@ -134,7 +134,7 @@ export default async function SpecPage() {
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">メール投稿</p>
               <p className="text-sm text-muted-foreground">
-                ダッシュボードで確認できる専用のメールアドレスに画像を添付して送信すると、文字を合成して投稿可能です。メールは Cloudflare Email Routing により Cloudflare Workers で処理されます。セキュリティ対策（リスト型攻撃対策・MTAのバウンス防止）のため、投稿の成功・失敗によらず、サービスからは一切の返信を行いません。
+                メニューで確認できる専用のメールアドレスに画像を添付して送信すると、文字を合成して投稿可能です。メールは Cloudflare Email Routing により Cloudflare Workers で処理されます。セキュリティ対策（リスト型攻撃対策・MTAのバウンス防止）のため、投稿の成功・失敗によらず、サービスからは一切の返信を行いません。
               </p>
             </div>            
 
@@ -158,7 +158,7 @@ export default async function SpecPage() {
                 </div>
                 <div>
                   <p className="text-xs font-medium mb-1">メール投稿</p>
-                  <p>メール投稿では、サーバー側で元画像のEXIFを解析します。カメラ機種は、ダッシュボードの初期設定で「機種名を表示」にしているか、件名に「カメラ」と入力した場合に保存します（「カメラなし」で無効化）。撮影場所は、件名に「都道府県」または「市町村」と入力した場合のみ、GPS座標から逆ジオコーディングして保存します（GPS座標自体は保存しません）。</p>
+                  <p>メール投稿では、サーバー側で元画像のEXIFを解析します。カメラ機種は、メニューの初期設定で「機種名を表示」にしているか、件名に「カメラ」と入力した場合に保存します（「カメラなし」で無効化）。撮影場所は、件名に「都道府県」または「市町村」と入力した場合のみ、GPS座標から逆ジオコーディングして保存します（GPS座標自体は保存しません）。</p>
                 </div>
                 <div>
                   <p className="text-xs font-medium mb-1">Bot投稿</p>
@@ -178,7 +178,7 @@ export default async function SpecPage() {
               <p className="font-medium mb-2">地図機能（ベータ）</p>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                 <li>ユーザーページに「地図」タブを追加し、都道府県別の投稿数をヒートマップ表示する機能です</li>
-                <li>ダッシュボードで「地図を公開する（ベータ）」をオンにしたユーザーのみ公開されます（オフの場合は本人のみ閲覧可能となっています）</li>
+                <li>メニューで「地図を公開する（ベータ）」をオンにしたユーザーのみ公開されます（オフの場合は本人のみ閲覧可能となっています）</li>
                 <li>位置情報を含めて投稿した画像のみが集計対象です</li>
               </ul>
             </div>
