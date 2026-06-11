@@ -3,17 +3,23 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut, Loader2 } from "lucide-react";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
 
 export function RevokeSessionButton({ sessionId }: { sessionId: string }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleRevoke = async () => {
     if (
-      !window.confirm(
-        "このセッションを失効させますか？\nこの端末からのログインは無効になり、再ログインが必要になります。"
-      )
+      !(await confirm({
+        title: "セッションを失効",
+        description:
+          "このセッションを失効させますか？\nこの端末からのログインは無効になり、再ログインが必要になります。",
+        confirmText: "失効させる",
+        destructive: true,
+      }))
     ) {
       return;
     }

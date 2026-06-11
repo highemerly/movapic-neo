@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { OptionsPanel } from "@/components/OptionsPanel";
 import { VisibilityPicker } from "@/components/VisibilityPicker";
 import {
@@ -42,6 +43,7 @@ const SAVE_DEBOUNCE_MS = 400;
 
 export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [position, setPosition] = useState<Position>(initial.position ?? DEFAULT_POSITION);
   const [font, setFont] = useState<FontFamily>(initial.font ?? DEFAULT_FONT);
   const [color, setColor] = useState<Color>(initial.color ?? DEFAULT_COLOR);
@@ -164,9 +166,13 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
     const next = !saveEnabled;
     // OFFにする際は警告
     if (!next) {
-      const confirmed = confirm(
-        "初期設定をOFFにすると、保存済みの設定は削除されます。\nよろしいですか？"
-      );
+      const confirmed = await confirm({
+        title: "初期設定をOFFにする",
+        description:
+          "初期設定をOFFにすると、保存済みの設定は削除されます。\nよろしいですか？",
+        confirmText: "OFFにする",
+        destructive: true,
+      });
       if (!confirmed) return;
     }
     setIsTogglingSave(true);

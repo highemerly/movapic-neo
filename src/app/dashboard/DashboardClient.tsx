@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { ImageGrid } from "@/components/gallery/ImageGrid";
 
 interface Image {
@@ -35,7 +36,7 @@ export function DashboardClient({ initialImages, publicUrl, username }: Dashboar
       setImages((prev) => prev.filter((img) => img.id !== id));
     } catch (error) {
       console.error("Delete error:", error);
-      alert("画像の削除に失敗しました");
+      toast.error("画像の削除に失敗しました");
     }
   };
 

@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { Pin } from "lucide-react";
+import { toast } from "sonner";
 
 interface PinButtonProps {
   imageId: string;
@@ -41,7 +42,7 @@ export function PinButton({
         setIsPinned(wasPinned);
         const data = await response.json();
         if (data.error?.message) {
-          alert(data.error.message);
+          toast.error(data.error.message);
         }
         return;
       }

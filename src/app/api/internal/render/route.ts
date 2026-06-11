@@ -8,7 +8,6 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { processImage } from "@/lib/imageProcessor";
 import { verifyComputeApiKey } from "@/lib/compute/internalAuth";
 import {
   Position,
@@ -57,6 +56,10 @@ export async function POST(request: NextRequest) {
   const imageBuffer = Buffer.from(await image.arrayBuffer());
 
   try {
+    // sharp/skia は「ハンドラ実行時」にだけ動的ロードする。top-level import にすると
+    // Next.js が起動時に全ルートモジュールを評価する際、web/worker-front でも
+    // libvips/skia が常駐してしまうため（compute でのみロードさせる）。
+    const { processImage } = await import("@/lib/imageProcessor");
     const result = await processImage({
       imageBuffer,
       text,

@@ -75,16 +75,3 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "server.js"]
-
-# ============================================
-# Migration image (built only when needed)
-# ============================================
-FROM base AS migration
-WORKDIR /app
-
-# Prisma CLI and generated client
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=prisma /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/prisma ./prisma
-
-CMD ["npx", "prisma", "migrate", "deploy"]

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
 
 interface DeleteButtonProps {
   imageId: string;
@@ -11,10 +13,18 @@ interface DeleteButtonProps {
 
 export function DeleteButton({ imageId, username }: DeleteButtonProps) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
-    if (!confirm("この画像を削除しますか？この操作は取り消せません。")) {
+    if (
+      !(await confirm({
+        title: "画像を削除",
+        description: "この画像を削除しますか？この操作は取り消せません。",
+        confirmText: "削除する",
+        destructive: true,
+      }))
+    ) {
       return;
     }
 
@@ -32,7 +42,7 @@ export function DeleteButton({ imageId, username }: DeleteButtonProps) {
       router.push(`/u/${username}`);
       router.refresh();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "削除に失敗しました");
+      toast.error(error instanceof Error ? error.message : "削除に失敗しました");
       setIsDeleting(false);
     }
   };

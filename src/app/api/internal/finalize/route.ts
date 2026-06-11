@@ -9,17 +9,24 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import sharp from "sharp";
-import { generateThumbnail } from "@/lib/thumbnail";
 import { verifyComputeApiKey } from "@/lib/compute/internalAuth";
 import { Position, isValidPosition } from "@/types";
 
+// sharp の Metadata から必要なフィールドだけを構造的に受ける（sharp 型を import しないことで
+// このモジュールの評価時に native を引かない＝boot 時の web/worker-front を native フリーに保つ）。
+type ImageMeta = {
+  width?: number;
+  height?: number;
+  format?: string;
+  compression?: string;
+};
+
 /**
- * sharp で検出した画像メタデータから、R2 に保存して良い Content-Type を返す。
+ * 画像メタデータから、R2 に保存して良い Content-Type を返す。
  * /api/v1/generate の出力（JPEG / AVIF）のみ許可。
  * sharp 0.30+ は AVIF を format='heif', compression='av1' として返す（libheif 経由）。
  */
-function detectSafeMimeType(metadata: sharp.Metadata): string | undefined {
+function detectSafeMimeType(metadata: ImageMeta): string | undefined {
   if (metadata.format === "jpeg") return "image/jpeg";
   if (metadata.format === "avif") return "image/avif";
   if (metadata.format === "heif" && metadata.compression === "av1") {
@@ -43,7 +50,13 @@ export async function POST(request: NextRequest) {
 
   const imageBuffer = Buffer.from(await image.arrayBuffer());
 
-  let metadata: sharp.Metadata;
+  // sharp/thumbnail は「ハンドラ実行時」にだけ動的ロードする。top-level import にすると
+  // Next.js が起動時に全ルートモジュールを評価する際、web/worker-front でも libvips が
+  // 常駐してしまうため（compute でのみロードさせる）。
+  const sharp = (await import("sharp")).default;
+  const { generateThumbnail } = await import("@/lib/thumbnail");
+
+  let metadata: ImageMeta;
   try {
     metadata = await sharp(imageBuffer).metadata();
   } catch {

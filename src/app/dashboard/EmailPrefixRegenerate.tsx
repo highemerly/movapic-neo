@@ -3,19 +3,26 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
+import { toast } from "sonner";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
 
 export function EmailPrefixRegenerate() {
   const router = useRouter();
+  const confirm = useConfirm();
   const [isRegenerating, setIsRegenerating] = useState(false);
 
   const handleRegenerate = async () => {
-    const confirmed = confirm(
-      `投稿用メールアドレスを再生成しますか？\n\n` +
-      `【注意】\n` +
-      `・現在のメールアドレスは二度と使用できなくなります\n` +
-      `・元のアドレスに戻すことはできません\n` +
-      `・メールクライアントの設定変更が必要になります`
-    );
+    const confirmed = await confirm({
+      title: "投稿用メールアドレスを再生成",
+      description:
+        `投稿用メールアドレスを再生成しますか？\n\n` +
+        `【注意】\n` +
+        `・現在のメールアドレスは二度と使用できなくなります\n` +
+        `・元のアドレスに戻すことはできません\n` +
+        `・メールクライアントの設定変更が必要になります`,
+      confirmText: "再生成する",
+      destructive: true,
+    });
 
     if (!confirmed) {
       return;
@@ -34,7 +41,7 @@ export function EmailPrefixRegenerate() {
 
       router.refresh();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "再生成に失敗しました");
+      toast.error(error instanceof Error ? error.message : "再生成に失敗しました");
     } finally {
       setIsRegenerating(false);
     }

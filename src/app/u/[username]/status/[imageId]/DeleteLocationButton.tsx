@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
+import { toast } from "sonner";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
 
 interface DeleteLocationButtonProps {
   imageId: string;
@@ -12,10 +14,18 @@ interface DeleteLocationButtonProps {
 
 export function DeleteLocationButton({ imageId, locationLabel }: DeleteLocationButtonProps) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDelete = async () => {
-    if (!confirm(`撮影場所「${locationLabel}」を削除します。元には戻せません。よろしいですか？`)) {
+    if (
+      !(await confirm({
+        title: "撮影場所を削除",
+        description: `撮影場所「${locationLabel}」を削除します。元には戻せません。よろしいですか？`,
+        confirmText: "削除する",
+        destructive: true,
+      }))
+    ) {
       return;
     }
 
@@ -30,7 +40,7 @@ export function DeleteLocationButton({ imageId, locationLabel }: DeleteLocationB
       }
       router.refresh();
     } catch (error) {
-      alert(error instanceof Error ? error.message : "削除に失敗しました");
+      toast.error(error instanceof Error ? error.message : "削除に失敗しました");
       setIsDeleting(false);
     }
   };

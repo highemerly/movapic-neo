@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { ThumbnailImage } from "./ThumbnailImage";
 import { FavoriteOverlay } from "@/components/favorite/FavoriteOverlay";
 import { PinOverlay } from "@/components/pin/PinOverlay";
@@ -25,13 +26,22 @@ interface ImageCardProps {
 }
 
 export function ImageCard({ image, publicUrl, username, showDelete, onDelete, isPinned }: ImageCardProps) {
+  const confirm = useConfirm();
   const [isDeleting, setIsDeleting] = useState(false);
   const imageUrl = `${publicUrl}/${image.storageKey}`;
   const detailUrl = username ? `/u/${username}/status/${image.id}` : imageUrl;
 
   const handleDelete = async () => {
     if (!onDelete) return;
-    if (!confirm("この画像を削除しますか？")) return;
+    if (
+      !(await confirm({
+        title: "画像を削除",
+        description: "この画像を削除しますか？",
+        confirmText: "削除する",
+        destructive: true,
+      }))
+    )
+      return;
 
     setIsDeleting(true);
     try {
