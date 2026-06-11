@@ -32,6 +32,15 @@ export async function register() {
       // worker 起動失敗で HTTP 配信まで落とさない
       console.error("[instrumentation] failed to start worker:", err);
     }
+
+    // Mastodon メンションの streaming 受信（低レイテンシ主経路。cron は安全網として併存）
+    try {
+      const { startMentionStream } = await import("@/lib/mention/streamer");
+      startMentionStream();
+    } catch (err) {
+      // streaming 起動失敗でも cron ポーリングで取り込みは継続する
+      console.error("[instrumentation] failed to start mention stream:", err);
+    }
   }
 
   console.log(`[instrumentation] COMPONENT_ROLE=${role || "(all-in-one)"}`);

@@ -8,12 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
-import {
-  fetchMentionNotifications,
-  updateLastNotificationId,
-  cleanupOldProcessedMentions,
-} from "@/lib/mention/fetcher";
-import { enqueueMention } from "@/lib/queue";
+import { pollAndEnqueueMentions } from "@/lib/mention/ingest";
 
 const getBotInstanceUrl = () => process.env.MASTODON_BOT_INSTANCE_URL || "https://handon.club";
 const getBotAccessToken = () => process.env.MASTODON_BOT_ACCESS_TOKEN || "";
@@ -60,46 +55,21 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // 通知を取得
-    const notifications = await fetchMentionNotifications(botInstanceUrl, botAccessToken, 10);
+    // 通知を取得して enqueue（streaming のキャッチアップと共通ロジック）
+    const { enqueued, failed, cleaned } = await pollAndEnqueueMentions(
+      botInstanceUrl,
+      botAccessToken,
+      10
+    );
 
-    if (notifications.length === 0) {
-      const cleanedCount = await cleanupOldProcessedMentions();
-      if (cleanedCount > 0) {
-        console.log(`[mention-process] Cleaned up ${cleanedCount} old records`);
-      }
-      return NextResponse.json({
-        success: true,
-        enqueued: 0,
-        duration: Date.now() - startTime,
-      });
-    }
-
-    // lastNotificationIdを即座に更新（最新のnotification.id）
-    // 通知は新しい順で返されるので、最初の要素が最新
-    const latestNotificationId = notifications[0].id;
-    await updateLastNotificationId(latestNotificationId);
-
-    // 古い順に enqueue（dedup は jobKey=mention:statusId で担保）
-    let enqueued = 0;
-    let failed = 0;
-    for (const notification of notifications.reverse()) {
-      try {
-        await enqueueMention({ notification });
-        enqueued++;
-      } catch (error) {
-        failed++;
-        console.error(`[mention-process] enqueue failed for ${notification.id}:`, error);
-      }
-    }
-
-    const cleanedCount = await cleanupOldProcessedMentions();
-    if (cleanedCount > 0) {
-      console.log(`[mention-process] Cleaned up ${cleanedCount} old records`);
+    if (cleaned > 0) {
+      console.log(`[mention-process] Cleaned up ${cleaned} old records`);
     }
 
     const duration = Date.now() - startTime;
-    console.log(`[mention-process] Done: enqueued=${enqueued}, failed=${failed}, duration=${duration}ms`);
+    if (enqueued > 0 || failed > 0) {
+      console.log(`[mention-process] Done: enqueued=${enqueued}, failed=${failed}, duration=${duration}ms`);
+    }
 
     return NextResponse.json({
       success: true,

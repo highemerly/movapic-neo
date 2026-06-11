@@ -64,6 +64,23 @@ export async function updateLastNotificationId(notificationId: string): Promise<
 }
 
 /**
+ * lastNotificationId を前進方向のみで更新する。
+ * streaming は通知を逐次受信するため、cron が既に進めた高水位を巻き戻さないよう
+ * snowflake ID を数値比較し、新しい場合のみ更新する（cron の since_id 後退を防ぐ）。
+ */
+export async function advanceLastNotificationId(notificationId: string): Promise<void> {
+  const current = await getLastNotificationId();
+  if (current) {
+    try {
+      if (BigInt(current) >= BigInt(notificationId)) return;
+    } catch {
+      // 数値化できない ID（非Mastodon等）の場合は素直に上書きにフォールバック
+    }
+  }
+  await updateLastNotificationId(notificationId);
+}
+
+/**
  * Mastodon通知を取得
  */
 export async function fetchMentionNotifications(
