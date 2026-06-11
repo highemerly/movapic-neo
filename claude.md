@@ -3,13 +3,6 @@
 ## 概要
 画像に文字を入れて生成するWebアプリ。
 
-## ⚠️ リリース後クリーンアップ（一時メモ）
-3-tier移行が本番で安定稼働したら以下を削除し、この節自体も削除すること:
-- **旧エンドポイントの後方互換エイリアス**（cronjob と Cloudflare email worker が新パスを叩いていることを確認後）:
-  - `src/app/api/v1/mention-process/route.ts` →（正規: `/api/v1/ingest/mention`）
-  - `src/app/api/v1/email-generate/route.ts` →（正規: `/api/v1/ingest/email`）
-- **`users.display_mode` カラム**（テーマlocalStorage一本化でコード参照は全除去済み・休眠中）: `prisma migrate` で drop ＋ `npx prisma generate`
-
 ## ページ名称
 - `/` → **トップページ**
 - `/dashboard` → **ダッシュボード**

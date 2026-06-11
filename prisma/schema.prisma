@@ -49,8 +49,6 @@ model User {
   mentionKeep        Boolean   @default(false) @map("mention_keep")
   // 地図機能（ベータ）の公開オプトイン。デフォルトoff、自分の画像投稿の都道府県集計を地図で公開する
   showLocationMap    Boolean   @default(false) @map("show_location_map")
-  // 表示モード ("system" | "light" | "dark")。nullは"system"扱い
-  displayMode        String?   @map("display_mode") @db.VarChar(10)
 
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
