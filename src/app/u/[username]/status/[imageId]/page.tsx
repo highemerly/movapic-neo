@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getAvatarUrl } from "@/lib/avatar";
@@ -21,6 +22,65 @@ import { PostSuccessToast } from "./PostSuccessToast";
 import { User, CalendarDays, Map as MapIcon, Globe, Heart, ImagePlus } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+  const { username, imageId } = await params;
+
+  const image = await prisma.image.findUnique({
+    where: { id: imageId },
+    select: {
+      storageKey: true,
+      overlayText: true,
+      mimeType: true,
+      width: true,
+      height: true,
+      isPublic: true,
+      user: { select: { username: true, displayName: true } },
+    },
+  });
+
+  // 非公開・不存在・ユーザー名不一致はデフォルト（noindex扱い）
+  if (!image || !image.isPublic || image.user.username !== username) {
+    return { title: "画像が見つかりません", robots: { index: false } };
+  }
+
+  const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
+  const imageUrl = `${publicUrl}/${image.storageKey}`;
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
+  const pageUrl = `${appUrl}/u/${username}/status/${imageId}`;
+
+  const title = image.overlayText;
+  const authorName = image.user.displayName || image.user.username;
+  const description = `${authorName} さんの投稿`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      type: "article",
+      siteName: "SHAMEZO",
+      locale: "ja_JP",
+      title,
+      description,
+      url: pageUrl,
+      images: [
+        {
+          url: imageUrl,
+          width: image.width,
+          height: image.height,
+          alt: image.overlayText,
+          type: image.mimeType,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [imageUrl],
+    },
+  };
+}
 
 interface PageProps {
   params: Promise<{
