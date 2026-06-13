@@ -8,6 +8,7 @@ import { Footer } from "@/components/Footer";
 import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { calculateStreak } from "@/lib/streak";
+import { getRankCounts } from "@/lib/achievements/counts";
 
 export const dynamic = "force-dynamic";
 
@@ -55,8 +56,8 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
   const initialYear = isValidYear ? queryYear : now.getFullYear();
   const initialMonth = isValidMonth ? queryMonth : now.getMonth() + 1;
 
-  // 総画像数と連続投稿日数の算出データを取得
-  const [totalImageCount, postDates] = await Promise.all([
+  // 総画像数・連続投稿日数・実績ランク数の算出データを取得
+  const [totalImageCount, postDates, rankCounts] = await Promise.all([
     prisma.image.count({
       where: { userId: user.id, isPublic: true },
     }),
@@ -64,6 +65,7 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
       where: { userId: user.id, isPublic: true },
       select: { createdAt: true },
     }),
+    getRankCounts(user.id),
   ]);
   const streak = calculateStreak(postDates.map((p) => p.createdAt));
 
@@ -81,6 +83,8 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
             instance: { domain: user.instance.domain },
           }}
           imageCount={totalImageCount}
+          goldCount={rankCounts.gold}
+          silverCount={rankCounts.silver}
           streak={streak}
           activeTab="calendar"
         />

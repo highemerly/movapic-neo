@@ -462,6 +462,18 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
 
       const data = await response.json();
 
+      // この投稿で新規獲得した実績があれば、遷移先の画像ページで演出するため一時保存
+      if (Array.isArray(data.newAchievements) && data.newAchievements.length > 0) {
+        try {
+          sessionStorage.setItem(
+            "movapic_new_achievements",
+            JSON.stringify(data.newAchievements)
+          );
+        } catch {
+          // sessionStorage 不可でも投稿フローは継続
+        }
+      }
+
       // 投稿成功後、詳細ページにリダイレクト（直後の完了メッセージ用に posted=1 を付与）
       if (data.imagePageUrl) {
         const path = data.imagePageUrl.replace(process.env.NEXT_PUBLIC_APP_URL || "", "");

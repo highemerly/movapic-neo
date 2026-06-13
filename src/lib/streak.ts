@@ -1,5 +1,5 @@
 // JSTの日付文字列 (YYYY-MM-DD) を返す
-function toJstDateString(d: Date): string {
+export function toJstDateString(d: Date): string {
   return new Date(d.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 

@@ -8,6 +8,7 @@ import { Footer } from "@/components/Footer";
 import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { calculateStreak } from "@/lib/streak";
+import { getRankCounts } from "@/lib/achievements/counts";
 import { PrefectureHeatmap, type PrefectureMapData } from "@/components/map/PrefectureHeatmap";
 import { ImageCard } from "@/components/gallery/ImageCard";
 
@@ -40,7 +41,7 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
   const isOwner = currentUser?.id === user.id;
   const isOptedIn = user.showLocationMap;
 
-  const [totalImageCount, postDates] = await Promise.all([
+  const [totalImageCount, postDates, rankCounts] = await Promise.all([
     prisma.image.count({
       where: { userId: user.id, isPublic: true },
     }),
@@ -48,6 +49,7 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
       where: { userId: user.id, isPublic: true },
       select: { createdAt: true },
     }),
+    getRankCounts(user.id),
   ]);
   const streak = calculateStreak(postDates.map((p) => p.createdAt));
 
@@ -62,6 +64,8 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
         instance: { domain: user.instance.domain },
       }}
       imageCount={totalImageCount}
+      goldCount={rankCounts.gold}
+      silverCount={rankCounts.silver}
       streak={streak}
       activeTab="map"
     />

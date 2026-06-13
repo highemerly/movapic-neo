@@ -167,9 +167,9 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
     // OFFにする際は警告
     if (!next) {
       const confirmed = await confirm({
-        title: "初期設定をOFFにする",
+        title: "「設定を保存する」を無効にする",
         description:
-          "初期設定をOFFにすると、保存済みの設定は削除されます。\nよろしいですか？",
+          "保存済みの設定は全て削除され、サービスの初期値に戻ります。\nよろしいですか？",
         confirmText: "OFFにする",
         destructive: true,
       });

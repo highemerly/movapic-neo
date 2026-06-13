@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { TriangleAlert } from "lucide-react";
 
 import {
   AlertDialog,
@@ -13,6 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export interface ConfirmOptions {
   /** モーダル見出し（省略時は「確認」） */
@@ -75,23 +77,39 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{state.title ?? "確認"}</AlertDialogTitle>
-            {state.description != null && (
-              <AlertDialogDescription className="whitespace-pre-line">
-                {state.description}
-              </AlertDialogDescription>
-            )}
+            <div className="flex items-start gap-3 text-left">
+              <span
+                className={cn(
+                  "mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full",
+                  state.destructive
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-amber-500/10 text-amber-600 dark:text-amber-500"
+                )}
+              >
+                <TriangleAlert className="size-5" aria-hidden="true" />
+              </span>
+              <div className="flex flex-1 flex-col gap-2">
+                <AlertDialogTitle>{state.title ?? "確認"}</AlertDialogTitle>
+                {state.description != null && (
+                  <AlertDialogDescription className="whitespace-pre-line">
+                    {state.description}
+                  </AlertDialogDescription>
+                )}
+              </div>
+            </div>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => settle(false)}>
+          <AlertDialogFooter className="gap-3 sm:gap-[30px]">
+            <AlertDialogCancel
+              className="h-11 flex-1 px-6 text-base sm:min-w-32 sm:flex-none"
+              onClick={() => settle(false)}
+            >
               {state.cancelText ?? "キャンセル"}
             </AlertDialogCancel>
             <AlertDialogAction
-              className={
-                state.destructive
-                  ? buttonVariants({ variant: "destructive" })
-                  : undefined
-              }
+              className={cn(
+                state.destructive && buttonVariants({ variant: "destructive" }),
+                "h-11 flex-1 px-6 text-base sm:min-w-32 sm:flex-none"
+              )}
               onClick={() => settle(true)}
             >
               {state.confirmText ?? "OK"}

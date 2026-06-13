@@ -19,6 +19,9 @@ import {
 import { PinButton } from "@/components/pin/PinButton";
 import { Footer } from "@/components/Footer";
 import { PostSuccessToast } from "./PostSuccessToast";
+import { AchievementCelebration } from "./AchievementCelebration";
+import { AchievementIcon } from "@/components/achievements/AchievementIcon";
+import { resolveAchievement } from "@/lib/achievements/catalog";
 import { User, CalendarDays, Map as MapIcon, Globe, Heart, ImagePlus } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -160,7 +163,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     },
   };
 
-  const [prevImage, nextImage] = await Promise.all([
+  const [prevImage, nextImage, earnedAchievementRows] = await Promise.all([
     // 前の画像（古い方向）
     prisma.image.findFirst({
       where: {
@@ -181,7 +184,17 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
       orderBy: { createdAt: "asc" },
       select: navigationSelect,
     }),
+    // この投稿がきっかけで獲得した実績（実績タブと同様、誰でも閲覧可）
+    prisma.achievement.findMany({
+      where: { imageId: image.id },
+      orderBy: { grantedAt: "asc" },
+      select: { key: true, category: true },
+    }),
   ]);
+
+  const earnedAchievements = earnedAchievementRows.map((a) =>
+    resolveAchievement(a.key, a.category)
+  );
 
   const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
   const imageUrl = `${publicUrl}/${image.storageKey}`;
@@ -196,6 +209,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     <div className="min-h-screen bg-background">
       <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain } : null} />
       {justPosted && <PostSuccessToast />}
+      {justPosted && <AchievementCelebration />}
       <main className="container mx-auto max-w-2xl px-4 py-2">
         {/* ヘッダー */}
         <div className="mb-2">
@@ -278,6 +292,29 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         <div className="mb-4">
           <p className="text-base whitespace-pre-wrap">{image.overlayText}</p>
         </div>
+
+        {/* この投稿で獲得した実績 */}
+        {earnedAchievements.length > 0 && (
+          <Link
+            href={`/u/${username}/achievements`}
+            className="mb-4 block rounded-lg border border-amber-300/60 bg-amber-50 p-3 transition-colors hover:bg-amber-100/70 dark:border-amber-800/50 dark:bg-amber-950/30 dark:hover:bg-amber-950/50"
+          >
+            <p className="mb-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
+              🏆 この投稿で実績を獲得しました
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {earnedAchievements.map((a) => (
+                <span
+                  key={a.key}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-200/70 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-900/50 dark:text-amber-200"
+                >
+                  <AchievementIcon name={a.icon} className="h-3.5 w-3.5" />
+                  {a.title}
+                </span>
+              ))}
+            </div>
+          </Link>
+        )}
 
         {/* メタ情報 */}
         <div className="flex items-center gap-2 text-xs text-muted-foreground">

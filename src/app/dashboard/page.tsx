@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAvatarUrl } from "@/lib/avatar";
-import { Globe, User, Heart, ChevronRight, Settings2, ShieldCheck, SlidersHorizontal } from "lucide-react";
+import { Globe, User, Heart, ChevronRight, Settings2, ShieldCheck, SlidersHorizontal, Trophy, Images, Calendar, Map as MapIcon } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { PostMethodTabs } from "./PostMethodTabs";
+import { NotificationButton } from "./NotificationButton";
 import { MentionSettingsForm } from "./MentionSettingsForm";
 import { EmailAddressDisplay } from "./EmailAddressDisplay";
 import { EmailPrefixRegenerate } from "./EmailPrefixRegenerate";
@@ -300,6 +301,29 @@ export default async function DashboardPage() {
                 </div>
               </Link>
             )}
+            <div className="mt-3 grid grid-cols-5 gap-2">
+              <Link href={`/u/${user.username}`}>
+                <Button variant="outline" className="w-full h-auto py-2" aria-label="一覧" title="一覧">
+                  <Images className="h-5 w-5" />
+                </Button>
+              </Link>
+              <Link href={`/u/${user.username}/calendar`}>
+                <Button variant="outline" className="w-full h-auto py-2" aria-label="カレンダー" title="カレンダー">
+                  <Calendar className="h-5 w-5" />
+                </Button>
+              </Link>
+              <Link href={`/u/${user.username}/map`}>
+                <Button variant="outline" className="w-full h-auto py-2" aria-label="地図" title="地図">
+                  <MapIcon className="h-5 w-5" />
+                </Button>
+              </Link>
+              <Link href={`/u/${user.username}/achievements`}>
+                <Button variant="outline" className="w-full h-auto py-2" aria-label="実績" title="実績">
+                  <Trophy className="h-5 w-5" />
+                </Button>
+              </Link>
+              <NotificationButton />
+            </div>
           </div>
         </section>
 

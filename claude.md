@@ -269,6 +269,12 @@ DBの`Image.source`フィールドで投稿元を識別：
   - right → 右上から
 - **既存画像のサムネイル生成**: `npx tsx scripts/generate-thumbnails.ts`
 
+## 実績・通知機能
+- ユーザーページの「実績」タブ（誰でも閲覧可）と、ヘッダーのベル通知（ログインユーザーのみ）。
+- 付与は「投稿した瞬間」に確定する条件のみ。web/email/mention の3経路すべてが収束する `publishImage.ts` に1箇所フック。
+- **実績を追加・変更する手順と不変条件は [`src/lib/achievements/README.md`](src/lib/achievements/README.md) に集約**（key は永続でリネーム禁止、しきい値は `>=`、live と backfill の集計を必ず同期、等）。
+- 既存ユーザーへの反映: `DATABASE_URL=... npx tsx scripts/backfill-achievements.ts`（冪等）。
+
 ## 本番DBマイグレーション
 
 ```bash

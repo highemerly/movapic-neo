@@ -122,6 +122,13 @@ export default async function PrivacyPage() {
                     <li>有効期限：30日間</li>
                   </ul>
                 </div>
+                <div>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">通知既読管理Cookie（not）</p>
+                  <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                    <li>目的：通知の既読状態を記憶</li>
+                    <li>有効期限：30日間</li>
+                  </ul>
+                </div>
               </div>
               <p className="text-sm text-muted-foreground mt-3">
               広告・ユーザーのトラッキングの目的でCookieは使用しません。

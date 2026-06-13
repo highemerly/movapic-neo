@@ -32,6 +32,8 @@ import {
   OutputFormat,
   Arrangement,
 } from "@/types";
+import { evaluateAndGrant, GrantedAchievement } from "@/lib/achievements/engine";
+import type { PostFacts } from "@/lib/achievements/catalog";
 
 /** サービス内の公開範囲（UI/DBと同じ値） */
 export type PublishVisibility = "public" | "unlisted" | "local";
@@ -96,6 +98,44 @@ export interface PublishImageResult {
   postId?: string;
   /** 投稿に失敗した場合のエラー（保存自体は成否に依存しない） */
   postError?: string;
+  /** この投稿で新規獲得した実績（web投稿の演出用。保存された場合のみ） */
+  newAchievements?: GrantedAchievement[];
+}
+
+/** 保存された投稿から実績評価用の PostFacts を作る。 */
+function toPostFacts(input: PublishImageInput): PostFacts {
+  return {
+    overlayText: input.text,
+    position: input.options.position,
+    font: input.options.font,
+    color: input.options.color,
+    size: input.options.size,
+    arrangement: input.options.arrangement,
+    source: input.source,
+    cameraModel: input.extras?.cameraModel ?? null,
+    locationPrefecture: input.extras?.locationPrefecture ?? null,
+    visibility: input.visibility,
+    createdAt: new Date(),
+  };
+}
+
+/**
+ * 実績評価を行い、新規獲得を返す。投稿処理を絶対に止めないため、ここで全例外を握りつぶす。
+ */
+async function evaluateAchievementsSafely(
+  input: PublishImageInput,
+  imageId: string
+): Promise<GrantedAchievement[]> {
+  try {
+    return await evaluateAndGrant({
+      userId: input.user.id,
+      post: toPostFacts(input),
+      imageId,
+    });
+  } catch (error) {
+    console.error("Achievement evaluation failed:", error);
+    return [];
+  }
 }
 
 /**
@@ -254,6 +294,9 @@ export async function publishImage(
       });
     }
 
+    // 画像は保存済み（投稿失敗でも残るポリシー）なので実績評価する
+    const newAchievements = await evaluateAchievementsSafely(input, imageId);
+
     return {
       imageId,
       storageKey,
@@ -261,6 +304,7 @@ export async function publishImage(
       postUrl: postResult?.postUrl,
       postId: postResult?.postId,
       postError: postResult && !postResult.success ? postResult.error : undefined,
+      newAchievements,
     };
   }
 
@@ -286,11 +330,15 @@ export async function publishImage(
     postResult.postId
   );
 
+  // 投稿成功時のみ保存されるので、ここで実績評価する
+  const newAchievements = await evaluateAchievementsSafely(input, imageId);
+
   return {
     imageId,
     storageKey,
     imagePageUrl,
     postUrl: postResult.postUrl,
     postId: postResult.postId,
+    newAchievements,
   };
 }

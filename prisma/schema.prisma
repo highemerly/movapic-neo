@@ -57,10 +57,56 @@ model User {
   instance      Instance       @relation(fields: [instanceId], references: [id])
   images        Image[]
   loginSessions LoginSession[]
+  achievements  Achievement[]
+  notifications Notification[]
 
   @@unique([instanceId, remoteId])
   @@unique([instanceId, username])
   @@map("users")
+}
+
+// 実績（トロフィー）。獲得は永続（要件を満たさなくなっても剥奪しない）。
+model Achievement {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  // 安定キー。固定実績は "posts:50" など、動的実績は "perfect-month:2026-06"。
+  key       String   @db.VarChar(64)
+  // カタログ系列キー（タブ表示・グルーピング用）。例: "post-count" / "perfect-month"
+  category  String   @db.VarChar(40)
+  // この実績を獲得したきっかけの投稿（閾値を超えた1枚）。画像削除時は null。
+  imageId   String?  @map("image_id")
+  grantedAt DateTime @default(now()) @map("granted_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  image Image? @relation(fields: [imageId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, key]) // レース時の二重付与をDBで防ぐ
+  @@index([userId, grantedAt])
+  @@map("achievements")
+}
+
+// 通知。ユーザーごとに生成され、種別（type）で情報ソースを区別する。
+// 現状は実績獲得("achievement")のみだが、将来「お気に入りされた通知」など別種別をここにマージする。
+// 90日で読み捨て（読み取り時に createdAt でフィルタ）。既読状態は持たない。
+model Notification {
+  id   String @id @default(uuid())
+  // 通知の受信者
+  userId String @map("user_id")
+  // 種別 / 情報ソース。"achievement" | （将来）"favorite" 等
+  type String @db.VarChar(40)
+  // type="achievement" のとき、獲得した実績のキー（表示文言は CATALOG から解決）
+  achievementKey String? @map("achievement_key") @db.VarChar(64)
+  // 関連画像（実績のきっかけ写真 / 将来: お気に入りされた写真）。画像削除時は null。
+  imageId String? @map("image_id")
+  // 種別ごとの追加情報（将来用: お気に入りした相手の表示名・acct 等）
+  data Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  image Image? @relation(fields: [imageId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@map("notifications")
 }
 
 // ログイン履歴（セッション単位の記録、本人の自己検出用）
@@ -122,6 +168,8 @@ model Image {
   createdAt     DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievements  Achievement[]
+  notifications Notification[]
 
   @@index([userId, createdAt])
   @@index([isPublic, createdAt])

@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Images, Calendar, Map as MapIcon, Flame } from "lucide-react";
+import { Images, Calendar, Map as MapIcon, Trophy, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 
 interface Tab {
-  key: "photos" | "calendar" | "map";
+  key: "photos" | "calendar" | "map" | "achievements";
   label: string;
   icon: typeof Images;
   href: string;
@@ -25,13 +25,17 @@ interface UserProfileHeaderProps {
     };
   };
   imageCount: number;
+  goldCount?: number;
+  silverCount?: number;
   streak?: number;
-  activeTab: "photos" | "calendar" | "map";
+  activeTab: "photos" | "calendar" | "map" | "achievements";
 }
 
 export function UserProfileHeader({
   user,
   imageCount,
+  goldCount = 0,
+  silverCount = 0,
   streak = 0,
   activeTab,
 }: UserProfileHeaderProps) {
@@ -54,6 +58,12 @@ export function UserProfileHeader({
       label: "地図",
       icon: MapIcon,
       href: `/u/${user.username}/map`,
+    },
+    {
+      key: "achievements",
+      label: "実績",
+      icon: Trophy,
+      href: `/u/${user.username}/achievements`,
     },
   ];
 
@@ -88,21 +98,23 @@ export function UserProfileHeader({
             <p className="text-[11px] leading-tight text-muted-foreground mt-0.5 line-clamp-2">{user.bio}</p>
           )}
           <div className="text-[11px] leading-tight text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-1">
-            <span>
-              {new Date(user.createdAt).toLocaleDateString("ja-JP", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-              に登録
-            </span>
-            <span>·</span>
             <span>{imageCount}枚の画像</span>
+            <span>·</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-0.5">
+                <Trophy className="w-3 h-3 text-amber-500" />
+                <span className="font-semibold text-foreground">{goldCount}</span>
+              </span>
+              <span className="inline-flex items-center gap-0.5">
+                <Trophy className="w-3 h-3 text-slate-400" />
+                <span className="font-semibold text-foreground">{silverCount}</span>
+              </span>
+            </span>
             {streak > 0 && (
               <>
                 <span>·</span>
                 <Flame className="w-3 h-3 -translate-y-px" />
-                <span>連続{streak}日</span>
+                <span>{streak}日連続投稿中</span>
               </>
             )}
           </div>

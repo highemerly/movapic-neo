@@ -16,7 +16,7 @@ export function RevokeSessionButton({ sessionId }: { sessionId: string }) {
       !(await confirm({
         title: "セッションを失効",
         description:
-          "このセッションを失効させますか？\nこの端末からのログインは無効になり、再ログインが必要になります。",
+          "この端末からのログインは無効になり、再ログインが必要になります。",
         confirmText: "失効させる",
         destructive: true,
       }))

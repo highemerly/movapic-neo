@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AnnouncementBar } from "./AnnouncementBar";
+import { NotificationBell } from "./NotificationBell";
 
 type SiteHeaderProps = {
   user?: {
@@ -59,7 +60,9 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
             <Image src="/shamezo_logo.svg" alt="SHAMEZO" width={160} height={29} priority />
           </Link>
 
-          <DropdownMenu>
+          <div className="flex items-center gap-2">
+            {user && <NotificationBell />}
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="icon">
                 <Menu className="h-5 w-5" />
@@ -119,6 +122,7 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
       </div>
     </header>

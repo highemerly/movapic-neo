@@ -165,6 +165,11 @@ export async function POST(request: NextRequest) {
       imageId: result.imageId,
       imagePageUrl: result.imagePageUrl,
       postUrl: result.postUrl,
+      // この投稿で新規獲得した実績（演出用）。キーのみ返し、表示文言はクライアントが解決
+      newAchievements: (result.newAchievements ?? []).map((a) => ({
+        key: a.key,
+        category: a.category,
+      })),
     });
   } catch (error) {
     console.error("Post error:", error);

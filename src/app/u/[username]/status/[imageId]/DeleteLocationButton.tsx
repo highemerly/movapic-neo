@@ -21,7 +21,7 @@ export function DeleteLocationButton({ imageId, locationLabel }: DeleteLocationB
     if (
       !(await confirm({
         title: "撮影場所を削除",
-        description: `撮影場所「${locationLabel}」を削除します。元には戻せません。よろしいですか？`,
+        description: `撮影場所「${locationLabel}」のみを削除し、写真は残します。元には戻せませんが、削除してよろしいですか？`,
         confirmText: "削除する",
         destructive: true,
       }))

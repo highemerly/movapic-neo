@@ -15,7 +15,6 @@ export function EmailPrefixRegenerate() {
     const confirmed = await confirm({
       title: "投稿用メールアドレスを再生成",
       description:
-        `投稿用メールアドレスを再生成しますか？\n\n` +
         `【注意】\n` +
         `・現在のメールアドレスは二度と使用できなくなります\n` +
         `・元のアドレスに戻すことはできません\n` +
