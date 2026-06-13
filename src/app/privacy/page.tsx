@@ -242,7 +242,7 @@ export default async function PrivacyPage() {
               </p>
             </div>
 
-            <p className="text-xs text-muted-foreground text-center">最終更新日：2026年6月11日</p>
+            <p className="text-xs text-muted-foreground text-center">最終更新日：2026年6月14日</p>
           </div>
         </section>
 
