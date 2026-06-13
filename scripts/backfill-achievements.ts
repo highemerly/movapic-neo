@@ -28,6 +28,7 @@ import {
   type AchStats,
   type PostFacts,
 } from "@/lib/achievements/catalog";
+import { summarizeDayCounts } from "@/lib/achievements/perfectMonth";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -87,7 +88,8 @@ function replayUser(userId: string, images: ReplayImage[]): GrantRow[] {
   let totalPosts = 0;
   const allDays = new Set<string>();
   const dayCounts = new Map<string, number>();
-  const monthDays = new Map<string, Set<string>>();
+  // ym -> (JST日 -> その日の投稿数)。distinct日数 / ダブル投稿日数（穴埋め）の両方をここから出す。
+  const monthDayCounts = new Map<string, Map<string, number>>();
   const featureCounts = { neon: 0, stamp: 0, xlarge: 0, vertical: 0 };
   const fonts = new Set<string>();
   const cameras = new Set<string>();
@@ -102,8 +104,9 @@ function replayUser(userId: string, images: ReplayImage[]): GrantRow[] {
     totalPosts += 1;
     allDays.add(day);
     dayCounts.set(day, (dayCounts.get(day) ?? 0) + 1);
-    if (!monthDays.has(ym)) monthDays.set(ym, new Set());
-    monthDays.get(ym)!.add(day);
+    if (!monthDayCounts.has(ym)) monthDayCounts.set(ym, new Map());
+    const mdc = monthDayCounts.get(ym)!;
+    mdc.set(day, (mdc.get(day) ?? 0) + 1);
 
     if (img.arrangement === "neon") featureCounts.neon += 1;
     if (img.arrangement === "stamp") featureCounts.stamp += 1;
@@ -116,11 +119,13 @@ function replayUser(userId: string, images: ReplayImage[]): GrantRow[] {
     if (img.source === "email") hasEmailPost = true;
     if (img.source === "mention") hasMentionPost = true;
 
+    const monthSummary = summarizeDayCounts(mdc.values());
     const stats: AchStats = {
       totalPosts,
       currentStreak: streakEndingAt(allDays, day),
       todayPosts: dayCounts.get(day) ?? 0,
-      distinctDaysInPostMonth: monthDays.get(ym)!.size,
+      distinctDaysInPostMonth: monthSummary.distinctDays,
+      doubleDaysInPostMonth: monthSummary.doubleDays,
       featureCounts: { ...featureCounts },
       distinctFonts: fonts.size,
       distinctCameraModels: cameras.size,

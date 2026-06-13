@@ -9,6 +9,7 @@
  */
 
 import prisma from "@/lib/db";
+import { toJstDateString } from "@/lib/streak";
 import {
   CATALOG,
   evaluatePerfectMonth,
@@ -16,6 +17,7 @@ import {
   type AchStats,
   type PostFacts,
 } from "./catalog";
+import { perfectMonthKey, shouldRemindMakeup } from "./perfectMonth";
 import { collectStats } from "./stats";
 
 export interface GrantCandidate {
@@ -113,5 +115,40 @@ export async function evaluateAndGrant(opts: {
     });
   }
 
+  // 皆勤賞の穴埋め推奨通知（今日投稿した・穴がある・埋め切っていない人にだけ・月1通）。
+  // 投稿フローを止めないため、ここは独立して握りつぶす。
+  await maybeNotifyMakeup(userId, post, stats, imageId).catch((e) =>
+    console.error("Makeup reminder failed:", e)
+  );
+
   return granted;
+}
+
+/**
+ * 穴埋め推奨通知。今日投稿した瞬間に評価され、条件を満たせば type="makeup-reminder" を1件作る。
+ * - skippedSoFar = 今日より前の未投稿日数。今日は投稿済み(=stats に反映済み)なので
+ *   「今月の経過日 - 投稿があった distinct 日数」で求まる。
+ * - 重複排除: 同月キー(perfect-month:YYYY-MM)の makeup-reminder が既にあれば送らない（月1通）。
+ */
+async function maybeNotifyMakeup(
+  userId: string,
+  post: PostFacts,
+  stats: AchStats,
+  imageId: string
+): Promise<void> {
+  const jstDay = toJstDateString(post.createdAt);
+  const elapsedDay = Number(jstDay.slice(8, 10));
+  const skippedSoFar = elapsedDay - stats.distinctDaysInPostMonth;
+  if (!shouldRemindMakeup(skippedSoFar, stats.doubleDaysInPostMonth)) return;
+
+  const key = perfectMonthKey(jstDay.slice(0, 7));
+  const existing = await prisma.notification.findFirst({
+    where: { userId, type: "makeup-reminder", achievementKey: key },
+    select: { id: true },
+  });
+  if (existing) return;
+
+  await prisma.notification.create({
+    data: { userId, type: "makeup-reminder", achievementKey: key, imageId },
+  });
 }

@@ -10,12 +10,21 @@
 
 import { toJstDateString } from "@/lib/streak";
 import {
+  PERFECT_MONTH_CATEGORY,
+  daysInMonthOf,
+  isPerfectMonth,
+  perfectMonthKey,
+} from "./perfectMonth";
+import {
   DEFAULT_POSITION,
   DEFAULT_FONT,
   DEFAULT_COLOR,
   DEFAULT_SIZE,
   DEFAULT_ARRANGEMENT,
 } from "@/types";
+
+// 皆勤賞の系列キーは perfectMonth.ts を単一ソースとし、互換のため catalog からも re-export する。
+export { PERFECT_MONTH_CATEGORY };
 
 /** 投稿後の集計値。live はDBから、backfill はメモリ上のリプレイから同じ形で渡す。 */
 export interface AchStats {
@@ -27,6 +36,8 @@ export interface AchStats {
   todayPosts: number;
   /** この投稿の月（JST）の、投稿があった distinct 日数 */
   distinctDaysInPostMonth: number;
+  /** この投稿の月（JST）で、2枚以上投稿した distinct 日数（皆勤賞の穴埋めストック） */
+  doubleDaysInPostMonth: number;
   /** 機能別の累計利用回数 */
   featureCounts: { neon: number; stamp: number; xlarge: number; vertical: number };
   /** 使ったフォントの種類数 */
@@ -82,8 +93,6 @@ export interface AchievementDef {
   /** 条件成立判定（純粋関数。付与済み判定は呼び出し側） */
   evaluate: (s: AchStats, p: PostFacts) => boolean;
 }
-
-export const PERFECT_MONTH_CATEGORY = "perfect-month";
 
 // ラダー（段階実績）のまとめ表示用メタ。ladderKey で引く。
 export const LADDER_META: Record<string, { label: string; unit: string }> = {
@@ -436,15 +445,17 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
 ];
 
 /**
- * 皆勤賞（動的キー）。投稿月の distinct 投稿日数がその月の日数に達したら
- * "perfect-month:YYYY-MM" を返す（月末日にのみ真になる）。
+ * 皆勤賞（動的キー）。判定式は perfectMonth.ts の isPerfectMonth に集約。
+ * 未投稿を GRACE 日まで許容し、その分をダブル投稿（doubleDaysInPostMonth）で穴埋めできる。
  */
 export function evaluatePerfectMonth(s: AchStats, post: PostFacts): string | null {
   const ym = toJstDateString(post.createdAt).slice(0, 7); // "2026-06"
   const year = Number(ym.slice(0, 4));
   const month = Number(ym.slice(5, 7));
-  const daysInMonth = new Date(year, month, 0).getDate();
-  return s.distinctDaysInPostMonth >= daysInMonth ? `${PERFECT_MONTH_CATEGORY}:${ym}` : null;
+  const daysInMonth = daysInMonthOf(year, month);
+  return isPerfectMonth(daysInMonth, s.distinctDaysInPostMonth, s.doubleDaysInPostMonth)
+    ? perfectMonthKey(ym)
+    : null;
 }
 
 /** 表示用の解決済み実績情報。 */
@@ -483,7 +494,7 @@ export function resolveAchievement(key: string, category?: string): ResolvedAchi
       rank: "gold",
       section: "皆勤賞",
       title: `${label}の皆勤賞`,
-      description: `${label}は毎日投稿しました`,
+      description: `${label}は皆勤賞を達成しました`,
       icon: "Crown",
     };
   }

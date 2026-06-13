@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DayCell } from "./DayCell";
 
@@ -16,6 +16,20 @@ interface DayData {
   };
 }
 
+interface PerfectMonthInfo {
+  achieved: boolean;
+  daysInMonth: number;
+  postedDays: number;
+  makeupBank: number;
+  allowance: number;
+  isCurrentMonth: boolean;
+  skippedSoFar: number | null;
+  shortfall: number | null;
+  stillAchievable: boolean | null;
+  shouldRemind: boolean;
+  filledDays: number[];
+}
+
 interface CalendarData {
   year: number;
   month: number;
@@ -23,6 +37,7 @@ interface CalendarData {
   hasPrevMonth: boolean;
   hasNextMonth: boolean;
   isPerfectAttendance: boolean;
+  perfectMonth: PerfectMonthInfo | null;
 }
 
 interface CalendarViewProps {
@@ -32,6 +47,27 @@ interface CalendarViewProps {
   initialMonth: number;
 }
 
+
+/**
+ * 穴埋めを促す注意書き（当月のみ）。
+ * 表示するのは「穴埋めができる かつ 過ぎた未投稿が上限以内」のときだけ（shouldRemind）。
+ * 達成/未達成のメッセージは出さない（達成時は月見出しの👑で示す）。
+ */
+function PerfectMonthCallout({ pm }: { pm: PerfectMonthInfo }) {
+  if (!pm.shouldRemind) return null;
+  const skipped = pm.skippedSoFar ?? 0;
+  return (
+    <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
+      <Crown className="mt-0.5 h-4 w-4 shrink-0" />
+      <div className="min-w-0">
+        <p className="font-semibold">今月は未投稿が{skipped}日あります</p>
+        <p>
+          別日に1日<span className="font-bold">2枚以上</span>投稿すると穴埋めできます（穴埋めできるのは最大{pm.allowance}日／1ヶ月）。
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export function CalendarView({
   username,
@@ -136,6 +172,9 @@ export function CalendarView({
   const today = new Date();
   const isCurrentMonth = year === today.getFullYear() && month === today.getMonth() + 1;
 
+  // ダブル投稿で「埋まった空き日」。穴埋め済みセルとして緑表示する。
+  const filledDays = new Set(data?.perfectMonth?.filledDays ?? []);
+
   // 未来の月かどうか
   const isFutureMonth =
     year > today.getFullYear() ||
@@ -169,6 +208,9 @@ export function CalendarView({
         </Button>
       </div>
 
+      {/* 皆勤賞・穴埋めのコールアウト（当月のみ） */}
+      {data?.perfectMonth && <PerfectMonthCallout pm={data.perfectMonth} />}
+
       {/* カレンダーグリッド */}
       <div className="grid grid-cols-7 gap-1">
         {grid.map((day, index) => (
@@ -176,6 +218,7 @@ export function CalendarView({
             key={index}
             day={day}
             dayData={day ? data?.days[day] : undefined}
+            isFilledHole={day != null && filledDays.has(day)}
             publicUrl={publicUrl}
             isToday={isCurrentMonth && day === today.getDate()}
             isSunday={index % 7 === 0}

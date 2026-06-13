@@ -7,6 +7,15 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { toJstDateString } from "@/lib/streak";
+import {
+  PERFECT_MONTH_GRACE,
+  daysInMonthOf,
+  filledHoleDays,
+  perfectMonthProgress,
+  shouldRemindMakeup,
+  summarizeDayCounts,
+} from "@/lib/achievements/perfectMonth";
 
 interface DayData {
   count: number;
@@ -18,6 +27,28 @@ interface DayData {
   };
 }
 
+/** 皆勤賞の達成状況・穴埋め進捗（UIの👑とコールアウト表示に使う）。未来月では null。 */
+interface PerfectMonthInfo {
+  achieved: boolean;
+  daysInMonth: number;
+  postedDays: number;
+  /** ダブル投稿した日数（穴埋めストック）。 */
+  makeupBank: number;
+  /** 未投稿の許容日数（= PERFECT_MONTH_GRACE）。 */
+  allowance: number;
+  isCurrentMonth: boolean;
+  /** 当月のみ: 今日より前の未投稿日数。過去月は null。 */
+  skippedSoFar: number | null;
+  /** 当月のみ: まだ埋まっていない穴の数。過去月は null。 */
+  shortfall: number | null;
+  /** 当月のみ: まだ皆勤賞に手が届くか。過去月は null。 */
+  stillAchievable: boolean | null;
+  /** 当月のみ: 穴埋めを促す注意書きを出すべきか（穴埋め可能 かつ 過ぎた未投稿が上限以内）。 */
+  shouldRemind: boolean;
+  /** ダブル投稿で「埋まった空き日」(1-31)。カレンダーで穴埋め済み表示にする。 */
+  filledDays: number[];
+}
+
 interface CalendarResponse {
   year: number;
   month: number;
@@ -25,6 +56,7 @@ interface CalendarResponse {
   hasPrevMonth: boolean;
   hasNextMonth: boolean;
   isPerfectAttendance: boolean;
+  perfectMonth: PerfectMonthInfo | null;
 }
 
 export async function GET(
@@ -154,15 +186,49 @@ export async function GET(
       hasNextMonth = !!nextMonthImage;
     }
 
-    // 皆勤賞判定（過去の月のみ、当月は常にfalse）
-    let isPerfectAttendance = false;
+    // 皆勤賞判定（穴埋め込み。未来月以外＝過去月・当月で判定）。
+    // 達成条件・進捗計算は perfectMonth.ts に集約（live/backfill と同一ロジック）。
     const isCurrentMonth = year === currentYear && month === currentMonth;
     const isFutureMonth = year > currentYear || (year === currentYear && month > currentMonth);
 
-    if (!isCurrentMonth && !isFutureMonth) {
-      const daysInMonth = new Date(year, month, 0).getDate();
-      const postedDays = Object.keys(days).length;
-      isPerfectAttendance = postedDays === daysInMonth;
+    let isPerfectAttendance = false;
+    let perfectMonth: PerfectMonthInfo | null = null;
+
+    if (!isFutureMonth) {
+      const daysInMonth = daysInMonthOf(year, month);
+      const { distinctDays, doubleDays } = summarizeDayCounts(
+        Object.values(days).map((d) => d.count)
+      );
+
+      // 投稿のあった日(1-31)の集合。当月は「今日より前の未投稿」を厳密に数えるため今日(JST)も渡す。
+      const postedDayNums = new Set(Object.keys(days).map(Number));
+      const todayDayNum = isCurrentMonth
+        ? Number(toJstDateString(now).slice(8, 10))
+        : undefined;
+
+      const progress = perfectMonthProgress({
+        daysInMonth,
+        distinctDays,
+        doubleDays,
+        postedDayNums: isCurrentMonth ? postedDayNums : undefined,
+        todayDayNum,
+      });
+      isPerfectAttendance = progress.achieved;
+      perfectMonth = {
+        achieved: progress.achieved,
+        daysInMonth,
+        postedDays: distinctDays,
+        makeupBank: progress.makeupBank,
+        allowance: PERFECT_MONTH_GRACE,
+        isCurrentMonth,
+        skippedSoFar: progress.skippedSoFar,
+        shortfall: progress.shortfall,
+        stillAchievable: progress.stillAchievable,
+        shouldRemind:
+          progress.skippedSoFar != null &&
+          shouldRemindMakeup(progress.skippedSoFar, progress.makeupBank),
+        filledDays: filledHoleDays({ daysInMonth, postedDayNums, doubleDays, todayDayNum }),
+      };
     }
 
     const response: CalendarResponse = {
@@ -172,6 +238,7 @@ export async function GET(
       hasPrevMonth: !!hasPrevMonth,
       hasNextMonth,
       isPerfectAttendance,
+      perfectMonth,
     };
 
     return NextResponse.json(response, {

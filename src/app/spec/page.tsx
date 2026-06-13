@@ -175,6 +175,13 @@ export default async function SpecPage() {
             </div>
 
             <div className="bg-muted rounded-lg p-4">
+              <p className="font-medium mb-2">皆勤賞</p>
+              <p className="text-sm text-muted-foreground">
+                皆勤賞は、SHAMEZOにおける最も栄誉のある実績です。その月に毎日投稿することで獲得でき、毎月獲得できます。皆勤賞はユーザーページのカレンダータブおよび実績タブで誰でも確認できます。なお、皆勤賞には穴埋め制度があり、投稿できなかった日が月4日までであれば、別の日に2枚投稿することでその日の穴埋めをすることができます。
+              </p>
+            </div>            
+
+            <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">地図機能</p>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                 <li>ユーザーページに「地図」タブを追加し、都道府県別の投稿数をヒートマップ表示する機能です</li>

@@ -11,6 +11,7 @@ export type NotificationItem = {
   achievementKey: string | null;
   createdAt: string;
   image: { id: string; pageUrl: string; thumbnailUrl: string } | null;
+  recipientUsername: string;
 };
 
 function getCookie(name: string): string | null {

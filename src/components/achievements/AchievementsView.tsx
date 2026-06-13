@@ -100,10 +100,12 @@ function LadderCard({
   ladderKey,
   defs,
   grantedMap,
+  currentValue,
 }: {
   ladderKey: string;
   defs: AchievementDef[];
   grantedMap: Map<string, string>;
+  currentValue: number;
 }) {
   const [open, setOpen] = useState(false);
   const meta = LADDER_META[ladderKey];
@@ -141,7 +143,10 @@ function LadderCard({
             {headingTitle}
           </p>
           <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-muted-foreground">
-            {achievedTiers.length}/{tiers.length}
+            <span className="tabular-nums">
+              {currentValue}
+              {unit}
+            </span>
             {anyAchieved && (
               <ChevronDown
                 className={cn("h-3 w-3 transition-transform", open && "rotate-180")}
@@ -290,7 +295,7 @@ function PerfectMonthCard({ months }: { months: GrantedItem[] }) {
           </div>
         ) : (
           <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
-            ひと月のすべての日に投稿すると獲得できます
+            未投稿を4日以内におさえ、別日に2枚以上投稿して穴を埋めると獲得できます
           </p>
         )}
       </div>
@@ -338,7 +343,13 @@ function PerfectMonthCard({ months }: { months: GrantedItem[] }) {
   );
 }
 
-export function AchievementsView({ granted }: { granted: GrantedItem[] }) {
+export function AchievementsView({
+  granted,
+  ladderValues,
+}: {
+  granted: GrantedItem[];
+  ladderValues: Record<string, number>;
+}) {
   const grantedMap = useMemo(
     () => new Map(granted.map((g) => [g.key, g.grantedAt])),
     [granted]
@@ -370,6 +381,7 @@ export function AchievementsView({ granted }: { granted: GrantedItem[] }) {
                     ladderKey={block.ladderKey}
                     defs={defs}
                     grantedMap={grantedMap}
+                    currentValue={ladderValues[block.ladderKey] ?? 0}
                   />
                 );
               }

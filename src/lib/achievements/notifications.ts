@@ -10,11 +10,14 @@ export const NOTIFICATION_WINDOW_DAYS = 90;
 export interface NotificationFeedItem {
   id: string;
   type: string;
-  /** type="achievement" のとき、獲得した実績キー（表示文言は CATALOG から解決） */
+  /** type="achievement" のとき、獲得した実績キー（表示文言は CATALOG から解決）。
+   *  type="makeup-reminder" のとき、対象月キー perfect-month:YYYY-MM。 */
   achievementKey: string | null;
   createdAt: Date;
   /** 関連画像（きっかけ写真）。サムネイルURLと画像ページへのリンク。 */
   image: { id: string; pageUrl: string; thumbnailUrl: string } | null;
+  /** 受信者のユーザー名。makeup-reminder のカレンダー遷移などに使う。 */
+  recipientUsername: string;
 }
 
 function publicBase(): string {
@@ -38,6 +41,7 @@ export async function getRecentNotifications(
       type: true,
       achievementKey: true,
       createdAt: true,
+      user: { select: { username: true } },
       image: {
         select: {
           id: true,
@@ -55,6 +59,7 @@ export async function getRecentNotifications(
     type: r.type,
     achievementKey: r.achievementKey,
     createdAt: r.createdAt,
+    recipientUsername: r.user.username,
     image: r.image
       ? {
           id: r.image.id,

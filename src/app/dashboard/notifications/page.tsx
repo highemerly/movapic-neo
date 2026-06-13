@@ -54,15 +54,18 @@ export default async function NotificationsPage() {
         ) : (
           <ul className="divide-y rounded-xl border">
             {items.map((n) => {
-              const a = n.achievementKey ? resolveAchievement(n.achievementKey) : null;
-              const href = n.image?.pageUrl ?? `/u/${currentUser.username}/achievements`;
+              const isReminder = n.type === "makeup-reminder";
+              const a = !isReminder && n.achievementKey ? resolveAchievement(n.achievementKey) : null;
+              const href = isReminder
+                ? `/u/${currentUser.username}/calendar`
+                : n.image?.pageUrl ?? `/u/${currentUser.username}/achievements`;
               return (
                 <li key={n.id}>
                   <Link
                     href={href}
                     className="flex items-center gap-2.5 px-3 py-2.5 transition-colors hover:bg-accent"
                   >
-                    {n.image ? (
+                    {!isReminder && n.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={n.image.thumbnailUrl}
@@ -71,20 +74,26 @@ export default async function NotificationsPage() {
                       />
                     ) : (
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                        <AchievementIcon name={a?.icon ?? "Trophy"} className="h-5 w-5" />
+                        <AchievementIcon name={isReminder ? "Crown" : a?.icon ?? "Trophy"} className="h-5 w-5" />
                       </span>
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-2">
                         <p className="min-w-0 flex-1 truncate text-sm">
-                          🏆 「<span className="font-semibold">{a?.title ?? "?"}</span>」を獲得
+                          {isReminder ? (
+                            <span className="font-semibold">👑 皆勤賞の穴埋めをしよう</span>
+                          ) : (
+                            <>🏆 「<span className="font-semibold">{a?.title ?? "?"}</span>」を獲得</>
+                          )}
                         </p>
                         <span className="shrink-0 text-[11px] text-muted-foreground">
                           {formatDate(n.createdAt)}
                         </span>
                       </div>
                       <p className="mt-0.5 truncate text-[11px] leading-snug text-muted-foreground">
-                        {a?.description ?? ""}
+                        {isReminder
+                          ? "別日に2枚以上投稿すると、未投稿の日を穴埋めできます"
+                          : a?.description ?? ""}
                       </p>
                     </div>
                   </Link>

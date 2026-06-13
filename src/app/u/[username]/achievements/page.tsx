@@ -8,6 +8,7 @@ import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { AchievementsView } from "@/components/achievements/AchievementsView";
 import { countRanks } from "@/lib/achievements/catalog";
+import { collectLadderValues } from "@/lib/achievements/stats";
 import { calculateStreak } from "@/lib/streak";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export default async function AchievementsPage({ params }: AchievementsPageProps
     notFound();
   }
 
-  const [totalImageCount, postDates, achievements] = await Promise.all([
+  const [totalImageCount, postDates, achievements, ladderValues] = await Promise.all([
     prisma.image.count({ where: { userId: user.id, isPublic: true } }),
     prisma.image.findMany({
       where: { userId: user.id, isPublic: true },
@@ -47,6 +48,7 @@ export default async function AchievementsPage({ params }: AchievementsPageProps
       select: { key: true, category: true, grantedAt: true },
       orderBy: { grantedAt: "desc" },
     }),
+    collectLadderValues(user.id),
   ]);
   const streak = calculateStreak(postDates.map((p) => p.createdAt));
 
@@ -83,7 +85,7 @@ export default async function AchievementsPage({ params }: AchievementsPageProps
           activeTab="achievements"
         />
 
-        <AchievementsView granted={granted} />
+        <AchievementsView granted={granted} ladderValues={ladderValues} />
 
         <Footer />
       </div>

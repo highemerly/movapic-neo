@@ -57,12 +57,15 @@ export function NotificationBell() {
         ) : (
           <ul className="py-1">
             {notifications.map((n) => {
-              const a = n.achievementKey ? resolveAchievement(n.achievementKey) : null;
-              const href = n.image?.pageUrl ?? "/dashboard/notifications";
+              const isReminder = n.type === "makeup-reminder";
+              const a = !isReminder && n.achievementKey ? resolveAchievement(n.achievementKey) : null;
+              const href = isReminder
+                ? `/u/${n.recipientUsername}/calendar`
+                : n.image?.pageUrl ?? "/dashboard/notifications";
               return (
                 <li key={n.id}>
                   <Link href={href} className="flex items-start gap-2.5 px-3 py-2 hover:bg-accent">
-                    {n.image ? (
+                    {!isReminder && n.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={n.image.thumbnailUrl}
@@ -71,12 +74,12 @@ export function NotificationBell() {
                       />
                     ) : (
                       <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                        <AchievementIcon name={a?.icon ?? "Trophy"} className="h-4 w-4" />
+                        <AchievementIcon name={isReminder ? "Crown" : a?.icon ?? "Trophy"} className="h-4 w-4" />
                       </span>
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium leading-tight">
-                        🏆 実績「{a?.title ?? "?"}」を獲得
+                        {isReminder ? "皆勤賞まであと少し！1日2枚投稿して、穴埋めしよう。" : `🏆 実績「${a?.title ?? "?"}」を獲得`}
                       </p>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">
                         {formatDate(n.createdAt)}
