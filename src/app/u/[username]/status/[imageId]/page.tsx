@@ -232,92 +232,83 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           </div>
         </div>
 
-
-        {/* 投稿者情報 */}
-        <div className="flex items-center gap-2 mb-4 p-3 bg-muted rounded-lg">
-          {image.user.avatarUrl && (
-            <Link href={`/u/${username}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={getAvatarUrl(image.user.avatarUrl) ?? image.user.avatarUrl}
-                alt={image.user.displayName || image.user.username}
-                className="w-10 h-10 rounded-full hover:opacity-80 transition-opacity"
-              />
-            </Link>
-          )}
-          <div className="flex-1 min-w-0">
-            <Link
-              href={`/u/${username}`}
-              className="text-sm font-semibold hover:underline"
-            >
-              {image.user.displayName || image.user.username}
-            </Link>
-            <a
-              href={`https://${image.user.instance.domain}/@${image.user.username}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block text-xs text-muted-foreground hover:underline truncate"
-            >
-              @{image.user.username}@{image.user.instance.domain}
-            </a>
-          </div>
-          <div className="flex items-center gap-1">
-            <Link
-              href={`/u/${username}`}
-              className="p-1.5 rounded-full hover:bg-background transition-colors"
-              title="ユーザーページ"
-            >
-              <User className="w-4 h-4 text-muted-foreground" />
-            </Link>
-            <Link
-              href={`/u/${username}/calendar`}
-              className="p-1.5 rounded-full hover:bg-background transition-colors"
-              title="カレンダー"
-            >
-              <CalendarDays className="w-4 h-4 text-muted-foreground" />
-            </Link>
-            {showMapIcon && (
-              <Link
-                href={`/u/${username}/map`}
-                className="p-1.5 rounded-full hover:bg-background transition-colors"
-                title="地図"
-              >
-                <MapIcon className="w-4 h-4 text-muted-foreground" />
-              </Link>
-            )}
-          </div>
-        </div>
-
         {/* テキスト */}
         <div className="mb-4">
-          <p className="text-base whitespace-pre-wrap">{image.overlayText}</p>
+          <p className="text-base whitespace-pre-wrap break-words">{image.overlayText}</p>
         </div>
 
-        {/* この投稿で獲得した実績 */}
-        {earnedAchievements.length > 0 && (
-          <Link
-            href={`/u/${username}/achievements`}
-            className="mb-4 block rounded-lg border border-amber-300/60 bg-amber-50 p-3 transition-colors hover:bg-amber-100/70 dark:border-amber-800/50 dark:bg-amber-950/30 dark:hover:bg-amber-950/50"
-          >
-            <p className="mb-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
-              🏆 この投稿で実績を獲得しました
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {earnedAchievements.map((a) => (
-                <span
-                  key={a.key}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-200/70 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-900/50 dark:text-amber-200"
-                >
-                  <AchievementIcon name={a.icon} className="h-3.5 w-3.5" />
-                  {a.title}
-                </span>
-              ))}
-            </div>
-          </Link>
+        {/* お気に入り（Mastodon連携） */}
+        {favoritable ? (
+          <div className="mt-2 flex items-center gap-2">
+            <FavoriteButton
+              imageId={imageId}
+              initialCount={image.favoriteCount}
+              initialIsFavorited={isFavorited}
+              initialFavoriters={cachedFavoriters.map((f) => ({
+                acct: f.acct,
+                displayName: f.displayName,
+                avatarUrl: getAvatarUrl(f.avatarUrl),
+                profileUrl: f.profileUrl,
+              }))}
+              canFavorite={canFavorite}
+              initialSyncError={initialSyncError}
+              disabledReason={
+                persistedReason === "deleted"
+                  ? "この投稿は削除されているため操作できません"
+                  : !currentUser
+                    ? "ログインするとお気に入りできます"
+                    : "お気に入りはMastodonアカウントで利用できます"
+              }
+            />
+          </div>
+        ) : !isMisskey ? (
+          <div className="mt-2 text-[11px] text-muted-foreground/70">
+            Mastodon に投稿されていないため、お気に入り機能は使えません。
+          </div>
+        ) : null}
+
+        {/* ピン留め・削除ボタン（自分の画像のみ） */}
+        {isOwner && (
+          <div className="mt-2 flex items-center gap-2">
+            <PinButton imageId={imageId} initialIsPinned={!!image.pinnedAt} />
+            <DeleteButton imageId={imageId} username={username} />
+          </div>
         )}
 
-        {/* メタ情報 */}
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        {/* EXIF情報（カメラ機種・撮影場所）。投稿者本人のみ撮影場所だけ削除可能。 */}
+        {(image.cameraModel || image.locationPrefecture) && (
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+            {image.cameraModel && (
+              <span>
+                📷 {image.cameraMake && !image.cameraModel.startsWith(image.cameraMake) ? `${image.cameraMake} ` : ""}{image.cameraModel}
+              </span>
+            )}
+            {image.cameraModel && image.locationPrefecture && <span aria-hidden>·</span>}
+            {image.locationPrefecture && (
+              <span className="inline-flex items-center gap-1">
+                <span>
+                  📍{" "}
+                  <Link
+                    href={`/u/${username}/map?prefecture=${encodeURIComponent(image.locationPrefecture)}`}
+                    className="hover:underline"
+                  >
+                    {image.locationPrefecture}
+                  </Link>
+                  {image.locationCity ?? ""}
+                </span>
+                {isOwner && (
+                  <DeleteLocationButton
+                    imageId={imageId}
+                    locationLabel={`${image.locationPrefecture}${image.locationCity ?? ""}`}
+                  />
+                )}
+              </span>
+            )}
+          </p>
+        )}
+
+        {/* メタ情報（日時・ソース・設定） */}
+        <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
           <p>
             {image.postUrl ? (
               <a
@@ -373,74 +364,82 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           />
         </div>
 
-        {/* EXIF情報（カメラ機種・撮影場所）。投稿者本人のみ撮影場所だけ削除可能。 */}
-        {(image.cameraModel || image.locationPrefecture) && (
-          <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-            {image.cameraModel && (
-              <span>
-                📷 {image.cameraMake && !image.cameraModel.startsWith(image.cameraMake) ? `${image.cameraMake} ` : ""}{image.cameraModel}
-              </span>
+        {/* 投稿者情報 */}
+        <div className="flex items-center gap-2 mt-4 p-3 bg-muted rounded-lg">
+          {image.user.avatarUrl && (
+            <Link href={`/u/${username}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={getAvatarUrl(image.user.avatarUrl) ?? image.user.avatarUrl}
+                alt={image.user.displayName || image.user.username}
+                className="w-10 h-10 rounded-full hover:opacity-80 transition-opacity"
+              />
+            </Link>
+          )}
+          <div className="flex-1 min-w-0">
+            <Link
+              href={`/u/${username}`}
+              className="text-sm font-semibold hover:underline"
+            >
+              {image.user.displayName || image.user.username}
+            </Link>
+            <a
+              href={`https://${image.user.instance.domain}/@${image.user.username}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-xs text-muted-foreground hover:underline truncate"
+            >
+              @{image.user.username}@{image.user.instance.domain}
+            </a>
+          </div>
+          <div className="flex items-center gap-1">
+            <Link
+              href={`/u/${username}`}
+              className="p-1.5 rounded-full hover:bg-background transition-colors"
+              title="ユーザーページ"
+            >
+              <User className="w-4 h-4 text-muted-foreground" />
+            </Link>
+            <Link
+              href={`/u/${username}/calendar`}
+              className="p-1.5 rounded-full hover:bg-background transition-colors"
+              title="カレンダー"
+            >
+              <CalendarDays className="w-4 h-4 text-muted-foreground" />
+            </Link>
+            {showMapIcon && (
+              <Link
+                href={`/u/${username}/map`}
+                className="p-1.5 rounded-full hover:bg-background transition-colors"
+                title="地図"
+              >
+                <MapIcon className="w-4 h-4 text-muted-foreground" />
+              </Link>
             )}
-            {image.cameraModel && image.locationPrefecture && <span aria-hidden>·</span>}
-            {image.locationPrefecture && (
-              <span className="inline-flex items-center gap-1">
-                <span>
-                  📍{" "}
-                  <Link
-                    href={`/u/${username}/map?prefecture=${encodeURIComponent(image.locationPrefecture)}`}
-                    className="hover:underline"
-                  >
-                    {image.locationPrefecture}
-                  </Link>
-                  {image.locationCity ?? ""}
+          </div>
+        </div>
+
+        {/* この投稿で獲得した実績 */}
+        {earnedAchievements.length > 0 && (
+          <Link
+            href={`/u/${username}/achievements`}
+            className="mt-4 block rounded-lg border border-amber-300/60 bg-amber-50 p-3 transition-colors hover:bg-amber-100/70 dark:border-amber-800/50 dark:bg-amber-950/30 dark:hover:bg-amber-950/50"
+          >
+            <p className="mb-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
+              🏆 この投稿で実績を獲得しました
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {earnedAchievements.map((a) => (
+                <span
+                  key={a.key}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-200/70 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-900/50 dark:text-amber-200"
+                >
+                  <AchievementIcon name={a.icon} className="h-3.5 w-3.5" />
+                  {a.title}
                 </span>
-                {isOwner && (
-                  <DeleteLocationButton
-                    imageId={imageId}
-                    locationLabel={`${image.locationPrefecture}${image.locationCity ?? ""}`}
-                  />
-                )}
-              </span>
-            )}
-          </p>
-        )}
-
-        {/* お気に入り（Mastodon連携） */}
-        {favoritable ? (
-          <div className="mt-2 flex items-center gap-2">
-            <FavoriteButton
-              imageId={imageId}
-              initialCount={image.favoriteCount}
-              initialIsFavorited={isFavorited}
-              initialFavoriters={cachedFavoriters.map((f) => ({
-                acct: f.acct,
-                displayName: f.displayName,
-                avatarUrl: getAvatarUrl(f.avatarUrl),
-                profileUrl: f.profileUrl,
-              }))}
-              canFavorite={canFavorite}
-              initialSyncError={initialSyncError}
-              disabledReason={
-                persistedReason === "deleted"
-                  ? "この投稿は削除されているため操作できません"
-                  : !currentUser
-                    ? "ログインするとお気に入りできます"
-                    : "お気に入りはMastodonアカウントで利用できます"
-              }
-            />
-          </div>
-        ) : !isMisskey ? (
-          <div className="mt-2 text-[11px] text-muted-foreground/70">
-            Mastodon に投稿されていないため、お気に入り機能は使えません。
-          </div>
-        ) : null}
-
-        {/* ピン留め・削除ボタン（自分の画像のみ） */}
-        {isOwner && (
-          <div className="mt-2 flex items-center gap-2">
-            <PinButton imageId={imageId} initialIsPinned={!!image.pinnedAt} />
-            <DeleteButton imageId={imageId} username={username} />
-          </div>
+              ))}
+            </div>
+          </Link>
         )}
 
         {/* 前後の画像ナビゲーション */}
