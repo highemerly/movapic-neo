@@ -113,7 +113,7 @@ export default async function SpecPage() {
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                 <li>iOSで撮影した画像は、向き（Orientation）を自動補正します</li>
                 <li>写真に含まれる撮影位置情報・撮影日時・撮影カメラ機種などのメタデータ（EXIF）は常に削除してアップロードされます</li>
-                <li>AVIF形式で高い圧縮を行います（同時に生成されるサムネイル画像はWebpです）。</li>
+                <li>AVIF形式で圧縮します（同時に生成されるサムネイル画像はWebp）</li>
               </ul>
             </div>
 
@@ -159,9 +159,9 @@ export default async function SpecPage() {
                 <div>
                   <p className="text-xs font-medium mb-1">解析方法</p>
                   <ul className="list-disc list-inside space-y-1">
-                    <li><strong>Web投稿</strong>: 画像を選択した時点で、お使いのブラウザ上でEXIF解析を行います。</li>
-                    <li><strong>Bot投稿</strong>: Fediverseサーバー投稿時にEXIFは通常除去されてしまうため、解析を行いません。</li>
-                    <li><strong>メール投稿</strong>: EXIFを付与したまま送信されていれば、サーバー側で元画像のEXIF解析を行います。</li>
+                    <li><strong>Web投稿</strong>: 画像を選択した時点で、お使いのブラウザ上でEXIF解析を行います</li>
+                    <li><strong>Bot投稿</strong>: Fediverseサーバー投稿時に通常EXIFが除去されてしまうため、EXIF解析は行いません</li>
+                    <li><strong>メール投稿</strong>: EXIFを付与したまま送信されていれば、サーバー側で元画像のEXIF解析を行います</li>
                   </ul>
                 </div>
                 <div>

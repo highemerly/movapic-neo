@@ -21,8 +21,15 @@ export default async function PrivacyPage() {
           <div className="space-y-4">
 
             <p className="text-sm text-muted-foreground">
-              SHAMEZO（以下「本サービス」）は、個人情報保護法をはじめとする関連法令を遵守し、ユーザーの個人情報を適切に取り扱います。そのために、以下のとおりプライバシーポリシーを定めます。
+              SHAMEZO（以下「本サービス」）は、個人情報保護法をはじめとする関連法令を遵守し、本サービスを利用する全ての方（以下「ユーザー」）の個人情報を適切に取り扱います。そのために、以下のとおりプライバシーポリシーを定めます。
             </p>
+
+            <div className="bg-muted rounded-lg p-4">
+              <p className="font-medium mb-3">個人情報とは</p>
+              <p className="text-sm text-muted-foreground">
+              本ポリシーにおける「個人情報」とは、個人情報保護法第2条第1項に定める個人情報を指しています。具体的には、氏名・メールアドレス・IPアドレスなど、特定の個人を識別できる情報を指します。
+              </p>
+            </div>
 
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-3">収集する個人情報とその収集方法</p>
@@ -144,8 +151,9 @@ export default async function PrivacyPage() {
                 <li>全ての通信はHTTPSで暗号化します</li>
                 <li>アップロードされ生成された画像のEXIF情報（GPS位置情報、カメラ情報等）は常に削除し、出力画像にはメタデータが含まれないようにします</li>
                 <li>カメラ機種名・撮影場所は、投稿時にユーザーが明示的に選択した場合に限り、選択範囲のみをサービスのデータベースに保存し、初期値では保存しません（「オプトイン」方式）</li>
-                <li>Fediverse（Mastodon/Misskey）の認証トークンなど重要な情報は暗号化したうえで保存します</li>
-                <li>重要なデータやアクセスログはバックアップを取得し適切に保管します</li>
+                <li>Fediverse（Mastodon/Misskey）の認証トークンなど、特に機密性が高いと管理人が判断した情報は、暗号化したうえで保存します</li>
+                <li>重要なデータ・アクセスログは原則バックアップを取得し、適切に保管します</li>
+                <li>IPアドレスやUser-agentを含む「ログイン時にセッション履歴として収集する情報」および「HTTPアクセスによって収集する情報」は、最低保存期間を90日とし、それ以上経過した情報は概ね7日以内に完全に消去します</li>
               </ul>
             </div>
 
@@ -191,7 +199,7 @@ export default async function PrivacyPage() {
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">分析ツール</p>
               <p className="text-sm text-muted-foreground">
-                技術的な分析のため、ビーコン情報を送信することがあります。ビーコン情報は rum.piyo.me へ送信されます。ビーコン情報を受信後、個人を特定できない形に加工し、第三者がアクセスできない領域に保管します。加工された情報を、技術的不具合の解消や、パフォーマンス・サービスの安定性・セキュリティの向上のためのモニタリング用途のみに利用します。広告やユーザーのトラッキングには利用しません。
+                技術的な分析のため、ビーコン情報を送信することがあります。ビーコン情報は rum.piyo.me へ送信されます。ビーコン情報を受信後速やかに個人を特定できない形に加工し、第三者がアクセスできない領域に保管します。加工された情報を、技術的不具合の解消や、パフォーマンス・サービスの安定性・セキュリティの向上のためのモニタリング用途のみに利用します。広告やユーザーのトラッキングには利用しません。
               </p>
               <p className="text-sm text-muted-foreground">
                 外部の分析ツール（Google Analyticsなど）は利用しません。
