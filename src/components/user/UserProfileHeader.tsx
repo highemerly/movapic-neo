@@ -102,11 +102,11 @@ export function UserProfileHeader({
             <span>·</span>
             <span className="inline-flex items-center gap-1.5">
               <span className="inline-flex items-center gap-0.5">
-                <Trophy className="w-3 h-3 text-amber-500" />
+                <Trophy className="w-3 h-3 fill-amber-400 text-amber-600" />
                 <span className="font-semibold text-foreground">{goldCount}</span>
               </span>
               <span className="inline-flex items-center gap-0.5">
-                <Trophy className="w-3 h-3 text-slate-400" />
+                <Trophy className="w-3 h-3 fill-slate-300 text-slate-500" />
                 <span className="font-semibold text-foreground">{silverCount}</span>
               </span>
             </span>

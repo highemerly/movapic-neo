@@ -1,8 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { AchievementIcon } from "./AchievementIcon";
 import {
   CATALOG,
@@ -28,216 +36,6 @@ function formatDate(iso: string): string {
   });
 }
 
-/** 単発実績・皆勤賞の1枚カード。secret かつ未達成のあいだは内容を「？？？」で隠す。
- *  ランク（金/銀）は取得して初めて色付きの●で分かる（未取得時は表示しない）。 */
-function SingleCard({
-  icon,
-  title,
-  description,
-  grantedAt,
-  rank,
-  secret = false,
-}: {
-  icon: string;
-  title: string;
-  description: string;
-  grantedAt?: string;
-  rank: AchievementRank;
-  secret?: boolean;
-}) {
-  const achieved = grantedAt != null;
-  // シークレット未達成: タイトル・説明を伏せる（アイコンは隠さない）
-  const hidden = secret && !achieved;
-  const displayTitle = hidden ? "？？？" : title;
-  const displayDescription = hidden ? "？？？" : description;
-  return (
-    <div
-      className={cn(
-        "flex items-start gap-2 rounded-lg border p-2 transition-colors",
-        achieved
-          ? "border-amber-300/70 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-950/30"
-          : "border-border bg-muted/30 opacity-60 grayscale"
-      )}
-    >
-      <span
-        className={cn(
-          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
-          achieved
-            ? "bg-amber-200 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-            : "bg-muted text-muted-foreground"
-        )}
-      >
-        <AchievementIcon name={icon} className="h-4 w-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className={cn("text-[13px] font-semibold leading-tight", !achieved && "text-muted-foreground")}>
-          {displayTitle}
-        </p>
-        {/* 2行目の説明の前に、取得時のみランク色の● を表示（未取得は金銀不明） */}
-        <p className="mt-0.5 flex items-center gap-1 text-[10px] leading-snug text-muted-foreground">
-          {achieved && (
-            <span
-              className={cn(
-                "h-2 w-2 shrink-0 rounded-full",
-                rank === "gold" ? "bg-amber-500" : "bg-slate-400"
-              )}
-            />
-          )}
-          {displayDescription}
-        </p>
-        {achieved && (
-          <p className="mt-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
-            {formatDate(grantedAt)} に獲得
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** 段階実績（同じ実績の閾値違い）をまとめた1枚カード。タップで達成履歴を展開。 */
-function LadderCard({
-  ladderKey,
-  defs,
-  grantedMap,
-  currentValue,
-}: {
-  ladderKey: string;
-  defs: AchievementDef[];
-  grantedMap: Map<string, string>;
-  currentValue: number;
-}) {
-  const [open, setOpen] = useState(false);
-  const meta = LADDER_META[ladderKey];
-  const tiers = [...defs].sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0));
-  const icon = tiers[0]?.icon ?? "Trophy";
-  const label = meta?.label ?? "";
-  const unit = meta?.unit ?? "";
-
-  const achievedTiers = tiers.filter((d) => grantedMap.has(d.key));
-  const anyAchieved = achievedTiers.length > 0;
-  const top = achievedTiers[achievedTiers.length - 1];
-  // 見出しは「いま持っている称号」（＝獲得済みの最高段）。未獲得なら最初の段の称号を薄く出す。
-  const headingTitle = top?.title ?? tiers[0]?.title ?? ladderKey;
-
-  const header = (
-    <>
-      <span
-        className={cn(
-          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
-          anyAchieved
-            ? "bg-amber-200 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-            : "bg-muted text-muted-foreground"
-        )}
-      >
-        <AchievementIcon name={icon} className="h-4 w-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <p
-            className={cn(
-              "text-[13px] font-semibold leading-tight",
-              !anyAchieved && "text-muted-foreground"
-            )}
-          >
-            {headingTitle}
-          </p>
-          <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-muted-foreground">
-            <span className="tabular-nums">
-              {currentValue}
-              {unit}
-            </span>
-            {anyAchieved && (
-              <ChevronDown
-                className={cn("h-3 w-3 transition-transform", open && "rotate-180")}
-              />
-            )}
-          </span>
-        </div>
-        {/* 機能ラベル＋閾値バッジ列 */}
-        <div className="mt-1 flex flex-wrap items-center gap-1">
-          {label && (
-            <span className="mr-0.5 text-[10px] font-medium text-muted-foreground">
-              {label}
-            </span>
-          )}
-          {tiers.map((d) => {
-            const done = grantedMap.has(d.key);
-            return (
-              <span
-                key={d.key}
-                className={cn(
-                  "rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
-                  done
-                    ? d.rank === "gold"
-                      ? "bg-amber-500 text-white"
-                      : "bg-slate-400 text-white"
-                    : "bg-muted text-muted-foreground/70 opacity-70"
-                )}
-              >
-                {d.tier}
-              </span>
-            );
-          })}
-        </div>
-        {/* 折りたたみ時は最新の到達の獲得日（称号は見出しに出ている） */}
-        {anyAchieved && top && !open && (
-          <p className="mt-1 text-[10px] font-medium text-amber-700 dark:text-amber-400">
-            {formatDate(grantedMap.get(top.key)!)} に獲得
-          </p>
-        )}
-      </div>
-    </>
-  );
-
-  return (
-    <div
-      className={cn(
-        "rounded-lg border p-2 transition-colors",
-        anyAchieved
-          ? "border-amber-300/70 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-950/30"
-          : "border-border bg-muted/30 opacity-60 grayscale"
-      )}
-    >
-      {anyAchieved ? (
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="flex w-full items-start gap-2 text-left"
-        >
-          {header}
-        </button>
-      ) : (
-        <div className="flex items-start gap-2">{header}</div>
-      )}
-
-      {/* 展開: 達成した全段階の日付履歴（新しい順） */}
-      {open && anyAchieved && (
-        <ul className="mt-2 space-y-1 border-t pt-2">
-          {[...achievedTiers].reverse().map((d) => (
-            <li
-              key={d.key}
-              className="flex items-baseline justify-between gap-2 text-[10px]"
-            >
-              <span className="min-w-0 font-medium">
-                {d.title}
-                <span className="ml-1 text-muted-foreground tabular-nums">
-                  ({d.tier}
-                  {unit})
-                </span>
-              </span>
-              <span className="shrink-0 text-amber-700 dark:text-amber-400">
-                {formatDate(grantedMap.get(d.key)!)} に獲得
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
 /** "perfect-month:2026-05" → "2026年5月" */
 function monthLabel(key: string): string {
   const ym = key.slice(PERFECT_MONTH_CATEGORY.length + 1); // "2026-05"
@@ -245,101 +43,327 @@ function monthLabel(key: string): string {
   return `${y}年${Number(m)}月`;
 }
 
-/** 皆勤賞カード。ラダー風に、獲得した月をチップで列挙する（金固定）。タップで獲得日を展開。 */
-function PerfectMonthCard({ months }: { months: GrantedItem[] }) {
-  const [open, setOpen] = useState(false);
-  const sorted = [...months].sort((a, b) => a.key.localeCompare(b.key)); // 古い月順
-  const any = sorted.length > 0;
-
-  const header = (
-    <>
-      <span
-        className={cn(
-          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
-          any
-            ? "bg-amber-200 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-            : "bg-muted text-muted-foreground"
-        )}
-      >
-        <AchievementIcon name="Crown" className="h-4 w-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <p
-            className={cn(
-              "text-[13px] font-semibold leading-tight",
-              !any && "text-muted-foreground"
-            )}
-          >
-            皆勤賞
-          </p>
-          {any && (
-            <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-muted-foreground">
-              {sorted.length}回
-              <ChevronDown
-                className={cn("h-3 w-3 transition-transform", open && "rotate-180")}
-              />
-            </span>
-          )}
-        </div>
-        {any ? (
-          <div className="mt-1 flex flex-wrap gap-1">
-            {sorted.map((g) => (
-              <span
-                key={g.key}
-                className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-white"
-              >
-                {monthLabel(g.key)}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">
-            未投稿を4日以内におさえ、別日に2枚以上投稿して穴を埋めると獲得できます
-          </p>
-        )}
-      </div>
-    </>
-  );
-
+/** 金/銀トロフィーのアイコン（中を塗りつぶし）。 */
+function RankBadge({ rank, className }: { rank: AchievementRank; className?: string }) {
   return (
-    <div
+    <Trophy
+      aria-hidden
       className={cn(
-        "rounded-lg border p-2 transition-colors",
-        any
-          ? "border-amber-300/70 bg-amber-50 dark:border-amber-800/60 dark:bg-amber-950/30"
-          : "border-border bg-muted/30 opacity-60 grayscale"
+        "shrink-0",
+        rank === "gold" ? "fill-amber-400 text-amber-600" : "fill-slate-300 text-slate-500",
+        className
+      )}
+    />
+  );
+}
+
+// --- 一覧の各エントリを「タイル＋詳細」を出せる共通モデルに正規化する ---
+
+interface TileModel {
+  icon: string;
+  /** 一覧に出す名前（シークレット未達成・未獲得ラダーは「？？？」） */
+  name: string;
+  /** 取得済みのときだけ金/銀。未取得は null（一覧にトロフィーを出さない） */
+  rank: AchievementRank | null;
+  achieved: boolean;
+  /** ラダーのみ: 全段階の進捗ドット（獲得済みは段のランク色、未獲得は薄色） */
+  progress?: { rank: AchievementRank; done: boolean }[];
+}
+
+type Entry =
+  | { id: string; kind: "single"; def: AchievementDef }
+  | { id: string; kind: "ladder"; ladderKey: string; defs: AchievementDef[] }
+  | { id: string; kind: "perfectMonth" };
+
+/** 実績 key（単発キー・ラダーの段キー・皆勤賞キーのいずれか）が、このエントリのモーダルで表示されるか。 */
+function entryMatchesKey(entry: Entry, key: string): boolean {
+  if (entry.kind === "single") return entry.def.key === key;
+  if (entry.kind === "ladder") return entry.defs.some((d) => d.key === key);
+  return key.startsWith(`${PERFECT_MONTH_CATEGORY}:`); // perfectMonth
+}
+
+function tileModel(
+  entry: Entry,
+  grantedMap: Map<string, string>,
+  perfectMonths: GrantedItem[]
+): TileModel {
+  if (entry.kind === "single") {
+    const { def } = entry;
+    const achieved = grantedMap.has(def.key);
+    const hidden = def.secret && !achieved;
+    return {
+      icon: def.icon,
+      name: hidden ? "？？？" : def.title,
+      rank: achieved ? def.rank : null,
+      achieved,
+    };
+  }
+  if (entry.kind === "ladder") {
+    const tiers = [...entry.defs].sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0));
+    const achievedTiers = tiers.filter((d) => grantedMap.has(d.key));
+    const top = achievedTiers[achievedTiers.length - 1];
+    return {
+      icon: tiers[0]?.icon ?? "Trophy",
+      // 称号は「獲得済みの最上段」を出す。1段も獲っていない時は例外的に最初の段の称号を出す
+      // （何を目指す系列か分かるように。途中まで獲った後の上位段だけ ？？？ で伏せる）。
+      name: top?.title ?? tiers[0]?.title ?? entry.ladderKey,
+      rank: top?.rank ?? null,
+      achieved: achievedTiers.length > 0,
+      progress: tiers.map((d) => ({ rank: d.rank, done: grantedMap.has(d.key) })),
+    };
+  }
+  // perfectMonth（段数は固定でなく毎月増えるので、獲得した月の数ぶん金ドットを並べる）
+  const any = perfectMonths.length > 0;
+  return {
+    icon: "Crown",
+    name: "皆勤賞",
+    rank: any ? "gold" : null,
+    achieved: any,
+    progress: any
+      ? perfectMonths.map(() => ({ rank: "gold" as const, done: true }))
+      : [{ rank: "gold" as const, done: false }],
+  };
+}
+
+/** 一覧の1マス。アイコン＋名前＋金/銀メダルのみ。タップで詳細モーダル。 */
+function Tile({ model, onClick }: { model: TileModel; onClick: () => void }) {
+  const { icon, name, rank, achieved } = model;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex flex-col items-center gap-1.5 rounded-lg border p-2 text-center transition-colors",
+        achieved
+          ? "border-amber-300/70 bg-amber-50 hover:bg-amber-100 dark:border-amber-800/60 dark:bg-amber-950/30 dark:hover:bg-amber-950/50"
+          : "border-border bg-muted/30 hover:bg-muted/60"
       )}
     >
-      {any ? (
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="flex w-full items-start gap-2 text-left"
+      <span className="relative">
+        <span
+          className={cn(
+            "flex h-11 w-11 items-center justify-center rounded-full",
+            achieved
+              ? "bg-amber-200 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+              : "bg-muted text-muted-foreground"
+          )}
         >
-          {header}
-        </button>
-      ) : (
-        <div className="flex items-start gap-2">{header}</div>
+          <AchievementIcon name={icon} className="h-5 w-5" />
+        </span>
+        {rank && (
+          <span className="absolute -right-1 -bottom-1 rounded-full bg-background p-px shadow-sm">
+            <RankBadge rank={rank} className="h-4 w-4" />
+          </span>
+        )}
+      </span>
+      <span
+        className={cn(
+          "line-clamp-2 text-[11px] font-medium leading-tight",
+          !achieved && "text-muted-foreground"
+        )}
+      >
+        {name}
+      </span>
+      {model.progress && (
+        <span className="mt-auto flex flex-wrap items-center justify-center gap-0.5 pt-0.5">
+          {model.progress.map((p, i) => (
+            <span
+              key={i}
+              className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                p.done
+                  ? p.rank === "gold"
+                    ? "bg-amber-500"
+                    : "bg-slate-400"
+                  : "bg-muted-foreground/25"
+              )}
+            />
+          ))}
+        </span>
       )}
+    </button>
+  );
+}
 
-      {open && any && (
-        <ul className="mt-2 space-y-1 border-t pt-2">
+/** 詳細モーダルの中身。ラダーは過去の獲得日を含む全段階を表示する。 */
+function DetailBody({
+  entry,
+  grantedMap,
+  ladderValues,
+  perfectMonths,
+}: {
+  entry: Entry;
+  grantedMap: Map<string, string>;
+  ladderValues: Record<string, number>;
+  perfectMonths: GrantedItem[];
+}) {
+  if (entry.kind === "single") {
+    const { def } = entry;
+    const grantedAt = grantedMap.get(def.key);
+    const achieved = grantedAt != null;
+    const hidden = def.secret && !achieved;
+    return (
+      <DetailShell
+        icon={def.icon}
+        title={hidden ? "？？？" : def.title}
+        rank={achieved ? def.rank : null}
+        achieved={achieved}
+        description={hidden ? "達成すると公開されるシークレット実績です" : def.description}
+      >
+        {achieved ? (
+          <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+            {formatDate(grantedAt)} に獲得
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">まだ獲得していません</p>
+        )}
+      </DetailShell>
+    );
+  }
+
+  if (entry.kind === "ladder") {
+    const meta = LADDER_META[entry.ladderKey];
+    const tiers = [...entry.defs].sort((a, b) => (a.tier ?? 0) - (b.tier ?? 0));
+    const achievedTiers = tiers.filter((d) => grantedMap.has(d.key));
+    const top = achievedTiers[achievedTiers.length - 1];
+    const any = achievedTiers.length > 0;
+    const unit = meta?.unit ?? "";
+    const currentValue = ladderValues[entry.ladderKey] ?? 0;
+    return (
+      <DetailShell
+        icon={tiers[0]?.icon ?? "Trophy"}
+        title={top?.title ?? tiers[0]?.title ?? entry.ladderKey}
+        rank={top?.rank ?? null}
+        achieved={any}
+        description={
+          meta ? `${meta.label}：現在 ${currentValue}${unit}` : undefined
+        }
+      >
+        <ul className="space-y-1.5">
+          {[...tiers].reverse().map((d) => {
+            const at = grantedMap.get(d.key);
+            const done = at != null;
+            return (
+              <li
+                key={d.key}
+                className={cn(
+                  "flex items-center justify-between gap-2 text-xs",
+                  !done && "text-muted-foreground"
+                )}
+              >
+                <span className="flex min-w-0 items-center gap-1.5">
+                  {done ? (
+                    <RankBadge rank={d.rank} className="h-3.5 w-3.5" />
+                  ) : (
+                    <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-muted-foreground/40" />
+                  )}
+                  <span className="truncate font-medium">
+                    {done || (!any && d.key === tiers[0]?.key) ? d.title : "？？？"}
+                  </span>
+                  <span className="shrink-0 tabular-nums text-muted-foreground">
+                    ({d.tier}
+                    {unit})
+                  </span>
+                </span>
+                <span className="shrink-0 text-[11px]">
+                  {done ? (
+                    <span className="text-amber-700 dark:text-amber-400">
+                      {formatDate(at)}
+                    </span>
+                  ) : (
+                    "未達成"
+                  )}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </DetailShell>
+    );
+  }
+
+  // perfectMonth
+  const sorted = [...perfectMonths].sort((a, b) => b.key.localeCompare(a.key)); // 新しい月順
+  const any = sorted.length > 0;
+  return (
+    <DetailShell
+      icon="Crown"
+      title="皆勤賞"
+      rank={any ? "gold" : null}
+      achieved={any}
+      description="1ヶ月の間毎日1枚以上投稿すると獲得できます（月4日までは救済措置があり、別日に穴埋め投稿も可能です）"
+    >
+      {any ? (
+        <ul className="space-y-1.5">
           {sorted.map((g) => (
             <li
               key={g.key}
-              className="flex items-baseline justify-between gap-2 text-[10px]"
+              className="flex items-center justify-between gap-2 text-xs"
             >
-              <span className="font-medium">{monthLabel(g.key)}</span>
-              <span className="text-amber-700 dark:text-amber-400">
+              <span className="flex items-center gap-1.5 font-medium">
+                <RankBadge rank="gold" className="h-3.5 w-3.5" />
+                {monthLabel(g.key)}
+              </span>
+              <span className="text-[11px] text-amber-700 dark:text-amber-400">
                 {formatDate(g.grantedAt)} に獲得
               </span>
             </li>
           ))}
         </ul>
+      ) : (
+        <p className="text-xs text-muted-foreground">まだ獲得していません</p>
       )}
-    </div>
+    </DetailShell>
+  );
+}
+
+/** 詳細モーダルの共通レイアウト（大きいアイコン＋タイトル＋メダル＋説明＋本文）。 */
+function DetailShell({
+  icon,
+  title,
+  rank,
+  achieved,
+  description,
+  children,
+}: {
+  icon: string;
+  title: string;
+  rank: AchievementRank | null;
+  achieved: boolean;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      <DialogHeader>
+        <div className="flex items-center gap-3 text-left">
+          <span
+            className={cn(
+              "relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full",
+              achieved
+                ? "bg-amber-200 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                : "bg-muted text-muted-foreground"
+            )}
+          >
+            <AchievementIcon name={icon} className="h-7 w-7" />
+            {rank && (
+              <span className="absolute -right-1 -bottom-1 rounded-full bg-background p-px shadow-sm">
+                <RankBadge rank={rank} className="h-5 w-5" />
+              </span>
+            )}
+          </span>
+          <div className="min-w-0">
+            <DialogTitle className="text-base">{title}</DialogTitle>
+            {description && (
+              <DialogDescription className="mt-0.5 text-xs">
+                {description}
+              </DialogDescription>
+            )}
+          </div>
+        </div>
+      </DialogHeader>
+      <div className="border-t pt-3">{children}</div>
+    </>
   );
 }
 
@@ -361,48 +385,76 @@ export function AchievementsView({
     [granted]
   );
 
+  // レイアウトを「セクション → エントリ配列」に正規化（タイルとモーダルで共用）
+  const sections = useMemo(
+    () =>
+      ACHIEVEMENT_LAYOUT.map((section) => ({
+        title: section.title,
+        entries: section.blocks
+          .map((block): Entry | null => {
+            if (block.kind === "perfectMonth") {
+              return { id: "perfect-month", kind: "perfectMonth" };
+            }
+            if (block.kind === "ladder") {
+              const defs = CATALOG.filter((d) => d.ladderKey === block.ladderKey);
+              return { id: block.ladderKey, kind: "ladder", ladderKey: block.ladderKey, defs };
+            }
+            const def = CATALOG_BY_KEY.get(block.key);
+            return def ? { id: def.key, kind: "single", def } : null;
+          })
+          .filter((e): e is Entry => e != null),
+      })),
+    []
+  );
+
+  // ?a=<実績key> でディープリンクされたら、該当する実績のモーダルを開いた状態でマウントする
+  // （投稿直後の獲得演出・画像詳細ページの実績チップからの遷移用）。
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const aParam = searchParams.get("a");
+
+  const [selected, setSelected] = useState<Entry | null>(() => {
+    if (!aParam) return null;
+    const entries = sections.flatMap((s) => s.entries);
+    return entries.find((e) => entryMatchesKey(e, aParam)) ?? null;
+  });
+
+  const closeModal = () => {
+    setSelected(null);
+    // ディープリンク経由なら URL から ?a= を消す（閉じた後に再オープンしない・履歴を汚さない）
+    if (aParam) router.replace(pathname, { scroll: false });
+  };
+
   return (
-    <div className="space-y-6">
-      {ACHIEVEMENT_LAYOUT.map((section) => (
+    <div className="space-y-5">
+      {sections.map((section) => (
         <section key={section.title}>
           <h2 className="mb-2 text-sm font-bold">{section.title}</h2>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {section.blocks.map((block) => {
-              if (block.kind === "perfectMonth") {
-                return <PerfectMonthCard key="perfect-month" months={perfectMonths} />;
-              }
-              if (block.kind === "ladder") {
-                const defs: AchievementDef[] = CATALOG.filter(
-                  (d) => d.ladderKey === block.ladderKey
-                );
-                return (
-                  <LadderCard
-                    key={block.ladderKey}
-                    ladderKey={block.ladderKey}
-                    defs={defs}
-                    grantedMap={grantedMap}
-                    currentValue={ladderValues[block.ladderKey] ?? 0}
-                  />
-                );
-              }
-              // single
-              const def = CATALOG_BY_KEY.get(block.key);
-              if (!def) return null;
-              return (
-                <SingleCard
-                  key={def.key}
-                  icon={def.icon}
-                  title={def.title}
-                  description={def.description}
-                  grantedAt={grantedMap.get(def.key)}
-                  rank={def.rank}
-                  secret={def.secret}
-                />
-              );
-            })}
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+            {section.entries.map((entry) => (
+              <Tile
+                key={entry.id}
+                model={tileModel(entry, grantedMap, perfectMonths)}
+                onClick={() => setSelected(entry)}
+              />
+            ))}
           </div>
         </section>
       ))}
+
+      <Dialog open={selected != null} onOpenChange={(o) => !o && closeModal()}>
+        <DialogContent>
+          {selected && (
+            <DetailBody
+              entry={selected}
+              grantedMap={grantedMap}
+              ladderValues={ladderValues}
+              perfectMonths={perfectMonths}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

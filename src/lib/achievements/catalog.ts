@@ -297,7 +297,7 @@ const singletons: AchievementDef[] = [
     category: "first-email",
     rank: "silver",
     section: "デビュー",
-    title: "懐かしのメール投稿",
+    title: "いにしえの投稿スタイル",
     description: "メール経由ではじめて投稿しました",
     icon: "Mail",
     evaluate: (s) => s.hasEmailPost,

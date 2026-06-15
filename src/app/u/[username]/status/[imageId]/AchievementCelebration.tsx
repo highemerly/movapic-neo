@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import { resolveAchievement } from "@/lib/achievements/catalog";
@@ -20,7 +21,7 @@ const SPARKLES = [
   { top: "44%", left: "92%", size: 12, delay: "0.3s" },
 ];
 
-export function AchievementCelebration() {
+export function AchievementCelebration({ username }: { username: string }) {
   const hydrated = useIsHydrated();
   const [dismissed, setDismissed] = useState(false);
 
@@ -81,9 +82,10 @@ export function AchievementCelebration() {
 
         <div className="mt-5 space-y-3">
           {items.map((a) => (
-            <div
+            <Link
               key={a.key}
-              className="flex items-center gap-3 rounded-xl border border-amber-200/70 bg-white/70 p-3 text-left dark:border-amber-800/50 dark:bg-white/5"
+              href={`/u/${username}/achievements?a=${encodeURIComponent(a.key)}`}
+              className="flex items-center gap-3 rounded-xl border border-amber-200/70 bg-white/70 p-3 text-left transition-colors hover:bg-amber-100/70 dark:border-amber-800/50 dark:bg-white/5 dark:hover:bg-amber-900/30"
             >
               <span className="animate-trophy-pop flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-200 text-amber-800 shadow-inner dark:bg-amber-900 dark:text-amber-200">
                 <AchievementIcon name={a.icon} className="h-6 w-6" />
@@ -94,7 +96,7 @@ export function AchievementCelebration() {
                   {a.description}
                 </p>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
 
