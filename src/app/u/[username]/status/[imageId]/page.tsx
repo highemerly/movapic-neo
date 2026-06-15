@@ -18,11 +18,12 @@ import {
 } from "@/lib/fediverse/favorite";
 import { PinButton } from "@/components/pin/PinButton";
 import { Footer } from "@/components/Footer";
+import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { PostSuccessToast } from "./PostSuccessToast";
 import { AchievementCelebration } from "./AchievementCelebration";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import { resolveAchievement } from "@/lib/achievements/catalog";
-import { User, CalendarDays, Map as MapIcon, Globe, Heart, ImagePlus } from "lucide-react";
+import { User, CalendarDays, Map as MapIcon } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -450,44 +451,9 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           />
         </div>
 
-        {/* アクションボタン */}
-        <div className="mt-8">
-          <div className="bg-muted rounded-lg p-3 space-y-3">
-            <Link href="/create" className="block">
-              <Button variant="default" className="w-full">
-                <ImagePlus className="h-4 w-4" />
-                写真を投稿する
-              </Button>
-            </Link>
-            <div className={`grid gap-3 ${currentUser ? "grid-cols-3" : "grid-cols-1"}`}>
-              <Link href="/public">
-                <Button variant="outline" className="w-full h-auto py-3 flex flex-col gap-1.5">
-                  <Globe className="h-4 w-4" />
-                  <span className="text-xs">みんなの写真</span>
-                </Button>
-              </Link>
-              {currentUser && (
-                <>
-                  <Link href={`/u/${currentUser.username}`}>
-                    <Button variant="outline" className="w-full h-auto py-3 flex flex-col gap-1.5">
-                      <User className="h-4 w-4" />
-                      <span className="text-xs">プロフィール</span>
-                    </Button>
-                  </Link>
-                  <Link href="/favorite">
-                    <Button variant="outline" className="w-full h-auto py-3 flex flex-col gap-1.5">
-                      <Heart className="h-4 w-4" />
-                      <span className="text-xs">お気に入り</span>
-                    </Button>
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
         <Footer />
       </main>
+      <FloatingPostButton />
     </div>
   );
 }
