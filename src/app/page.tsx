@@ -7,7 +7,7 @@ import { getSessionClaims } from "@/lib/auth/session";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { LoginSection } from "@/components/auth/LoginSection";
 import { Button } from "@/components/ui/button";
-import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
+import { FeaturedMarquee } from "@/components/gallery/FeaturedMarquee";
 import { Footer } from "@/components/Footer";
 import { getAllowedServers } from "@/lib/auth/allowedServers";
 
@@ -19,15 +19,15 @@ const getFeaturedImages = unstable_cache(
     prisma.image.findMany({
       where: { isPublic: true },
       orderBy: { createdAt: "desc" },
-      take: 6,
+      take: 16,
       select: {
         id: true,
         storageKey: true,
         overlayText: true,
+        position: true,
         user: {
           select: {
             username: true,
-            displayName: true,
           },
         },
       },
@@ -43,20 +43,41 @@ export default async function HomePage() {
   // ログイン状態は JWT（署名+exp検証のみ）で判定＝DBアクセスなし
   const isLoggedIn = (await getSessionClaims()) !== null;
 
-  // フィーチャー画像を取得（最新6件・5分キャッシュ）
+  // フィーチャー画像を取得（最新16件・5分キャッシュ）
   const featuredImages = await getFeaturedImages();
+  const marqueeImages = featuredImages.map((image) => ({
+    id: image.id,
+    storageKey: image.storageKey,
+    overlayText: image.overlayText,
+    position: image.position,
+    username: image.user.username,
+  }));
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="container mx-auto max-w-2xl px-4 py-6">
-        {/* ヘッダー */}
-        <div className="text-center mb-6">
-          <div className="flex justify-center mb-4">
+      <main className="py-6">
+        {/* ロゴ */}
+        <div className="container mx-auto max-w-2xl px-4">
+          <div className="flex justify-center">
             <Image src="/shamezo_logo_with_tagline.svg" alt="SHAMEZO" width={340} height={76} className="h-auto w-auto max-w-full" priority />
           </div>
+        </div>
 
-          {/* ログインボタン（保護ページからのリダイレクト時はバナー表示） */}
-          <div className="max-w-sm mx-auto mt-6 mb-8">
+        {/* 作例（ロゴ直下に横並びで自動スクロール） */}
+        {marqueeImages.length > 0 && (
+          <div className="mt-5">
+            <FeaturedMarquee images={marqueeImages} publicUrl={publicUrl} />
+          </div>
+        )}
+
+        {/* ログイン（保護ページからのリダイレクト時はバナー表示） */}
+        <div className="container mx-auto max-w-2xl px-4">
+          <div className="max-w-sm mx-auto mt-6">
+            {!isLoggedIn && (
+              <p className="mb-3 text-center text-sm font-semibold">
+                今すぐログインして投稿してみよう！
+              </p>
+            )}
             <Suspense
               fallback={
                 <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden text-center">
@@ -69,40 +90,19 @@ export default async function HomePage() {
               <LoginSection allowedServers={allowedServers} initialIsLoggedIn={isLoggedIn} />
             </Suspense>
           </div>
-        </div>
 
-        {/* フィーチャー画像 */}
-        {featuredImages.length > 0 && (
-          <div className="mt-6">
-            <h2 className="text-sm font-semibold text-center mb-4 text-muted-foreground">
-              みんなの作品
-            </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {featuredImages.map((image) => (
-                <Link
-                  key={image.id}
-                  href={`/u/${image.user.username}/status/${image.id}`}
-                  className="block bg-muted rounded-lg overflow-hidden"
-                >
-                  <ThumbnailImage
-                    src={`${publicUrl}/${image.storageKey}`}
-                    alt={image.overlayText}
-                    loading="eager"
-                    className="hover:opacity-90 transition-opacity"
-                  />
-                </Link>
-              ))}
-            </div>
-            <div className="text-center mt-6">
+          {/* みんなの作品をもっと見る */}
+          {marqueeImages.length > 0 && (
+            <div className="text-center mt-8">
               <Link href="/public">
-                <Button variant="outline">もっと見る</Button>
+                <Button variant="outline">みんなの作品をもっと見る</Button>
               </Link>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* フッター */}
-        <Footer />
+          {/* フッター */}
+          <Footer />
+        </div>
       </main>
     </div>
   );
