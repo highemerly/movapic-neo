@@ -65,7 +65,7 @@ export function PostMethodTabs({
           <Link href="/create">
             <Button className="mt-6 w-full h-auto py-2 flex flex-col gap-0.5" size="lg">
               <ImagePlus className="h-6 w-6" />
-              <span>Webブラウザから写真を投稿する</span>
+              <span>いますぐ写真を投稿する</span>
             </Button>
           </Link>
         )}

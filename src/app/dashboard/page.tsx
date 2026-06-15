@@ -1,14 +1,13 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getAvatarUrl } from "@/lib/avatar";
-import { Globe, User, Heart, ChevronRight, Settings2, ShieldCheck, SlidersHorizontal, Trophy, Images, Calendar, Map as MapIcon } from "lucide-react";
+import { Globe, Server, Heart, ChevronRight, Settings2, ShieldCheck, SlidersHorizontal, Trophy, Images, Calendar, Map as MapIcon } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { PostMethodTabs } from "./PostMethodTabs";
-import { NotificationButton } from "./NotificationButton";
 import { MentionSettingsForm } from "./MentionSettingsForm";
 import { EmailAddressDisplay } from "./EmailAddressDisplay";
 import { EmailPrefixRegenerate } from "./EmailPrefixRegenerate";
@@ -17,7 +16,7 @@ import { DefaultsEditor } from "./DefaultsEditor";
 import { LocationMapToggle } from "./LocationMapToggle";
 import { DisplayModeSelector } from "./DisplayModeSelector";
 import prisma from "@/lib/db";
-import { calculateStreak } from "@/lib/streak";
+import { getUserProfileStats } from "@/lib/userStats";
 import {
   Position,
   FontFamily,
@@ -37,7 +36,8 @@ export default async function DashboardPage() {
   }
 
   // ユーザーのデフォルト設定、bio、統計情報を取得
-  const [userWithPreferences, imageCount, postDates, favoritesAgg, topFavoriteImage] = await Promise.all([
+  // 投稿数・連続投稿・都道府県数・実績数はユーザーページの各タブと共通の集計（getUserProfileStats）
+  const [userWithPreferences, profileStats, favoritesAgg, topFavoriteImage, recentPublicImages] = await Promise.all([
     prisma.user.findUnique({
       where: { id: user.id },
       select: {
@@ -54,13 +54,7 @@ export default async function DashboardPage() {
         showLocationMap: true,
       },
     }),
-    prisma.image.count({
-      where: { userId: user.id },
-    }),
-    prisma.image.findMany({
-      where: { userId: user.id },
-      select: { createdAt: true },
-    }),
+    getUserProfileStats(user.id),
     prisma.image.aggregate({
       where: { userId: user.id },
       _sum: { favoriteCount: true },
@@ -76,10 +70,26 @@ export default async function DashboardPage() {
         favoriteCount: true,
       },
     }),
+    // 「みんなの投稿」プレビュー用に直近の公開投稿を取得（この中からランダムで4枚出す）
+    prisma.image.findMany({
+      where: { isPublic: true },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: {
+        id: true,
+        thumbnailKey: true,
+        storageKey: true,
+        overlayText: true,
+        user: { select: { username: true } },
+      },
+    }),
   ]);
 
-  const streak = calculateStreak(postDates.map((p) => p.createdAt));
   const totalFavorites = favoritesAgg._sum.favoriteCount ?? 0;
+  // 直近20投稿からランダムに最大4枚（force-dynamic なのでリクエストごとに入れ替わる）
+  const previewImages = [...recentPublicImages]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 4);
   const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
   // Bot設定を環境変数から取得
@@ -180,49 +190,9 @@ export default async function DashboardPage() {
       <SiteHeader user={user ? { username: user.username, instanceDomain: user.instance.domain } : null} />
       <div className="container mx-auto px-4 pt-2 pb-8 max-w-2xl">
 
-        {/* セクション1: みる */}
+        {/* セクション1: 自分の情報 */}
         <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-2">みる</h2>
-          <div className="bg-muted rounded-lg p-4">
-            <div className="grid grid-cols-3 gap-3">
-            <Link href="/public">
-              <Button variant="outline" className="w-full h-auto py-2 flex flex-col gap-0.5">
-                <Globe className="h-5 w-5" />
-                <span className="text-sm">みんなの写真</span>
-              </Button>
-            </Link>
-            <Link href={`/u/${user.username}`}>
-              <Button variant="outline" className="w-full h-auto py-2 flex flex-col gap-0.5">
-                <User className="h-5 w-5" />
-                <span className="text-sm">自分の写真</span>
-              </Button>
-            </Link>
-            <Link href="/favorite">
-              <Button variant="outline" className="w-full h-auto py-2 flex flex-col gap-0.5">
-                <Heart className="h-5 w-5" />
-                <span className="text-sm">お気に入り</span>
-              </Button>
-            </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* セクション2: 投稿する */}
-        <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-2">投稿する</h2>
-          <div className="bg-muted rounded-lg p-4">
-            <PostMethodTabs
-              instanceDomain={user.instance.domain}
-              instanceType={user.instance.type}
-              mentionSettingsContent={mentionSettingsContent}
-              emailSettingsContent={emailSettingsContent}
-            />
-          </div>
-        </section>
-
-        {/* セクション3: アカウント */}
-        <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-2">アカウント</h2>
+          <h2 className="text-lg font-semibold mb-2">自分の情報</h2>
           <div className="relative bg-muted rounded-lg p-4">
             <LogoutButton
               variant="ghost"
@@ -258,27 +228,47 @@ export default async function DashboardPage() {
                 アイコンが表示されていない場合は、ログインし直すと反映されます。
               </p>
             )}
-            <div className="mt-3 grid grid-cols-4 gap-x-3 text-sm">
-              <div>
-                <p className="text-muted-foreground text-xs">投稿数</p>
-                <p className="font-medium">{imageCount}件</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">連続投稿</p>
-                <p className="font-medium">{streak}日</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">獲得ふぁぼ</p>
-                <p className="font-medium">{totalFavorites}</p>
-              </div>
-              {userWithPreferences?.createdAt && (
-                <div>
-                  <p className="text-muted-foreground text-xs">登録日</p>
-                  <p className="font-medium">
-                    {userWithPreferences.createdAt.toLocaleDateString("ja-JP", { year: "numeric", month: "numeric", day: "numeric" })}
-                  </p>
-                </div>
-              )}
+            <div className="mt-3 grid grid-cols-4 gap-2">
+              <Link href={`/u/${user.username}`}>
+                <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="一覧" title="投稿数">
+                  <Images className="h-5 w-5" />
+                  <span className="leading-none whitespace-nowrap">
+                    <span className="text-sm font-semibold tabular-nums">{profileStats.imageCount}</span>
+                    <span className="text-[10px]">枚</span>
+                  </span>
+                </Button>
+              </Link>
+              <Link href={`/u/${user.username}/calendar`}>
+                <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="カレンダー" title="連続投稿日数">
+                  <Calendar className="h-5 w-5" />
+                  <span className="leading-none whitespace-nowrap">
+                    <span className="text-[10px]">連続</span>
+                    <span className="text-sm font-semibold tabular-nums">{profileStats.streak}</span>
+                    <span className="text-[10px]">日</span>
+                  </span>
+                </Button>
+              </Link>
+              <Link href={`/u/${user.username}/map`}>
+                <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="地図" title="都道府県数">
+                  <MapIcon className="h-5 w-5" />
+                  <span className="leading-none whitespace-nowrap">
+                    <span className="text-sm font-semibold tabular-nums">{profileStats.prefectureCount}</span>
+                    <span className="text-[10px]">カ所</span>
+                  </span>
+                </Button>
+              </Link>
+              <Link href={`/u/${user.username}/achievements`}>
+                <Button variant="outline" className="w-full h-14 flex flex-col gap-1 justify-center" aria-label="実績" title="獲得実績（金・銀）">
+                  <span className="flex items-center gap-1 leading-none whitespace-nowrap">
+                    <Trophy className="h-3.5 w-3.5 fill-amber-400 text-amber-600" />
+                    <span className="text-sm font-semibold tabular-nums">{profileStats.goldCount}</span>
+                  </span>
+                  <span className="flex items-center gap-1 leading-none whitespace-nowrap">
+                    <Trophy className="h-3.5 w-3.5 fill-slate-300 text-slate-500" />
+                    <span className="text-sm font-semibold tabular-nums">{profileStats.silverCount}</span>
+                  </span>
+                </Button>
+              </Link>
             </div>
             {topFavoriteImage && (
               <Link
@@ -301,29 +291,78 @@ export default async function DashboardPage() {
                 </div>
               </Link>
             )}
-            <div className="mt-3 grid grid-cols-5 gap-2">
-              <Link href={`/u/${user.username}`}>
-                <Button variant="outline" className="w-full h-auto py-2" aria-label="一覧" title="一覧">
-                  <Images className="h-5 w-5" />
-                </Button>
-              </Link>
-              <Link href={`/u/${user.username}/calendar`}>
-                <Button variant="outline" className="w-full h-auto py-2" aria-label="カレンダー" title="カレンダー">
-                  <Calendar className="h-5 w-5" />
-                </Button>
-              </Link>
-              <Link href={`/u/${user.username}/map`}>
-                <Button variant="outline" className="w-full h-auto py-2" aria-label="地図" title="地図">
-                  <MapIcon className="h-5 w-5" />
-                </Button>
-              </Link>
-              <Link href={`/u/${user.username}/achievements`}>
-                <Button variant="outline" className="w-full h-auto py-2" aria-label="実績" title="実績">
-                  <Trophy className="h-5 w-5" />
-                </Button>
-              </Link>
-              <NotificationButton />
+            <p className="mt-3 text-xs text-muted-foreground">
+              {userWithPreferences?.createdAt &&
+                `${userWithPreferences.createdAt.toLocaleDateString("ja-JP", { year: "numeric", month: "numeric", day: "numeric" })}に登録・`}
+              獲得お気に入り{totalFavorites}件
+            </p>
+          </div>
+        </section>
+
+        {/* セクション2: 投稿する */}
+        <section className="mb-4">
+          <h2 className="text-lg font-semibold mb-2">投稿する</h2>
+          <div className="bg-muted rounded-lg p-4">
+            <PostMethodTabs
+              instanceDomain={user.instance.domain}
+              instanceType={user.instance.type}
+              mentionSettingsContent={mentionSettingsContent}
+              emailSettingsContent={emailSettingsContent}
+            />
+          </div>
+        </section>
+
+        {/* セクション3: みんなの投稿をみる */}
+        <section className="mb-4">
+          <h2 className="text-lg font-semibold mb-2">みんなの投稿をみる</h2>
+          <div className="bg-muted rounded-lg p-4">
+            <div className="grid grid-cols-3 gap-3">
+            <Link href="/public">
+              <Button variant="outline" className="w-full h-16 flex flex-col gap-1 justify-center">
+                <Globe className="h-5 w-5" />
+                <span className="text-sm">みんな</span>
+              </Button>
+            </Link>
+            <Link href={`/public?instances=${encodeURIComponent(user.instance.domain)}`}>
+              <Button variant="outline" className="w-full h-16 flex flex-col gap-1 justify-center">
+                <Server className="h-5 w-5" />
+                <span className="w-full whitespace-normal break-all text-center text-[11px] leading-tight line-clamp-2">
+                  {user.instance.domain}のみ
+                </span>
+              </Button>
+            </Link>
+            <Link href="/favorite">
+              <Button variant="outline" className="w-full h-16 flex flex-col gap-1 justify-center">
+                <Heart className="h-5 w-5" />
+                <span className="text-sm">お気に入り</span>
+              </Button>
+            </Link>
             </div>
+
+            {/* 「みんな」ボタンからの吹き出し：直近の公開投稿サムネイル */}
+            {previewImages.length > 0 && (
+              <div className="relative mt-3">
+                <div className="absolute -top-1.5 left-[16.66%] h-3 w-3 -translate-x-1/2 rotate-45 border-l border-t bg-background" />
+                <div className="rounded-lg border bg-background p-3">
+                  <div className="grid grid-cols-4 gap-2">
+                    {previewImages.map((img) => (
+                      <Link
+                        key={img.id}
+                        href={`/u/${img.user.username}/status/${img.id}`}
+                        className="block overflow-hidden rounded-md border transition-opacity hover:opacity-80"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`${publicUrl}/${img.thumbnailKey || img.storageKey}`}
+                          alt={img.overlayText}
+                          className="aspect-square w-full object-cover"
+                        />
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
