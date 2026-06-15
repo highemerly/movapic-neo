@@ -18,6 +18,7 @@ import {
 
 interface DayData {
   count: number;
+  /** カレンダーのサムネに使う画像。複数投稿日はその日の最古の投稿。 */
   latest: {
     id: string;
     thumbnailKey: string | null;
@@ -148,7 +149,14 @@ export async function GET(
         };
       } else {
         days[day].count++;
-        // 最新の画像は既にorderByで先頭に来ているので更新不要
+        // サムネはその日の最古の投稿を使う。images は createdAt 降順なので
+        // 後に来るものほど古い → 毎回上書きすれば最終的に最古が残る。
+        days[day].latest = {
+          id: image.id,
+          thumbnailKey: image.thumbnailKey,
+          storageKey: image.storageKey,
+          position: image.position,
+        };
       }
 
       if (!dayImages.has(day)) dayImages.set(day, []);
