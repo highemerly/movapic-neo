@@ -88,6 +88,8 @@ function replayUser(userId: string, images: ReplayImage[]): GrantRow[] {
   let totalPosts = 0;
   const allDays = new Set<string>();
   const dayCounts = new Map<string, number>();
+  // JST日 -> その日に使った source の集合（ハットトリック判定）
+  const daySources = new Map<string, Set<string>>();
   // ym -> (JST日 -> その日の投稿数)。distinct日数 / ダブル投稿日数（穴埋め）の両方をここから出す。
   const monthDayCounts = new Map<string, Map<string, number>>();
   const featureCounts = { neon: 0, stamp: 0, xlarge: 0, vertical: 0 };
@@ -104,6 +106,8 @@ function replayUser(userId: string, images: ReplayImage[]): GrantRow[] {
     totalPosts += 1;
     allDays.add(day);
     dayCounts.set(day, (dayCounts.get(day) ?? 0) + 1);
+    if (!daySources.has(day)) daySources.set(day, new Set());
+    daySources.get(day)!.add(img.source);
     if (!monthDayCounts.has(ym)) monthDayCounts.set(ym, new Map());
     const mdc = monthDayCounts.get(ym)!;
     mdc.set(day, (mdc.get(day) ?? 0) + 1);
@@ -132,6 +136,7 @@ function replayUser(userId: string, images: ReplayImage[]): GrantRow[] {
       distinctPrefectures: prefectures.size,
       hasEmailPost,
       hasMentionPost,
+      distinctSourcesToday: daySources.get(day)?.size ?? 0,
     };
     const post: PostFacts = {
       overlayText: img.overlayText,

@@ -13,8 +13,8 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
   const postDay = toJstDateString(post.createdAt);
 
   const [dateRows, featureCounts, fontGroups, distinctGroups] = await Promise.all([
-    // 全投稿日（streak / today / monthly-distinct-days 用）
-    prisma.image.findMany({ where: { userId }, select: { createdAt: true } }),
+    // 全投稿日（streak / today / monthly-distinct-days / 当日のsource種類 用）
+    prisma.image.findMany({ where: { userId }, select: { createdAt: true, source: true } }),
     // 機能別の利用回数
     prisma.$transaction([
       prisma.image.count({ where: { userId, arrangement: "neon" } }),
@@ -52,6 +52,11 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
   }
   const monthSummary = summarizeDayCounts(monthDayCounts.values());
 
+  // 投稿日（JST）に使った source の種類数（ハットトリック判定）
+  const sourcesToday = new Set(
+    dateRows.filter((r) => toJstDateString(r.createdAt) === postDay).map((r) => r.source)
+  );
+
   return {
     totalPosts: dateRows.length,
     currentStreak: calculateStreak(dateRows.map((r) => r.createdAt)),
@@ -64,6 +69,7 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
     distinctPrefectures: prefGroups.length,
     hasEmailPost: sources.has("email"),
     hasMentionPost: sources.has("mention"),
+    distinctSourcesToday: sourcesToday.size,
   };
 }
 

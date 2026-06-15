@@ -50,6 +50,8 @@ export interface AchStats {
   hasEmailPost: boolean;
   /** メンション（bot）経由の投稿が1件以上あるか */
   hasMentionPost: boolean;
+  /** この投稿の日（JST）に投稿した source の種類数（web/email/mention） */
+  distinctSourcesToday: number;
 }
 
 /** 今まさに作成された投稿そのものの属性。 */
@@ -187,7 +189,7 @@ const FEATURES: {
   { f: "neon", label: "ネオン", icon: "Sparkles", titles: { 5: "ネオンの灯", 30: "ネオンマスター" } },
   { f: "stamp", label: "ハンコ", icon: "Stamp", titles: { 5: "スタンプラリー", 30: "判子奉行" } },
   { f: "xlarge", label: "特大文字", icon: "ALargeSmall", titles: { 5: "主張強め", 30: "特大マスター" } },
-  { f: "vertical", label: "縦書き", icon: "GalleryVerticalEnd", titles: { 5: "やっぱり縦書きだよね", 30: "縦書き絵師" } },
+  { f: "vertical", label: "縦書き", icon: "GalleryVerticalEnd", titles: { 5: "やっぱり縦書きだよね", 30: "書道師範" } },
 ];
 const featureUsage: AchievementDef[] = FEATURES.flatMap(({ f, label, icon, titles }) =>
   [5, 30].map((n) => ({
@@ -323,6 +325,16 @@ const singletons: AchievementDef[] = [
     evaluate: (_s, p) => p.locationPrefecture != null,
   },
   {
+    key: "hat-trick",
+    category: "hat-trick",
+    rank: "silver",
+    section: "使いこなし",
+    title: "ハットトリック",
+    description: "1日にWeb・メール・Botの3経路すべてから投稿しました",
+    icon: "SoccerBall",
+    evaluate: (s) => s.distinctSourcesToday >= 3,
+  },
+  {
     key: "local-only",
     category: "local-only",
     rank: "silver",
@@ -423,6 +435,7 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
     title: "使いこなし",
     blocks: [
       { kind: "single", key: "custom-options" },
+      { kind: "single", key: "hat-trick" },
       { kind: "single", key: "local-only" },
       { kind: "ladder", ladderKey: "feature:neon" },
       { kind: "ladder", ladderKey: "feature:stamp" },
