@@ -44,7 +44,7 @@ export default async function SpecPage() {
             </div>
 
             <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-3">テキストの処理</p>
+              <p className="font-medium mb-3">テキストの合成処理</p>
               <div className="space-y-3">
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">フォントの種類</p>
@@ -69,19 +69,78 @@ export default async function SpecPage() {
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">フォントサイズ</p>
                   <p className="text-sm text-muted-foreground">
-                    画像のサイズに応じて自動計算されます。画像の短辺の画像幅に16文字納まる文字サイズを基準（中）として計算しています。
+                    画像のサイズに応じて自動計算されます。画像の短辺の画像幅に16文字納まる文字サイズを基準（中）として計算します。
                   </p>
                 </div>
               </div>
             </div>
 
             <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-2">その他の画像処理</p>
+              <p className="font-medium mb-2">画像処理</p>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                <li>スマートフォン、特にiOSで撮影した画像は、向き（Orientation）を自動補正しています</li>
-                <li>プライバシー保護のため、GPS情報やカメラ情報などのメタデータ（EXIF）は出力画像から常に削除されます</li>
-                <li>出力は原則AVIFフォーマットとなり、高解像度画像とサムネイル画像がいずれもCloudflare R2にアップロードされます</li>
+                <li>iOSで撮影した画像は、向き（Orientation）を自動補正します</li>
+                <li>写真に含まれる撮影位置情報・撮影日時・撮影カメラ機種などのメタデータ（EXIF）は常に削除してアップロードされます</li>
+                <li>AVIF形式で高い圧縮を行います（同時に生成されるサムネイル画像はWebpです）。</li>
               </ul>
+            </div>
+
+            <div className="bg-muted rounded-lg p-4">
+              <p className="font-medium mb-3">EXIF処理</p>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  出力画像からは、撮影位置情報・撮影日時・カメラ機種などのEXIFを<strong>常に削除</strong>してから投稿・アップロードします。そのまえに、ユーザーが希望した範囲に限って、EXIFを解析し、カメラ機種・撮影場所（都道府県または市町村のみ）などをデータベースに保存することもできます。
+                </p>
+                <div className="overflow-x-auto">
+                  <p className="text-xs font-medium mb-2">サーバーに保存される内容</p>
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">投稿形式</th>
+                        <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">カメラ機種</th>
+                        <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">位置情報</th>
+                        <th className="text-left py-2 font-medium text-xs text-muted-foreground">EXIF全体</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-sm text-muted-foreground">
+                      <tr className="border-b border-border">
+                        <td className="py-2 pr-4">Web投稿</td>
+                        <td className="py-2 pr-4">希望時のみ</td>
+                        <td className="py-2 pr-4">希望時のみ</td>
+                        <td className="py-2">×</td>
+                      </tr>
+                      <tr className="border-b border-border">
+                        <td className="py-2 pr-4">Bot投稿</td>
+                        <td className="py-2 pr-4">×</td>
+                        <td className="py-2 pr-4">×</td>
+                        <td className="py-2">×</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2 pr-4">メール投稿</td>
+                        <td className="py-2 pr-4">希望時のみ</td>
+                        <td className="py-2 pr-4">希望時のみ</td>
+                        <td className="py-2">×</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div>
+                  <p className="text-xs font-medium mb-1">解析方法</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li><strong>Web投稿</strong>: 画像を選択した時点で、お使いのブラウザ上でEXIF解析を行います。</li>
+                    <li><strong>Bot投稿</strong>: Fediverseサーバー投稿時にEXIFは通常除去されてしまうため、解析を行いません。</li>
+                    <li><strong>メール投稿</strong>: EXIFを付与したまま送信されていれば、サーバー側で元画像のEXIF解析を行います。</li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-xs font-medium mb-1">位置情報の変換</p>
+                  <p>位置情報を含む選択肢を選んだ場合のみ、SHAMEZOサーバーから国土地理院（GSI）の逆ジオコーディングAPIにGPS座標を送信し、市区町村コードを取得して保存します。
+                     Web投稿ではGPS座標をブラウザからSHAMEZOサーバーへ一度送信し、市区町村コードに変換します（この場合でも、GPS座標そのものはサーバーには保存されません）。</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium mb-1">ブラウザ仕様</p>
+                  <p>スマートフォンのプライバシー保護機能により、Web投稿の場合にGPS情報が自動的に除去される場合があります。iOSでアップロードする場合はGPS情報の送信を許可してください。Androidでアップロードする場合、機種によっては「タップして写真を撮る」を使ってその場で撮影することでGPS情報付きでアップロードできる場合があります。</p>
+                </div>
+              </div>
             </div>
 
             <div className="bg-muted rounded-lg p-4">
@@ -139,53 +198,37 @@ export default async function SpecPage() {
             </div>            
 
             <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-3">撮影情報（EXIF）の取り扱い</p>
-              <div className="space-y-3 text-sm text-muted-foreground">
-                <p>
-                  Web投稿画面では、画像を選択した時点でブラウザ上でEXIFを解析します。出力画像からは常にEXIFを削除しますが、投稿時にユーザーが選択した範囲に限り、カメラ機種・撮影場所（都道府県または市町村のみ）をサービスのデータベースに保存します。
-                </p>
-                <div>
-                  <p className="text-xs font-medium mb-1">位置情報の解析</p>
-                  <p>GPS緯度経度は<strong>サービスには保存しません</strong>。位置情報を含む選択肢を選んだ場合のみ、国土地理院（GSI）の逆ジオコーディングAPIにGPS座標を送信し、市区町村コードを取得して都道府県名・市区町村名に変換して保存します。</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium mb-1">投稿後の削除</p>
-                  <p>保存した撮影場所は、投稿者本人が画像詳細ページから単独で削除できます（カメラ機種はあとから削除できません）。</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium mb-1">iOSからの投稿</p>
-                  <p>iOSのプライバシー保護により、Safari/Chromeなど全ブラウザで写真ピッカーから渡される画像はGPS情報が自動的に除去される場合があります。iPhone/iPadで直接アップロードする場合はGPS情報の送信を許可してください。</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium mb-1">メール投稿</p>
-                  <p>メール投稿では、サーバー側で元画像のEXIFを解析します。カメラ機種は、メニューの初期設定で「機種名を表示」にしているか、件名に「カメラ」と入力した場合に保存します（「カメラなし」で無効化）。撮影場所は、件名に「都道府県」または「市町村」と入力した場合のみ、GPS座標から逆ジオコーディングして保存します（GPS座標自体は保存しません）。</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium mb-1">Bot投稿</p>
-                  <p>メンション（Bot）投稿では、画像が一度Fediverseサーバーを経由する際にEXIFが除去されるため、撮影情報は解析できません。</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">お気に入り</p>
               <p className="text-sm text-muted-foreground">
-                Mastodonサーバーでのお気に入りとSHAMEZOのお気に入りは同期します。Mastodonサーバーでのお気に入り情報が元データとなっており、SHAMEZO側からは定期的に情報を取得して同期しています。SHAMEZO側でお気に入り登録をした場合は、バックエンドでMastodonサーバーにお気に入り登録リクエストを送信しています。投稿直後は頻繁に同期されますが、1日以上前の投稿はあまり同期されません。そのため、最新の情報ではない可能性があります。
+                Fediverse上（Mastodonサーバー・Misskeyサーバー）上でのお気に入りとSHAMEZOのお気に入りは自動で同期されます。
               </p>
+              <ul className="mt-4 list-disc list-inside text-sm text-muted-foreground space-y-1">
+                  <li>Fediverse上の情報が元データです</li>
+                  <li>SHAMEZO側から定期的に情報を取得し同期します（投稿直後はより頻繁に同期されます）</li>
+                  <li>Fediverse上でお気に入り登録した場合、SHAMEZO側にも表示されますが、若干のタイムラグがあります</li>
+                  <li>SHAMEZO上でお気に入り登録した場合、即座にFediverse上に反映されます</li>
+              </ul>
             </div>
 
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">皆勤賞</p>
               <p className="text-sm text-muted-foreground">
-                皆勤賞は、SHAMEZOにおける最も栄誉のある実績です。その月に毎日投稿することで獲得でき、毎月獲得できます。皆勤賞はユーザーページのカレンダータブおよび実績タブで誰でも確認できます。なお、皆勤賞には穴埋め制度があり、投稿できなかった日が月4日までであれば、別の日に2枚投稿することでその日の穴埋めをすることができます。
+                皆勤賞は、SHAMEZOにおける最も栄誉のある実績です。
               </p>
+                <ul className="mt-4 list-disc list-inside text-sm text-muted-foreground space-y-1">
+                  <li>その月に毎日投稿することで獲得できます</li>
+                  <li>1日の基準は日本標準時間の0:00~23:59です</li>
+                  <li>投稿できなかった日が月4日以下であれば救済措置があり、同月別日に2枚以上投稿すると、投稿できなかった日の穴埋めとして処理されます</li>
+                  <li>皆勤賞はユーザー画面のカレンダータブ・実績タブで公開され、誰でも確認できます</li>
+                  <li>皆勤賞は月ごとに計算されるため、毎月獲得することができます</li>
+                </ul>
             </div>            
 
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">地図機能</p>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                 <li>ユーザーページに「地図」タブを追加し、都道府県別の投稿数をヒートマップ表示する機能です</li>
-                <li>メニューで「地図を公開する」をオンにしたユーザーのみ公開されます（オフの場合は本人のみ閲覧可能となっています）</li>
+                <li>メニューで「地図を公開する」をオンにしたユーザーのみ公開されます（オフの場合は本人のみ閲覧可能）</li>
                 <li>位置情報を含めて投稿した画像のみが集計対象です</li>
               </ul>
             </div>
