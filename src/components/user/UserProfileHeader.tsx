@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Images, Calendar, Map as MapIcon, Trophy, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
+import { AttendanceCrown } from "@/components/user/AttendanceCrown";
 
 interface Tab {
   key: "photos" | "calendar" | "map" | "achievements";
@@ -28,6 +29,8 @@ interface UserProfileHeaderProps {
   goldCount?: number;
   silverCount?: number;
   streak?: number;
+  /** 直近（先月/今月）の皆勤賞を獲得していればアバターに王冠を表示 */
+  perfectAttendance?: boolean;
   activeTab: "photos" | "calendar" | "map" | "achievements";
 }
 
@@ -37,6 +40,7 @@ export function UserProfileHeader({
   goldCount = 0,
   silverCount = 0,
   streak = 0,
+  perfectAttendance = false,
   activeTab,
 }: UserProfileHeaderProps) {
   // 地図タブは常に表示（オプトイン未済でも表示し、遷移先で公開設定の有無に応じた案内を出す）
@@ -72,14 +76,17 @@ export function UserProfileHeader({
       {/* ユーザー情報 */}
       <div className="flex items-start gap-3 mb-2">
         {user.avatarUrl && (
-          <Link href={`/u/${user.username}`}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={user.avatarUrl}
-              alt={user.displayName || user.username}
-              className="w-12 h-12 rounded-full hover:opacity-80 transition-opacity"
-            />
-          </Link>
+          <div className="relative shrink-0">
+            <Link href={`/u/${user.username}`}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={user.avatarUrl}
+                alt={user.displayName || user.username}
+                className="w-12 h-12 rounded-full hover:opacity-80 transition-opacity"
+              />
+            </Link>
+            {perfectAttendance && <AttendanceCrown />}
+          </div>
         )}
         <div className="flex-1 min-w-0">
           <h1 className="text-base font-bold truncate leading-tight">

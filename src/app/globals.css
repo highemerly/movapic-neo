@@ -149,6 +149,22 @@
   .animate-banner-shine {
     animation: banner-shine 2.8s ease-in-out infinite;
   }
+  /* 皆勤賞の王冠バッジ（金色のグロー＋ゆらぎ） */
+  .animate-crown-glow {
+    animation: crown-glow 2s ease-in-out infinite;
+  }
+}
+
+@keyframes crown-glow {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  50% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(1.3);
+  }
 }
 
 @keyframes trophy-pop {

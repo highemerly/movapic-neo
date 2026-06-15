@@ -8,6 +8,8 @@ import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { AchievementsView } from "@/components/achievements/AchievementsView";
 import { countRanks } from "@/lib/achievements/catalog";
+import { perfectMonthKey } from "@/lib/achievements/perfectMonth";
+import { lastMonthYm, thisMonthYm } from "@/lib/achievements/lastMonthPerfect";
 import { collectLadderValues } from "@/lib/achievements/stats";
 import { calculateStreak } from "@/lib/streak";
 
@@ -59,6 +61,13 @@ export default async function AchievementsPage({ params }: AchievementsPageProps
   }));
   const ranks = countRanks(achievements);
 
+  // 直近（先月/今月）の皆勤賞を取っていればアバターに王冠を表示（取得済みデータから判定）
+  const recentPerfectKeys = new Set([
+    perfectMonthKey(lastMonthYm()),
+    perfectMonthKey(thisMonthYm()),
+  ]);
+  const perfectAttendance = achievements.some((a) => recentPerfectKeys.has(a.key));
+
   return (
     <>
       <SiteHeader
@@ -82,6 +91,7 @@ export default async function AchievementsPage({ params }: AchievementsPageProps
           goldCount={ranks.gold}
           silverCount={ranks.silver}
           streak={streak}
+          perfectAttendance={perfectAttendance}
           activeTab="achievements"
         />
 

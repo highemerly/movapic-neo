@@ -17,6 +17,8 @@ import { LocationMapToggle } from "./LocationMapToggle";
 import { DisplayModeSelector } from "./DisplayModeSelector";
 import prisma from "@/lib/db";
 import { getUserProfileStats } from "@/lib/userStats";
+import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
+import { AttendanceCrown } from "@/components/user/AttendanceCrown";
 import {
   Position,
   FontFamily,
@@ -37,7 +39,7 @@ export default async function DashboardPage() {
 
   // ユーザーのデフォルト設定、bio、統計情報を取得
   // 投稿数・連続投稿・都道府県数・実績数はユーザーページの各タブと共通の集計（getUserProfileStats）
-  const [userWithPreferences, profileStats, favoritesAgg, topFavoriteImage, recentPublicImages] = await Promise.all([
+  const [userWithPreferences, profileStats, favoritesAgg, topFavoriteImage, recentPublicImages, perfectAttendance] = await Promise.all([
     prisma.user.findUnique({
       where: { id: user.id },
       select: {
@@ -83,6 +85,7 @@ export default async function DashboardPage() {
         user: { select: { username: true } },
       },
     }),
+    hasRecentPerfectAttendance(user.id),
   ]);
 
   const totalFavorites = favoritesAgg._sum.favoriteCount ?? 0;
@@ -200,14 +203,17 @@ export default async function DashboardPage() {
             />
             <div className="flex items-center gap-4 pr-20">
               {user.avatarUrl && (
-                <Link href={`/u/${user.username}`} className="flex-shrink-0">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={getAvatarUrl(user.avatarUrl) ?? user.avatarUrl}
-                    alt={user.displayName || user.username}
-                    className="w-12 h-12 rounded-full hover:opacity-80 transition-opacity"
-                  />
-                </Link>
+                <div className="relative flex-shrink-0">
+                  <Link href={`/u/${user.username}`} className="block">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={getAvatarUrl(user.avatarUrl) ?? user.avatarUrl}
+                      alt={user.displayName || user.username}
+                      className="w-12 h-12 rounded-full hover:opacity-80 transition-opacity"
+                    />
+                  </Link>
+                  {perfectAttendance && <AttendanceCrown />}
+                </div>
               )}
               <div className="flex-1 min-w-0">
                 <p className="font-medium truncate">

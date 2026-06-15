@@ -25,6 +25,8 @@ import { PostSuccessToast } from "./PostSuccessToast";
 import { AchievementCelebration } from "./AchievementCelebration";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import { resolveAchievement } from "@/lib/achievements/catalog";
+import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
+import { AttendanceCrown } from "@/components/user/AttendanceCrown";
 import { User, CalendarDays, Map as MapIcon } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -129,6 +131,9 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   if (image.user.username !== username) {
     notFound();
   }
+
+  // 投稿者が直近（先月/今月）の皆勤賞を取っていればアバターに王冠を表示
+  const posterPerfectAttendance = await hasRecentPerfectAttendance(image.user.id);
 
   // Mastodonお気に入りキャッシュから初期表示データを算出
   // お気に入り可能 = Mastodonのstatusが存在する投稿のみ（local投稿・Misskeyは対象外）
@@ -367,17 +372,24 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           />
         </div>
 
-        {/* 投稿者情報 */}
-        <div className="flex items-center gap-2 mt-4 p-3 bg-muted rounded-lg">
+        {/* 投稿者情報（王冠が頭上に出るぶん、王冠ありのときだけ上パディングを確保） */}
+        <div
+          className={`flex items-center gap-2 mt-4 px-3 pb-3 bg-muted rounded-lg ${
+            posterPerfectAttendance ? "pt-5" : "pt-3"
+          }`}
+        >
           {image.user.avatarUrl && (
-            <Link href={`/u/${username}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={getAvatarUrl(image.user.avatarUrl) ?? image.user.avatarUrl}
-                alt={image.user.displayName || image.user.username}
-                className="w-10 h-10 rounded-full hover:opacity-80 transition-opacity"
-              />
-            </Link>
+            <div className="relative shrink-0">
+              <Link href={`/u/${username}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={getAvatarUrl(image.user.avatarUrl) ?? image.user.avatarUrl}
+                  alt={image.user.displayName || image.user.username}
+                  className="w-10 h-10 rounded-full hover:opacity-80 transition-opacity"
+                />
+              </Link>
+              {posterPerfectAttendance && <AttendanceCrown />}
+            </div>
           )}
           <div className="flex-1 min-w-0">
             <Link
