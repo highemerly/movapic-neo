@@ -9,12 +9,11 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { toJstDateString } from "@/lib/streak";
 import {
-  PERFECT_MONTH_GRACE,
+  computeMakeups,
+  currentMonthMakeupStatus,
   daysInMonthOf,
-  filledHoleDays,
-  perfectMonthProgress,
-  shouldRemindMakeup,
-  summarizeDayCounts,
+  isPerfectMonth,
+  type MakeupMatch,
 } from "@/lib/achievements/perfectMonth";
 
 interface DayData {
@@ -27,26 +26,29 @@ interface DayData {
   };
 }
 
+/** 穴埋め済みの空き日（後日のダブル投稿で埋まった日）。カレンダーで2枚目サムネ＋緑表示にする。 */
+interface FilledDay {
+  /** 埋められた空き日(1-31)。 */
+  day: number;
+  /** その穴を埋めた（ダブル投稿した）日(1-31)。 */
+  filledBy: number;
+  /** filledBy 日に「2枚目に投稿した写真」（穴埋めの決め手）。サムネ＋リンク先に使う。 */
+  image: { id: string; thumbnailKey: string | null; storageKey: string };
+}
+
 /** 皆勤賞の達成状況・穴埋め進捗（UIの👑とコールアウト表示に使う）。未来月では null。 */
 interface PerfectMonthInfo {
   achieved: boolean;
-  daysInMonth: number;
-  postedDays: number;
-  /** ダブル投稿した日数（穴埋めストック）。 */
-  makeupBank: number;
-  /** 未投稿の許容日数（= PERFECT_MONTH_GRACE）。 */
-  allowance: number;
   isCurrentMonth: boolean;
-  /** 当月のみ: 今日より前の未投稿日数。過去月は null。 */
-  skippedSoFar: number | null;
-  /** 当月のみ: まだ埋まっていない穴の数。過去月は null。 */
-  shortfall: number | null;
-  /** 当月のみ: まだ皆勤賞に手が届くか。過去月は null。 */
-  stillAchievable: boolean | null;
-  /** 当月のみ: 穴埋めを促す注意書きを出すべきか（穴埋め可能 かつ 過ぎた未投稿が上限以内）。 */
-  shouldRemind: boolean;
-  /** ダブル投稿で「埋まった空き日」(1-31)。カレンダーで穴埋め済み表示にする。 */
-  filledDays: number[];
+  /**
+   * 当月の穴埋めコールアウト種別。
+   * - "today": 未埋めの穴があり、今日まだ穴埋めしていない（本日2枚投稿で埋められる）
+   * - "tomorrow": 今日は穴埋め済みだが穴が残り、翌日以降に埋められる
+   * - null: 表示しない（穴なし／皆勤不能／月末で埋める後日なし）
+   */
+  callout: "today" | "tomorrow" | null;
+  /** 後日のダブル投稿で「埋まった空き日」。カレンダーで穴埋め済み表示にする。 */
+  filledDays: FilledDay[];
 }
 
 interface CalendarResponse {
@@ -126,6 +128,8 @@ export async function GET(
 
     // 日付ごとにグループ化
     const days: Record<number, DayData> = {};
+    // 日(1-31) -> その日の画像（createdAt 降順＝新しい順。穴埋めの「2枚目」抽出に使う）
+    const dayImages = new Map<number, { id: string; thumbnailKey: string | null; storageKey: string }[]>();
 
     for (const image of images) {
       // JSTに変換して日付を取得
@@ -146,6 +150,13 @@ export async function GET(
         days[day].count++;
         // 最新の画像は既にorderByで先頭に来ているので更新不要
       }
+
+      if (!dayImages.has(day)) dayImages.set(day, []);
+      dayImages.get(day)!.push({
+        id: image.id,
+        thumbnailKey: image.thumbnailKey,
+        storageKey: image.storageKey,
+      });
     }
 
     // 前月に投稿があるかチェック
@@ -196,39 +207,39 @@ export async function GET(
 
     if (!isFutureMonth) {
       const daysInMonth = daysInMonthOf(year, month);
-      const { distinctDays, doubleDays } = summarizeDayCounts(
-        Object.values(days).map((d) => d.count)
-      );
+      // 日(1-31)→投稿数。穴埋めの日付順マッチング・達成判定の単一ソースに渡す。
+      const dayCounts: Record<number, number> = {};
+      for (const [dayStr, d] of Object.entries(days)) dayCounts[Number(dayStr)] = d.count;
+      const count = (d: number) => dayCounts[d] ?? 0;
 
-      // 投稿のあった日(1-31)の集合。当月は「今日より前の未投稿」を厳密に数えるため今日(JST)も渡す。
-      const postedDayNums = new Set(Object.keys(days).map(Number));
-      const todayDayNum = isCurrentMonth
-        ? Number(toJstDateString(now).slice(8, 10))
-        : undefined;
+      isPerfectAttendance = isPerfectMonth({ daysInMonth, dayCounts });
 
-      const progress = perfectMonthProgress({
-        daysInMonth,
-        distinctDays,
-        doubleDays,
-        postedDayNums: isCurrentMonth ? postedDayNums : undefined,
-        todayDayNum,
-      });
-      isPerfectAttendance = progress.achieved;
-      perfectMonth = {
-        achieved: progress.achieved,
-        daysInMonth,
-        postedDays: distinctDays,
-        makeupBank: progress.makeupBank,
-        allowance: PERFECT_MONTH_GRACE,
-        isCurrentMonth,
-        skippedSoFar: progress.skippedSoFar,
-        shortfall: progress.shortfall,
-        stillAchievable: progress.stillAchievable,
-        shouldRemind:
-          progress.skippedSoFar != null &&
-          shouldRemindMakeup(progress.skippedSoFar, progress.makeupBank),
-        filledDays: filledHoleDays({ daysInMonth, postedDayNums, doubleDays, todayDayNum }),
-      };
+      // 穴埋め対応（古い穴 ← 後日のダブル）。当月は今日まで、過去月は月末まで。
+      let matches: MakeupMatch[];
+      let callout: "today" | "tomorrow" | null = null;
+      if (isCurrentMonth) {
+        const todayDayNum = Number(toJstDateString(now).slice(8, 10));
+        const status = currentMonthMakeupStatus({ daysInMonth, todayDayNum, dayCounts });
+        matches = status.matches;
+        // コールアウトは「まだ皆勤に届く範囲で、未埋めの穴が残る」ときだけ。
+        if (status.unfilled > 0 && status.stillAchievable) {
+          if (!status.todayUsedMakeup) callout = "today";
+          else if (todayDayNum < daysInMonth) callout = "tomorrow";
+        }
+      } else {
+        matches = computeMakeups({ lastDay: daysInMonth, holeLastDay: daysInMonth, count });
+      }
+
+      // 各穴埋めに、埋めた日の「2枚目に投稿した写真」を添える（dayImages は新しい順なので末尾-1）。
+      const filledDays: FilledDay[] = [];
+      for (const m of matches) {
+        const imgs = dayImages.get(m.filledBy);
+        if (!imgs || imgs.length < 2) continue;
+        const second = imgs[imgs.length - 2]; // 時系列で2枚目に投稿した写真
+        filledDays.push({ day: m.holeDay, filledBy: m.filledBy, image: second });
+      }
+
+      perfectMonth = { achieved: isPerfectAttendance, isCurrentMonth, callout, filledDays };
     }
 
     const response: CalendarResponse = {

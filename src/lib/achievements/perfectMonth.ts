@@ -1,9 +1,12 @@
 /**
  * 皆勤賞ロジックの単一ソース（しきい値・判定式・進捗・穴埋め通知ゲートを集約）。
  *
- * 「皆勤賞」は『未投稿を PERFECT_MONTH_GRACE 日まで許容し、その分を同月の別日に
- * 2枚以上投稿（＝ダブル投稿）して穴埋めできる』制度。判定の中核を1箇所に集め、
- * live(stats/engine) / backfill / カレンダーAPI / 穴埋め通知 の4経路がすべてここを呼ぶ。
+ * 「皆勤賞」は『未投稿を PERFECT_MONTH_GRACE 日まで許容し、その分を同月の "後日" に
+ * 2枚以上投稿（＝ダブル投稿）して穴埋めできる』制度。穴埋めは「忘れた過去日」を
+ * 「それより後の日のダブル投稿」で埋めるもので、ダブル投稿日 D は D より前の未投稿日のみ
+ * 埋められる（将来日は埋められない＝月末日を忘れると後日が無く埋まらない）。1日のダブルは
+ * 1日分のみ埋める。判定の中核を1箇所に集め、live(stats/engine) / backfill / カレンダーAPI /
+ * 穴埋め通知 の4経路がすべてここを呼ぶ。
  *
  * catalog.ts と同じく「サーバー/クライアント両方から import されうる」ため、
  * React・サーバー専用 API を import しないこと（型・純粋関数のみ）。
@@ -46,100 +49,131 @@ export function summarizeDayCounts(counts: Iterable<number>): {
   return { distinctDays, doubleDays };
 }
 
-/**
- * 皆勤賞の達成判定（純粋）。
- * missing(= daysInMonth - distinctDays) が GRACE 以内で、かつダブル投稿した日数(doubleDays)が
- * その未投稿日数以上（＝穴を埋め切っている）なら達成。
- * distinctDays === daysInMonth（完全皆勤）なら missing=0 で常に成立（従来達成者と後方互換）。
- */
-export function isPerfectMonth(
-  daysInMonth: number,
-  distinctDays: number,
-  doubleDays: number
-): boolean {
-  const missing = daysInMonth - distinctDays;
-  return missing >= 0 && missing <= PERFECT_MONTH_GRACE && doubleDays >= missing;
+/** 日(1-31) → その日の投稿数。投稿のない日はキー無し（0扱い）でよい。 */
+export type DayCounts = Record<number, number> | ReadonlyMap<number, number>;
+
+/** DayCounts を「日→投稿数」の関数に正規化する。 */
+function toCountFn(dayCounts: DayCounts): (day: number) => number {
+  if (dayCounts instanceof Map) return (d) => dayCounts.get(d) ?? 0;
+  const rec = dayCounts as Record<number, number>;
+  return (d) => rec[d] ?? 0;
 }
 
-export interface PerfectMonthProgress {
-  /** その月の皆勤賞を達成しているか（穴埋め込み）。 */
-  achieved: boolean;
-  /** 月全体の未投稿日数（達成判定基準。当月は未来日も含む）。 */
-  missing: number;
-  /** ダブル投稿した日数（＝穴埋めストック）。 */
-  makeupBank: number;
-  /** 当月のみ: 今日より前の未投稿日数。過去/未来月の判定では null。 */
-  skippedSoFar: number | null;
-  /** 当月のみ: まだ埋まっていない穴の数 max(0, skippedSoFar - makeupBank)。 */
-  shortfall: number | null;
-  /** 当月のみ: まだ皆勤賞に手が届く範囲か（skippedSoFar <= GRACE）。 */
-  stillAchievable: boolean | null;
+/** distinct（1枚以上投稿した日数）を数える。 */
+function countDistinct(count: (day: number) => number, daysInMonth: number): number {
+  let n = 0;
+  for (let d = 1; d <= daysInMonth; d++) if (count(d) >= 1) n++;
+  return n;
+}
+
+/** 穴埋めの対応（どの空き日が、どの日のダブル投稿で埋まったか）。 */
+export interface MakeupMatch {
+  /** 埋められた空き日(1-31)。 */
+  holeDay: number;
+  /** その穴を埋めたダブル投稿の日(1-31)。holeDay より必ず後（filledBy > holeDay）。 */
+  filledBy: number;
 }
 
 /**
- * 達成判定＋（当月なら）進捗を返す。カレンダーAPI・通知で共用。
- * 当月の skippedSoFar は postedDayNums と todayDayNum から「今日より前の未投稿」を厳密に数える。
+ * ダブル投稿による穴埋めのマッチングを計算（純粋）。
+ * 日 1..lastDay を時系列に走査し、未投稿日(=0枚, d<=holeLastDay)を pending hole に積み、
+ * ダブル投稿日(>=2枚)で「最も古い pending hole（必ずその日より前）」を1つ消費して対応づける。
+ * ＝各ダブルは自分より前の未投稿日を1つだけ埋める（将来日は埋められない）。
+ * 最古優先の貪欲法で最大マッチング。返り値は対応の配列（holeDay 昇順）。
+ *
+ * - 月全体の判定: holeLastDay = lastDay = daysInMonth。
+ * - 当月の表示: lastDay = 今日, holeLastDay = 今日-1（今日はまだ穴ではないが、今日のダブルで
+ *   過去の穴を埋められるので lastDay には含める）。
  */
-export function perfectMonthProgress(args: {
-  daysInMonth: number;
-  distinctDays: number;
-  doubleDays: number;
-  /** 当月のみ指定: 投稿があった「日(1-31)」の集合。 */
-  postedDayNums?: Set<number>;
-  /** 当月のみ指定: JSTの今日の日(1-31)。指定があると当月扱いで skippedSoFar 等を計算。 */
-  todayDayNum?: number;
-}): PerfectMonthProgress {
-  const { daysInMonth, distinctDays, doubleDays, postedDayNums, todayDayNum } = args;
-  const missing = daysInMonth - distinctDays;
-  const achieved = isPerfectMonth(daysInMonth, distinctDays, doubleDays);
-
-  let skippedSoFar: number | null = null;
-  let shortfall: number | null = null;
-  let stillAchievable: boolean | null = null;
-
-  if (todayDayNum != null && postedDayNums) {
-    let s = 0;
-    for (let d = 1; d < todayDayNum; d++) {
-      if (!postedDayNums.has(d)) s++;
+export function computeMakeups(args: {
+  lastDay: number;
+  holeLastDay: number;
+  count: (day: number) => number;
+}): MakeupMatch[] {
+  const { lastDay, holeLastDay, count } = args;
+  const pending: number[] = []; // 未割当の穴（古い順）
+  const matches: MakeupMatch[] = [];
+  for (let d = 1; d <= lastDay; d++) {
+    const c = count(d);
+    if (c === 0) {
+      if (d <= holeLastDay) pending.push(d);
+    } else if (c >= 2) {
+      const hole = pending.shift();
+      if (hole !== undefined) matches.push({ holeDay: hole, filledBy: d });
     }
-    skippedSoFar = s;
-    shortfall = Math.max(0, s - doubleDays);
-    stillAchievable = s <= PERFECT_MONTH_GRACE;
   }
-
-  return { achieved, missing, makeupBank: doubleDays, skippedSoFar, shortfall, stillAchievable };
+  return matches;
 }
 
 /**
- * ダブル投稿（穴埋めストック）によって「埋まった空き日」を返す（純粋）。
- * ストック数(doubleDays)ぶんだけ、古い穴（投稿のない日）から順に埋める。
- * 当月は todayDayNum を渡し、今日以降の空き日（まだ穴ではない）は対象外にする。
- * 返り値はカレンダーで「穴埋め済み」表示にする日(1-31)の配列（昇順）。
+ * 皆勤賞の達成判定（純粋・日付対応）。
+ * missing(= daysInMonth - distinctDays) が GRACE 以内で、かつ全ての未投稿日が
+ * 「後日のダブル投稿」で埋まり切っている（穴埋めマッチ数 >= missing）なら達成。
+ * missing=0（完全皆勤）は常に成立（従来達成者と後方互換）。
+ * 月末日を忘れた場合は埋める後日が無いので不成立になる（新ルールの意図どおり）。
  */
-export function filledHoleDays(args: {
+export function isPerfectMonth(args: {
   daysInMonth: number;
-  postedDayNums: Set<number>;
-  doubleDays: number;
-  todayDayNum?: number;
-}): number[] {
-  const { daysInMonth, postedDayNums, doubleDays, todayDayNum } = args;
-  if (doubleDays <= 0) return [];
-  const limit = todayDayNum != null ? todayDayNum - 1 : daysInMonth; // 当月は過ぎた日まで
-  const holes: number[] = [];
-  for (let d = 1; d <= limit; d++) {
-    if (!postedDayNums.has(d)) holes.push(d);
-  }
-  return holes.slice(0, doubleDays);
+  dayCounts: DayCounts;
+}): boolean {
+  const { daysInMonth } = args;
+  const count = toCountFn(args.dayCounts);
+  const distinctDays = countDistinct(count, daysInMonth);
+  const missing = daysInMonth - distinctDays;
+  if (missing < 0 || missing > PERFECT_MONTH_GRACE) return false;
+  if (missing === 0) return true;
+  const fills = computeMakeups({ lastDay: daysInMonth, holeLastDay: daysInMonth, count }).length;
+  return fills >= missing;
+}
+
+/** 当月の穴埋め進捗（カレンダーのコールアウト・通知ゲートで共用）。 */
+export interface CurrentMonthMakeupStatus {
+  /** 今日時点で確定した穴埋め対応（古い穴 ← 後日のダブル）。 */
+  matches: MakeupMatch[];
+  /** 今日より前の未投稿日数。 */
+  skippedSoFar: number;
+  /** まだ埋まっていない（対応のつかない）過去の穴の数。 */
+  unfilled: number;
+  /** 今日すでにダブル投稿しているか（count(today) >= 2 ＝ 今日の穴埋め枠を使用済み）。 */
+  todayUsedMakeup: boolean;
+  /** まだ皆勤賞に手が届く範囲か（skippedSoFar <= GRACE）。 */
+  stillAchievable: boolean;
+}
+
+/**
+ * 当月の穴埋め状況を計算（純粋）。todayDayNum は JST の今日の日(1-31)。
+ * matches は「今日まで（今日のダブルを含む）」で、穴は「今日より前」だけを対象にする。
+ */
+export function currentMonthMakeupStatus(args: {
+  daysInMonth: number;
+  todayDayNum: number;
+  dayCounts: DayCounts;
+}): CurrentMonthMakeupStatus {
+  const { todayDayNum } = args;
+  const count = toCountFn(args.dayCounts);
+  const matches = computeMakeups({
+    lastDay: todayDayNum,
+    holeLastDay: todayDayNum - 1,
+    count,
+  });
+  let skippedSoFar = 0;
+  for (let d = 1; d < todayDayNum; d++) if (count(d) === 0) skippedSoFar++;
+  return {
+    matches,
+    skippedSoFar,
+    unfilled: skippedSoFar - matches.length,
+    todayUsedMakeup: count(todayDayNum) >= 2,
+    stillAchievable: skippedSoFar <= PERFECT_MONTH_GRACE,
+  };
 }
 
 /**
  * 穴埋め推奨通知を送るべきか（純粋）。
  * - 1日以上の未投稿がある（skippedSoFar >= 1）
- * - まだ埋まっていない穴がある（shortfall > 0）
+ * - まだ埋まっていない穴がある（unfilled > 0）
  * - 穴が多すぎない（skippedSoFar <= MAKEUP_REMINDER_MAX_SKIPPED）
  * 「今日投稿した」「同月内で未送信」の条件は呼び出し側で担保する。
  */
-export function shouldRemindMakeup(skippedSoFar: number, makeupBank: number): boolean {
-  const shortfall = skippedSoFar - makeupBank;
-  return skippedSoFar >= 1 && shortfall > 0 && skippedSoFar <= MAKEUP_REMINDER_MAX_SKIPPED;
+export function shouldRemindMakeup(skippedSoFar: number, unfilled: number): boolean {
+  return skippedSoFar >= 1 && unfilled > 0 && skippedSoFar <= MAKEUP_REMINDER_MAX_SKIPPED;
 }

@@ -90,10 +90,11 @@ function replayUser(userId: string, images: ReplayImage[]): GrantRow[] {
   const dayCounts = new Map<string, number>();
   // JST日 -> その日に使った source の集合（ハットトリック判定）
   const daySources = new Map<string, Set<string>>();
-  // ym -> (JST日 -> その日の投稿数)。distinct日数 / ダブル投稿日数（穴埋め）の両方をここから出す。
+  // ym -> (JST日 -> その日の投稿数)。distinct日数 / 穴埋めの日付順マッチングをここから出す。
   const monthDayCounts = new Map<string, Map<string, number>>();
   const featureCounts = { neon: 0, stamp: 0, xlarge: 0, vertical: 0 };
   const fonts = new Set<string>();
+  const colors = new Set<string>();
   const cameras = new Set<string>();
   const prefectures = new Set<string>();
   let hasEmailPost = false;
@@ -118,20 +119,27 @@ function replayUser(userId: string, images: ReplayImage[]): GrantRow[] {
     if (img.position === "left" || img.position === "right") featureCounts.vertical += 1;
 
     fonts.add(img.font);
+    colors.add(img.color);
     if (img.cameraModel) cameras.add(img.cameraModel);
     if (img.locationPrefecture) prefectures.add(img.locationPrefecture);
     if (img.source === "email") hasEmailPost = true;
     if (img.source === "mention") hasMentionPost = true;
 
     const monthSummary = summarizeDayCounts(mdc.values());
+    // 日(1-31)→投稿数（穴埋めの日付順マッチング用。live=stats.ts と同一形式）
+    const postMonthDayCounts: Record<number, number> = {};
+    for (const [dayStr, c] of mdc) {
+      postMonthDayCounts[Number(dayStr.slice(8, 10))] = c;
+    }
     const stats: AchStats = {
       totalPosts,
       currentStreak: streakEndingAt(allDays, day),
       todayPosts: dayCounts.get(day) ?? 0,
       distinctDaysInPostMonth: monthSummary.distinctDays,
-      doubleDaysInPostMonth: monthSummary.doubleDays,
+      postMonthDayCounts,
       featureCounts: { ...featureCounts },
       distinctFonts: fonts.size,
+      distinctColors: colors.size,
       distinctCameraModels: cameras.size,
       distinctPrefectures: prefectures.size,
       hasEmailPost,

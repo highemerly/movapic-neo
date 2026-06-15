@@ -12,7 +12,7 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
   const postYm = toJstDateString(post.createdAt).slice(0, 7);
   const postDay = toJstDateString(post.createdAt);
 
-  const [dateRows, featureCounts, fontGroups, distinctGroups] = await Promise.all([
+  const [dateRows, featureCounts, fontGroups, colorGroups, distinctGroups] = await Promise.all([
     // 全投稿日（streak / today / monthly-distinct-days / 当日のsource種類 用）
     prisma.image.findMany({ where: { userId }, select: { createdAt: true, source: true } }),
     // 機能別の利用回数
@@ -24,6 +24,8 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
     ]),
     // フォントの種類数
     prisma.image.groupBy({ by: ["font"], where: { userId }, orderBy: { font: "asc" } }),
+    // 文字色の種類数
+    prisma.image.groupBy({ by: ["color"], where: { userId }, orderBy: { color: "asc" } }),
     // distinct カメラ機種 / 都道府県 / source
     prisma.$transaction([
       prisma.image.groupBy({
@@ -45,12 +47,17 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
   const [cameraGroups, prefGroups, sourceGroups] = distinctGroups;
   const sources = new Set(sourceGroups.map((g) => g.source));
 
-  // 投稿月の日別投稿数 → distinct日数 / ダブル投稿日数（皆勤賞の穴埋め判定に使用）
+  // 投稿月の日別投稿数 → distinct日数 / 日付順マッチング（皆勤賞の穴埋め判定に使用）
   const monthDayCounts = new Map<string, number>();
   for (const d of jstDays) {
     if (d.startsWith(postYm)) monthDayCounts.set(d, (monthDayCounts.get(d) ?? 0) + 1);
   }
   const monthSummary = summarizeDayCounts(monthDayCounts.values());
+  // 日(1-31)→投稿数（穴埋めの日付順マッチング用。キーは JST 日付文字列の DD 部分）
+  const postMonthDayCounts: Record<number, number> = {};
+  for (const [dayStr, c] of monthDayCounts) {
+    postMonthDayCounts[Number(dayStr.slice(8, 10))] = c;
+  }
 
   // 投稿日（JST）に使った source の種類数（ハットトリック判定）
   const sourcesToday = new Set(
@@ -62,9 +69,10 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
     currentStreak: calculateStreak(dateRows.map((r) => r.createdAt)),
     todayPosts: jstDays.filter((d) => d === postDay).length,
     distinctDaysInPostMonth: monthSummary.distinctDays,
-    doubleDaysInPostMonth: monthSummary.doubleDays,
+    postMonthDayCounts,
     featureCounts: { neon, stamp, xlarge, vertical },
     distinctFonts: fontGroups.length,
+    distinctColors: colorGroups.length,
     distinctCameraModels: cameraGroups.length,
     distinctPrefectures: prefGroups.length,
     hasEmailPost: sources.has("email"),
@@ -100,12 +108,13 @@ export async function collectLadderValues(userId: string): Promise<Record<string
         where: { userId, locationPrefecture: { not: null } },
         orderBy: { locationPrefecture: "asc" },
       }),
+      prisma.image.groupBy({ by: ["color"], where: { userId }, orderBy: { color: "asc" } }),
     ]),
   ]);
 
   const jstDays = dateRows.map((r) => toJstDateString(r.createdAt));
   const [neon, stamp, xlarge, vertical] = featureCounts;
-  const [cameraGroups, prefGroups] = distinctGroups;
+  const [cameraGroups, prefGroups, colorGroups] = distinctGroups;
 
   return {
     "post-count": dateRows.length,
@@ -117,5 +126,6 @@ export async function collectLadderValues(userId: string): Promise<Record<string
     "feature:vertical": vertical,
     cameras: cameraGroups.length,
     prefectures: prefGroups.length,
+    colors: colorGroups.length,
   };
 }

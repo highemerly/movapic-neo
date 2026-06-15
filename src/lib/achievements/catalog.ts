@@ -36,12 +36,14 @@ export interface AchStats {
   todayPosts: number;
   /** この投稿の月（JST）の、投稿があった distinct 日数 */
   distinctDaysInPostMonth: number;
-  /** この投稿の月（JST）で、2枚以上投稿した distinct 日数（皆勤賞の穴埋めストック） */
-  doubleDaysInPostMonth: number;
+  /** この投稿の月（JST）の日(1-31)→投稿数。皆勤賞の穴埋め（日付順マッチング）判定に使う。 */
+  postMonthDayCounts: Record<number, number>;
   /** 機能別の累計利用回数 */
   featureCounts: { neon: number; stamp: number; xlarge: number; vertical: number };
   /** 使ったフォントの種類数 */
   distinctFonts: number;
+  /** 使った文字色の種類数 */
+  distinctColors: number;
   /** 投稿に使ったカメラ機種の種類数 */
   distinctCameraModels: number;
   /** 位置情報付き投稿の異なる都道府県数 */
@@ -107,10 +109,11 @@ export const LADDER_META: Record<string, { label: string; unit: string }> = {
   "feature:vertical": { label: "縦書きの利用", unit: "回" },
   cameras: { label: "カメラ機種", unit: "機種" },
   prefectures: { label: "都道府県", unit: "都道府県" },
+  colors: { label: "文字色", unit: "色" },
 };
 
 // セクション（カテゴリ）表示順
-export const SECTIONS = ["デビュー", "投稿数", "使いこなし", "シークレット"] as const;
+export const SECTIONS = ["デビュー", "投稿数", "使いこなし", "期間限定", "シークレット"] as const;
 
 const cp = (s: string) => Array.from(s).length; // コードポイント長
 const jstHour = (d: Date) => new Date(d.getTime() + 9 * 60 * 60 * 1000).getUTCHours(); // JSTの時(0-23)
@@ -125,8 +128,9 @@ const POST_COUNT_TITLES: Record<number, string> = {
   100: "文字入れ師範",
   200: "文字入れの鉄人",
   300: "文字入れ仙人",
+  500: "文字入れの神",
 };
-const postCount: AchievementDef[] = [5, 10, 20, 30, 50, 100, 200, 300].map((n) => ({
+const postCount: AchievementDef[] = [5, 10, 20, 30, 50, 100, 200, 300, 500].map((n) => ({
   key: `posts:${n}`,
   category: "post-count",
   rank: n >= 100 ? "gold" : "silver",
@@ -184,15 +188,22 @@ const FEATURES: {
   f: keyof AchStats["featureCounts"];
   label: string;
   icon: string;
+  tiers: number[];
   titles: Record<number, string>;
 }[] = [
-  { f: "neon", label: "ネオン", icon: "Sparkles", titles: { 5: "ネオンの灯", 30: "ネオンマスター" } },
-  { f: "stamp", label: "ハンコ", icon: "Stamp", titles: { 5: "スタンプラリー", 30: "判子奉行" } },
-  { f: "xlarge", label: "特大文字", icon: "ALargeSmall", titles: { 5: "主張強め", 30: "特大マスター" } },
-  { f: "vertical", label: "縦書き", icon: "GalleryVerticalEnd", titles: { 5: "やっぱり縦書きだよね", 30: "書道師範" } },
+  { f: "neon", label: "ネオン", icon: "Sparkles", tiers: [5, 30], titles: { 5: "ネオンの灯", 30: "ネオンマスター" } },
+  { f: "stamp", label: "ハンコ", icon: "Stamp", tiers: [5, 30], titles: { 5: "スタンプラリー", 30: "判子奉行" } },
+  { f: "xlarge", label: "特大文字", icon: "ALargeSmall", tiers: [5, 30], titles: { 5: "主張強め", 30: "特大マスター" } },
+  {
+    f: "vertical",
+    label: "縦書き",
+    icon: "GalleryVerticalEnd",
+    tiers: [1, 5, 30, 100],
+    titles: { 1: "縦書き、はじめました", 5: "やっぱり縦書きだよね", 30: "書道師範", 100: "書聖" },
+  },
 ];
-const featureUsage: AchievementDef[] = FEATURES.flatMap(({ f, label, icon, titles }) =>
-  [5, 30].map((n) => ({
+const featureUsage: AchievementDef[] = FEATURES.flatMap(({ f, label, icon, tiers, titles }) =>
+  tiers.map((n) => ({
     key: `feature:${f}:${n}`,
     category: "feature-usage",
     rank: n >= 30 ? "gold" : "silver",
@@ -245,6 +256,24 @@ const prefectures: AchievementDef[] = [2, 5, 15, 30, 47].map((n) => ({
   evaluate: (s) => s.distinctPrefectures >= n,
 }));
 
+// --- 文字色（使った文字色の種類数） ---
+const COLOR_TITLES: Record<number, string> = {
+  4: "色とりどり",
+  8: "色彩の魔術師",
+};
+const colors: AchievementDef[] = [4, 8].map((n) => ({
+  key: `colors:${n}`,
+  category: "colors",
+  rank: n >= 8 ? "gold" : "silver",
+  section: "使いこなし",
+  ladderKey: "colors",
+  tier: n,
+  title: COLOR_TITLES[n],
+  description: `${n}色の文字色を使って投稿しました`,
+  icon: "Rainbow",
+  evaluate: (s) => s.distinctColors >= n,
+}));
+
 // --- 単発実績 ---
 const singletons: AchievementDef[] = [
   {
@@ -295,6 +324,28 @@ const singletons: AchievementDef[] = [
     evaluate: (s) => s.distinctFonts >= 3,
   },
   {
+    key: "one-char",
+    category: "one-char",
+    rank: "silver",
+    section: "シークレット",
+    secret: true,
+    title: "一文字入魂",
+    description: "たった1文字だけ入れて投稿しました",
+    icon: "Feather",
+    evaluate: (_s, p) => cp(p.overlayText) === 1,
+  },
+  {
+    key: "new-year-writing",
+    category: "new-year-writing",
+    rank: "gold",
+    section: "シークレット",
+    secret: true,
+    title: "書き初め",
+    description: "元日（1月1日）に投稿しました",
+    icon: "Brush",
+    evaluate: (_s, p) => toJstDateString(p.createdAt).slice(5) === "01-01",
+  },
+  {
     key: "first-email",
     category: "first-email",
     rank: "silver",
@@ -338,7 +389,7 @@ const singletons: AchievementDef[] = [
     key: "local-only",
     category: "local-only",
     rank: "silver",
-    section: "使いこなし",
+    section: "デビュー",
     title: "Fediverseにはナイショ",
     description: "連携サーバーへ同時投稿せず（なし）で投稿しました",
     icon: "EyeOff",
@@ -377,8 +428,7 @@ const singletons: AchievementDef[] = [
     key: "early-adopter",
     category: "early-adopter",
     rank: "gold",
-    section: "シークレット",
-    secret: true,
+    section: "期間限定",
     title: "アーリーアダプター",
     description: "サービス初期から参加している証の記念実績",
     icon: "Rocket",
@@ -393,6 +443,7 @@ export const CATALOG: AchievementDef[] = [
   ...featureUsage,
   ...cameras,
   ...prefectures,
+  ...colors,
   ...singletons,
 ];
 
@@ -420,6 +471,7 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
       { kind: "single", key: "first-location" },
       { kind: "single", key: "first-email" },
       { kind: "single", key: "first-mention" },
+      { kind: "single", key: "local-only" },
     ],
   },
   {
@@ -436,37 +488,44 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
     blocks: [
       { kind: "single", key: "custom-options" },
       { kind: "single", key: "hat-trick" },
-      { kind: "single", key: "local-only" },
       { kind: "ladder", ladderKey: "feature:neon" },
       { kind: "ladder", ladderKey: "feature:stamp" },
       { kind: "ladder", ladderKey: "feature:xlarge" },
       { kind: "ladder", ladderKey: "feature:vertical" },
       { kind: "ladder", ladderKey: "cameras" },
       { kind: "ladder", ladderKey: "prefectures" },
+      { kind: "ladder", ladderKey: "colors" },
+    ],
+  },
+  {
+    title: "期間限定",
+    blocks: [
+      { kind: "single", key: "early-adopter" },
     ],
   },
   {
     title: "シークレット",
     blocks: [
       { kind: "single", key: "long-text" },
+      { kind: "single", key: "one-char" },
       { kind: "single", key: "all-fonts" },
+      { kind: "single", key: "new-year-writing" },
       { kind: "single", key: "early-bird" },
       { kind: "single", key: "night-owl" },
-      { kind: "single", key: "early-adopter" },
     ],
   },
 ];
 
 /**
  * 皆勤賞（動的キー）。判定式は perfectMonth.ts の isPerfectMonth に集約。
- * 未投稿を GRACE 日まで許容し、その分をダブル投稿（doubleDaysInPostMonth）で穴埋めできる。
+ * 未投稿を GRACE 日まで許容し、その分を「後日のダブル投稿」で穴埋めできる（日付順マッチング）。
  */
 export function evaluatePerfectMonth(s: AchStats, post: PostFacts): string | null {
   const ym = toJstDateString(post.createdAt).slice(0, 7); // "2026-06"
   const year = Number(ym.slice(0, 4));
   const month = Number(ym.slice(5, 7));
   const daysInMonth = daysInMonthOf(year, month);
-  return isPerfectMonth(daysInMonth, s.distinctDaysInPostMonth, s.doubleDaysInPostMonth)
+  return isPerfectMonth({ daysInMonth, dayCounts: s.postMonthDayCounts })
     ? perfectMonthKey(ym)
     : null;
 }

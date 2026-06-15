@@ -280,7 +280,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
             {image.cameraModel && (
               <span>
-                📷 {image.cameraMake && !image.cameraModel.startsWith(image.cameraMake) ? `${image.cameraMake} ` : ""}{image.cameraModel}
+                📷 {image.cameraModel}{image.cameraMake && !image.cameraModel.startsWith(image.cameraMake) ? `（${image.cameraMake}）` : ""}
               </span>
             )}
             {image.cameraModel && image.locationPrefecture && <span aria-hidden>·</span>}

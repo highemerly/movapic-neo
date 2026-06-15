@@ -7,7 +7,7 @@
 | ファイル | 役割 |
 |---|---|
 | `catalog.ts` | 実績定義（カタログ）・カテゴリ／表示順（`ACHIEVEMENT_LAYOUT`）・皆勤賞の動的評価。**サーバー/クライアント両方から import されるので React・サーバー専用APIを入れない**（型・`@/lib/streak`・`@/types` のみ） |
-| `perfectMonth.ts` | **皆勤賞ロジックの単一ソース**。しきい値（`PERFECT_MONTH_GRACE` / `MAKEUP_REMINDER_MAX_SKIPPED`）・達成判定（`isPerfectMonth`）・進捗（`perfectMonthProgress`）・穴埋め通知ゲート（`shouldRemindMakeup`）・日別集計（`summarizeDayCounts`）。catalog 同様 React/サーバー専用APIを入れない。live/backfill/カレンダーAPI/通知の4経路がここを共用する |
+| `perfectMonth.ts` | **皆勤賞ロジックの単一ソース**。しきい値（`PERFECT_MONTH_GRACE` / `MAKEUP_REMINDER_MAX_SKIPPED`）・穴埋めの日付順マッチング（`computeMakeups`）・達成判定（`isPerfectMonth`）・当月進捗（`currentMonthMakeupStatus`）・穴埋め通知ゲート（`shouldRemindMakeup`）・日別集計（`summarizeDayCounts`）。catalog 同様 React/サーバー専用APIを入れない。live/backfill/カレンダーAPI/通知の4経路がここを共用する |
 | `stats.ts` | live 用。投稿後に DB から集計（`collectStats`）して `AchStats` を作る |
 | `engine.ts` | live 用。`evaluateAndGrant` が新規付与＋通知作成。`selectNewlyGranted` は純粋関数で live/backfill 共有 |
 | `notifications.ts` | 通知フィード取得（直近90日の `Notification` をサムネ・リンク付きで返す） |
@@ -59,7 +59,7 @@
 ## 手順C: 判定に新しい集計値が必要なとき（重要・2箇所を必ず同期）
 
 `AchStats` に項目を足したら、**live と backfill の両方**で同じ値を作ること。ズレると付与結果が食い違う。
-（例: 皆勤賞の `doubleDaysInPostMonth` は live=`stats.ts`・backfill=`replayUser` の双方で `summarizeDayCounts` を使って算出している。）
+（例: 皆勤賞の `postMonthDayCounts`（投稿月の日(1-31)→投稿数）は live=`stats.ts`・backfill=`replayUser` の双方で同形式に組み立て、`isPerfectMonth` の日付順マッチングに渡している。）
 
 1. `catalog.ts` の `AchStats` にフィールド追加。
 2. `stats.ts` `collectStats`（live・DBクエリ）で算出。クエリは `userId` スコープで数本に収める。`groupBy` は当 Prisma で `orderBy` 必須。
@@ -88,16 +88,16 @@ npm run build             # 本番ビルド（新ルート・静的解析）
 
 月ごとに key が増える（`perfect-month:YYYY-MM`）ため CATALOG には入れず、`evaluatePerfectMonth` で評価する。実績タブでは `ACHIEVEMENT_LAYOUT` の `{ kind: "perfectMonth" }` ブロックが獲得月ぶんのカードを並べる。同様の「無限に増える系」を足すならこの方式に倣う。
 
-**達成条件（穴埋め制度）**: 「毎日投稿」ではなく「未投稿を `PERFECT_MONTH_GRACE`(=4) 日まで許容し、その分を同月の別日に **2枚以上投稿（ダブル投稿）** して穴埋めする」。
-`missing = 月の日数 - distinctDays`、`missing <= 4 かつ doubleDays >= missing` で達成（`perfectMonth.ts` の `isPerfectMonth`）。`missing=0`（完全皆勤）は常に成立し、旧「毎日投稿」達成者と後方互換。判定が真→偽に戻らない（distinct↑・double↑で単調）ため、当月でも達成時点で付与・👑表示できる。
+**達成条件（穴埋め制度・日付順）**: 「毎日投稿」ではなく「未投稿を `PERFECT_MONTH_GRACE`(=4) 日まで許容し、忘れた過去日を **同月の "後日" の2枚以上投稿（ダブル投稿）** で穴埋めする」。
+穴埋めは日付の前後を見る: ダブル投稿日 D は **D より前の未投稿日のみ** 埋められる（将来日は埋められない＝月末日を忘れると後日が無く埋まらない）。1日のダブルは1日分だけ。`computeMakeups`（古い穴から後日のダブルへ貪欲に対応づける最大マッチング）の件数が `missing(= 月の日数 - distinctDays)` 以上で、かつ `missing <= 4` なら達成（`perfectMonth.ts` の `isPerfectMonth`）。`missing=0`（完全皆勤）は常に成立し、旧「毎日投稿」達成者と後方互換。投稿が増えても穴埋めマッチは単調増加・missing は単調減少で判定は真→偽に戻らないため、当月でも達成時点で付与・👑表示できる。
 
 - 判定・進捗・しきい値・通知ゲートはすべて `perfectMonth.ts` に集約。catalog/stats/backfill/カレンダーAPI/engine は **必ずここを呼ぶ**（式を各所に再実装しない）。
-- カレンダーAPI（`/api/v1/public/users/[username]/calendar`）は `perfectMonthProgress` で `isPerfectAttendance` と `perfectMonth`（進捗）を返す。未来月以外（過去月・当月）で計算。
-- カレンダーUI: 2枚以上投稿した日（穴埋め元）は金リング＋枚数バッジ。ダブル投稿で**埋まった空き日**（`filledHoleDays`＝古い穴から doubleDays ぶん）は緑＋✓で「穴埋め済み」表示。当月で穴があれば穴埋めを促すコールアウトを出す。
+- カレンダーAPI（`/api/v1/public/users/[username]/calendar`）は `isPerfectMonth` で `isPerfectAttendance` を、`computeMakeups`/`currentMonthMakeupStatus` で穴埋め対応とコールアウトを返す。未来月以外（過去月・当月）で計算。
+- カレンダーUI: 2枚以上投稿した日（穴埋め元）は金リング＋枚数バッジ。**埋まった空き日**は「埋めた日の2枚目に投稿した写真」をサムネにして緑（透明度高め）で塗り、右上に「{何日}日」を出し、その画像ページへリンクする。当月で未埋めの穴が残り皆勤がまだ可能なら穴埋めを促すコールアウト（`callout`: `"today"`＝本日2枚で埋められる／`"tomorrow"`＝今日は穴埋め済みなので翌日）を出す。
 
-**穴埋め推奨通知（type=`makeup-reminder`）／カレンダー注意書き**: いずれも `shouldRemindMakeup(skippedSoFar, makeupBank)`（未投稿1日以上・まだ埋め切っていない・`skippedSoFar <= MAKEUP_REMINDER_MAX_SKIPPED`(=5)）で出す。注意: 許容は4日なので skipped=5 は達成不能だが、促し自体は出す（仕様）。
+**穴埋め推奨通知（type=`makeup-reminder`）／カレンダー注意書き**: 通知は `shouldRemindMakeup(skippedSoFar, unfilled)`（未投稿1日以上・まだ埋まっていない穴がある・`skippedSoFar <= MAKEUP_REMINDER_MAX_SKIPPED`(=5)）で出す。`unfilled` は `currentMonthMakeupStatus` の日付順マッチングで厳密に数える。
 - 通知: live の `evaluateAndGrant` 内 `maybeNotifyMakeup` が投稿した瞬間に評価し1件作る。重複排除は `achievementKey = perfect-month:YYYY-MM` で **月1通**。描画（ベル・/notifications）は `type` で分岐し、`achievementKey` を実績解決せず専用文言＋カレンダー遷移にする。backfill では送らない。投稿を止めないよう `.catch` で握りつぶす。
-- カレンダー注意書き: API が `perfectMonth.shouldRemind` を返し、UI はそれだけを見て出す（達成/未達成メッセージは出さず、達成は月見出しの👑で示す）。
+- カレンダー注意書き: API が `perfectMonth.callout` を返し、UI はそれだけを見て出す（達成/未達成メッセージは出さず、達成は月見出しの👑で示す）。穴埋め制度の説明文をカレンダー下にも常時表示。
 
 ## スキーマを変える場合（カラム追加など。通常は不要）
 

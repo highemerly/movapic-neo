@@ -17,7 +17,12 @@ import {
   type AchStats,
   type PostFacts,
 } from "./catalog";
-import { perfectMonthKey, shouldRemindMakeup } from "./perfectMonth";
+import {
+  currentMonthMakeupStatus,
+  daysInMonthOf,
+  perfectMonthKey,
+  shouldRemindMakeup,
+} from "./perfectMonth";
 import { collectStats } from "./stats";
 
 export interface GrantCandidate {
@@ -126,8 +131,8 @@ export async function evaluateAndGrant(opts: {
 
 /**
  * 穴埋め推奨通知。今日投稿した瞬間に評価され、条件を満たせば type="makeup-reminder" を1件作る。
- * - skippedSoFar = 今日より前の未投稿日数。今日は投稿済み(=stats に反映済み)なので
- *   「今月の経過日 - 投稿があった distinct 日数」で求まる。
+ * - 穴埋めは「忘れた過去日」を「後日のダブル投稿」で埋める制度なので、日付順マッチングで
+ *   「まだ埋まっていない過去の穴(unfilled)」を厳密に数える（currentMonthMakeupStatus）。
  * - 重複排除: 同月キー(perfect-month:YYYY-MM)の makeup-reminder が既にあれば送らない（月1通）。
  */
 async function maybeNotifyMakeup(
@@ -137,9 +142,15 @@ async function maybeNotifyMakeup(
   imageId: string
 ): Promise<void> {
   const jstDay = toJstDateString(post.createdAt);
-  const elapsedDay = Number(jstDay.slice(8, 10));
-  const skippedSoFar = elapsedDay - stats.distinctDaysInPostMonth;
-  if (!shouldRemindMakeup(skippedSoFar, stats.doubleDaysInPostMonth)) return;
+  const todayDayNum = Number(jstDay.slice(8, 10));
+  const year = Number(jstDay.slice(0, 4));
+  const month = Number(jstDay.slice(5, 7));
+  const status = currentMonthMakeupStatus({
+    daysInMonth: daysInMonthOf(year, month),
+    todayDayNum,
+    dayCounts: stats.postMonthDayCounts,
+  });
+  if (!shouldRemindMakeup(status.skippedSoFar, status.unfilled)) return;
 
   const key = perfectMonthKey(jstDay.slice(0, 7));
   const existing = await prisma.notification.findFirst({

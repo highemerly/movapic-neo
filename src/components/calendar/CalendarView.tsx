@@ -16,18 +16,17 @@ interface DayData {
   };
 }
 
+interface FilledDay {
+  day: number;
+  filledBy: number;
+  image: { id: string; thumbnailKey: string | null; storageKey: string };
+}
+
 interface PerfectMonthInfo {
   achieved: boolean;
-  daysInMonth: number;
-  postedDays: number;
-  makeupBank: number;
-  allowance: number;
   isCurrentMonth: boolean;
-  skippedSoFar: number | null;
-  shortfall: number | null;
-  stillAchievable: boolean | null;
-  shouldRemind: boolean;
-  filledDays: number[];
+  callout: "today" | "tomorrow" | null;
+  filledDays: FilledDay[];
 }
 
 interface CalendarData {
@@ -50,20 +49,23 @@ interface CalendarViewProps {
 
 /**
  * 穴埋めを促す注意書き（当月のみ）。
- * 表示するのは「穴埋めができる かつ 過ぎた未投稿が上限以内」のときだけ（shouldRemind）。
+ * 表示するのは「まだ皆勤に届く範囲で、未埋めの穴が残る」ときだけ（callout が非 null）。
+ * - "today": 本日2枚投稿すれば穴埋めできる
+ * - "tomorrow": 今日はもう穴埋め済み（1日1回まで）なので翌日に促す
  * 達成/未達成のメッセージは出さない（達成時は月見出しの👑で示す）。
  */
 function PerfectMonthCallout({ pm }: { pm: PerfectMonthInfo }) {
-  if (!pm.shouldRemind) return null;
-  const skipped = pm.skippedSoFar ?? 0;
+  if (!pm.callout) return null;
+  const body =
+    pm.callout === "today"
+      ? "投稿を忘れた日があります。本日2枚投稿すれば穴埋めでき、皆勤賞に近づきます！"
+      : "穴埋め投稿は1日につき1回までです。明日2枚投稿しましょう！";
   return (
     <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
       <Crown className="mt-0.5 h-4 w-4 shrink-0" />
       <div className="min-w-0">
-        <p className="font-semibold">今月は未投稿が{skipped}日あります</p>
-        <p>
-          別日に1日<span className="font-bold">2枚以上</span>投稿すると穴埋めできます（穴埋めできるのは最大{pm.allowance}日／1ヶ月）。
-        </p>
+        <p className="font-semibold">穴埋め投稿をしよう！</p>
+        <p>{body}</p>
       </div>
     </div>
   );
@@ -172,8 +174,10 @@ export function CalendarView({
   const today = new Date();
   const isCurrentMonth = year === today.getFullYear() && month === today.getMonth() + 1;
 
-  // ダブル投稿で「埋まった空き日」。穴埋め済みセルとして緑表示する。
-  const filledDays = new Set(data?.perfectMonth?.filledDays ?? []);
+  // 後日のダブル投稿で「埋まった空き日」。日→穴埋め情報のマップ（穴埋め済みセルの緑表示・遷移に使う）。
+  const filledByDay = new Map<number, FilledDay>(
+    (data?.perfectMonth?.filledDays ?? []).map((f) => [f.day, f])
+  );
 
   // 未来の月かどうか
   const isFutureMonth =
@@ -213,26 +217,36 @@ export function CalendarView({
 
       {/* カレンダーグリッド */}
       <div className="grid grid-cols-7 gap-1">
-        {grid.map((day, index) => (
-          <DayCell
-            key={index}
-            day={day}
-            dayData={day ? data?.days[day] : undefined}
-            isFilledHole={day != null && filledDays.has(day)}
-            publicUrl={publicUrl}
-            isToday={isCurrentMonth && day === today.getDate()}
-            isSunday={index % 7 === 0}
-            isSaturday={index % 7 === 6}
-            loading={loading}
-            onClick={() => {
-              if (day && data?.days[day]) {
-                const imageId = data.days[day].latest.id;
-                router.push(`/u/${username}/status/${imageId}`);
-              }
-            }}
-          />
-        ))}
+        {grid.map((day, index) => {
+          const filled = day != null ? filledByDay.get(day) : undefined;
+          return (
+            <DayCell
+              key={index}
+              day={day}
+              dayData={day ? data?.days[day] : undefined}
+              filledMakeup={filled ? { filledBy: filled.filledBy, image: filled.image } : undefined}
+              publicUrl={publicUrl}
+              isToday={isCurrentMonth && day === today.getDate()}
+              isSunday={index % 7 === 0}
+              isSaturday={index % 7 === 6}
+              loading={loading}
+              onClick={() => {
+                if (day && data?.days[day]) {
+                  router.push(`/u/${username}/status/${data.days[day].latest.id}`);
+                } else if (filled) {
+                  // 穴埋め済みセルは「埋めた日の2枚目の写真」へ遷移
+                  router.push(`/u/${username}/status/${filled.image.id}`);
+                }
+              }}
+            />
+          );
+        })}
       </div>
+
+      {/* 穴埋め制度の説明（通常色・小さめ） */}
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+        皆勤賞👑を目指そう！1ヶ月間投稿すれば、皆勤賞の称号が得られます。もし投稿を忘れた日があっても、同じ月の後日に1日2枚以上投稿すると、忘れた日の穴埋めをすることができます（ただし、穴埋めのための投稿は1日につき1回まで・月につき4回までです）。
+      </p>
 
     </div>
   );

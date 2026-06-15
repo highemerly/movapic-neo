@@ -24,6 +24,9 @@ import {
   Moon,
   EyeOff,
   Rocket,
+  Rainbow,
+  Feather,
+  Brush,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { cn } from "@/lib/utils";
@@ -76,6 +79,9 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   Moon,
   EyeOff,
   Rocket,
+  Rainbow,
+  Feather,
+  Brush,
   SoccerBall,
 };
 
