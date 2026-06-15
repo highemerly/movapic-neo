@@ -27,7 +27,7 @@ import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
-import { User, CalendarDays, Map as MapIcon } from "lucide-react";
+import { User, CalendarDays } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -209,9 +209,6 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
 
   // 自分の画像かどうか
   const isOwner = currentUser?.id === image.userId;
-
-  // 地図マークの表示判定（投稿者が地図を公開している、または本人が見ている）
-  const showMapIcon = image.user.showLocationMap || isOwner;
 
   return (
     <div className="min-h-screen bg-background">
@@ -422,15 +419,6 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             >
               <CalendarDays className="w-4 h-4 text-muted-foreground" />
             </Link>
-            {showMapIcon && (
-              <Link
-                href={`/u/${username}/map`}
-                className="p-1.5 rounded-full hover:bg-background transition-colors"
-                title="地図"
-              >
-                <MapIcon className="w-4 h-4 text-muted-foreground" />
-              </Link>
-            )}
           </div>
         </div>
 
