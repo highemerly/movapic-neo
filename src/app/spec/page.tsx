@@ -68,9 +68,42 @@ export default async function SpecPage() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">フォントサイズ</p>
-                  <p className="text-sm text-muted-foreground">
-                    画像のサイズに応じて自動計算されます。画像の短辺の画像幅に16文字納まる文字サイズを基準（中）として計算します。
+                  <p className="text-sm text-muted-foreground mb-3">
+                    画像のサイズに応じて自動計算されます。画像の短辺に約14文字が納まる文字サイズを基準（中）とし、設定に応じて倍率をかけて計算します（下限14px・上限500px）。
                   </p>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">サイズ設定</th>
+                          <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">基準（中）に対する倍率</th>
+                          <th className="text-left py-2 font-medium text-xs text-muted-foreground">短辺に納まる文字数の目安</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-sm text-muted-foreground">
+                        <tr className="border-b border-border">
+                          <td className="py-2 pr-4">小</td>
+                          <td className="py-2 pr-4">0.75倍</td>
+                          <td className="py-2">約18文字</td>
+                        </tr>
+                        <tr className="border-b border-border">
+                          <td className="py-2 pr-4">中（基準）</td>
+                          <td className="py-2 pr-4">1.0倍</td>
+                          <td className="py-2">約14文字</td>
+                        </tr>
+                        <tr className="border-b border-border">
+                          <td className="py-2 pr-4">大</td>
+                          <td className="py-2 pr-4">1.4倍</td>
+                          <td className="py-2">約10文字</td>
+                        </tr>
+                        <tr>
+                          <td className="py-2 pr-4">特大</td>
+                          <td className="py-2 pr-4">2.35倍</td>
+                          <td className="py-2">約6文字</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
