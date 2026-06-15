@@ -1,5 +1,9 @@
 "use client";
 
+/** 暗いサムネ上で文字を読めるようにする控えめな灰色の縁取り（細めの多方向シャドウ）。 */
+const TEXT_OUTLINE =
+  "0.5px 0.5px 0 rgba(80,80,80,0.65), -0.5px 0.5px 0 rgba(80,80,80,0.65), 0.5px -0.5px 0 rgba(80,80,80,0.65), -0.5px -0.5px 0 rgba(80,80,80,0.65)";
+
 interface DayData {
   count: number;
   latest: {
@@ -48,6 +52,8 @@ export function DayCell({
 
   const hasImage = !!dayData;
   const isFilledHole = !hasImage && !!filledMakeup;
+  // サムネ上に日付が重なるセル（縁取り適用の対象）。
+  const onImage = hasImage || isFilledHole;
   // 2枚以上投稿した日 = 皆勤賞の穴埋め元。金色の縁取りと枚数バッジで示す。
   const makeupCount = (dayData?.count ?? 0) >= 2 ? dayData!.count : 0;
   const imageUrl = dayData?.latest.thumbnailKey
@@ -67,7 +73,13 @@ export function DayCell({
     <button
       onClick={onClick}
       disabled={!clickable || loading}
-      title={isFilledHole ? `${filledMakeup!.filledBy}日のダブル投稿で穴埋めされました` : undefined}
+      title={
+        isFilledHole
+          ? `${filledMakeup!.filledBy}日のダブル投稿で穴埋めされました`
+          : makeupCount > 0
+          ? `${dayData!.count}枚投稿`
+          : undefined
+      }
       className={`
         relative aspect-square rounded overflow-hidden
         transition-all duration-200
@@ -95,47 +107,41 @@ export function DayCell({
           <img
             src={filledImageUrl}
             alt={`${day}日の穴埋め（${filledMakeup!.filledBy}日の投稿）`}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover grayscale opacity-70"
             loading="lazy"
           />
-          {/* 穴埋めを示す緑の塗りつぶし（透明度高め） */}
-          <div className="absolute inset-0 bg-green-500/55 dark:bg-green-500/45" />
+          {/* 日付の視認性確保のための下方グラデーション */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
         </>
       ) : (
         <div className="absolute inset-0 bg-muted/50" />
       )}
 
-      {/* 穴埋め元（2枚以上投稿した日）: 金色の内側リング＋枚数バッジ */}
+      {/* 穴埋め元（2枚以上投稿した日）: 右上に琥珀の丸＋「+」（正確な枚数はtitleで） */}
       {makeupCount > 0 && (
-        <>
-          <div className="pointer-events-none absolute inset-0 rounded ring-2 ring-inset ring-amber-400/90" />
-          <span className="absolute right-0.5 top-0.5 z-10 rounded-full bg-amber-400 px-1 text-[9px] font-bold leading-tight text-amber-950 shadow-sm">
-            +{makeupCount - 1}
-          </span>
-        </>
+        <span className="pointer-events-none absolute right-0.5 top-0.5 z-10 flex h-4 w-4 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-amber-400 text-[8px] sm:text-[13px] font-bold leading-none text-amber-950 ring-1 ring-black/15 shadow-sm">
+          +
+        </span>
       )}
 
-      {/* 穴埋め済み（空き日が後日のダブル投稿で埋まった）: 緑の内側リング＋「何日で埋めたか」 */}
+      {/* 穴埋め済み（空き日が後日のダブル投稿で埋まった）: 右上に灰色の丸＋「補」（詳細はtitleで） */}
       {isFilledHole && (
-        <>
-          <div className="pointer-events-none absolute inset-0 rounded ring-2 ring-inset ring-green-500/90" />
-          <span className="absolute right-0.5 top-0.5 z-10 rounded-full bg-green-600 px-1 text-[9px] font-bold leading-tight text-white shadow-sm">
-            {filledMakeup!.filledBy}日
-          </span>
-        </>
+        <span className="pointer-events-none absolute right-0.5 top-0.5 z-10 flex h-4 w-4 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-zinc-500/90 text-[8px] sm:text-[13px] font-bold leading-none text-white ring-1 ring-black/15 shadow-sm">
+          埋
+        </span>
       )}
 
-      {/* 日付 */}
+      {/* 日付。画像・穴埋めセルは暗いサムネ上に重なるため、黒の縁取り（多方向シャドウ）で
+          土日の赤青や平日の白がどんな背景でもはっきり読めるようにする。 */}
       <div
         className={`
           absolute bottom-0.5 left-1/2 -translate-x-1/2
-          text-xs sm:text-sm font-medium
-          ${hasImage ? "text-white drop-shadow-md" : ""}
-          ${isFilledHole ? "text-white drop-shadow-md" : ""}
-          ${!hasImage && !isFilledHole && isSunday ? "text-red-500" : ""}
-          ${!hasImage && !isFilledHole && isSaturday ? "text-blue-500" : ""}
-          ${!hasImage && !isFilledHole && !isSunday && !isSaturday ? "text-muted-foreground" : ""}
+          text-xs sm:text-sm font-semibold
+          ${isSunday ? (onImage ? "text-red-400" : "text-red-500") : ""}
+          ${isSaturday ? (onImage ? "text-blue-400" : "text-blue-500") : ""}
+          ${!isSunday && !isSaturday ? (onImage ? "text-white" : "text-muted-foreground") : ""}
         `}
+        style={onImage ? { textShadow: TEXT_OUTLINE } : undefined}
       >
         {day}
       </div>

@@ -44,6 +44,8 @@ interface CalendarViewProps {
   publicUrl: string;
   initialYear: number;
   initialMonth: number;
+  /** 閲覧者がこのカレンダーの持ち主本人か（穴埋め促しコールアウトの表示制御）。 */
+  isOwner: boolean;
 }
 
 
@@ -59,13 +61,36 @@ function PerfectMonthCallout({ pm }: { pm: PerfectMonthInfo }) {
   const body =
     pm.callout === "today"
       ? "投稿を忘れた日があります。本日2枚投稿すれば穴埋めでき、皆勤賞に近づきます！"
-      : "穴埋め投稿は1日につき1回までです。明日2枚投稿しましょう！";
+      : "明日2枚投稿すると、皆勤賞に近づきます！";
   return (
     <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
       <Crown className="mt-0.5 h-4 w-4 shrink-0" />
       <div className="min-w-0">
-        <p className="font-semibold">穴埋め投稿をしよう！</p>
+        <p className="font-semibold">穴埋め投稿で皆勤賞を目指そう！</p>
         <p>{body}</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 皆勤賞を達成した月に表示する祝祭バナー（達成月のみ・閲覧者全員に表示）。
+ * 金色グラデ＋光沢走査＋王冠ポップ＋きらめきで「達成」を派手に演出する。
+ */
+function PerfectMonthBanner({ month }: { month: number }) {
+  return (
+    <div className="animate-celebrate-in relative mb-3 overflow-hidden rounded-xl bg-gradient-to-r from-amber-200 via-yellow-100 to-amber-200 px-4 py-3 shadow-md dark:from-amber-900/50 dark:via-yellow-800/30 dark:to-amber-900/50">
+      {/* 斜めの光沢が左から右へ走る */}
+      <div className="animate-banner-shine pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-white/50 blur-md dark:bg-white/10" />
+      <div className="relative flex items-center justify-center gap-2 text-amber-900 dark:text-amber-100">
+        <span className="animate-sparkle text-lg leading-none">✨</span>
+        <Crown className="animate-trophy-pop h-6 w-6 shrink-0 fill-amber-400 text-amber-600 drop-shadow-sm dark:text-amber-300" />
+        <span className="text-base font-extrabold tracking-wide sm:text-lg">
+          {month}月 皆勤賞達成！
+        </span>
+        <span className="animate-sparkle text-lg leading-none" style={{ animationDelay: "0.7s" }}>
+          ✨
+        </span>
       </div>
     </div>
   );
@@ -76,6 +101,7 @@ export function CalendarView({
   publicUrl,
   initialYear,
   initialMonth,
+  isOwner,
 }: CalendarViewProps) {
   const router = useRouter();
   const [year, setYear] = useState(initialYear);
@@ -198,7 +224,6 @@ export function CalendarView({
           <ChevronLeft className="w-4 h-4" />
         </Button>
         <h2 className="text-base font-bold min-w-[120px] text-center">
-          {data?.isPerfectAttendance && <span className="mr-1">&#128081;</span>}
           {year}年{month}月
         </h2>
         <Button
@@ -212,8 +237,11 @@ export function CalendarView({
         </Button>
       </div>
 
-      {/* 皆勤賞・穴埋めのコールアウト（当月のみ） */}
-      {data?.perfectMonth && <PerfectMonthCallout pm={data.perfectMonth} />}
+      {/* 皆勤賞達成バナー（達成月のみ・閲覧者全員に表示） */}
+      {data?.perfectMonth?.achieved && <PerfectMonthBanner month={data.month} />}
+
+      {/* 穴埋め促しコールアウト（本人かつ未達成で穴埋め可能なとき） */}
+      {isOwner && data?.perfectMonth && <PerfectMonthCallout pm={data.perfectMonth} />}
 
       {/* カレンダーグリッド */}
       <div className="grid grid-cols-7 gap-1">
@@ -243,10 +271,33 @@ export function CalendarView({
         })}
       </div>
 
-      {/* 穴埋め制度の説明（通常色・小さめ） */}
-      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-        皆勤賞👑を目指そう！1ヶ月間投稿すれば、皆勤賞の称号が得られます。もし投稿を忘れた日があっても、同じ月の後日に1日2枚以上投稿すると、忘れた日の穴埋めをすることができます（ただし、穴埋めのための投稿は1日につき1回まで・月につき4回までです）。
-      </p>
+      {/* 凡例＋穴埋め制度の説明 */}
+      <div className="mt-4 space-y-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+        <p className="flex items-center gap-1.5 font-semibold text-foreground">
+          <Crown className="h-4 w-4 shrink-0 fill-amber-400 text-amber-500" />
+          皆勤賞を目指そう！
+        </p>
+        <p>
+          あの月に毎日投稿すると、皆勤賞の称号が得られます。万が一投稿を忘れてしまっても、同月の後日に1日2枚以上投稿すれば、忘れた日を「穴埋め」できます（穴埋め投稿は1日につき1回まで・月につき4回まで）。
+        </p>
+
+        {/* マーカーの凡例 */}
+        <div className="space-y-2">
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-400 text-[8px] font-bold leading-none text-amber-950 ring-1 ring-black/15">
+              +
+            </span>
+            <span>2枚以上投稿した日</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-zinc-500/90 text-[8px] font-bold leading-none text-white ring-1 ring-black/15">
+              埋
+            </span>
+            <span>穴埋めされた日</span>
+          </div>
+        </div>
+
+      </div>
 
     </div>
   );

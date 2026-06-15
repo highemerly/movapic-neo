@@ -145,6 +145,10 @@
   .animate-sparkle {
     animation: sparkle 1.4s ease-in-out infinite;
   }
+  /* 皆勤賞バナーの光沢走査 */
+  .animate-banner-shine {
+    animation: banner-shine 2.8s ease-in-out infinite;
+  }
 }
 
 @keyframes trophy-pop {
@@ -170,6 +174,16 @@
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes banner-shine {
+  0% {
+    transform: translateX(-150%) skewX(-12deg);
+  }
+  55%,
+  100% {
+    transform: translateX(420%) skewX(-12deg);
   }
 }
 

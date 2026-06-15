@@ -69,6 +69,12 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
   ]);
   const streak = calculateStreak(postDates.map((p) => p.createdAt));
 
+  // 閲覧者がこのカレンダーの持ち主本人かどうか（穴埋め促しコールアウトは本人のみ表示）
+  const isOwner =
+    !!currentUser &&
+    currentUser.username === cleanUsername &&
+    currentUser.instance.domain === user.instance.domain;
+
   return (
     <>
       <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain } : null} />
@@ -95,6 +101,7 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
           publicUrl={publicUrl}
           initialYear={initialYear}
           initialMonth={initialMonth}
+          isOwner={isOwner}
         />
 
         <Footer />
