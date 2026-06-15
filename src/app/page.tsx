@@ -9,6 +9,7 @@ import { LoginSection } from "@/components/auth/LoginSection";
 import { Button } from "@/components/ui/button";
 import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
 import { Footer } from "@/components/Footer";
+import { getAllowedServers } from "@/lib/auth/allowedServers";
 
 // ログイン判定（getSessionClaims）で cookie を読むためページは動的になる。
 // 公開ギャラリーのクエリは unstable_cache で 5 分キャッシュし、全訪問者で共有する。
@@ -34,15 +35,6 @@ const getFeaturedImages = unstable_cache(
   ["home-featured-images"],
   { revalidate: 300, tags: ["featured-images"] }
 );
-
-// 許可サーバーを取得
-function getAllowedServers(): string[] | undefined {
-  const allowed = process.env.ALLOWED_SERVERS;
-  if (!allowed || allowed.trim() === "") {
-    return undefined;
-  }
-  return allowed.split(",").map((s) => s.trim().toLowerCase());
-}
 
 export default async function HomePage() {
   const allowedServers = getAllowedServers();

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { isJapaneseHoliday } from "@/lib/holidays";
 import { DayCell } from "./DayCell";
 
 interface DayData {
@@ -257,6 +258,7 @@ export function CalendarView({
               isToday={isCurrentMonth && day === today.getDate()}
               isSunday={index % 7 === 0}
               isSaturday={index % 7 === 6}
+              isHoliday={day != null && isJapaneseHoliday(year, month, day)}
               loading={loading}
               onClick={() => {
                 if (day && data?.days[day]) {

@@ -31,6 +31,8 @@ interface DayCellProps {
   isToday: boolean;
   isSunday: boolean;
   isSaturday: boolean;
+  /** 日本の祝日（振替休日・国民の休日含む）。日曜と同じ赤系で色付けする。 */
+  isHoliday: boolean;
   loading: boolean;
   onClick: () => void;
 }
@@ -43,6 +45,7 @@ export function DayCell({
   isToday,
   isSunday,
   isSaturday,
+  isHoliday,
   loading,
   onClick,
 }: DayCellProps) {
@@ -54,6 +57,9 @@ export function DayCell({
   const isFilledHole = !hasImage && !!filledMakeup;
   // サムネ上に日付が重なるセル（縁取り適用の対象）。
   const onImage = hasImage || isFilledHole;
+  // 祝日は日曜と同じ赤系。赤を青（土曜）より優先する（祝日が土曜のときも赤にする）。
+  const isRed = isSunday || isHoliday;
+  const isBlue = isSaturday && !isRed;
   // 2枚以上投稿した日 = 皆勤賞の穴埋め元。金色の縁取りと枚数バッジで示す。
   const makeupCount = (dayData?.count ?? 0) >= 2 ? dayData!.count : 0;
   const imageUrl = dayData?.latest.thumbnailKey
@@ -137,9 +143,9 @@ export function DayCell({
         className={`
           absolute bottom-0.5 left-1/2 -translate-x-1/2
           text-xs sm:text-sm font-semibold
-          ${isSunday ? (onImage ? "text-red-400" : "text-red-500") : ""}
-          ${isSaturday ? (onImage ? "text-blue-400" : "text-blue-500") : ""}
-          ${!isSunday && !isSaturday ? (onImage ? "text-white" : "text-muted-foreground") : ""}
+          ${isRed ? (onImage ? "text-red-400" : "text-red-500") : ""}
+          ${isBlue ? (onImage ? "text-blue-400" : "text-blue-500") : ""}
+          ${!isRed && !isBlue ? (onImage ? "text-white" : "text-muted-foreground") : ""}
         `}
         style={onImage ? { textShadow: TEXT_OUTLINE } : undefined}
       >

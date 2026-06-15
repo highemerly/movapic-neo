@@ -123,7 +123,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
     return (
       <div className="space-y-4">
         {!isLoggedIn && agreementCheckbox}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-center text-sm text-destructive">{error}</p>}
         <Button
           onClick={() => handleLogin()}
           disabled={isLoading}
@@ -134,7 +134,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
           {buttonLabel}
         </Button>
         {!isLoggedIn && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-center text-xs text-muted-foreground">
             他のサーバーでは現在利用できません
           </p>
         )}
@@ -161,7 +161,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
   return (
     <form onSubmit={handleLogin} className="space-y-4">
       {agreementCheckbox}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="text-center text-sm text-destructive">{error}</p>}
       <div className="flex gap-2">
         <Input
           type="text"
@@ -175,13 +175,13 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
           type="submit"
           disabled={isLoading}
           aria-disabled={(!server.trim() || !agreed) || undefined}
-          className={`py-6 text-lg ${(!server.trim() || !agreed) ? "opacity-50" : ""}`}
+          className={`shrink-0 py-6 px-4 text-sm ${(!server.trim() || !agreed) ? "opacity-50" : ""}`}
           size="lg"
         >
           {isLoading ? "処理中..." : "ログイン"}
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-center text-xs text-muted-foreground">
         Mastodon または Misskey サーバーのドメインを入力してください
       </p>
     </form>

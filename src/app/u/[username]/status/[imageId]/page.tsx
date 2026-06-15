@@ -18,6 +18,8 @@ import {
 } from "@/lib/fediverse/favorite";
 import { PinButton } from "@/components/pin/PinButton";
 import { Footer } from "@/components/Footer";
+import { NewUserGuide } from "@/components/onboarding/NewUserGuide";
+import { getAllowedServers } from "@/lib/auth/allowedServers";
 import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { PostSuccessToast } from "./PostSuccessToast";
 import { AchievementCelebration } from "./AchievementCelebration";
@@ -451,9 +453,16 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           />
         </div>
 
+        {/* 新規ユーザー向けガイド（SNSからの初回流入の受け皿） */}
+        <NewUserGuide
+          isLoggedIn={!!currentUser}
+          allowedServers={getAllowedServers()}
+        />
+
         <Footer />
       </main>
-      <FloatingPostButton />
+      {/* 非ログインユーザーには投稿FABを出さない（ガイドのログイン導線へ誘導） */}
+      {currentUser && <FloatingPostButton />}
     </div>
   );
 }
