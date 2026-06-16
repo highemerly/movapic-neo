@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Crown } from "lucide-react";
+import { StackedSquaresIcon } from "./StackedSquaresIcon";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { isJapaneseHoliday } from "@/lib/holidays";
 import { DayCell } from "./DayCell";
 
@@ -49,7 +51,6 @@ interface CalendarViewProps {
   isOwner: boolean;
 }
 
-
 /**
  * 穴埋めを促す注意書き（当月のみ）。
  * 表示するのは「まだ皆勤に届く範囲で、未埋めの穴が残る」ときだけ（callout が非 null）。
@@ -78,18 +79,21 @@ function PerfectMonthCallout({ pm }: { pm: PerfectMonthInfo }) {
  * 皆勤賞を達成した月に表示する祝祭バナー（達成月のみ・閲覧者全員に表示）。
  * 金色グラデ＋光沢走査＋王冠ポップ＋きらめきで「達成」を派手に演出する。
  */
-function PerfectMonthBanner({ month }: { month: number }) {
+function PerfectMonthBanner() {
   return (
-    <div className="animate-celebrate-in relative mb-3 overflow-hidden rounded-xl bg-gradient-to-r from-amber-200 via-yellow-100 to-amber-200 px-4 py-3 shadow-md dark:from-amber-900/50 dark:via-yellow-800/30 dark:to-amber-900/50">
+    <div className="animate-celebrate-in relative mt-4 overflow-hidden rounded-xl bg-gradient-to-r from-amber-200 via-yellow-100 to-amber-200 px-4 py-3 shadow-md dark:from-amber-900/50 dark:via-yellow-800/30 dark:to-amber-900/50">
       {/* 斜めの光沢が左から右へ走る */}
       <div className="animate-banner-shine pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-white/50 blur-md dark:bg-white/10" />
       <div className="relative flex items-center justify-center gap-2 text-amber-900 dark:text-amber-100">
         <span className="animate-sparkle text-lg leading-none">✨</span>
         <Crown className="animate-trophy-pop h-6 w-6 shrink-0 fill-amber-400 text-amber-600 drop-shadow-sm dark:text-amber-300" />
         <span className="text-base font-extrabold tracking-wide sm:text-lg">
-          {month}月 皆勤賞達成！
+          皆勤賞達成！
         </span>
-        <span className="animate-sparkle text-lg leading-none" style={{ animationDelay: "0.7s" }}>
+        <span
+          className="animate-sparkle text-lg leading-none"
+          style={{ animationDelay: "0.7s" }}
+        >
           ✨
         </span>
       </div>
@@ -109,12 +113,14 @@ export function CalendarView({
   const [month, setMonth] = useState(initialMonth);
   const [data, setData] = useState<CalendarData | null>(null);
   const [loading, setLoading] = useState(true);
+  // 月送りの方向（スライドイン演出用）。prev=左から / next=右から。
+  const [direction, setDirection] = useState<"prev" | "next" | null>(null);
 
   const fetchCalendarData = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/v1/public/users/${encodeURIComponent(username)}/calendar?year=${year}&month=${month}`
+        `/api/v1/public/users/${encodeURIComponent(username)}/calendar?year=${year}&month=${month}`,
       );
       if (response.ok) {
         const json = await response.json();
@@ -143,6 +149,7 @@ export function CalendarView({
   };
 
   const goToPrevMonth = () => {
+    setDirection("prev");
     let newYear = year;
     let newMonth = month;
     if (month === 1) {
@@ -157,6 +164,7 @@ export function CalendarView({
   };
 
   const goToNextMonth = () => {
+    setDirection("next");
     let newYear = year;
     let newMonth = month;
     if (month === 12) {
@@ -199,11 +207,12 @@ export function CalendarView({
 
   const grid = generateCalendarGrid();
   const today = new Date();
-  const isCurrentMonth = year === today.getFullYear() && month === today.getMonth() + 1;
+  const isCurrentMonth =
+    year === today.getFullYear() && month === today.getMonth() + 1;
 
   // 後日のダブル投稿で「埋まった空き日」。日→穴埋め情報のマップ（穴埋め済みセルの緑表示・遷移に使う）。
   const filledByDay = new Map<number, FilledDay>(
-    (data?.perfectMonth?.filledDays ?? []).map((f) => [f.day, f])
+    (data?.perfectMonth?.filledDays ?? []).map((f) => [f.day, f]),
   );
 
   // 未来の月かどうか
@@ -212,7 +221,7 @@ export function CalendarView({
     (year === today.getFullYear() && month > today.getMonth() + 1);
 
   return (
-    <div className="w-full">
+    <div className="w-full overflow-x-clip">
       {/* ナビゲーション */}
       <div className="flex items-center justify-center gap-2 mb-3">
         <Button
@@ -238,39 +247,61 @@ export function CalendarView({
         </Button>
       </div>
 
-      {/* 皆勤賞達成バナー（達成月のみ・閲覧者全員に表示） */}
-      {data?.perfectMonth?.achieved && <PerfectMonthBanner month={data.month} />}
+      {/* 月切り替え時に「にゅーっ」と入れ替わるよう year-month をキーに remount し、
+          進む/戻る方向へ fade + slide で入場させる。 */}
+      <div
+        key={`${year}-${month}`}
+        className={cn(
+          "animate-in fade-in duration-300 ease-out",
+          direction === "prev"
+            ? "slide-in-from-left-4"
+            : direction === "next"
+              ? "slide-in-from-right-4"
+              : "",
+        )}
+      >
+        {/* 穴埋め促しコールアウト（本人かつ未達成で穴埋め可能なとき） */}
+        {isOwner && data?.perfectMonth && (
+          <PerfectMonthCallout pm={data.perfectMonth} />
+        )}
 
-      {/* 穴埋め促しコールアウト（本人かつ未達成で穴埋め可能なとき） */}
-      {isOwner && data?.perfectMonth && <PerfectMonthCallout pm={data.perfectMonth} />}
-
-      {/* カレンダーグリッド */}
-      <div className="grid grid-cols-7 gap-1">
-        {grid.map((day, index) => {
-          const filled = day != null ? filledByDay.get(day) : undefined;
-          return (
-            <DayCell
-              key={index}
-              day={day}
-              dayData={day ? data?.days[day] : undefined}
-              filledMakeup={filled ? { filledBy: filled.filledBy, image: filled.image } : undefined}
-              publicUrl={publicUrl}
-              isToday={isCurrentMonth && day === today.getDate()}
-              isSunday={index % 7 === 0}
-              isSaturday={index % 7 === 6}
-              isHoliday={day != null && isJapaneseHoliday(year, month, day)}
-              loading={loading}
-              onClick={() => {
-                if (day && data?.days[day]) {
-                  router.push(`/u/${username}/status/${data.days[day].latest.id}`);
-                } else if (filled) {
-                  // 穴埋め済みセルは「埋めた日の2枚目の写真」へ遷移
-                  router.push(`/u/${username}/status/${filled.image.id}`);
+        {/* カレンダーグリッド */}
+        <div className="grid grid-cols-7 gap-1">
+          {grid.map((day, index) => {
+            const filled = day != null ? filledByDay.get(day) : undefined;
+            return (
+              <DayCell
+                key={index}
+                day={day}
+                dayData={day ? data?.days[day] : undefined}
+                filledMakeup={
+                  filled
+                    ? { filledBy: filled.filledBy, image: filled.image }
+                    : undefined
                 }
-              }}
-            />
-          );
-        })}
+                publicUrl={publicUrl}
+                isToday={isCurrentMonth && day === today.getDate()}
+                isSunday={index % 7 === 0}
+                isSaturday={index % 7 === 6}
+                isHoliday={day != null && isJapaneseHoliday(year, month, day)}
+                loading={loading}
+                onClick={() => {
+                  if (day && data?.days[day]) {
+                    router.push(
+                      `/u/${username}/status/${data.days[day].latest.id}`,
+                    );
+                  } else if (filled) {
+                    // 穴埋め済みセルは「埋めた日の2枚目の写真」へ遷移
+                    router.push(`/u/${username}/status/${filled.image.id}`);
+                  }
+                }}
+              />
+            );
+          })}
+        </div>
+
+        {/* 皆勤賞達成バナー（達成月のみ・閲覧者全員に表示・カレンダーの下） */}
+        {data?.perfectMonth?.achieved && <PerfectMonthBanner />}
       </div>
 
       {/* 凡例＋穴埋め制度の説明 */}
@@ -280,15 +311,13 @@ export function CalendarView({
           皆勤賞を目指そう！
         </p>
         <p>
-          あの月に毎日投稿すると、皆勤賞の称号が得られます。万が一投稿を忘れてしまっても、同月の後日に1日2枚以上投稿すれば、忘れた日を「穴埋め」できます（穴埋め投稿は1日につき1回まで・月につき4回まで）。
+          ある月に毎日投稿すると、皆勤賞の称号が得られます。万が一投稿を忘れてしまっても、同月の後日に1日2枚以上投稿すれば、忘れた日を「穴埋め」できます（穴埋め投稿は1日につき1回まで・月につき4回まで）。
         </p>
 
         {/* マーカーの凡例 */}
         <div className="space-y-2">
           <div className="flex items-start gap-2">
-            <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-400 text-[8px] font-bold leading-none text-amber-950 ring-1 ring-black/15">
-              +
-            </span>
+            <StackedSquaresIcon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={2.5} />
             <span>2枚以上投稿した日</span>
           </div>
           <div className="flex items-start gap-2">
@@ -298,9 +327,7 @@ export function CalendarView({
             <span>穴埋めされた日</span>
           </div>
         </div>
-
       </div>
-
     </div>
   );
 }

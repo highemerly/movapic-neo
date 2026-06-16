@@ -89,6 +89,8 @@ export interface CreateClientProps {
       domain: string;
       type: string;
     };
+    /** プロキシ済みアバターURL（サーバー側で getAvatarUrl 済み）。ヘッダーのアイコン用 */
+    avatarUrl?: string | null;
   };
   preferences: {
     position: Position | null;
@@ -643,7 +645,7 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
     <div className="min-h-screen bg-background">
       <TopProgressBar active={isProcessing} label={progressLabel} />
       <SiteHeader
-        user={{ username: user.username, instanceDomain: user.instance.domain }}
+        user={{ username: user.username, instanceDomain: user.instance.domain, avatarUrl: user.avatarUrl }}
       />
 
       {/* エラートースト（成功トーストと同じ画面上部・目立つよう大きめ＋スライドイン・5秒で自動消滅） */}

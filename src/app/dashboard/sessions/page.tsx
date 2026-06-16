@@ -3,6 +3,7 @@ import Link from "@/components/Link";
 import { ChevronLeft } from "lucide-react";
 import { getCurrentUser, getCurrentSessionJti } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
 import { parseUserAgent } from "@/lib/auth/uaParser";
 import prisma from "@/lib/db";
@@ -35,7 +36,7 @@ export default async function SessionsPage() {
 
   return (
     <>
-      <SiteHeader user={{ username: user.username, instanceDomain: user.instance.domain }} />
+      <SiteHeader user={{ username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) }} />
       <div className="container mx-auto px-4 py-8 max-w-2xl">
         <div className="mb-4">
           <Link

@@ -61,7 +61,7 @@ export default async function PublicTimelinePage({
 
   return (
     <>
-      <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain } : null} />
+      <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain, avatarUrl: getAvatarUrl(currentUser.avatarUrl) } : null} />
       <div className="container mx-auto px-4 pt-4 pb-8 max-w-6xl">
         <div className="flex items-center gap-3 mb-4">
           <h1 className="text-2xl font-bold shrink-0">みんなの写真</h1>

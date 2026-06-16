@@ -6,6 +6,7 @@ import { getRecentNotifications } from "@/lib/achievements/notifications";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { userPathSegment } from "@/lib/userHandle";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 
@@ -31,7 +32,7 @@ export default async function NotificationsPage() {
   return (
     <>
       <SiteHeader
-        user={{ username: currentUser.username, instanceDomain: currentUser.instance.domain }}
+        user={{ username: currentUser.username, instanceDomain: currentUser.instance.domain, avatarUrl: getAvatarUrl(currentUser.avatarUrl) }}
       />
       <div className="container mx-auto px-4 pt-4 pb-8 max-w-xl">
         <div className="mb-4">

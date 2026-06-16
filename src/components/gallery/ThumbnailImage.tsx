@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+
 interface ThumbnailImageProps {
   src: string;
   alt: string;
@@ -32,13 +34,32 @@ export function ThumbnailImage({
   className = "",
   loading = "lazy",
 }: ThumbnailImageProps) {
+  // 読み込み完了まではシマー（パルス）プレースホルダーで隠し、完了したらフェードイン。
+  const [loaded, setLoaded] = useState(false);
+  const ref = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    // キャッシュ済み等で onLoad 前に読み込み完了しているケースを拾う
+    if (ref.current?.complete) setLoaded(true);
+  }, []);
+
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={alt}
-      className={`w-full h-auto aspect-square object-cover scale-[1.15] ${getPositionClasses(position)} ${className}`}
-      loading={loading}
-    />
+    <div className="relative aspect-square w-full overflow-hidden">
+      {!loaded && (
+        <div className="absolute inset-0 animate-pulse bg-muted" aria-hidden />
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        ref={ref}
+        src={src}
+        alt={alt}
+        onLoad={() => setLoaded(true)}
+        onError={() => setLoaded(true)}
+        className={`absolute inset-0 h-full w-full scale-[1.15] object-cover transition-opacity duration-300 ${
+          loaded ? "opacity-100" : "opacity-0"
+        } ${getPositionClasses(position)} ${className}`}
+        loading={loading}
+      />
+    </div>
   );
 }

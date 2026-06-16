@@ -31,7 +31,7 @@ export function InstanceFilterBar({ ownInstance, selected }: InstanceFilterBarPr
         href={`/public?instances=${encodeURIComponent(ownInstance)}`}
         className={cn(pill, isOwn ? active : inactive)}
       >
-        自分のサーバー
+        {ownInstance}
       </Link>
     </nav>
   );

@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
+import { TabTransition } from "@/components/user/TabTransition";
 import { calculateStreak } from "@/lib/streak";
 import { getRankCounts } from "@/lib/achievements/counts";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
@@ -18,7 +19,9 @@ interface UserGalleryPageProps {
   params: Promise<{ username: string }>;
 }
 
-export default async function UserGalleryPage({ params }: UserGalleryPageProps) {
+export default async function UserGalleryPage({
+  params,
+}: UserGalleryPageProps) {
   const { username } = await params;
   const currentUser = await getCurrentUser();
 
@@ -87,26 +90,41 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
     },
   });
 
-  const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
+  const publicUrl = (
+    process.env.S3_PUBLIC_URL ||
+    process.env.R2_PUBLIC_URL ||
+    ""
+  ).replace(/\/+$/, "");
 
   // 総画像数と連続投稿日数の算出データを取得
-  const [totalImageCount, postDates, rankCounts, perfectAttendance] = await Promise.all([
-    prisma.image.count({
-      where: { userId: user.id, isPublic: true },
-    }),
-    prisma.image.findMany({
-      where: { userId: user.id, isPublic: true },
-      select: { createdAt: true },
-    }),
-    getRankCounts(user.id),
-    hasRecentPerfectAttendance(user.id),
-  ]);
+  const [totalImageCount, postDates, rankCounts, perfectAttendance] =
+    await Promise.all([
+      prisma.image.count({
+        where: { userId: user.id, isPublic: true },
+      }),
+      prisma.image.findMany({
+        where: { userId: user.id, isPublic: true },
+        select: { createdAt: true },
+      }),
+      getRankCounts(user.id),
+      hasRecentPerfectAttendance(user.id),
+    ]);
   const streak = calculateStreak(postDates.map((p) => p.createdAt));
 
   return (
     <>
-      <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain } : null} />
-      <div className="container mx-auto px-4 pt-4 pb-8 max-w-4xl">
+      <SiteHeader
+        user={
+          currentUser
+            ? {
+                username: currentUser.username,
+                instanceDomain: currentUser.instance.domain,
+                avatarUrl: getAvatarUrl(currentUser.avatarUrl),
+              }
+            : null
+        }
+      />
+      <div className="container mx-auto px-4 pt-4 pb-8 max-w-4xl overflow-x-clip">
         <UserProfileHeader
           user={{
             username: cleanUsername,
@@ -124,24 +142,26 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
           activeTab="photos"
         />
 
-        {/* 画像一覧（ピン留め画像を先頭に） */}
-        <UserGalleryClient
-          initialImages={[
-            ...pinnedImages.map((img) => ({
-              ...img,
-              pinnedAt: img.pinnedAt?.toISOString() ?? null,
-              createdAt: img.createdAt.toISOString(),
-            })),
-            ...images.map((img) => ({
-              ...img,
-              pinnedAt: img.pinnedAt?.toISOString() ?? null,
-              createdAt: img.createdAt.toISOString(),
-            })),
-          ]}
-          publicUrl={publicUrl}
-          username={userPathSegment(cleanUsername, user.instance.domain)}
-          pinnedImageIds={pinnedImageIds}
-        />
+        {/* 画像一覧（ピン留め画像を先頭に・タブ切替時に横スライドで表示） */}
+        <TabTransition tab="photos">
+          <UserGalleryClient
+            initialImages={[
+              ...pinnedImages.map((img) => ({
+                ...img,
+                pinnedAt: img.pinnedAt?.toISOString() ?? null,
+                createdAt: img.createdAt.toISOString(),
+              })),
+              ...images.map((img) => ({
+                ...img,
+                pinnedAt: img.pinnedAt?.toISOString() ?? null,
+                createdAt: img.createdAt.toISOString(),
+              })),
+            ]}
+            publicUrl={publicUrl}
+            username={userPathSegment(cleanUsername, user.instance.domain)}
+            pinnedImageIds={pinnedImageIds}
+          />
+        </TabTransition>
 
         <Footer />
       </div>

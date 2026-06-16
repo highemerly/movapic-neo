@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
+import { TabTransition } from "@/components/user/TabTransition";
 import { calculateStreak } from "@/lib/streak";
 import { getRankCounts } from "@/lib/achievements/counts";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
@@ -19,7 +20,10 @@ interface CalendarPageProps {
   searchParams: Promise<{ year?: string; month?: string }>;
 }
 
-export default async function CalendarPage({ params, searchParams }: CalendarPageProps) {
+export default async function CalendarPage({
+  params,
+  searchParams,
+}: CalendarPageProps) {
   const { username } = await params;
   const query = await searchParams;
   const currentUser = await getCurrentUser();
@@ -44,7 +48,11 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
     notFound();
   }
 
-  const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
+  const publicUrl = (
+    process.env.S3_PUBLIC_URL ||
+    process.env.R2_PUBLIC_URL ||
+    ""
+  ).replace(/\/+$/, "");
 
   // クエリパラメータまたは現在の年月を使用
   const now = new Date();
@@ -59,17 +67,18 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
   const initialMonth = isValidMonth ? queryMonth : now.getMonth() + 1;
 
   // 総画像数・連続投稿日数・実績ランク数の算出データを取得
-  const [totalImageCount, postDates, rankCounts, perfectAttendance] = await Promise.all([
-    prisma.image.count({
-      where: { userId: user.id, isPublic: true },
-    }),
-    prisma.image.findMany({
-      where: { userId: user.id, isPublic: true },
-      select: { createdAt: true },
-    }),
-    getRankCounts(user.id),
-    hasRecentPerfectAttendance(user.id),
-  ]);
+  const [totalImageCount, postDates, rankCounts, perfectAttendance] =
+    await Promise.all([
+      prisma.image.count({
+        where: { userId: user.id, isPublic: true },
+      }),
+      prisma.image.findMany({
+        where: { userId: user.id, isPublic: true },
+        select: { createdAt: true },
+      }),
+      getRankCounts(user.id),
+      hasRecentPerfectAttendance(user.id),
+    ]);
   const streak = calculateStreak(postDates.map((p) => p.createdAt));
 
   // 閲覧者がこのカレンダーの持ち主本人かどうか（穴埋め促しコールアウトは本人のみ表示）
@@ -80,8 +89,18 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
 
   return (
     <>
-      <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain } : null} />
-      <div className="container mx-auto px-4 pt-4 pb-8 max-w-4xl">
+      <SiteHeader
+        user={
+          currentUser
+            ? {
+                username: currentUser.username,
+                instanceDomain: currentUser.instance.domain,
+                avatarUrl: getAvatarUrl(currentUser.avatarUrl),
+              }
+            : null
+        }
+      />
+      <div className="container mx-auto px-4 pt-4 pb-8 max-w-4xl overflow-x-clip">
         <UserProfileHeader
           user={{
             username: cleanUsername,
@@ -99,14 +118,16 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
           activeTab="calendar"
         />
 
-        {/* カレンダー */}
-        <CalendarView
-          username={userPathSegment(cleanUsername, user.instance.domain)}
-          publicUrl={publicUrl}
-          initialYear={initialYear}
-          initialMonth={initialMonth}
-          isOwner={isOwner}
-        />
+        {/* カレンダー（タブ切替時に横スライドで表示） */}
+        <TabTransition tab="calendar">
+          <CalendarView
+            username={userPathSegment(cleanUsername, user.instance.domain)}
+            publicUrl={publicUrl}
+            initialYear={initialYear}
+            initialMonth={initialMonth}
+            isOwner={isOwner}
+          />
+        </TabTransition>
 
         <Footer />
       </div>

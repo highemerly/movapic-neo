@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import { StackedSquaresIcon } from "./StackedSquaresIcon";
+
 /** 暗いサムネ上で文字を読めるようにする控えめな灰色の縁取り（細めの多方向シャドウ）。 */
 const TEXT_OUTLINE =
   "0.5px 0.5px 0 rgba(80,80,80,0.65), -0.5px 0.5px 0 rgba(80,80,80,0.65), 0.5px -0.5px 0 rgba(80,80,80,0.65), -0.5px -0.5px 0 rgba(80,80,80,0.65)";
@@ -49,6 +52,14 @@ export function DayCell({
   loading,
   onClick,
 }: DayCellProps) {
+  // サムネ読み込み完了までシマー（パルス）で隠し、完了後にフェードイン
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    // キャッシュ済み等で onLoad 前に読み込み完了しているケースを拾う
+    if (imgRef.current?.complete) setImgLoaded(true);
+  }, []);
+
   if (day === null) {
     return <div className="aspect-square bg-muted/30 rounded" />;
   }
@@ -65,8 +76,8 @@ export function DayCell({
   const imageUrl = dayData?.latest.thumbnailKey
     ? `${publicUrl}/${dayData.latest.thumbnailKey}`
     : dayData?.latest.storageKey
-    ? `${publicUrl}/${dayData.latest.storageKey}`
-    : null;
+      ? `${publicUrl}/${dayData.latest.storageKey}`
+      : null;
   // 穴埋め済みセルは「埋めた日の2枚目の写真」をサムネに使う。
   const filledImageUrl = filledMakeup
     ? filledMakeup.image.thumbnailKey
@@ -83,8 +94,8 @@ export function DayCell({
         isFilledHole
           ? `${filledMakeup!.filledBy}日のダブル投稿で穴埋めされました`
           : makeupCount > 0
-          ? `${dayData!.count}枚投稿`
-          : undefined
+            ? `${dayData!.count}枚投稿`
+            : undefined
       }
       className={`
         relative aspect-square rounded overflow-hidden
@@ -97,11 +108,23 @@ export function DayCell({
       {/* 背景画像またはプレースホルダー（穴埋め済みは2枚目サムネ＋緑オーバーレイ） */}
       {hasImage && imageUrl ? (
         <>
+          {/* 読み込み中はシマーで隠す */}
+          {!imgLoaded && (
+            <div
+              className="absolute inset-0 animate-pulse bg-muted"
+              aria-hidden
+            />
+          )}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
+            ref={imgRef}
             src={imageUrl}
             alt={`${day}日の投稿`}
-            className="absolute inset-0 w-full h-full object-cover"
+            onLoad={() => setImgLoaded(true)}
+            onError={() => setImgLoaded(true)}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+              imgLoaded ? "opacity-100" : "opacity-0"
+            }`}
             loading="lazy"
           />
           {/* オーバーレイ */}
@@ -109,11 +132,23 @@ export function DayCell({
         </>
       ) : isFilledHole && filledImageUrl ? (
         <>
+          {/* 読み込み中はシマーで隠す */}
+          {!imgLoaded && (
+            <div
+              className="absolute inset-0 animate-pulse bg-muted"
+              aria-hidden
+            />
+          )}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
+            ref={imgRef}
             src={filledImageUrl}
             alt={`${day}日の穴埋め（${filledMakeup!.filledBy}日の投稿）`}
-            className="absolute inset-0 w-full h-full object-cover grayscale opacity-70"
+            onLoad={() => setImgLoaded(true)}
+            onError={() => setImgLoaded(true)}
+            className={`absolute inset-0 w-full h-full object-cover grayscale transition-opacity duration-300 ${
+              imgLoaded ? "opacity-70" : "opacity-0"
+            }`}
             loading="lazy"
           />
           {/* 日付の視認性確保のための下方グラデーション */}
@@ -123,11 +158,12 @@ export function DayCell({
         <div className="absolute inset-0 bg-muted/50" />
       )}
 
-      {/* 穴埋め元（2枚以上投稿した日）: 右上に琥珀の丸＋「+」（正確な枚数はtitleで） */}
+      {/* 穴埋め元（2枚以上投稿した日）: 右上に「□が重なった」アイコンで複数枚を示す（正確な枚数はtitleで） */}
       {makeupCount > 0 && (
-        <span className="pointer-events-none absolute right-0.5 top-0.5 z-10 flex h-4 w-4 sm:h-6 sm:w-6 items-center justify-center rounded-full bg-amber-400 text-[8px] sm:text-[13px] font-bold leading-none text-amber-950 ring-1 ring-black/15 shadow-sm">
-          +
-        </span>
+        <StackedSquaresIcon
+          className="pointer-events-none absolute right-0.5 top-0.5 z-10 h-3 w-3 sm:h-5 sm:w-5 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
+          strokeWidth={2.5}
+        />
       )}
 
       {/* 穴埋め済み（空き日が後日のダブル投稿で埋まった）: 右上に灰色の丸＋「補」（詳細はtitleで） */}

@@ -6,6 +6,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
+import { TabTransition } from "@/components/user/TabTransition";
 import { AchievementsView } from "@/components/achievements/AchievementsView";
 import { countRanks } from "@/lib/achievements/catalog";
 import { perfectMonthKey } from "@/lib/achievements/perfectMonth";
@@ -20,7 +21,9 @@ interface AchievementsPageProps {
   params: Promise<{ username: string }>;
 }
 
-export default async function AchievementsPage({ params }: AchievementsPageProps) {
+export default async function AchievementsPage({
+  params,
+}: AchievementsPageProps) {
   const { username } = await params;
   const currentUser = await getCurrentUser();
 
@@ -40,19 +43,20 @@ export default async function AchievementsPage({ params }: AchievementsPageProps
     notFound();
   }
 
-  const [totalImageCount, postDates, achievements, ladderValues] = await Promise.all([
-    prisma.image.count({ where: { userId: user.id, isPublic: true } }),
-    prisma.image.findMany({
-      where: { userId: user.id, isPublic: true },
-      select: { createdAt: true },
-    }),
-    prisma.achievement.findMany({
-      where: { userId: user.id },
-      select: { key: true, category: true, grantedAt: true },
-      orderBy: { grantedAt: "desc" },
-    }),
-    collectLadderValues(user.id),
-  ]);
+  const [totalImageCount, postDates, achievements, ladderValues] =
+    await Promise.all([
+      prisma.image.count({ where: { userId: user.id, isPublic: true } }),
+      prisma.image.findMany({
+        where: { userId: user.id, isPublic: true },
+        select: { createdAt: true },
+      }),
+      prisma.achievement.findMany({
+        where: { userId: user.id },
+        select: { key: true, category: true, grantedAt: true },
+        orderBy: { grantedAt: "desc" },
+      }),
+      collectLadderValues(user.id),
+    ]);
   const streak = calculateStreak(postDates.map((p) => p.createdAt));
 
   const granted = achievements.map((a) => ({
@@ -67,18 +71,24 @@ export default async function AchievementsPage({ params }: AchievementsPageProps
     perfectMonthKey(lastMonthYm()),
     perfectMonthKey(thisMonthYm()),
   ]);
-  const perfectAttendance = achievements.some((a) => recentPerfectKeys.has(a.key));
+  const perfectAttendance = achievements.some((a) =>
+    recentPerfectKeys.has(a.key),
+  );
 
   return (
     <>
       <SiteHeader
         user={
           currentUser
-            ? { username: currentUser.username, instanceDomain: currentUser.instance.domain }
+            ? {
+                username: currentUser.username,
+                instanceDomain: currentUser.instance.domain,
+                avatarUrl: getAvatarUrl(currentUser.avatarUrl),
+              }
             : null
         }
       />
-      <div className="container mx-auto px-4 pt-4 pb-8 max-w-4xl">
+      <div className="container mx-auto px-4 pt-4 pb-8 max-w-4xl overflow-x-clip">
         <UserProfileHeader
           user={{
             username: cleanUsername,
@@ -96,7 +106,10 @@ export default async function AchievementsPage({ params }: AchievementsPageProps
           activeTab="achievements"
         />
 
-        <AchievementsView granted={granted} ladderValues={ladderValues} />
+        {/* 実績一覧（タブ切替時に横スライドで表示） */}
+        <TabTransition tab="achievements">
+          <AchievementsView granted={granted} ladderValues={ladderValues} />
+        </TabTransition>
 
         <Footer />
       </div>

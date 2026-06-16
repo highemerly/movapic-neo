@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
 
 export default async function LicensePage() {
@@ -7,7 +8,7 @@ export default async function LicensePage() {
 
   return (
     <>
-      <SiteHeader user={user ? { username: user.username, instanceDomain: user.instance.domain } : null} />
+      <SiteHeader user={user ? { username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) } : null} />
       <div className="container mx-auto px-4 py-8 max-w-2xl">
 
         <section className="mb-8">

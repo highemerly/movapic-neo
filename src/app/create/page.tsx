@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUserWithPreferences } from "@/lib/auth/session";
+import { getAvatarUrl } from "@/lib/avatar";
 import { CreateClient } from "./CreateClient";
 import type {
   Position,
@@ -28,6 +29,7 @@ export default async function CreatePage() {
       user={{
         username: user.username,
         instance: { domain: user.instanceDomain, type: user.instanceType },
+        avatarUrl: getAvatarUrl(user.avatarUrl),
       }}
       preferences={{
         position: user.preferences.position as Position | null,

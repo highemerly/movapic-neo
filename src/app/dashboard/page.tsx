@@ -193,12 +193,12 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <SiteHeader user={user ? { username: user.username, instanceDomain: user.instance.domain } : null} />
+      <SiteHeader user={user ? { username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) } : null} />
       <div className="container mx-auto px-4 pt-2 pb-8 max-w-2xl">
 
-        {/* セクション1: 自分の情報 */}
+        {/* セクション1: あなたの情報 */}
         <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-2">自分の情報</h2>
+          <h2 className="text-lg font-semibold mb-2">あなたの情報</h2>
           <div className="relative bg-muted rounded-lg p-4">
             <LogoutButton
               variant="ghost"

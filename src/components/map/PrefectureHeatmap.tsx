@@ -65,14 +65,19 @@ function heatmapFill(count: number, max: number): string {
 function heatmapTextClass(count: number, max: number): string {
   if (count === 0 || max <= 0) return "bg-muted text-muted-foreground/60";
   const ratio = count / max;
-  if (ratio <= 0.2) return "bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-200";
-  if (ratio <= 0.4) return "bg-blue-300 text-blue-950 dark:bg-blue-800 dark:text-blue-100";
+  if (ratio <= 0.2)
+    return "bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-200";
+  if (ratio <= 0.4)
+    return "bg-blue-300 text-blue-950 dark:bg-blue-800 dark:text-blue-100";
   if (ratio <= 0.6) return "bg-blue-500 text-white";
   if (ratio <= 0.8) return "bg-blue-600 text-white";
   return "bg-blue-700 text-white";
 }
 
-function thumbnailUrl(publicUrl: string, latest: PrefectureLatestImage): string {
+function thumbnailUrl(
+  publicUrl: string,
+  latest: PrefectureLatestImage,
+): string {
   const key = latest.thumbnailKey ?? latest.storageKey;
   return `${publicUrl}/${key}`;
 }
@@ -155,7 +160,11 @@ export function PrefectureHeatmap({
         <div className="flex items-center justify-end gap-2 text-[10px] text-muted-foreground">
           <span>少</span>
           {HEATMAP_COLORS.map((c) => (
-            <div key={c} className="h-2 w-4 rounded" style={{ backgroundColor: c }} />
+            <div
+              key={c}
+              className="h-2 w-4 rounded"
+              style={{ backgroundColor: c }}
+            />
           ))}
           <span>多（最大 {max} 件）</span>
         </div>
@@ -199,7 +208,9 @@ function TileGrid({
           let inner: React.ReactNode;
           if (entry) {
             inner = (
-              <div className={`relative h-full w-full overflow-hidden rounded ${ring}`}>
+              <div
+                className={`relative h-full w-full overflow-hidden rounded ${ring}`}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={thumbnailUrl(publicUrl, entry.latest)}
@@ -208,15 +219,21 @@ function TileGrid({
                   className="absolute inset-0 h-full w-full object-cover"
                 />
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/45 text-center text-white">
-                  <span className="text-[10px] font-medium leading-tight drop-shadow">{shortName(pref.name)}</span>
-                  <span className="text-[9px] leading-tight drop-shadow">{count}</span>
+                  <span className="text-[10px] font-medium leading-tight drop-shadow">
+                    {shortName(pref.name)}
+                  </span>
+                  <span className="text-[9px] leading-tight drop-shadow">
+                    {count}
+                  </span>
                 </div>
               </div>
             );
           } else {
             const tone = heatmapTextClass(count, max);
             inner = (
-              <div className={`flex h-full w-full flex-col items-center justify-center rounded p-0.5 text-center text-[10px] leading-tight ${tone}`}>
+              <div
+                className={`flex h-full w-full flex-col items-center justify-center rounded p-0.5 text-center text-[10px] leading-tight ${tone}`}
+              >
                 <span className="font-medium">{shortName(pref.name)}</span>
                 <span className="text-[9px] opacity-90">{count}</span>
               </div>
@@ -240,7 +257,7 @@ function TileGrid({
               )}
             </div>
           );
-        })
+        }),
       )}
     </div>
   );
@@ -261,7 +278,13 @@ function JapanSvg({
 }) {
   const [view, setView] = useState(DEFAULT_VIEW);
   const svgRef = useRef<SVGSVGElement>(null);
-  const dragStart = useRef<{ px: number; py: number; vx: number; vy: number; pid: number } | null>(null);
+  const dragStart = useRef<{
+    px: number;
+    py: number;
+    vx: number;
+    vy: number;
+    pid: number;
+  } | null>(null);
   // ドラッグ中のクリックを無視するためのフラグ（path.onClick で参照）
   const wasDragging = useRef(false);
 
@@ -305,10 +328,13 @@ function JapanSvg({
     const rect = svgRef.current.getBoundingClientRect();
     const scaleX = view.w / rect.width;
     const scaleY = view.h / rect.height;
+    // 値はここで確定させる（setView の updater は後で実行されることがあり、
+    // その時点で onPointerUp により dragStart.current が null になっていると落ちる）
+    const { vx, vy } = dragStart.current;
     setView((v) => ({
       ...v,
-      x: dragStart.current!.vx - dx * scaleX,
-      y: dragStart.current!.vy - dy * scaleY,
+      x: vx - dx * scaleX,
+      y: vy - dy * scaleY,
     }));
   };
   const onPointerUp = (e: React.PointerEvent<SVGSVGElement>) => {

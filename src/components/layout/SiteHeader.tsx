@@ -20,6 +20,8 @@ type SiteHeaderProps = {
     username: string;
     /** ログインユーザーの所属サーバードメイン。「あなたのサーバー」リンク用 */
     instanceDomain?: string;
+    /** ログインユーザーのアバター画像URL（プロキシ済み）。「あなたの写真」のアイコン用 */
+    avatarUrl?: string | null;
   } | null;
 };
 
@@ -99,15 +101,24 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
                     className="flex items-center gap-3 cursor-pointer"
                   >
                     <Server className="h-5 w-5" />
-                    所属サーバーの写真
+                    {user.instanceDomain} の写真
                   </Link>
                 </DropdownMenuItem>
               )}
               {user && (
                 <DropdownMenuItem asChild className="py-3 text-base">
                   <Link href={`/u/${userPathSegment(user.username, user.instanceDomain || DEFAULT_INSTANCE)}`} className="flex items-center gap-3 cursor-pointer">
-                    <Images className="h-5 w-5" />
-                    自分の写真
+                    {user.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={user.avatarUrl}
+                        alt=""
+                        className="h-5 w-5 rounded-full object-cover"
+                      />
+                    ) : (
+                      <Images className="h-5 w-5" />
+                    )}
+                    あなたの写真
                   </Link>
                 </DropdownMenuItem>
               )}
