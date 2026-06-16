@@ -12,17 +12,21 @@ import { calculateStreak } from "@/lib/streak";
 import { getRankCounts } from "@/lib/achievements/counts";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
+import { SuccessToast } from "@/components/SuccessToast";
 
 export const dynamic = "force-dynamic";
 
 interface UserGalleryPageProps {
   params: Promise<{ username: string }>;
+  searchParams: Promise<{ deleted?: string }>;
 }
 
 export default async function UserGalleryPage({
   params,
+  searchParams,
 }: UserGalleryPageProps) {
   const { username } = await params;
+  const { deleted } = await searchParams;
   const currentUser = await getCurrentUser();
 
   // username@domain を分解（既定インスタンスは domain 省略可）
@@ -113,6 +117,9 @@ export default async function UserGalleryPage({
 
   return (
     <>
+      {deleted === "mastodon" && (
+        <SuccessToast message="Mastodonの投稿も削除しました" />
+      )}
       <SiteHeader
         user={
           currentUser

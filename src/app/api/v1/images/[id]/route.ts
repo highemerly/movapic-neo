@@ -4,8 +4,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/session";
+import { getCurrentUserWithValidation } from "@/lib/auth/session";
 import { deleteImage } from "@/lib/storage/storage";
+import { decryptToken } from "@/lib/auth/tokens";
+import { mastodonStatusExists } from "@/lib/fediverse/delete";
 import prisma from "@/lib/db";
 
 export async function DELETE(
@@ -13,7 +15,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUserWithValidation();
 
     if (!user) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
@@ -50,7 +52,32 @@ export async function DELETE(
       where: { id },
     });
 
-    return NextResponse.json({ success: true });
+    // Mastodonに投稿が残っている場合は、その情報をクライアントに返す。
+    // クライアントは「Mastodonの投稿も削除しますか？」と尋ね、ユーザーが望めば
+    // /api/v1/fediverse/delete-status で実際に削除する（ここでは削除しない）。
+    let mastodonStatus: { statusId: string; statusUrl: string | null } | null =
+      null;
+    if (image.postId && user.instance.type === "mastodon") {
+      try {
+        const accessToken = decryptToken(user.accessToken);
+        const exists = await mastodonStatusExists(
+          user.instance.domain,
+          accessToken,
+          image.postId
+        );
+        if (exists) {
+          mastodonStatus = {
+            statusId: image.postId,
+            statusUrl: image.postUrl,
+          };
+        }
+      } catch (error) {
+        // 確認に失敗しても画像削除自体は成功しているので、尋ねずに進める
+        console.error("Failed to check Mastodon status:", error);
+      }
+    }
+
+    return NextResponse.json({ success: true, mastodonStatus });
   } catch (error) {
     console.error("Failed to delete image:", error);
     return NextResponse.json(

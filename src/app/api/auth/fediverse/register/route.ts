@@ -124,6 +124,17 @@ export async function POST(request: NextRequest) {
         server: normalizedServer,
       });
     } else if (instanceInfo.type === "misskey") {
+      // Misskey: 動作未検証のため当面ログインを無効化。
+      // 検証完了後に MISSKEY_LOGIN_ENABLED=true で再開できる。
+      if (process.env.MISSKEY_LOGIN_ENABLED !== "true") {
+        return errorResponse(
+          ErrorCodes.SERVER_NOT_ALLOWED,
+          "Misskeyは現在サポートされていません",
+          403,
+          { suggestion: "Mastodonのサーバーでログインしてください" }
+        );
+      }
+
       // Misskey: MiAuth
       const sessionId = generateMiAuthSessionId();
       const timestamp = Date.now();

@@ -39,7 +39,54 @@ export function DeleteButton({ imageId, username }: DeleteButtonProps) {
         throw new Error(data.error || "削除に失敗しました");
       }
 
-      router.push(`/u/${username}`);
+      // サービスからの削除は完了。Mastodonに投稿が残っている場合は、
+      // 続けて「そちらも削除しますか？」を尋ねる。
+      const data: {
+        mastodonStatus?: { statusId: string; statusUrl: string | null } | null;
+      } = await response.json().catch(() => ({}));
+
+      let deletedMastodon = false;
+      const mastodonStatus = data.mastodonStatus;
+      if (mastodonStatus) {
+        const deleteRemote = await confirm({
+          title: "Mastodonの投稿も削除",
+          description:
+            "この画像はMastodonにも投稿されています。Mastodon側の投稿も削除しますか？",
+          confirmText: "Mastodonからも削除",
+          cancelText: "残しておく",
+          destructive: true,
+        });
+
+        if (deleteRemote) {
+          try {
+            const remoteResponse = await fetch(
+              "/api/v1/fediverse/delete-status",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ statusId: mastodonStatus.statusId }),
+              }
+            );
+            if (!remoteResponse.ok) {
+              const remoteData = await remoteResponse.json().catch(() => ({}));
+              throw new Error(
+                remoteData.error || "Mastodon投稿の削除に失敗しました"
+              );
+            }
+            deletedMastodon = true;
+          } catch (error) {
+            // サービス側の画像は既に削除済みなので、ここでは通知のみ
+            toast.error(
+              error instanceof Error
+                ? error.message
+                : "Mastodon投稿の削除に失敗しました"
+            );
+          }
+        }
+      }
+
+      // 成功トーストは遷移先のユーザーページで表示する（投稿完了時と同じ方式）。
+      router.push(deletedMastodon ? `/u/${username}?deleted=mastodon` : `/u/${username}`);
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "削除に失敗しました");
