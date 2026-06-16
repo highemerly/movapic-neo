@@ -31,6 +31,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
+// 配列からランダムに最大 n 件を取り出す（force-dynamic なのでリクエストごとに入れ替わる）。
+// 描画関数の外に切り出して、render 中の不純呼び出し（react-hooks/purity）を避ける。
+function pickRandomSample<T>(items: T[], n: number): T[] {
+  return [...items].sort(() => Math.random() - 0.5).slice(0, n);
+}
+
 export default async function DashboardPage() {
   const user = await getCurrentUser();
 
@@ -92,10 +98,8 @@ export default async function DashboardPage() {
   // 自分の /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）
   const selfSeg = userPathSegment(user.username, user.instance.domain);
   const totalFavorites = favoritesAgg._sum.favoriteCount ?? 0;
-  // 直近20投稿からランダムに最大4枚（force-dynamic なのでリクエストごとに入れ替わる）
-  const previewImages = [...recentPublicImages]
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 4);
+  // 直近20投稿からランダムに最大4枚
+  const previewImages = pickRandomSample(recentPublicImages, 4);
   const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
   // Bot設定を環境変数から取得

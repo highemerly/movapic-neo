@@ -21,7 +21,8 @@ export function ExpandReveal({
 
   useEffect(() => {
     // 初回ペイント（高さ0・透明）の次フレームで展開を開始してトランジションを走らせる
-    setOpen(true);
+    const raf = requestAnimationFrame(() => setOpen(true));
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   return (

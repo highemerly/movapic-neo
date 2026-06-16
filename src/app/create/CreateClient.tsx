@@ -205,7 +205,6 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
   // 消えるときは突然ではなくフェードアウトさせる（FADE_MS かけてから unmount）
   useEffect(() => {
     if (!error) return;
-    setErrorLeaving(false); // 新しいエラーは入場アニメーションから始める
     let ms = 8000;
     if (error.retryAfterSeconds) {
       const seconds = Math.min(10, Math.max(3, error.retryAfterSeconds + 1));
@@ -218,6 +217,12 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
       clearTimeout(remove);
     };
   }, [error]);
+
+  // エラー表示: 入場アニメーションから始めるため leaving を必ず false に戻す
+  const showError = useCallback((e: ParsedApiError) => {
+    setErrorLeaving(false);
+    setError(e);
+  }, []);
 
   // 閉じるボタン等から手動で消す: フェードアウトしてから unmount
   const dismissError = () => {
@@ -309,7 +314,7 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
 
       if (!response.ok) {
         const parsedError = await parseApiError(response);
-        setError(parsedError);
+        showError(parsedError);
         return null;
       }
 
@@ -341,12 +346,12 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
     } catch (err) {
       clearTimeout(timeoutId);
       if (err instanceof Error && err.name === "AbortError") {
-        setError({
+        showError({
           message: "リクエストがタイムアウトしました",
           suggestion: "画像サイズを小さくして再試行してください",
         });
       } else {
-        setError({ message: "エラーが発生しました" });
+        showError({ message: "エラーが発生しました" });
       }
       return null;
     }
@@ -388,11 +393,11 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
   // プレビューボタン
   const handleGenerate = async () => {
     if (!formState.imageFile) {
-      setError({ message: "画像を選択してください" });
+      showError({ message: "画像を選択してください" });
       return;
     }
     if (!formState.text.trim()) {
-      setError({ message: "テキストを入力してください" });
+      showError({ message: "テキストを入力してください" });
       return;
     }
 
@@ -414,11 +419,11 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
   // 投稿ボタン: プレビュー済みならその画像を、未プレビュー/変更ありなら生成してから投稿
   const handlePost = async () => {
     if (!formState.imageFile) {
-      setError({ message: "画像を選択してください" });
+      showError({ message: "画像を選択してください" });
       return;
     }
     if (!formState.text.trim()) {
-      setError({ message: "テキストを入力してください" });
+      showError({ message: "テキストを入力してください" });
       return;
     }
 
@@ -488,7 +493,7 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
 
       if (!response.ok) {
         const parsedError = await parseApiError(response);
-        setError(parsedError);
+        showError(parsedError);
         return;
       }
 
@@ -521,7 +526,7 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
         router.push("/dashboard");
       }
     } catch {
-      setError({ message: "投稿に失敗しました" });
+      showError({ message: "投稿に失敗しました" });
     } finally {
       setIsPosting(false);
     }
