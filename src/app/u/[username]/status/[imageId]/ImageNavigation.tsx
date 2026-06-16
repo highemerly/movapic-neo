@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { userPathSegment } from "@/lib/userHandle";
 
 interface NavImage {
   id: string;
@@ -7,6 +8,9 @@ interface NavImage {
   storageKey: string;
   user: {
     username: string;
+    instance: {
+      domain: string;
+    };
   };
 }
 
@@ -44,7 +48,7 @@ export function ImageNavigation({
       <div className="flex-1 min-w-0">
         {prevImage ? (
           <Link
-            href={`/u/${prevImage.user.username}/status/${prevImage.id}${queryString}`}
+            href={`/u/${userPathSegment(prevImage.user.username, prevImage.user.instance.domain)}/status/${prevImage.id}${queryString}`}
             className="flex flex-col items-start gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors group"
           >
             <div className="flex items-center gap-2">
@@ -69,7 +73,7 @@ export function ImageNavigation({
       <div className="flex-1 min-w-0">
         {nextImage ? (
           <Link
-            href={`/u/${nextImage.user.username}/status/${nextImage.id}${queryString}`}
+            href={`/u/${userPathSegment(nextImage.user.username, nextImage.user.instance.domain)}/status/${nextImage.id}${queryString}`}
             className="flex flex-col items-end gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors group"
           >
             <div className="flex items-center gap-2">

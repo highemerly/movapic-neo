@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { parseUserHandle } from "@/lib/userHandle";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
@@ -16,12 +17,13 @@ export async function GET(
   try {
     const { username } = await params;
 
-    // ユーザーを取得（handon.club限定）
+    // ユーザーを取得（username@domain で解決。domain 省略時は既定インスタンス）
+    const { username: cleanUsername, domain } = parseUserHandle(username);
     const user = await prisma.user.findFirst({
       where: {
-        username,
+        username: cleanUsername,
         instance: {
-          domain: process.env.MASTODON_INSTANCE || "handon.club",
+          domain,
         },
       },
     });

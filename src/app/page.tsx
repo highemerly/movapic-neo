@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { FeaturedMarquee } from "@/components/gallery/FeaturedMarquee";
 import { Footer } from "@/components/Footer";
 import { getAllowedServers } from "@/lib/auth/allowedServers";
+import { userPathSegment } from "@/lib/userHandle";
 
 // ログイン判定（getSessionClaims）で cookie を読むためページは動的になる。
 // 公開ギャラリーのクエリは unstable_cache で 5 分キャッシュし、全訪問者で共有する。
@@ -28,6 +29,7 @@ const getFeaturedImages = unstable_cache(
         user: {
           select: {
             username: true,
+            instance: { select: { domain: true } },
           },
         },
       },
@@ -50,7 +52,7 @@ export default async function HomePage() {
     storageKey: image.storageKey,
     overlayText: image.overlayText,
     position: image.position,
-    username: image.user.username,
+    username: userPathSegment(image.user.username, image.user.instance.domain),
   }));
 
   return (

@@ -5,6 +5,7 @@ import { Images, Calendar, Map as MapIcon, Trophy, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
+import { userPathSegment } from "@/lib/userHandle";
 
 interface Tab {
   key: "photos" | "calendar" | "map" | "achievements";
@@ -43,31 +44,34 @@ export function UserProfileHeader({
   perfectAttendance = false,
   activeTab,
 }: UserProfileHeaderProps) {
+  // /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）
+  const seg = userPathSegment(user.username, user.instance.domain);
+
   // 地図タブは常に表示（オプトイン未済でも表示し、遷移先で公開設定の有無に応じた案内を出す）
   const tabs: Tab[] = [
     {
       key: "photos",
       label: "一覧",
       icon: Images,
-      href: `/u/${user.username}`,
+      href: `/u/${seg}`,
     },
     {
       key: "calendar",
       label: "カレンダー",
       icon: Calendar,
-      href: `/u/${user.username}/calendar`,
+      href: `/u/${seg}/calendar`,
     },
     {
       key: "map",
       label: "地図",
       icon: MapIcon,
-      href: `/u/${user.username}/map`,
+      href: `/u/${seg}/map`,
     },
     {
       key: "achievements",
       label: "実績",
       icon: Trophy,
-      href: `/u/${user.username}/achievements`,
+      href: `/u/${seg}/achievements`,
     },
   ];
 
@@ -77,7 +81,7 @@ export function UserProfileHeader({
       <div className="flex items-start gap-3 mb-2">
         {user.avatarUrl && (
           <div className="relative shrink-0">
-            <Link href={`/u/${user.username}`}>
+            <Link href={`/u/${seg}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={user.avatarUrl}

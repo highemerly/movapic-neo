@@ -114,7 +114,7 @@ export function CalendarView({
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/v1/public/users/${username}/calendar?year=${year}&month=${month}`
+        `/api/v1/public/users/${encodeURIComponent(username)}/calendar?year=${year}&month=${month}`
       );
       if (response.ok) {
         const json = await response.json();

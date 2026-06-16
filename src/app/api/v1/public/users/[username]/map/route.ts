@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
+import { parseUserHandle } from "@/lib/userHandle";
 
 interface PrefectureEntry {
   count: number;
@@ -28,11 +29,13 @@ export async function GET(
   try {
     const { username } = await params;
 
+    // username@domain で解決（domain 省略時は既定インスタンス）
+    const { username: cleanUsername, domain } = parseUserHandle(username);
     const user = await prisma.user.findFirst({
       where: {
-        username,
+        username: cleanUsername,
         instance: {
-          domain: process.env.MASTODON_INSTANCE || "handon.club",
+          domain,
         },
       },
       select: { id: true, showLocationMap: true },

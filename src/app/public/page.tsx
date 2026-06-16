@@ -72,6 +72,9 @@ export default async function PublicTimelinePage({
         </div>
 
         <PublicTimelineClient
+          // サーバー絞り込みが変わったら再マウントして state（images/cursor）を作り直す。
+          // ソフトナビゲーションでは props は更新されるが useState は初期化されないため。
+          key={instancesParam ?? "all"}
           initialImages={images.map((img: (typeof images)[number]) => ({
             id: img.id,
             storageKey: img.storageKey,

@@ -12,6 +12,7 @@ import { perfectMonthKey } from "@/lib/achievements/perfectMonth";
 import { lastMonthYm, thisMonthYm } from "@/lib/achievements/lastMonthPerfect";
 import { collectLadderValues } from "@/lib/achievements/stats";
 import { calculateStreak } from "@/lib/streak";
+import { parseUserHandle } from "@/lib/userHandle";
 
 export const dynamic = "force-dynamic";
 
@@ -23,13 +24,13 @@ export default async function AchievementsPage({ params }: AchievementsPageProps
   const { username } = await params;
   const currentUser = await getCurrentUser();
 
-  const cleanUsername = username.startsWith("@") ? username.slice(1) : username;
+  const { username: cleanUsername, domain } = parseUserHandle(username);
 
   const user = await prisma.user.findFirst({
     where: {
       username: cleanUsername,
       instance: {
-        domain: process.env.MASTODON_INSTANCE || "handon.club",
+        domain,
       },
     },
     include: { instance: true },

@@ -12,6 +12,7 @@ import { getRankCounts } from "@/lib/achievements/counts";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { PrefectureHeatmap, type PrefectureMapData } from "@/components/map/PrefectureHeatmap";
 import { ImageCard } from "@/components/gallery/ImageCard";
+import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
 
 export const dynamic = "force-dynamic";
 
@@ -25,13 +26,13 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
   const { prefecture: prefectureFilter } = await searchParams;
   const currentUser = await getCurrentUser();
 
-  const cleanUsername = username.startsWith("@") ? username.slice(1) : username;
+  const { username: cleanUsername, domain } = parseUserHandle(username);
 
   const user = await prisma.user.findFirst({
     where: {
       username: cleanUsername,
       instance: {
-        domain: process.env.MASTODON_INSTANCE || "handon.club",
+        domain,
       },
     },
     include: { instance: true },
@@ -41,6 +42,8 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
 
   const isOwner = currentUser?.id === user.id;
   const isOptedIn = user.showLocationMap;
+  // /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）
+  const seg = userPathSegment(cleanUsername, user.instance.domain);
 
   const [totalImageCount, postDates, rankCounts, perfectAttendance] = await Promise.all([
     prisma.image.count({
@@ -182,7 +185,7 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
           <PrefectureHeatmap
             data={data}
             publicUrl={publicUrl}
-            username={cleanUsername}
+            username={seg}
             selectedPrefecture={selectedPrefecture}
           />
         )}
@@ -199,7 +202,7 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
                 </span>
               </h3>
               <Link
-                href={`/u/${cleanUsername}/map`}
+                href={`/u/${seg}/map`}
                 className="text-xs text-muted-foreground hover:underline"
               >
                 絞り込みを解除
@@ -223,7 +226,7 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
                       createdAt: img.createdAt.toISOString(),
                     }}
                     publicUrl={publicUrl}
-                    username={cleanUsername}
+                    username={seg}
                   />
                 ))}
               </div>

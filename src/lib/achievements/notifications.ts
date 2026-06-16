@@ -4,6 +4,7 @@
  */
 
 import prisma from "@/lib/db";
+import { userPathSegment } from "@/lib/userHandle";
 
 export const NOTIFICATION_WINDOW_DAYS = 90;
 
@@ -16,7 +17,8 @@ export interface NotificationFeedItem {
   createdAt: Date;
   /** 関連画像（きっかけ写真）。サムネイルURLと画像ページへのリンク。 */
   image: { id: string; pageUrl: string; thumbnailUrl: string } | null;
-  /** 受信者のユーザー名。makeup-reminder のカレンダー遷移などに使う。 */
+  /** 受信者の /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）。
+   *  makeup-reminder のカレンダー遷移などのリンク生成に使う。 */
   recipientUsername: string;
 }
 
@@ -41,13 +43,13 @@ export async function getRecentNotifications(
       type: true,
       achievementKey: true,
       createdAt: true,
-      user: { select: { username: true } },
+      user: { select: { username: true, instance: { select: { domain: true } } } },
       image: {
         select: {
           id: true,
           thumbnailKey: true,
           storageKey: true,
-          user: { select: { username: true } },
+          user: { select: { username: true, instance: { select: { domain: true } } } },
         },
       },
     },
@@ -59,11 +61,11 @@ export async function getRecentNotifications(
     type: r.type,
     achievementKey: r.achievementKey,
     createdAt: r.createdAt,
-    recipientUsername: r.user.username,
+    recipientUsername: userPathSegment(r.user.username, r.user.instance.domain),
     image: r.image
       ? {
           id: r.image.id,
-          pageUrl: `/u/${r.image.user.username}/status/${r.image.id}`,
+          pageUrl: `/u/${userPathSegment(r.image.user.username, r.image.user.instance.domain)}/status/${r.image.id}`,
           thumbnailUrl: `${base}/${r.image.thumbnailKey || r.image.storageKey}`,
         }
       : null,

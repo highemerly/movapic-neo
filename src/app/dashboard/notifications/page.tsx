@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getRecentNotifications } from "@/lib/achievements/notifications";
 import { resolveAchievement } from "@/lib/achievements/catalog";
+import { userPathSegment } from "@/lib/userHandle";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
@@ -25,6 +26,7 @@ export default async function NotificationsPage() {
   }
 
   const items = await getRecentNotifications(currentUser.id);
+  const selfSeg = userPathSegment(currentUser.username, currentUser.instance.domain);
 
   return (
     <>
@@ -57,8 +59,8 @@ export default async function NotificationsPage() {
               const isReminder = n.type === "makeup-reminder";
               const a = !isReminder && n.achievementKey ? resolveAchievement(n.achievementKey) : null;
               const href = isReminder
-                ? `/u/${currentUser.username}/calendar`
-                : n.image?.pageUrl ?? `/u/${currentUser.username}/achievements`;
+                ? `/u/${selfSeg}/calendar`
+                : n.image?.pageUrl ?? `/u/${selfSeg}/achievements`;
               return (
                 <li key={n.id}>
                   <Link

@@ -33,6 +33,7 @@ import {
   Arrangement,
 } from "@/types";
 import { evaluateAndGrant, GrantedAchievement } from "@/lib/achievements/engine";
+import { userPathSegment } from "@/lib/userHandle";
 import type { PostFacts } from "@/lib/achievements/catalog";
 
 /** サービス内の公開範囲（UI/DBと同じ値） */
@@ -190,9 +191,9 @@ export async function postImageToFediverse(input: {
   return { success: false, error: "サポートされていないプラットフォームです" };
 }
 
-function buildImagePageUrl(username: string, imageId: string): string {
+function buildImagePageUrl(username: string, domain: string, imageId: string): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-  return `${appUrl}/u/${username}/status/${imageId}`;
+  return `${appUrl}/u/${userPathSegment(username, domain)}/status/${imageId}`;
 }
 
 /**
@@ -249,7 +250,7 @@ async function storeAndRecord(
   });
 
   return {
-    imagePageUrl: buildImagePageUrl(input.user.username, imageId),
+    imagePageUrl: buildImagePageUrl(input.user.username, input.user.instance.domain, imageId),
     storageKey,
   };
 }
@@ -269,7 +270,7 @@ export async function publishImage(
   const imageId = randomUUID();
   const extension = getExtensionFromMimeType(input.contentType);
   const filename = `movapic-${imageId}.${extension}`;
-  const imagePageUrl = buildImagePageUrl(input.user.username, imageId);
+  const imagePageUrl = buildImagePageUrl(input.user.username, input.user.instance.domain, imageId);
 
   const isLocal = input.visibility === "local";
 

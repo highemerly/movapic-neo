@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
+import { userPathSegment } from "@/lib/userHandle";
 
 // /self/* へのアクセスを /u/[username]/* にリダイレクト
 export async function GET(
@@ -14,5 +15,5 @@ export async function GET(
 
   const { path } = await params;
   const targetPath = path.join("/");
-  redirect(`/u/${user.username}/${targetPath}`);
+  redirect(`/u/${userPathSegment(user.username, user.instance.domain)}/${targetPath}`);
 }

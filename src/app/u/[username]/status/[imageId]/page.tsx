@@ -18,6 +18,7 @@ import {
 } from "@/lib/fediverse/favorite";
 import { PinButton } from "@/components/pin/PinButton";
 import { Footer } from "@/components/Footer";
+import { parseUserHandle } from "@/lib/userHandle";
 import { NewUserGuide } from "@/components/onboarding/NewUserGuide";
 import { getAllowedServers } from "@/lib/auth/allowedServers";
 import { FloatingPostButton } from "@/components/FloatingPostButton";
@@ -43,12 +44,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       width: true,
       height: true,
       isPublic: true,
-      user: { select: { username: true, displayName: true } },
+      user: { select: { username: true, displayName: true, instance: { select: { domain: true } } } },
     },
   });
 
-  // 非公開・不存在・ユーザー名不一致はデフォルト（noindex扱い）
-  if (!image || !image.isPublic || image.user.username !== username) {
+  // 非公開・不存在・ハンドル（username@domain）不一致はデフォルト（noindex扱い）
+  const { username: cleanUsername, domain } = parseUserHandle(username);
+  if (
+    !image ||
+    !image.isPublic ||
+    image.user.username !== cleanUsername ||
+    image.user.instance.domain !== domain
+  ) {
     return { title: "画像が見つかりません", robots: { index: false } };
   }
 
@@ -127,8 +134,9 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     notFound();
   }
 
-  // ユーザー名が一致しない場合
-  if (image.user.username !== username) {
+  // ハンドル（username@domain）が一致しない場合
+  const { username: cleanUsername, domain } = parseUserHandle(username);
+  if (image.user.username !== cleanUsername || image.user.instance.domain !== domain) {
     notFound();
   }
 
@@ -167,6 +175,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     user: {
       select: {
         username: true,
+        instance: { select: { domain: true } },
       },
     },
   };

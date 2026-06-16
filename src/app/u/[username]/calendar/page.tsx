@@ -10,6 +10,7 @@ import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { calculateStreak } from "@/lib/streak";
 import { getRankCounts } from "@/lib/achievements/counts";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
+import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
 
 export const dynamic = "force-dynamic";
 
@@ -23,15 +24,15 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
   const query = await searchParams;
   const currentUser = await getCurrentUser();
 
-  // @を除去
-  const cleanUsername = username.startsWith("@") ? username.slice(1) : username;
+  // username@domain を分解（既定インスタンスは domain 省略可）
+  const { username: cleanUsername, domain } = parseUserHandle(username);
 
-  // ユーザーを取得（handon.club限定）
+  // ユーザーを取得（インスタンスドメインで絞り込み）
   const user = await prisma.user.findFirst({
     where: {
       username: cleanUsername,
       instance: {
-        domain: process.env.MASTODON_INSTANCE || "handon.club",
+        domain,
       },
     },
     include: {
@@ -100,7 +101,7 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
 
         {/* カレンダー */}
         <CalendarView
-          username={cleanUsername}
+          username={userPathSegment(cleanUsername, user.instance.domain)}
           publicUrl={publicUrl}
           initialYear={initialYear}
           initialMonth={initialMonth}

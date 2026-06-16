@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
 import { FavoriteOverlay } from "@/components/favorite/FavoriteOverlay";
+import { userPathSegment } from "@/lib/userHandle";
 
 interface FavoriteImage {
   id: string;
@@ -118,7 +119,7 @@ function FavoriteImageCard({
   publicUrl: string;
 }) {
   const imageUrl = `${publicUrl}/${image.storageKey}`;
-  const detailUrl = `/u/${image.user.username}/status/${image.id}`;
+  const detailUrl = `/u/${userPathSegment(image.user.username, image.user.instance)}/status/${image.id}`;
 
   return (
     <Link

@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AnnouncementBar } from "./AnnouncementBar";
 import { NotificationBell } from "./NotificationBell";
+import { userPathSegment, DEFAULT_INSTANCE } from "@/lib/userHandle";
 
 type SiteHeaderProps = {
   user?: {
@@ -103,7 +104,7 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
               )}
               {user && (
                 <DropdownMenuItem asChild className="py-3 text-base">
-                  <Link href={`/u/${user.username}`} className="flex items-center gap-3 cursor-pointer">
+                  <Link href={`/u/${userPathSegment(user.username, user.instanceDomain || DEFAULT_INSTANCE)}`} className="flex items-center gap-3 cursor-pointer">
                     <Images className="h-5 w-5" />
                     自分の写真
                   </Link>

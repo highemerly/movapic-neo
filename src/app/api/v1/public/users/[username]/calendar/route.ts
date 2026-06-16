@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { parseUserHandle } from "@/lib/userHandle";
 import { toJstDateString } from "@/lib/streak";
 import {
   computeMakeups,
@@ -90,9 +91,10 @@ export async function GET(
       );
     }
 
-    // ユーザーを検索
+    // ユーザーを検索（username@domain で解決。domain 省略時は既定インスタンス）
+    const { username: cleanUsername, domain } = parseUserHandle(username);
     const user = await prisma.user.findFirst({
-      where: { username },
+      where: { username: cleanUsername, instance: { domain } },
       select: { id: true },
     });
 
