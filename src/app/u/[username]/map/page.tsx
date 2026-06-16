@@ -89,7 +89,7 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
           </div>
           <Footer />
         </div>
-        <FloatingPostButton />
+        <FloatingPostButton maxWidthClass="max-w-4xl" />
       </>
     );
   }
@@ -236,7 +236,7 @@ export default async function UserMapPage({ params, searchParams }: MapPageProps
 
         <Footer />
       </div>
-      <FloatingPostButton />
+      <FloatingPostButton maxWidthClass="max-w-4xl" />
     </>
   );
 }

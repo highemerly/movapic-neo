@@ -110,7 +110,7 @@ export default async function CalendarPage({ params, searchParams }: CalendarPag
 
         <Footer />
       </div>
-      <FloatingPostButton />
+      <FloatingPostButton maxWidthClass="max-w-4xl" />
     </>
   );
 }

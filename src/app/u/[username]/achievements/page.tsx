@@ -100,7 +100,7 @@ export default async function AchievementsPage({ params }: AchievementsPageProps
 
         <Footer />
       </div>
-      <FloatingPostButton />
+      <FloatingPostButton maxWidthClass="max-w-4xl" />
     </>
   );
 }

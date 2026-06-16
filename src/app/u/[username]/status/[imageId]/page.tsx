@@ -471,7 +471,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         <Footer />
       </main>
       {/* 非ログインユーザーには投稿FABを出さない（ガイドのログイン導線へ誘導） */}
-      {currentUser && <FloatingPostButton />}
+      {currentUser && <FloatingPostButton maxWidthClass="max-w-2xl" />}
     </div>
   );
 }

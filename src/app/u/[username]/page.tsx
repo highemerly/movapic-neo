@@ -145,7 +145,7 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
 
         <Footer />
       </div>
-      <FloatingPostButton />
+      <FloatingPostButton maxWidthClass="max-w-4xl" />
     </>
   );
 }
