@@ -28,6 +28,7 @@ export async function GET(request: NextRequest) {
       achievementKey: n.achievementKey,
       createdAt: n.createdAt.toISOString(),
       image: n.image,
+      favorite: n.favorite,
       recipientUsername: n.recipientUsername,
     })),
   });

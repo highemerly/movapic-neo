@@ -5,12 +5,23 @@ import { markNotificationsSeen } from "@/app/actions/notifications";
 
 const COOKIE_NAME = "not";
 
+export type FavoriteFeedData = {
+  count: number;
+  favoriters: {
+    acct: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    profileUrl: string | null;
+  }[];
+};
+
 export type NotificationItem = {
   id: string;
   type: string;
   achievementKey: string | null;
   createdAt: string;
   image: { id: string; pageUrl: string; thumbnailUrl: string } | null;
+  favorite: FavoriteFeedData | null;
   recipientUsername: string;
 };
 

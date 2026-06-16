@@ -48,22 +48,21 @@ export default async function PrivacyPage() {
                 <div>
                   <p className="text-ms text-muted-foreground font-medium mb-2">ログイン時にセッション履歴として収集する情報</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li>IPアドレス</li>
                     <li>ログイン日時</li>
-                    <li>User-Agent（ブラウザ・OSの識別情報）</li>
-                    <li>IPアドレスから推定される接続元の国コード</li>
+                    <li>IPアドレス</li>
+                    <li>ブラウザに関する情報（User-Agent）</li>
+                    <li>IPアドレスから推定される接続元の国・地域・都市</li>
                   </ul>
-                  <p className="text-xs text-muted-foreground mt-2">※ ユーザーが不審なログインを確認できるようメニューに表示するために保存します。</p>
                 </div>
                 <div>
                   <p className="text-ms text-muted-foreground font-medium mb-2">HTTPアクセスによって収集する情報</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                     <li>IPアドレス</li>
-                    <li>IPアドレスから推定される接続元の国や地域の情報</li>
+                    <li>IPアドレスから推定される接続元の国・地域・都市</li>
                     <li>接続先ポート番号</li>
                     <li>リクエスト日時</li>
                     <li>リクエスト先URL</li>
-                    <li>TLSバージョン・暗号スイート</li>
+                    <li>TLSバージョン・暗号スイート・フィンガープリント</li>
                     <li>ブラウザに関する情報（User-Agent, Referer, Accept-Languageヘッダ）</li>
                   </ul>
                 </div>
@@ -81,12 +80,12 @@ export default async function PrivacyPage() {
                     <li>カメラのメーカー名とモデル名</li>
                     <li>撮影場所（都道府県または都道府県+市区町村）</li>
                   </ul>
-                  <p className="text-xs text-muted-foreground mt-2">※ 緯度経度情報を含む詳細な位置情報は収集しません。都道府県または市区町村レベルに加工した結果のみを収集します。</p>
                 </div>
                 <div>
                   <p className="text-ms text-muted-foreground font-medium mb-2">ユーザーがメール投稿機能を利用した場合に限り、メールから収集する情報</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li>送信元メールアドレス（エンベロープFrom）および差出人（ヘッダFrom）</li>
+                    <li>送信元メールアドレス（エンベロープFrom）</li>
+                    <li>メール差出人（ヘッダFrom）</li>
                   </ul>
                 </div>
               </div>

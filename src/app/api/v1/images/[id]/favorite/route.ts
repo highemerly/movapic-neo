@@ -23,6 +23,7 @@ import {
   type CachedFavoriter,
   type FavoriteErrorReason,
 } from "@/lib/fediverse/favorite";
+import { reconcileFavoriteNotificationSafely } from "@/lib/notifications/favoriteNotifications";
 
 // 投稿経過時間ベースのTTL（fav数が動きやすい投稿直後ほど短く）
 const MIN_MS = 60_000;
@@ -96,6 +97,9 @@ async function syncFavoriteCache(image: ImageForFavorite): Promise<SyncResult> {
       ownerToken,
       image.postId!
     );
+    // 更新前の状態（差分の基準）を退避してから上書きする
+    const previousFavoriters = readCache(image);
+    const wasFirstSync = !image.favoritesSyncedAt;
     await prisma.image.update({
       where: { id: image.id },
       data: {
@@ -104,6 +108,16 @@ async function syncFavoriteCache(image: ImageForFavorite): Promise<SyncResult> {
         favoritesSyncedAt: new Date(),
         postStatus: 200,
       },
+    });
+    // 「お気に入りされた」通知を差分更新（失敗してもsync本体は止めない）
+    await reconcileFavoriteNotificationSafely({
+      imageId: image.id,
+      ownerUserId: image.userId,
+      ownerAcct: `${image.user.username}@${image.user.instance.domain}`,
+      wasFirstSync,
+      previousFavoriters,
+      currentFavoriters: data.favoriters,
+      count: data.count,
     });
     return { count: data.count, favoriters: data.favoriters, errorReason: null };
   } catch (error) {

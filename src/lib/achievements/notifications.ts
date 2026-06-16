@@ -5,8 +5,21 @@
 
 import prisma from "@/lib/db";
 import { userPathSegment } from "@/lib/userHandle";
+import { getAvatarUrl } from "@/lib/avatar";
+import type { FavoriteNotificationData } from "@/lib/notifications/favoriteNotifications";
 
 export const NOTIFICATION_WINDOW_DAYS = 90;
+
+/** type="favorite" の表示用データ（相手のavatarはプロキシ経由に変換済み）。 */
+export interface FavoriteFeedData {
+  count: number;
+  favoriters: {
+    acct: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    profileUrl: string | null;
+  }[];
+}
 
 export interface NotificationFeedItem {
   id: string;
@@ -15,8 +28,10 @@ export interface NotificationFeedItem {
    *  type="makeup-reminder" のとき、対象月キー perfect-month:YYYY-MM。 */
   achievementKey: string | null;
   createdAt: Date;
-  /** 関連画像（きっかけ写真）。サムネイルURLと画像ページへのリンク。 */
+  /** 関連画像（きっかけ写真 / お気に入りされた写真）。サムネイルURLと画像ページへのリンク。 */
   image: { id: string; pageUrl: string; thumbnailUrl: string } | null;
+  /** type="favorite" のとき、お気に入りした相手と総数。 */
+  favorite: FavoriteFeedData | null;
   /** 受信者の /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）。
    *  makeup-reminder のカレンダー遷移などのリンク生成に使う。 */
   recipientUsername: string;
@@ -42,6 +57,7 @@ export async function getRecentNotifications(
       id: true,
       type: true,
       achievementKey: true,
+      data: true,
       createdAt: true,
       user: { select: { username: true, instance: { select: { domain: true } } } },
       image: {
@@ -69,5 +85,21 @@ export async function getRecentNotifications(
           thumbnailUrl: `${base}/${r.image.thumbnailKey || r.image.storageKey}`,
         }
       : null,
+    favorite: r.type === "favorite" ? toFavoriteFeedData(r.data) : null,
   }));
+}
+
+// Notification.data（type="favorite"）を表示用に整形。avatarはプロキシ経由に変換。
+function toFavoriteFeedData(data: unknown): FavoriteFeedData | null {
+  const d = data as FavoriteNotificationData | null;
+  if (!d || !Array.isArray(d.favoriters)) return null;
+  return {
+    count: typeof d.count === "number" ? d.count : d.favoriters.length,
+    favoriters: d.favoriters.map((f) => ({
+      acct: f.acct,
+      displayName: f.displayName,
+      avatarUrl: getAvatarUrl(f.avatarUrl),
+      profileUrl: f.profileUrl,
+    })),
+  };
 }

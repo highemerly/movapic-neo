@@ -391,7 +391,7 @@ const singletons: AchievementDef[] = [
     rank: "silver",
     section: "デビュー",
     title: "Fediverseにはナイショ",
-    description: "連携サーバーへ同時投稿せず（なし）で投稿しました",
+    description: "連携サーバーへ同時投稿しませんでした",
     icon: "EyeOff",
     evaluate: (_s, p) => p.visibility === "local",
   },

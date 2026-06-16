@@ -308,10 +308,13 @@ export function CalendarView({
       <div className="mt-4 space-y-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">
         <p className="flex items-center gap-1.5 font-semibold text-foreground">
           <Crown className="h-4 w-4 shrink-0 fill-amber-400 text-amber-500" />
-          皆勤賞を目指そう！
+          皆勤賞を目指しませんか？
         </p>
         <p>
-          ある月に毎日投稿すると、皆勤賞の称号が得られます。万が一投稿を忘れてしまっても、同月の後日に1日2枚以上投稿すれば、忘れた日を「穴埋め」できます（穴埋め投稿は1日につき1回まで・月につき4回まで）。
+          1ヶ月間毎日投稿すれば、カレンダーが埋まって皆勤賞の称号が得られます。皆勤賞はSHAMEZOにおける最高の栄誉です。
+        </p>
+        <p>
+          もし投稿を忘れてしまっても大丈夫。同じ月の後日に1日2枚以上投稿すれば、2枚目の投稿で忘れた日の投稿を「穴埋め」できます（ただし、穴埋めのための投稿は1日につき1回まで・月につき4回まで）。
         </p>
 
         {/* マーカーの凡例 */}
