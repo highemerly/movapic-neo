@@ -22,13 +22,13 @@ export default async function PrivacyPage() {
           <div className="space-y-4">
 
             <p className="text-sm text-muted-foreground">
-              SHAMEZO（以下「本サービス」）は、個人情報保護法をはじめとする関連法令を遵守し、本サービスを利用する全ての方（以下「ユーザー」）の個人情報を適切に取り扱います。そのために、以下のとおりプライバシーポリシーを定めます。
+              SHAMEZO（以下「本サービス」）は、個人情報保護法をはじめとする関連法令を遵守し、本サービスを利用する全ての方（以下「ユーザー」）の個人情報を適切に取り扱います。そのために、以下のとおりプライバシーポリシーを定めます。本サービスの運営者を以下「管理者」といいます。
             </p>
 
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-3">個人情報とは</p>
               <p className="text-sm text-muted-foreground">
-              本ポリシーにおける「個人情報」とは、個人情報保護法第2条第1項に定める個人情報を指しています。具体的には、氏名・メールアドレス・IPアドレスなど、特定の個人を識別できる情報を指します。
+              本ポリシーにおける「個人情報」とは、個人情報保護法第2条第1項に定める個人情報を指しています。例えば、氏名・メールアドレス・IPアドレスなど、特定の個人を識別できる情報を指します。
               </p>
             </div>
 
@@ -152,7 +152,7 @@ export default async function PrivacyPage() {
                 <li>全ての通信はHTTPSで暗号化します</li>
                 <li>アップロードされ生成された画像のEXIF情報（GPS位置情報、カメラ情報等）は常に削除し、出力画像にはメタデータが含まれないようにします</li>
                 <li>カメラ機種名・撮影場所は、投稿時にユーザーが明示的に選択した場合に限り、選択範囲のみをサービスのデータベースに保存し、初期値では保存しません（「オプトイン」方式）</li>
-                <li>Fediverse（Mastodon/Misskey）の認証トークンなど、特に機密性が高いと管理人が判断した情報は、暗号化したうえで保存します</li>
+                <li>Fediverse（Mastodon/Misskey）の認証トークンなど、特に機密性が高いと管理者が判断した情報は、暗号化したうえで保存します</li>
                 <li>重要なデータ・アクセスログは原則バックアップを取得し、適切に保管します</li>
                 <li>IPアドレスやUser-agentを含む「ログイン時にセッション履歴として収集する情報」および「HTTPアクセスによって収集する情報」は、最低保存期間を90日とし、それ以上経過した情報は概ね7日以内に完全に消去します</li>
               </ul>
@@ -251,7 +251,7 @@ export default async function PrivacyPage() {
               </p>
             </div>
 
-            <p className="text-xs text-muted-foreground text-center">最終更新日：2026年6月14日</p>
+            <p className="text-xs text-muted-foreground text-center">最終更新日：2026年6月16日</p>
           </div>
         </section>
 

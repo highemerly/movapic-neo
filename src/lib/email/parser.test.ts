@@ -32,6 +32,9 @@ describe("parseEmail - 件名オプション解析", () => {
       color: "white",
       size: "medium",
       arrangement: "none",
+      visibility: "public",
+      cameraOption: "none",
+      locationOption: "none",
     });
   });
 
@@ -88,6 +91,9 @@ describe("parseEmail - 件名オプション解析", () => {
       color: "red",
       size: "large",
       arrangement: "neon",
+      visibility: "public",
+      cameraOption: "none",
+      locationOption: "none",
     });
   });
 
