@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Sparkles } from "lucide-react";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import { resolveAchievement } from "@/lib/achievements/catalog";

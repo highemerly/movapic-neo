@@ -37,7 +37,11 @@ import {
   Visibility,
   MAX_TEXT_LENGTH,
 } from "@/types";
-import { parseApiError, formatErrorMessage, type ParsedApiError } from "@/lib/errors";
+import {
+  parseApiError,
+  formatErrorMessage,
+  type ParsedApiError,
+} from "@/lib/errors";
 import { extractExif, type ExtractedExif } from "@/lib/exif/parser";
 import { Label } from "@/components/ui/label";
 
@@ -98,7 +102,9 @@ export interface CreateClientProps {
 }
 
 // インスタンス種別から出力形式を自動決定
-function outputFromInstanceType(instanceType: string | undefined): OutputFormat {
+function outputFromInstanceType(
+  instanceType: string | undefined,
+): OutputFormat {
   return instanceType === "misskey" ? "misskey" : "mastodon";
 }
 
@@ -166,7 +172,7 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
   const [lastGeneratedState, setLastGeneratedState] =
     useState<GenerateFormState | null>(null);
   const [visibility, setVisibility] = useState<Visibility>(
-    preferences.visibility ?? "public"
+    preferences.visibility ?? "public",
   );
   const [isSavingDefaults, setIsSavingDefaults] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -177,7 +183,10 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
   const [cameraOption, setCameraOption] = useState<CameraOption>("none");
   const [locationOption, setLocationOption] = useState<LocationOption>("none");
   // 位置情報の解析結果（タップで1回だけ /api/v1/geocode を呼びキャッシュ、同じ画像内で再利用）
-  const [geocoded, setGeocoded] = useState<{ prefecture: string; city: string } | null>(null);
+  const [geocoded, setGeocoded] = useState<{
+    prefecture: string;
+    city: string;
+  } | null>(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [geocodeError, setGeocodeError] = useState<string | null>(null);
 
@@ -223,30 +232,33 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
     };
   }, [resultUrl]);
 
-  const handleImageSelect = useCallback(async (file: File, preview: string) => {
-    setFormState((prev) => ({
-      ...prev,
-      imageFile: file,
-      imagePreview: preview,
-    }));
-    // 新しい画像がアップロードされたら生成結果をクリア
-    setHasGenerated(false);
-    setResultUrl(null);
-    setError(null);
-    // 撮影情報の選択肢と位置情報の解析キャッシュは画像ごとに毎回リセット
-    // 撮影場所は毎回ユーザーに選択してもらう（保存対象外）。
-    // カメラ機種は EXIF が取れた後にユーザー初期値があれば "show" に復元する。
-    setCameraOption("none");
-    setLocationOption("none");
-    setGeocoded(null);
-    setGeocodeError(null);
-    setExif(null);
-    const extracted = await extractExif(file);
-    setExif(extracted);
-    if (preferences.cameraOption === "show" && extracted?.cameraModel) {
-      setCameraOption("show");
-    }
-  }, [preferences.cameraOption]);
+  const handleImageSelect = useCallback(
+    async (file: File, preview: string) => {
+      setFormState((prev) => ({
+        ...prev,
+        imageFile: file,
+        imagePreview: preview,
+      }));
+      // 新しい画像がアップロードされたら生成結果をクリア
+      setHasGenerated(false);
+      setResultUrl(null);
+      setError(null);
+      // 撮影情報の選択肢と位置情報の解析キャッシュは画像ごとに毎回リセット
+      // 撮影場所は毎回ユーザーに選択してもらう（保存対象外）。
+      // カメラ機種は EXIF が取れた後にユーザー初期値があれば "show" に復元する。
+      setCameraOption("none");
+      setLocationOption("none");
+      setGeocoded(null);
+      setGeocodeError(null);
+      setExif(null);
+      const extracted = await extractExif(file);
+      setExif(extracted);
+      if (preferences.cameraOption === "show" && extracted?.cameraModel) {
+        setCameraOption("show");
+      }
+    },
+    [preferences.cameraOption],
+  );
 
   const handleReset = useCallback(() => {
     // 出力形式はインスタンス種別の自動値を保持
@@ -306,11 +318,23 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
         blob: await response.blob(),
         mimeType,
         requestId: response.headers.get("X-Request-Id") || "",
-        processingTime: parseInt(response.headers.get("X-Processing-Time") || "0", 10),
-        originalFileSize: parseInt(response.headers.get("X-Original-File-Size") || "0", 10),
+        processingTime: parseInt(
+          response.headers.get("X-Processing-Time") || "0",
+          10,
+        ),
+        originalFileSize: parseInt(
+          response.headers.get("X-Original-File-Size") || "0",
+          10,
+        ),
         originalFormat: response.headers.get("X-Original-Format") || "",
-        originalWidth: parseInt(response.headers.get("X-Original-Width") || "0", 10),
-        originalHeight: parseInt(response.headers.get("X-Original-Height") || "0", 10),
+        originalWidth: parseInt(
+          response.headers.get("X-Original-Width") || "0",
+          10,
+        ),
+        originalHeight: parseInt(
+          response.headers.get("X-Original-Height") || "0",
+          10,
+        ),
       };
     } catch (err) {
       clearTimeout(timeoutId);
@@ -405,7 +429,10 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
       let stateToPost: GenerateFormState;
 
       const canUseExisting =
-        hasGenerated && !hasChangedSinceGeneration && resultBlob && lastGeneratedState;
+        hasGenerated &&
+        !hasChangedSinceGeneration &&
+        resultBlob &&
+        lastGeneratedState;
 
       if (canUseExisting) {
         blob = resultBlob;
@@ -443,8 +470,11 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
         if (exif.cameraMake) formData.append("cameraMake", exif.cameraMake);
         if (exif.cameraModel) formData.append("cameraModel", exif.cameraModel);
       }
-      if ((locationOption === "pref" || locationOption === "city") &&
-          exif?.gpsLatitude != null && exif?.gpsLongitude != null) {
+      if (
+        (locationOption === "pref" || locationOption === "city") &&
+        exif?.gpsLatitude != null &&
+        exif?.gpsLongitude != null
+      ) {
         formData.append("gpsLatitude", String(exif.gpsLatitude));
         formData.append("gpsLongitude", String(exif.gpsLongitude));
       }
@@ -463,11 +493,14 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
       const data = await response.json();
 
       // この投稿で新規獲得した実績があれば、遷移先の画像ページで演出するため一時保存
-      if (Array.isArray(data.newAchievements) && data.newAchievements.length > 0) {
+      if (
+        Array.isArray(data.newAchievements) &&
+        data.newAchievements.length > 0
+      ) {
         try {
           sessionStorage.setItem(
             "movapic_new_achievements",
-            JSON.stringify(data.newAchievements)
+            JSON.stringify(data.newAchievements),
           );
         } catch {
           // sessionStorage 不可でも投稿フローは継続
@@ -476,7 +509,10 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
 
       // 投稿成功後、詳細ページにリダイレクト（直後の完了メッセージ用に posted=1 を付与）
       if (data.imagePageUrl) {
-        const path = data.imagePageUrl.replace(process.env.NEXT_PUBLIC_APP_URL || "", "");
+        const path = data.imagePageUrl.replace(
+          process.env.NEXT_PUBLIC_APP_URL || "",
+          "",
+        );
         const sep = path.includes("?") ? "&" : "?";
         router.push(`${path}${sep}posted=1`);
       } else {
@@ -515,7 +551,9 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
         setTimeout(() => setSaveSuccess(false), 3000);
       } else {
         const data = await response.json();
-        setError({ message: data.error?.message || "設定の保存に失敗しました" });
+        setError({
+          message: data.error?.message || "設定の保存に失敗しました",
+        });
       }
     } catch {
       setError({ message: "設定の保存に失敗しました" });
@@ -555,7 +593,8 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
     }
   };
 
-  const canGenerate = formState.text.trim().length > 0 && formState.imageFile !== null;
+  const canGenerate =
+    formState.text.trim().length > 0 && formState.imageFile !== null;
 
   // 生成後に設定が変更されたかどうか（安価な比較のため useMemo は不要）
   const hasChangedSinceGeneration =
@@ -603,7 +642,9 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
   return (
     <div className="min-h-screen bg-background">
       <TopProgressBar active={isProcessing} label={progressLabel} />
-      <SiteHeader user={{ username: user.username, instanceDomain: user.instance.domain }} />
+      <SiteHeader
+        user={{ username: user.username, instanceDomain: user.instance.domain }}
+      />
 
       {/* エラートースト（成功トーストと同じ画面上部・目立つよう大きめ＋スライドイン・5秒で自動消滅） */}
       {error && (
@@ -619,7 +660,9 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">{formatErrorMessage(error)}</p>
               {error.supportInfo && (
-                <p className="mt-1 text-xs text-white/80">{error.supportInfo}</p>
+                <p className="mt-1 text-xs text-white/80">
+                  {error.supportInfo}
+                </p>
               )}
             </div>
             <button
@@ -635,42 +678,63 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
       )}
 
       <main
-        className={`container mx-auto max-w-md px-4 pt-4 pb-8 ${showSticky ? "pb-28" : ""}`}
+        className={`container mx-auto px-4 pt-4 pb-8 transition-[max-width] duration-500 ease-out ${
+          formState.imageFile ? "max-w-md lg:max-w-6xl" : "max-w-md"
+        } ${showSticky ? "pb-28" : ""}`}
       >
         <h1 className="mb-3 text-xl font-bold">新しい写真を投稿する</h1>
-        <div className="space-y-6">
-          {/* ① 写真を選ぶ */}
-          <div className="space-y-2">
-            <StepHeader num={1} label="写真を選ぶ" />
-            <ImageUpload
-              imageFile={formState.imageFile}
-              imagePreview={formState.imagePreview}
-              resultUrl={resultUrl}
-              hasGenerated={hasGenerated}
-              resultInfo={resultInfo}
-              isLoading={isLoading}
-              isPosting={isPosting}
-              loadingTime={loadingTime}
-              onImageSelect={handleImageSelect}
-              onReset={handleReset}
-              disabled={isLoading || isPosting}
-            />
+        {/* 写真アップロード後（横幅の広い端末）は2段組:
+            左列 = ① 写真 + 注意事項（lg で sticky・常に表示） / 右列 = ②〜⑤ + ⑥設定保存。
+            スマホ幅と未アップロード時は従来どおり1列。投稿ボタンは段組の外（従来位置）に置く。 */}
+        <div
+          className={`grid gap-6 ${
+            formState.imageFile
+              ? "lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] lg:gap-8 lg:items-start"
+              : ""
+          }`}
+        >
+          {/* 左列: ① 写真を選ぶ + 注意事項 */}
+          <div
+            className={
+              formState.imageFile
+                ? "space-y-6 lg:sticky lg:top-4 lg:self-start"
+                : "space-y-6"
+            }
+          >
+            {/* ① 写真を選ぶ */}
+            <div className="space-y-2">
+              <StepHeader num={1} label="写真を選ぶ" />
+              <ImageUpload
+                imageFile={formState.imageFile}
+                imagePreview={formState.imagePreview}
+                resultUrl={resultUrl}
+                hasGenerated={hasGenerated}
+                resultInfo={resultInfo}
+                isLoading={isLoading}
+                isPosting={isPosting}
+                loadingTime={loadingTime}
+                onImageSelect={handleImageSelect}
+                onReset={handleReset}
+                disabled={isLoading || isPosting}
+              />
+            </div>
+
+            {/* 注意事項（画像直下に常に表示・公開範囲と撮影場所に応じて動的に変化） */}
+            <div className="space-y-2">
+              <PostVisibilityNotice
+                visibility={visibility}
+                instanceDomain={user.instance.domain}
+              />
+              {locationDisplayLabel && (
+                <PostLocationNotice locationLabel={locationDisplayLabel} />
+              )}
+            </div>
           </div>
 
-          {/* 注意事項（画像直下に常に表示・公開範囲と撮影場所に応じて動的に変化） */}
-          <div className="space-y-2">
-            <PostVisibilityNotice
-              visibility={visibility}
-              instanceDomain={user.instance.domain}
-            />
-            {locationDisplayLabel && (
-              <PostLocationNotice locationLabel={locationDisplayLabel} />
-            )}
-          </div>
-
-          {/* ②コメント入力 → ③オプション → ④追加情報 → ⑤同時投稿先 → ⑥投稿（画像選択後に表示） */}
+          {/* 右列: ②コメント入力 → ③オプション → ④追加情報 → ⑤同時投稿先 → ⑥設定保存
+              （投稿ボタンは段組の外・従来位置に配置）。アップロード時に にゅーっと出現。 */}
           {formState.imageFile && (
-            <>
+            <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-500 ease-out">
               <div className="space-y-2">
                 <StepHeader
                   num={2}
@@ -679,171 +743,233 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
                 />
                 <TextInput
                   value={formState.text}
-                  onChange={(text) => setFormState((prev) => ({ ...prev, text }))}
-                  disabled={isLoading || isPosting}
-                />
-              </div>
-
-              {/* ③ コメント合成オプションを変更 */}
-              <div className="space-y-4">
-                <StepHeader num={3} label="コメント合成オプションを変更" />
-                <OptionsPanel
-                  position={formState.position}
-                  font={formState.font}
-                  color={formState.color}
-                  size={formState.size}
-                  arrangement={formState.arrangement}
-                  onPositionChange={(position) =>
-                    setFormState((prev) => ({ ...prev, position }))
-                  }
-                  onFontChange={(font) =>
-                    setFormState((prev) => ({ ...prev, font }))
-                  }
-                  onColorChange={(color) =>
-                    setFormState((prev) => ({ ...prev, color }))
-                  }
-                  onSizeChange={(size) =>
-                    setFormState((prev) => ({ ...prev, size }))
-                  }
-                  onArrangementChange={(arrangement) =>
-                    setFormState((prev) => ({ ...prev, arrangement }))
+                  onChange={(text) =>
+                    setFormState((prev) => ({ ...prev, text }))
                   }
                   disabled={isLoading || isPosting}
                 />
               </div>
 
-              {/* ④ 投稿する情報を追加（EXIF撮影情報）
+              {/* ③〜⑥: コメント未入力のうちは「非アクティブ風」（淡色＋操作不可）で見せ、
+                  コメントが入力されたら通常状態に戻す（表示自体は常に出しておく） */}
+              <div
+                className={`space-y-6 transition-opacity duration-300 ${
+                  formState.text.trim().length === 0
+                    ? "pointer-events-none select-none opacity-40"
+                    : ""
+                }`}
+                aria-disabled={formState.text.trim().length === 0}
+              >
+                {/* ③ コメント合成オプションを変更 */}
+                <div className="space-y-4">
+                  <StepHeader num={3} label="コメント合成オプションを変更" />
+                  <OptionsPanel
+                    position={formState.position}
+                    font={formState.font}
+                    color={formState.color}
+                    size={formState.size}
+                    arrangement={formState.arrangement}
+                    onPositionChange={(position) =>
+                      setFormState((prev) => ({ ...prev, position }))
+                    }
+                    onFontChange={(font) =>
+                      setFormState((prev) => ({ ...prev, font }))
+                    }
+                    onColorChange={(color) =>
+                      setFormState((prev) => ({ ...prev, color }))
+                    }
+                    onSizeChange={(size) =>
+                      setFormState((prev) => ({ ...prev, size }))
+                    }
+                    onArrangementChange={(arrangement) =>
+                      setFormState((prev) => ({ ...prev, arrangement }))
+                    }
+                    disabled={isLoading || isPosting}
+                  />
+                </div>
+
+                {/* ④ 投稿する情報を追加（EXIF撮影情報）
                   カメラ機種名と撮影場所を独立したセグメントで毎回選ぶ。デザインは
                   OptionsPanel の SegmentControl と揃える。位置情報のセグメントは
                   pref/city を選んだ初回タップ時のみ /geocode を呼んで結果をキャッシュ。 */}
-              <div className="space-y-4">
-                <StepHeader num={4} label="投稿する情報を追加" />
-                {(() => {
-                  const cameraText = exif?.cameraModel
-                    ? exif.cameraMake && !exif.cameraModel.startsWith(exif.cameraMake)
-                      ? `${exif.cameraMake} ${exif.cameraModel}`
-                      : exif.cameraModel
-                    : null;
-                  const hasGps = !!(exif && exif.gpsLatitude != null && exif.gpsLongitude != null);
-                  const disabled = isLoading || isPosting;
-
-                  // EXIFが何も無い場合は何も選べない
-                  if (!cameraText && !hasGps) {
-                    return (
-                      <p className="text-xs text-muted-foreground">
-                        この画像には付与できる撮影情報（カメラ機種・GPS）がありません。
-                      </p>
+                <div className="space-y-4">
+                  <StepHeader num={4} label="投稿する情報を追加" />
+                  {(() => {
+                    const cameraText = exif?.cameraModel
+                      ? exif.cameraMake &&
+                        !exif.cameraModel.startsWith(exif.cameraMake)
+                        ? `${exif.cameraMake} ${exif.cameraModel}`
+                        : exif.cameraModel
+                      : null;
+                    const hasGps = !!(
+                      exif &&
+                      exif.gpsLatitude != null &&
+                      exif.gpsLongitude != null
                     );
-                  }
+                    const disabled = isLoading || isPosting;
 
-                  const segmentBtn = (
-                    selected: boolean,
-                    onClick: () => void,
-                    label: React.ReactNode,
-                    extraDisabled = false,
-                  ) => (
-                    <button
-                      type="button"
-                      onClick={onClick}
-                      disabled={disabled || extraDisabled}
-                      className={`min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${
-                        selected
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      } ${disabled || extraDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
-                    >
-                      {label}
-                    </button>
-                  );
+                    // EXIFが何も無い場合は何も選べない
+                    if (!cameraText && !hasGps) {
+                      return (
+                        <p className="text-xs text-muted-foreground">
+                          この画像には付与できる撮影情報（カメラ機種・GPS）がありません。
+                        </p>
+                      );
+                    }
 
-                  // セグメントボタンのラベル: 機種名は実値、撮影場所は解析後は実値、未解析時はプレースホルダ
-                  const cameraShowLabel = cameraText ? `📷 ${cameraText}` : "(機種情報なし)";
-                  const prefLabel = geocoded ? `📍 ${geocoded.prefecture}` : "📍 都道府県のみ";
-                  const cityLabel = geocoded ? `📍 ${geocoded.prefecture}${geocoded.city}` : "📍 都道府県+市町村";
+                    const segmentBtn = (
+                      selected: boolean,
+                      onClick: () => void,
+                      label: React.ReactNode,
+                      extraDisabled = false,
+                    ) => (
+                      <button
+                        type="button"
+                        onClick={onClick}
+                        disabled={disabled || extraDisabled}
+                        className={`min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                          selected
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        } ${disabled || extraDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
+                      >
+                        {label}
+                      </button>
+                    );
 
-                  return (
-                    <div className="space-y-5">
-                      {/* カメラ機種名 */}
-                      <div className="space-y-2">
-                        <Label>カメラの機種名</Label>
-                        <div className="flex rounded-lg border bg-muted p-1 gap-1">
-                          {segmentBtn(cameraOption === "none", () => setCameraOption("none"), "表示しない")}
-                          {segmentBtn(cameraOption === "show", () => setCameraOption("show"), cameraShowLabel, !cameraText)}
+                    // セグメントボタンのラベル: 機種名は実値、撮影場所は解析後は実値、未解析時はプレースホルダ
+                    const cameraShowLabel = cameraText
+                      ? `📷 ${cameraText}`
+                      : "(機種情報なし)";
+                    const prefLabel = geocoded
+                      ? `📍 ${geocoded.prefecture}`
+                      : "📍 都道府県のみ";
+                    const cityLabel = geocoded
+                      ? `📍 ${geocoded.prefecture}${geocoded.city}`
+                      : "📍 都道府県+市町村";
+
+                    return (
+                      <div className="space-y-5">
+                        {/* カメラ機種名 */}
+                        <div className="space-y-2">
+                          <Label>カメラの機種名</Label>
+                          <div className="flex rounded-lg border bg-muted p-1 gap-1">
+                            {segmentBtn(
+                              cameraOption === "none",
+                              () => setCameraOption("none"),
+                              "表示しない",
+                            )}
+                            {segmentBtn(
+                              cameraOption === "show",
+                              () => setCameraOption("show"),
+                              cameraShowLabel,
+                              !cameraText,
+                            )}
+                          </div>
+                          {!cameraText && (
+                            <p className="text-[11px] text-muted-foreground">
+                              この画像にはカメラ機種情報がありません。
+                            </p>
+                          )}
                         </div>
-                        {!cameraText && (
-                          <p className="text-[11px] text-muted-foreground">この画像にはカメラ機種情報がありません。</p>
-                        )}
-                      </div>
 
-                      {/* 撮影場所 */}
-                      <div className="space-y-2">
-                        <Label>撮影場所</Label>
-                        <div className="flex rounded-lg border bg-muted p-1 gap-1">
-                          {segmentBtn(locationOption === "none", () => handleLocationOptionChange("none"), "表示しない")}
-                          {segmentBtn(locationOption === "pref", () => handleLocationOptionChange("pref"), prefLabel, !hasGps)}
-                          {segmentBtn(locationOption === "city", () => handleLocationOptionChange("city"), cityLabel, !hasGps)}
+                        {/* 撮影場所 */}
+                        <div className="space-y-2">
+                          <Label>撮影場所</Label>
+                          <div className="flex rounded-lg border bg-muted p-1 gap-1">
+                            {segmentBtn(
+                              locationOption === "none",
+                              () => handleLocationOptionChange("none"),
+                              "表示しない",
+                            )}
+                            {segmentBtn(
+                              locationOption === "pref",
+                              () => handleLocationOptionChange("pref"),
+                              prefLabel,
+                              !hasGps,
+                            )}
+                            {segmentBtn(
+                              locationOption === "city",
+                              () => handleLocationOptionChange("city"),
+                              cityLabel,
+                              !hasGps,
+                            )}
+                          </div>
+                          {!hasGps && (
+                            <p className="text-[11px] text-muted-foreground">
+                              この画像には位置情報がありません。特定のブラウザからアップロードした写真はブラウザの仕様により位置情報が削除されることがあります。
+                            </p>
+                          )}
+                          {hasGps &&
+                            locationOption !== "none" &&
+                            !geocoded &&
+                            (isGeocoding ? (
+                              <p className="text-[11px] text-muted-foreground">
+                                撮影場所を解析中…
+                              </p>
+                            ) : geocodeError ? (
+                              <p className="text-[11px] text-destructive">
+                                {geocodeError}
+                              </p>
+                            ) : null)}
                         </div>
-                        {!hasGps && (
+
+                        {hasGps && (
                           <p className="text-[11px] text-muted-foreground">
-                            この画像には位置情報がありません。特定のブラウザからアップロードした写真はブラウザの仕様により位置情報が削除されることがあります。
+                            いかなる場合もサーバーには詳細な位置情報（座標）は保存されず、都道府県名または市区町村名のみが保存されます。
                           </p>
                         )}
-                        {hasGps && locationOption !== "none" && !geocoded && (
-                          isGeocoding ? (
-                            <p className="text-[11px] text-muted-foreground">撮影場所を解析中…</p>
-                          ) : geocodeError ? (
-                            <p className="text-[11px] text-destructive">{geocodeError}</p>
-                          ) : null
-                        )}
                       </div>
+                    );
+                  })()}
+                </div>
 
-                      {hasGps && (
-                        <p className="text-[11px] text-muted-foreground">
-                          いかなる場合もサーバーには詳細な位置情報（座標）は保存されず、都道府県名または市区町村名のみが保存されます。
-                        </p>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
+                {/* ⑤ 同時投稿先（連携サーバーへの公開範囲） */}
+                <div className="space-y-2">
+                  <StepHeader
+                    num={5}
+                    label={`${user.instance.domain || "連携サーバー"} への同時投稿`}
+                  />
+                  <VisibilityPicker
+                    value={visibility}
+                    onChange={setVisibility}
+                    disabled={isLoading || isPosting}
+                  />
+                </div>
 
-              {/* ⑤ 同時投稿先（連携サーバーへの公開範囲） */}
-              <div className="space-y-2">
-                <StepHeader
-                  num={5}
-                  label={`${user.instance.domain || "連携サーバー"} への同時投稿`}
-                />
-                <VisibilityPicker
-                  value={visibility}
-                  onChange={setVisibility}
-                  disabled={isLoading || isPosting}
-                />
-              </div>
-
-              {/* ⑥ 設定保存・投稿 */}
-              <div className="space-y-3">
-                <StepHeader num={6} label="設定保存・投稿" />
-                {/* 現在の設定を初期値として保存（プレビュー/投稿ボタンの上に配置） */}
-                <SaveDefaultsSection
-                  onSave={handleSaveDefaults}
-                  isSaving={isSavingDefaults}
-                  saveSuccess={saveSuccess}
-                  disabled={isLoading || isPosting}
-                  instanceDomain={user.instance.domain}
-                />
-                <div ref={anchorRef}>
-                  <ActionButtons {...actionButtonsProps} />
+                {/* ⑥ 設定保存（投稿ボタンは段組の外・従来位置に配置） */}
+                <div className="space-y-3">
+                  <StepHeader num={6} label="設定保存・投稿" />
+                  {/* 現在の設定を初期値として保存（プレビュー/投稿ボタンの上に配置） */}
+                  <SaveDefaultsSection
+                    onSave={handleSaveDefaults}
+                    isSaving={isSavingDefaults}
+                    saveSuccess={saveSuccess}
+                    disabled={isLoading || isPosting}
+                    instanceDomain={user.instance.domain}
+                  />
                 </div>
               </div>
-            </>
+            </div>
           )}
+        </div>
 
-          {/* 生成結果の詳細情報 */}
-          {hasGenerated && resultInfo && !isLoading && (
+        {/* 投稿ボタン（段組の外。PC では2列合計の幅いっぱいに配置） */}
+        {formState.imageFile && (
+          <div ref={anchorRef} className="mt-6">
+            <ActionButtons {...actionButtonsProps} />
+          </div>
+        )}
+
+        {/* 生成結果の詳細情報（PC では2列合計の幅いっぱいに配置） */}
+        {hasGenerated && resultInfo && !isLoading && (
+          <div className="mt-6">
             <ResultDetails resultInfo={resultInfo} />
-          )}
+          </div>
+        )}
 
-          {/* 他の投稿方法 */}
+        {/* 他の投稿方法（PC では2列合計の幅いっぱいに配置） */}
+        <div className="mt-6">
           <OtherPostMethods />
         </div>
 
@@ -855,7 +981,9 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
       {showSticky && (
         <div
           className="fixed inset-x-0 bottom-0 z-50 border-t bg-background/95 px-4 pt-2 shadow-[0_-2px_8px_rgba(0,0,0,0.08)] backdrop-blur"
-          style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
+          style={{
+            paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)",
+          }}
         >
           <div className="container mx-auto max-w-md">
             <ActionButtons {...actionButtonsProps} />

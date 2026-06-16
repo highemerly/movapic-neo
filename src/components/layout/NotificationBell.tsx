@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Bell, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {

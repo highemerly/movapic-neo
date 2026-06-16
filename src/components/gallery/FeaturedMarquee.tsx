@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
 
 export interface FeaturedMarqueeItem {

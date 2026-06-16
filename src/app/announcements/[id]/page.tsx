@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Info, AlertTriangle, ArrowLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";

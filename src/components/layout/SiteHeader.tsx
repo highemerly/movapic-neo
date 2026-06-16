@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import Image from "next/image";
 import { Menu, ImagePlus, Images, Globe, Server, LayoutDashboard, Heart, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -73,20 +73,20 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
             <DropdownMenuContent align="end" className="w-56">
               {user && (
                 <DropdownMenuItem asChild className="py-3 text-base">
-                  <Link href="/dashboard" className="flex items-center gap-3 cursor-pointer">
+                  <Link href="/dashboard" prefetch className="flex items-center gap-3 cursor-pointer">
                     <LayoutDashboard className="h-5 w-5" />
                     メニュー
                   </Link>
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem asChild className="py-3 text-base">
-                <Link href="/create" className="flex items-center gap-3 cursor-pointer font-semibold">
+                <Link href="/create" prefetch className="flex items-center gap-3 cursor-pointer font-semibold">
                   <ImagePlus className="h-5 w-5" />
                   写真を投稿
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="py-3 text-base">
-                <Link href="/public" className="flex items-center gap-3 cursor-pointer">
+                <Link href="/public" prefetch className="flex items-center gap-3 cursor-pointer">
                   <Globe className="h-5 w-5" />
                   みんなの写真
                 </Link>
@@ -95,6 +95,7 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
                 <DropdownMenuItem asChild className="py-3 text-base">
                   <Link
                     href={`/public?instances=${encodeURIComponent(user.instanceDomain)}`}
+                    prefetch
                     className="flex items-center gap-3 cursor-pointer"
                   >
                     <Server className="h-5 w-5" />

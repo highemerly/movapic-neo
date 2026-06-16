@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { ThumbnailImage } from "./ThumbnailImage";
 import { FavoriteOverlay } from "@/components/favorite/FavoriteOverlay";

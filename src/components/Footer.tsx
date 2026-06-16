@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { FooterThemeToggle } from "@/components/FooterThemeToggle";
 
 export function Footer() {

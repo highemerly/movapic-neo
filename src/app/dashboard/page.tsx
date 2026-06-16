@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Globe, Server, Heart, ChevronRight, Settings2, ShieldCheck, SlidersHorizontal, Trophy, Images, Calendar, Map as MapIcon } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -207,7 +207,7 @@ export default async function DashboardPage() {
             <div className="flex items-center gap-4 pr-20">
               {user.avatarUrl && (
                 <div className="relative flex-shrink-0">
-                  <Link href={`/u/${selfSeg}`} className="block">
+                  <Link href={`/u/${selfSeg}`} prefetch className="block">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={getAvatarUrl(user.avatarUrl) ?? user.avatarUrl}
@@ -238,7 +238,7 @@ export default async function DashboardPage() {
               </p>
             )}
             <div className="mt-3 grid grid-cols-4 gap-2">
-              <Link href={`/u/${selfSeg}`}>
+              <Link href={`/u/${selfSeg}`} prefetch>
                 <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="一覧" title="投稿数">
                   <Images className="h-5 w-5" />
                   <span className="leading-none whitespace-nowrap">
@@ -247,7 +247,7 @@ export default async function DashboardPage() {
                   </span>
                 </Button>
               </Link>
-              <Link href={`/u/${selfSeg}/calendar`}>
+              <Link href={`/u/${selfSeg}/calendar`} prefetch>
                 <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="カレンダー" title="連続投稿日数">
                   <Calendar className="h-5 w-5" />
                   <span className="leading-none whitespace-nowrap">
@@ -257,7 +257,7 @@ export default async function DashboardPage() {
                   </span>
                 </Button>
               </Link>
-              <Link href={`/u/${selfSeg}/map`}>
+              <Link href={`/u/${selfSeg}/map`} prefetch>
                 <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="地図" title="都道府県数">
                   <MapIcon className="h-5 w-5" />
                   <span className="leading-none whitespace-nowrap">
@@ -266,7 +266,7 @@ export default async function DashboardPage() {
                   </span>
                 </Button>
               </Link>
-              <Link href={`/u/${selfSeg}/achievements`}>
+              <Link href={`/u/${selfSeg}/achievements`} prefetch>
                 <Button variant="outline" className="w-full h-14 flex flex-col gap-1 justify-center" aria-label="実績" title="獲得実績（金・銀）">
                   <span className="flex items-center gap-1 leading-none whitespace-nowrap">
                     <Trophy className="h-3.5 w-3.5 fill-amber-400 text-amber-600" />
@@ -282,6 +282,7 @@ export default async function DashboardPage() {
             {topFavoriteImage && (
               <Link
                 href={`/u/${selfSeg}/status/${topFavoriteImage.id}`}
+                prefetch
                 className="mt-3 flex items-center gap-3 rounded-lg border overflow-hidden hover:bg-muted/50 transition-colors group"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}

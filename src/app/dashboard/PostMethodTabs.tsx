@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, ReactNode, ReactElement } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";

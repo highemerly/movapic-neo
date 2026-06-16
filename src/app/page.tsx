@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import Image from "next/image";
 import { unstable_cache } from "next/cache";
 import prisma from "@/lib/db";

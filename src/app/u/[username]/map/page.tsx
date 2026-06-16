@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/Link";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getAvatarUrl } from "@/lib/avatar";

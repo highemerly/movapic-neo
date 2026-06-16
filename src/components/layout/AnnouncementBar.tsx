@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { X, Info, AlertTriangle } from "lucide-react";
 import {
   announcements,

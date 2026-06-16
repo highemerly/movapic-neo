@@ -12,7 +12,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { useRouter } from "next/navigation";
 import { Plus, Minus, RotateCcw } from "lucide-react";
 import { JAPAN_TILE_GRID, PREFECTURE_BY_CODE } from "@/lib/geocode/prefectures";

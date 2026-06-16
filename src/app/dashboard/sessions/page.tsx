@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { ChevronLeft } from "lucide-react";
 import { getCurrentUser, getCurrentSessionJti } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
