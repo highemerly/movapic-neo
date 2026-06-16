@@ -79,6 +79,13 @@
 - 処理タイムアウト: 30秒（超過時は504エラー）
 - レスポンスにContent-Lengthヘッダーを含む
 
+### RSCプリフェッチ（`?_rsc=` クエリ）
+App Router の `<Link>` はビューポート進入で対象ルートの RSC ペイロード（`?_rsc=...` 付き fetch）を自動プリフェッチする。画像カードのグリッド等で1ページ数十件のリクエストが発生したため、**原則すべてのプリフェッチをオプトアウト**する方針。
+- `next/link` を直接 import せず、必ず `import Link from "@/components/Link"`（[src/components/Link.tsx](src/components/Link.tsx)）を使う。これは `prefetch={false}` を既定にした素の転送ラッパー。`prefetch={false}` でもホバー/フォーカス時は先読みされるのでクリック体感は維持される。
+- **明示的に先読みしたい主要動線だけ** `<Link href=... prefetch>` でオプトイン。
+- プリフェッチは遷移先URLをキーに Router Cache へ入るため、**同一URLは1箇所だけ `prefetch` すれば十分**（ページ内の他の同URLリンクもキャッシュを再利用）。逆に**同じURLを複数の `<Link prefetch>` で持つと、各リンクがマウント時に同時発火してキャッシュミスし、同一ページへ `?_rsc=` リクエストが重複して飛ぶ**ので避ける。
+- 現在オプトイン済みの箇所: SiteHeaderのハンバーガーメニュー（`/dashboard`・`/create`・`/public`・`/public?instances=...`）、`/u/[username]` のタブ（一覧/カレンダー/地図/実績）、`/dashboard` の「あなたの情報」セクション内のLink（アバター＋4スタットボタン＋人気投稿。`/u/[selfSeg]` への prefetch はスタットボタン側1箇所に集約し、アバターは prefetch なし）。
+
 ## API
 
 ### POST /api/v1/generate

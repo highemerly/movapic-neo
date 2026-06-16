@@ -207,7 +207,9 @@ export default async function DashboardPage() {
             <div className="flex items-center gap-4 pr-20">
               {user.avatarUrl && (
                 <div className="relative flex-shrink-0">
-                  <Link href={`/u/${selfSeg}`} prefetch className="block">
+                  {/* prefetch は下のスタットボタン（同一URL /u/[selfSeg]）に集約。
+                      同じURLを2箇所で prefetch すると両方が同時に発火して二重リクエストになる。 */}
+                  <Link href={`/u/${selfSeg}`} className="block">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={getAvatarUrl(user.avatarUrl) ?? user.avatarUrl}
