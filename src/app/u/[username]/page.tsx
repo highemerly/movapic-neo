@@ -72,7 +72,7 @@ export default async function UserGalleryPage({ params }: UserGalleryPageProps) 
       isPublic: true,
       id: { notIn: pinnedImageIds },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: 20,
     select: {
       id: true,

@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
           user: { instance: { domain: { in: instanceDomains } } },
         }),
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit + 1,
       ...(cursor && {
         cursor: { id: cursor },

@@ -31,7 +31,7 @@ export default async function PublicTimelinePage({
         user: { instance: { domain: { in: instanceDomains } } },
       }),
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: 20,
     select: {
       id: true,

@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     const images = await prisma.image.findMany({
       where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit + 1, // 次のページがあるか確認するため+1
       ...(cursor && {
         cursor: { id: cursor },

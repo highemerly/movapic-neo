@@ -28,7 +28,7 @@ export default async function FavoritePage() {
         array_contains: [{ acct: viewerAcct }] as Prisma.InputJsonValue,
       },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: PAGE_SIZE,
     select: {
       id: true,

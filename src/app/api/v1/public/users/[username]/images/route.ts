@@ -63,7 +63,7 @@ export async function GET(
         isPublic: true,
         ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: limit + 1,
       ...(cursor && {
         cursor: { id: cursor },
