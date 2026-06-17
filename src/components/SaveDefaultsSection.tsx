@@ -1,14 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Bookmark, Check, ChevronDown } from "lucide-react";
+import { Bookmark, Check } from "lucide-react";
 
 interface SaveDefaultsSectionProps {
   onSave: () => void;
   isSaving: boolean;
   saveSuccess: boolean;
   disabled?: boolean;
-  instanceDomain?: string;
 }
 
 export function SaveDefaultsSection({
@@ -16,11 +14,7 @@ export function SaveDefaultsSection({
   isSaving,
   saveSuccess,
   disabled,
-  instanceDomain,
 }: SaveDefaultsSectionProps) {
-  const [open, setOpen] = useState(false);
-  const domain = instanceDomain || "連携サーバー";
-
   return (
     <div className="text-sm space-y-1.5">
       <button

@@ -8,7 +8,6 @@ import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 
 interface PostMethodTabsProps {
-  instanceDomain: string;
   instanceType: string;
   mentionSettingsContent: ReactNode;
   emailSettingsContent: ReactNode;
@@ -17,7 +16,6 @@ interface PostMethodTabsProps {
 type TabId = "web" | "mention" | "email";
 
 export function PostMethodTabs({
-  instanceDomain: _instanceDomain,
   instanceType,
   mentionSettingsContent,
   emailSettingsContent,

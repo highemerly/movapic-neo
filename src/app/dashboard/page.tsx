@@ -320,7 +320,6 @@ export default async function DashboardPage() {
           <h2 className="text-lg font-semibold mb-2">投稿する</h2>
           <div className="bg-muted rounded-lg p-4">
             <PostMethodTabs
-              instanceDomain={user.instance.domain}
               instanceType={user.instance.type}
               mentionSettingsContent={mentionSettingsContent}
               emailSettingsContent={emailSettingsContent}

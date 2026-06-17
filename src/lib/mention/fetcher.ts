@@ -93,6 +93,10 @@ export async function fetchMentionNotifications(
   const url = new URL(`${instanceUrl}/api/v1/notifications`);
   url.searchParams.set("types[]", "mention");
   url.searchParams.set("limit", String(limit));
+  // Mastodon 4.3+ の通知ポリシーで filter された通知（フォロー外・新規アカウント等の
+  // 「保留中の通知」）も取得対象に含める。これを付けないと、ストリーミング（user:notification は
+  // filtered を配信しない）と REST の両経路で取りこぼす。dedup は jobKey で担保されるため安全。
+  url.searchParams.set("include_filtered", "true");
   if (sinceId) {
     url.searchParams.set("since_id", sinceId);
   }

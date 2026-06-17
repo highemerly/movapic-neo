@@ -953,7 +953,6 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
                     isSaving={isSavingDefaults}
                     saveSuccess={saveSuccess}
                     disabled={isLoading || isPosting}
-                    instanceDomain={user.instance.domain}
                   />
                 </div>
               </div>
