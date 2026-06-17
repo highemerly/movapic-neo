@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Trophy } from "lucide-react";
+import { Sparkles, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -27,6 +27,17 @@ export interface GrantedItem {
   category: string;
   grantedAt: string; // ISO
 }
+
+// ディープリンク（?a=）到達時の獲得演出で散らすキラキラの配置（決め打ち）。
+// 投稿直後の AchievementCelebration と同じ animate-sparkle を流用する。
+const SPARKLES = [
+  { top: "10%", left: "8%", size: 16, delay: "0s" },
+  { top: "14%", left: "88%", size: 13, delay: "0.2s" },
+  { top: "72%", left: "6%", size: 15, delay: "0.4s" },
+  { top: "80%", left: "90%", size: 18, delay: "0.1s" },
+  { top: "44%", left: "3%", size: 11, delay: "0.5s" },
+  { top: "40%", left: "94%", size: 11, delay: "0.3s" },
+];
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("ja-JP", {
@@ -80,6 +91,17 @@ function entryMatchesKey(entry: Entry, key: string): boolean {
   if (entry.kind === "single") return entry.def.key === key;
   if (entry.kind === "ladder") return entry.defs.some((d) => d.key === key);
   return key.startsWith(`${PERFECT_MONTH_CATEGORY}:`); // perfectMonth
+}
+
+/** エントリが1つでも獲得済みか（獲得演出を出してよいかの判定に使う）。 */
+function isEntryAchieved(
+  entry: Entry,
+  grantedMap: Map<string, string>,
+  perfectMonths: GrantedItem[]
+): boolean {
+  if (entry.kind === "single") return grantedMap.has(entry.def.key);
+  if (entry.kind === "ladder") return entry.defs.some((d) => grantedMap.has(d.key));
+  return perfectMonths.length > 0;
 }
 
 function tileModel(
@@ -191,11 +213,14 @@ function DetailBody({
   grantedMap,
   ladderValues,
   perfectMonths,
+  celebrate = false,
 }: {
   entry: Entry;
   grantedMap: Map<string, string>;
   ladderValues: Record<string, number>;
   perfectMonths: GrantedItem[];
+  /** 獲得演出中はアイコンをポップさせる（ディープリンク到達時のみ true） */
+  celebrate?: boolean;
 }) {
   if (entry.kind === "single") {
     const { def } = entry;
@@ -208,6 +233,7 @@ function DetailBody({
         title={hidden ? "？？？" : def.title}
         rank={achieved ? def.rank : null}
         achieved={achieved}
+        celebrate={celebrate}
         description={hidden ? "達成すると公開されるシークレット実績です" : def.description}
       >
         {achieved ? (
@@ -235,6 +261,7 @@ function DetailBody({
         title={top?.title ?? tiers[0]?.title ?? entry.ladderKey}
         rank={top?.rank ?? null}
         achieved={any}
+        celebrate={celebrate}
         description={
           meta ? `${meta.label}：現在 ${currentValue}${unit}` : undefined
         }
@@ -291,6 +318,7 @@ function DetailBody({
       title="皆勤賞"
       rank={any ? "gold" : null}
       achieved={any}
+      celebrate={celebrate}
       description="1ヶ月の間毎日1枚以上投稿すると獲得できます（月4日までは救済措置があり、別日に穴埋め投稿も可能です）"
     >
       {any ? (
@@ -325,6 +353,7 @@ function DetailShell({
   achieved,
   description,
   children,
+  celebrate = false,
 }: {
   icon: string;
   title: string;
@@ -332,6 +361,8 @@ function DetailShell({
   achieved: boolean;
   description?: string;
   children: React.ReactNode;
+  /** 獲得演出中はアイコンをポップさせる */
+  celebrate?: boolean;
 }) {
   return (
     <>
@@ -340,6 +371,7 @@ function DetailShell({
           <span
             className={cn(
               "relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full",
+              celebrate && achieved && "animate-trophy-pop",
               achieved
                 ? "bg-amber-200 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
                 : "bg-muted text-muted-foreground"
@@ -413,15 +445,36 @@ export function AchievementsView({
   const router = useRouter();
   const pathname = usePathname();
   const aParam = searchParams.get("a");
+  // 「今まさに獲得した」専用フラグ。ボット返信リンクなど、獲得直後の動線だけが付ける。
+  // 画像詳細ページの実績チップ（?a= のみ）からの遷移では演出しないための区別。
+  const celebrateParam = searchParams.get("celebrate") === "1";
 
-  const [selected, setSelected] = useState<Entry | null>(() => {
+  // マウント時に ?a= で開く初期エントリ（ボット返信・投稿直後の獲得演出からの遷移）。
+  const initialEntry = useMemo(() => {
     if (!aParam) return null;
     const entries = sections.flatMap((s) => s.entries);
     return entries.find((e) => entryMatchesKey(e, aParam)) ?? null;
-  });
+  }, [aParam, sections]);
+
+  const [selected, setSelected] = useState<Entry | null>(initialEntry);
+
+  // 獲得演出は「celebrate=1 付きで到達し、かつ獲得済み」のときだけ。
+  // 通常のタイルクリックや画像詳細ページの実績チップ（?a= のみ）では演出しない。
+  const [celebrate, setCelebrate] = useState<boolean>(
+    () =>
+      celebrateParam &&
+      initialEntry != null &&
+      isEntryAchieved(initialEntry, grantedMap, perfectMonths)
+  );
+
+  const openTile = (entry: Entry) => {
+    setSelected(entry);
+    setCelebrate(false);
+  };
 
   const closeModal = () => {
     setSelected(null);
+    setCelebrate(false);
     // ディープリンク経由なら URL から ?a= を消す（閉じた後に再オープンしない・履歴を汚さない）
     if (aParam) router.replace(pathname, { scroll: false });
   };
@@ -436,7 +489,7 @@ export function AchievementsView({
               <Tile
                 key={entry.id}
                 model={tileModel(entry, grantedMap, perfectMonths)}
-                onClick={() => setSelected(entry)}
+                onClick={() => openTile(entry)}
               />
             ))}
           </div>
@@ -444,13 +497,41 @@ export function AchievementsView({
       ))}
 
       <Dialog open={selected != null} onOpenChange={(o) => !o && closeModal()}>
-        <DialogContent>
+        <DialogContent
+          className={cn(
+            celebrate &&
+              "overflow-hidden border-amber-300/60 bg-gradient-to-b from-amber-50 to-white dark:border-amber-700/50 dark:from-amber-950/60 dark:to-background"
+          )}
+        >
+          {celebrate && (
+            <>
+              {/* キラキラ（装飾・クリックを邪魔しない） */}
+              {SPARKLES.map((s, i) => (
+                <Sparkles
+                  key={i}
+                  aria-hidden
+                  className="animate-sparkle pointer-events-none absolute text-amber-400"
+                  style={{
+                    top: s.top,
+                    left: s.left,
+                    width: s.size,
+                    height: s.size,
+                    animationDelay: s.delay,
+                  }}
+                />
+              ))}
+              <p className="text-center text-xs font-bold tracking-widest text-amber-600 dark:text-amber-400">
+                🎉 ACHIEVEMENT
+              </p>
+            </>
+          )}
           {selected && (
             <DetailBody
               entry={selected}
               grantedMap={grantedMap}
               ladderValues={ladderValues}
               perfectMonths={perfectMonths}
+              celebrate={celebrate}
             />
           )}
         </DialogContent>

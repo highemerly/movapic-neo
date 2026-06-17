@@ -14,6 +14,8 @@ import { OutputFormat, MAX_TEXT_LENGTH } from "@/types";
 import { ErrorCodes } from "@/lib/errors";
 import { USER_AGENT } from "@/lib/userAgent";
 import { assertSafeRemoteUrl } from "@/lib/security/ssrf";
+import { resolveAchievement } from "@/lib/achievements/catalog";
+import { userPathSegment } from "@/lib/userHandle";
 
 const REQUEST_TIMEOUT = 30000;
 const MAX_RETRY_COUNT = 2;
@@ -469,6 +471,33 @@ export async function processOneMention(
       `処理が完了しました (${requestId})\n処理時間: ${elapsedSeconds}秒`,
       originalVisibility
     );
+  }
+
+  // STEP13: 実績獲得通知（この投稿で新規実績を獲得していればリプライでお知らせ）
+  if (published.newAchievements && published.newAchievements.length > 0) {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+    const seg = userPathSegment(user.username, user.instance.domain);
+    const lines = published.newAchievements.map((a) => {
+      const { title } = resolveAchievement(a.key, a.category);
+      // celebrate=1 は「今まさに獲得した」演出を出すための専用フラグ
+      const url = `${appUrl}/u/${seg}/achievements?a=${encodeURIComponent(a.key)}&celebrate=1`;
+      return `🏆「${title}」\n${url}`;
+    });
+    const header =
+      published.newAchievements.length === 1
+        ? "この投稿で実績を獲得しました！"
+        : `この投稿で実績を${published.newAchievements.length}個獲得しました！`;
+    try {
+      await sendBotReply(
+        statusId,
+        replyToAcct,
+        `${header}\n${lines.join("\n")}`,
+        originalVisibility
+      );
+    } catch (error) {
+      // 通知失敗は本処理の成功を妨げない
+      console.error(`[mention] 実績通知リプライ失敗:`, error);
+    }
   }
 
   console.log(`[mention] 処理完了: statusId=${statusId}, imageId=${imageId}, requestId=${requestId}`);
