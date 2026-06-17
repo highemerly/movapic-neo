@@ -28,7 +28,7 @@ import {
   type AchStats,
   type PostFacts,
 } from "@/lib/achievements/catalog";
-import { summarizeDayCounts } from "@/lib/achievements/perfectMonth";
+import { perfectMonthGrace, summarizeDayCounts } from "@/lib/achievements/perfectMonth";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -80,7 +80,7 @@ interface GrantRow {
   grantedAt: Date;
 }
 
-function replayUser(userId: string, images: ReplayImage[]): GrantRow[] {
+function replayUser(userId: string, images: ReplayImage[], grace: number): GrantRow[] {
   const grants: GrantRow[] = [];
   const grantedKeys = new Set<string>();
 
@@ -176,7 +176,7 @@ function replayUser(userId: string, images: ReplayImage[]): GrantRow[] {
       }
     }
     // 皆勤賞（動的）
-    const pm = evaluatePerfectMonth(stats, post);
+    const pm = evaluatePerfectMonth(stats, post, grace);
     if (pm && !grantedKeys.has(pm)) {
       grantedKeys.add(pm);
       grants.push({
@@ -198,7 +198,12 @@ const EARLY_ADOPTER_CUTOFF = new Date("2026-06-15T00:00:00+09:00");
 
 async function main() {
   const users = await prisma.user.findMany({
-    select: { id: true, username: true, createdAt: true },
+    select: {
+      id: true,
+      username: true,
+      createdAt: true,
+      instance: { select: { domain: true } },
+    },
   });
   console.log(`対象ユーザー: ${users.length}人`);
 
@@ -246,7 +251,7 @@ async function main() {
 
     // 1. 投稿ベースの実績付与
     if (images.length > 0) {
-      const grants = replayUser(user.id, images);
+      const grants = replayUser(user.id, images, perfectMonthGrace(user.instance.domain));
       if (grants.length > 0) {
         const result = await prisma.achievement.createMany({ data: grants, skipDuplicates: true });
         grantedCount += result.count;

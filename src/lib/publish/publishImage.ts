@@ -132,6 +132,7 @@ async function evaluateAchievementsSafely(
       userId: input.user.id,
       post: toPostFacts(input),
       imageId,
+      instanceDomain: input.user.instance.domain,
     });
   } catch (error) {
     console.error("Achievement evaluation failed:", error);

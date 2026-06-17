@@ -12,6 +12,7 @@ import { calculateStreak } from "@/lib/streak";
 import { getRankCounts } from "@/lib/achievements/counts";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
+import { perfectMonthGrace } from "@/lib/achievements/perfectMonth";
 
 export const dynamic = "force-dynamic";
 
@@ -126,6 +127,7 @@ export default async function CalendarPage({
             initialYear={initialYear}
             initialMonth={initialMonth}
             isOwner={isOwner}
+            grace={perfectMonthGrace(user.instance.domain)}
           />
         </TabTransition>
 

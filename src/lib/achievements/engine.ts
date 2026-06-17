@@ -20,6 +20,7 @@ import {
 import {
   currentMonthMakeupStatus,
   daysInMonthOf,
+  perfectMonthGrace,
   perfectMonthKey,
   shouldRemindMakeup,
 } from "./perfectMonth";
@@ -48,11 +49,13 @@ function isUniqueViolation(e: unknown): boolean {
 /**
  * 新規付与すべき実績を選ぶ純粋関数（DBアクセスなし）。
  * 既取得キーは ownedKeys で除外する。
+ * grace は皆勤賞の未投稿許容日数（投稿者の所属インスタンスで決まる）。
  */
 export function selectNewlyGranted(
   stats: AchStats,
   post: PostFacts,
-  ownedKeys: Set<string>
+  ownedKeys: Set<string>,
+  grace: number
 ): GrantCandidate[] {
   const out: GrantCandidate[] = [];
   for (const def of CATALOG) {
@@ -61,7 +64,7 @@ export function selectNewlyGranted(
       out.push({ key: def.key, category: def.category });
     }
   }
-  const pm = evaluatePerfectMonth(stats, post);
+  const pm = evaluatePerfectMonth(stats, post, grace);
   if (pm && !ownedKeys.has(pm)) {
     out.push({ key: pm, category: PERFECT_MONTH_CATEGORY });
   }
@@ -79,8 +82,11 @@ export async function evaluateAndGrant(opts: {
   userId: string;
   post: PostFacts;
   imageId: string;
+  /** 投稿者の所属インスタンスドメイン（皆勤賞の穴埋め枠 grace の決定に使う）。 */
+  instanceDomain: string;
 }): Promise<GrantedAchievement[]> {
-  const { userId, post, imageId } = opts;
+  const { userId, post, imageId, instanceDomain } = opts;
+  const grace = perfectMonthGrace(instanceDomain);
 
   const owned = new Set(
     (
@@ -92,7 +98,7 @@ export async function evaluateAndGrant(opts: {
   );
 
   const stats = await collectStats(userId, post);
-  const candidates = selectNewlyGranted(stats, post, owned);
+  const candidates = selectNewlyGranted(stats, post, owned, grace);
   if (candidates.length === 0) return [];
 
   const granted: GrantedAchievement[] = [];
@@ -122,7 +128,7 @@ export async function evaluateAndGrant(opts: {
 
   // 皆勤賞の穴埋め推奨通知（今日投稿した・穴がある・埋め切っていない人にだけ・月1通）。
   // 投稿フローを止めないため、ここは独立して握りつぶす。
-  await maybeNotifyMakeup(userId, post, stats, imageId).catch((e) =>
+  await maybeNotifyMakeup(userId, post, stats, imageId, grace).catch((e) =>
     console.error("Makeup reminder failed:", e)
   );
 
@@ -139,7 +145,8 @@ async function maybeNotifyMakeup(
   userId: string,
   post: PostFacts,
   stats: AchStats,
-  imageId: string
+  imageId: string,
+  grace: number
 ): Promise<void> {
   const jstDay = toJstDateString(post.createdAt);
   const todayDayNum = Number(jstDay.slice(8, 10));
@@ -149,6 +156,7 @@ async function maybeNotifyMakeup(
     daysInMonth: daysInMonthOf(year, month),
     todayDayNum,
     dayCounts: stats.postMonthDayCounts,
+    grace,
   });
   if (!shouldRemindMakeup(status.skippedSoFar, status.unfilled)) return;
 

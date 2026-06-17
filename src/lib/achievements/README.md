@@ -7,7 +7,7 @@
 | ファイル | 役割 |
 |---|---|
 | `catalog.ts` | 実績定義（カタログ）・カテゴリ／表示順（`ACHIEVEMENT_LAYOUT`）・皆勤賞の動的評価。**サーバー/クライアント両方から import されるので React・サーバー専用APIを入れない**（型・`@/lib/streak`・`@/types` のみ） |
-| `perfectMonth.ts` | **皆勤賞ロジックの単一ソース**。しきい値（`PERFECT_MONTH_GRACE` / `MAKEUP_REMINDER_MAX_SKIPPED`）・穴埋めの日付順マッチング（`computeMakeups`）・達成判定（`isPerfectMonth`）・当月進捗（`currentMonthMakeupStatus`）・穴埋め通知ゲート（`shouldRemindMakeup`）・日別集計（`summarizeDayCounts`）。catalog 同様 React/サーバー専用APIを入れない。live/backfill/カレンダーAPI/通知の4経路がここを共用する |
+| `perfectMonth.ts` | **皆勤賞ロジックの単一ソース**。しきい値（`perfectMonthGrace(domain)` ＝ ホーム handon.club は4・その他は3 / `MAKEUP_REMINDER_MAX_SKIPPED`）・穴埋めの日付順マッチング（`computeMakeups`）・達成判定（`isPerfectMonth`）・当月進捗（`currentMonthMakeupStatus`）・穴埋め通知ゲート（`shouldRemindMakeup`）・日別集計（`summarizeDayCounts`）。catalog 同様 React/サーバー専用APIを入れない。live/backfill/カレンダーAPI/通知の4経路がここを共用する |
 | `stats.ts` | live 用。投稿後に DB から集計（`collectStats`）して `AchStats` を作る |
 | `engine.ts` | live 用。`evaluateAndGrant` が新規付与＋通知作成。`selectNewlyGranted` は純粋関数で live/backfill 共有 |
 | `notifications.ts` | 通知フィード取得（直近90日の `Notification` をサムネ・リンク付きで返す） |
@@ -88,10 +88,11 @@ npm run build             # 本番ビルド（新ルート・静的解析）
 
 月ごとに key が増える（`perfect-month:YYYY-MM`）ため CATALOG には入れず、`evaluatePerfectMonth` で評価する。実績タブでは `ACHIEVEMENT_LAYOUT` の `{ kind: "perfectMonth" }` ブロックが獲得月ぶんのカードを並べる。同様の「無限に増える系」を足すならこの方式に倣う。
 
-**達成条件（穴埋め制度・日付順）**: 「毎日投稿」ではなく「未投稿を `PERFECT_MONTH_GRACE`(=4) 日まで許容し、忘れた過去日を **同月の "後日" の2枚以上投稿（ダブル投稿）** で穴埋めする」。
-穴埋めは日付の前後を見る: ダブル投稿日 D は **D より前の未投稿日のみ** 埋められる（将来日は埋められない＝月末日を忘れると後日が無く埋まらない）。1日のダブルは1日分だけ。`computeMakeups`（古い穴から後日のダブルへ貪欲に対応づける最大マッチング）の件数が `missing(= 月の日数 - distinctDays)` 以上で、かつ `missing <= 4` なら達成（`perfectMonth.ts` の `isPerfectMonth`）。`missing=0`（完全皆勤）は常に成立し、旧「毎日投稿」達成者と後方互換。投稿が増えても穴埋めマッチは単調増加・missing は単調減少で判定は真→偽に戻らないため、当月でも達成時点で付与・👑表示できる。
+**達成条件（穴埋め制度・日付順）**: 「毎日投稿」ではなく「未投稿を grace 日まで許容し、忘れた過去日を **同月の "後日" の2枚以上投稿（ダブル投稿）** で穴埋めする」。
+**grace は投稿者の所属インスタンスで決まる**（`perfectMonthGrace(domain)`：ホームインスタンス handon.club は4日・その他は3日。サービス発祥の handon.club を少しだけ優遇）。判定・進捗・カレンダー注意書きはすべて **その実績の持ち主（投稿者本人）の所属ドメイン** 基準で grace を解決する（閲覧者ではない）。
+穴埋めは日付の前後を見る: ダブル投稿日 D は **D より前の未投稿日のみ** 埋められる（将来日は埋められない＝月末日を忘れると後日が無く埋まらない）。1日のダブルは1日分だけ。`computeMakeups`（古い穴から後日のダブルへ貪欲に対応づける最大マッチング）の件数が `missing(= 月の日数 - distinctDays)` 以上で、かつ `missing <= grace` なら達成（`perfectMonth.ts` の `isPerfectMonth`）。`missing=0`（完全皆勤）は常に成立し、旧「毎日投稿」達成者と後方互換。投稿が増えても穴埋めマッチは単調増加・missing は単調減少で判定は真→偽に戻らないため、当月でも達成時点で付与・👑表示できる。
 
-- 判定・進捗・しきい値・通知ゲートはすべて `perfectMonth.ts` に集約。catalog/stats/backfill/カレンダーAPI/engine は **必ずここを呼ぶ**（式を各所に再実装しない）。
+- 判定・進捗・しきい値・通知ゲートはすべて `perfectMonth.ts` に集約。catalog/stats/backfill/カレンダーAPI/engine は **必ずここを呼ぶ**（式を各所に再実装しない）。grace は呼び出し側が `perfectMonthGrace(投稿者ドメイン)` で求めて渡す（live=`publishImage`→`evaluateAndGrant` が `input.user.instance.domain`、backfill=ユーザーの `instance.domain`、カレンダーAPI=`parseUserHandle` の domain）。
 - カレンダーAPI（`/api/v1/public/users/[username]/calendar`）は `isPerfectMonth` で `isPerfectAttendance` を、`computeMakeups`/`currentMonthMakeupStatus` で穴埋め対応とコールアウトを返す。未来月以外（過去月・当月）で計算。
 - カレンダーUI: 2枚以上投稿した日（穴埋め元）は金リング＋枚数バッジ。**埋まった空き日**は「埋めた日の2枚目に投稿した写真」をサムネにして緑（透明度高め）で塗り、右上に「{何日}日」を出し、その画像ページへリンクする。当月で未埋めの穴が残り皆勤がまだ可能なら穴埋めを促すコールアウト（`callout`: `"today"`＝本日2枚で埋められる／`"tomorrow"`＝今日は穴埋め済みなので翌日）を出す。
 

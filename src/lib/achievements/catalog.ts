@@ -518,14 +518,15 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
 
 /**
  * 皆勤賞（動的キー）。判定式は perfectMonth.ts の isPerfectMonth に集約。
- * 未投稿を GRACE 日まで許容し、その分を「後日のダブル投稿」で穴埋めできる（日付順マッチング）。
+ * 未投稿を grace 日（投稿者の所属インスタンスで決定）まで許容し、その分を
+ * 「後日のダブル投稿」で穴埋めできる（日付順マッチング）。grace は呼び出し側が渡す。
  */
-export function evaluatePerfectMonth(s: AchStats, post: PostFacts): string | null {
+export function evaluatePerfectMonth(s: AchStats, post: PostFacts, grace: number): string | null {
   const ym = toJstDateString(post.createdAt).slice(0, 7); // "2026-06"
   const year = Number(ym.slice(0, 4));
   const month = Number(ym.slice(5, 7));
   const daysInMonth = daysInMonthOf(year, month);
-  return isPerfectMonth({ daysInMonth, dayCounts: s.postMonthDayCounts })
+  return isPerfectMonth({ daysInMonth, dayCounts: s.postMonthDayCounts, grace })
     ? perfectMonthKey(ym)
     : null;
 }

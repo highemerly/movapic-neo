@@ -1,7 +1,7 @@
 /**
  * 皆勤賞ロジックの単一ソース（しきい値・判定式・進捗・穴埋め通知ゲートを集約）。
  *
- * 「皆勤賞」は『未投稿を PERFECT_MONTH_GRACE 日まで許容し、その分を同月の "後日" に
+ * 「皆勤賞」は『未投稿を grace 日まで許容し、その分を同月の "後日" に
  * 2枚以上投稿（＝ダブル投稿）して穴埋めできる』制度。穴埋めは「忘れた過去日」を
  * 「それより後の日のダブル投稿」で埋めるもので、ダブル投稿日 D は D より前の未投稿日のみ
  * 埋められる（将来日は埋められない＝月末日を忘れると後日が無く埋まらない）。1日のダブルは
@@ -12,11 +12,28 @@
  * React・サーバー専用 API を import しないこと（型・純粋関数のみ）。
  */
 
+import { DEFAULT_INSTANCE } from "@/lib/userHandle";
+
 /** 皆勤賞の系列キー（DBの category 列）。動的キーは "perfect-month:YYYY-MM"。 */
 export const PERFECT_MONTH_CATEGORY = "perfect-month";
 
-/** 未投稿として許容する日数。これを超える未投稿があるとその月の皆勤賞は不成立。 */
-export const PERFECT_MONTH_GRACE = 4;
+/**
+ * 未投稿として許容する日数（穴埋め枠）。これを超える未投稿があるとその月の皆勤賞は不成立。
+ * SHAMEZO はホームインスタンス（handon.club）発祥で、その利用促進も兼ねるため、
+ * ホームインスタンス所属ユーザーのみ +1 日だけ優遇する（HOME=4 / その他=3）。
+ * しきい値は所属インスタンスごとに `perfectMonthGrace(domain)` で解決し、
+ * live/backfill/カレンダーAPI のいずれも「投稿者本人の所属インスタンス」基準で判定する。
+ */
+export const PERFECT_MONTH_GRACE_HOME = 4;
+/** ホーム以外のインスタンス所属ユーザーの未投稿許容日数。 */
+export const PERFECT_MONTH_GRACE_DEFAULT = 3;
+
+/** インスタンスドメインに応じた未投稿許容日数（穴埋め枠）を返す。 */
+export function perfectMonthGrace(instanceDomain: string | null | undefined): number {
+  return instanceDomain === DEFAULT_INSTANCE
+    ? PERFECT_MONTH_GRACE_HOME
+    : PERFECT_MONTH_GRACE_DEFAULT;
+}
 
 /** 穴埋め推奨通知を送る／カレンダーで注意を促す「過ぎた未投稿日数」の上限。超えたら出さない。 */
 export const MAKEUP_REMINDER_MAX_SKIPPED = 5;
@@ -107,20 +124,22 @@ export function computeMakeups(args: {
 
 /**
  * 皆勤賞の達成判定（純粋・日付対応）。
- * missing(= daysInMonth - distinctDays) が GRACE 以内で、かつ全ての未投稿日が
+ * missing(= daysInMonth - distinctDays) が grace 以内で、かつ全ての未投稿日が
  * 「後日のダブル投稿」で埋まり切っている（穴埋めマッチ数 >= missing）なら達成。
  * missing=0（完全皆勤）は常に成立（従来達成者と後方互換）。
  * 月末日を忘れた場合は埋める後日が無いので不成立になる（新ルールの意図どおり）。
+ * grace は投稿者の所属インスタンスで決まる（`perfectMonthGrace`）。
  */
 export function isPerfectMonth(args: {
   daysInMonth: number;
   dayCounts: DayCounts;
+  grace: number;
 }): boolean {
-  const { daysInMonth } = args;
+  const { daysInMonth, grace } = args;
   const count = toCountFn(args.dayCounts);
   const distinctDays = countDistinct(count, daysInMonth);
   const missing = daysInMonth - distinctDays;
-  if (missing < 0 || missing > PERFECT_MONTH_GRACE) return false;
+  if (missing < 0 || missing > grace) return false;
   if (missing === 0) return true;
   const fills = computeMakeups({ lastDay: daysInMonth, holeLastDay: daysInMonth, count }).length;
   return fills >= missing;
@@ -136,20 +155,22 @@ export interface CurrentMonthMakeupStatus {
   unfilled: number;
   /** 今日すでにダブル投稿しているか（count(today) >= 2 ＝ 今日の穴埋め枠を使用済み）。 */
   todayUsedMakeup: boolean;
-  /** まだ皆勤賞に手が届く範囲か（skippedSoFar <= GRACE）。 */
+  /** まだ皆勤賞に手が届く範囲か（skippedSoFar <= grace）。 */
   stillAchievable: boolean;
 }
 
 /**
  * 当月の穴埋め状況を計算（純粋）。todayDayNum は JST の今日の日(1-31)。
  * matches は「今日まで（今日のダブルを含む）」で、穴は「今日より前」だけを対象にする。
+ * grace は投稿者の所属インスタンスで決まる（`perfectMonthGrace`）。
  */
 export function currentMonthMakeupStatus(args: {
   daysInMonth: number;
   todayDayNum: number;
   dayCounts: DayCounts;
+  grace: number;
 }): CurrentMonthMakeupStatus {
-  const { todayDayNum } = args;
+  const { todayDayNum, grace } = args;
   const count = toCountFn(args.dayCounts);
   const matches = computeMakeups({
     lastDay: todayDayNum,
@@ -163,7 +184,7 @@ export function currentMonthMakeupStatus(args: {
     skippedSoFar,
     unfilled: skippedSoFar - matches.length,
     todayUsedMakeup: count(todayDayNum) >= 2,
-    stillAchievable: skippedSoFar <= PERFECT_MONTH_GRACE,
+    stillAchievable: skippedSoFar <= grace,
   };
 }
 

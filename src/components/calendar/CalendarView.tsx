@@ -7,6 +7,8 @@ import { StackedSquaresIcon } from "./StackedSquaresIcon";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isJapaneseHoliday } from "@/lib/holidays";
+import { PERFECT_MONTH_GRACE_HOME } from "@/lib/achievements/perfectMonth";
+import { DEFAULT_INSTANCE } from "@/lib/userHandle";
 import { DayCell } from "./DayCell";
 
 interface DayData {
@@ -49,6 +51,8 @@ interface CalendarViewProps {
   initialMonth: number;
   /** 閲覧者がこのカレンダーの持ち主本人か（穴埋め促しコールアウトの表示制御）。 */
   isOwner: boolean;
+  /** このカレンダーの持ち主の未投稿許容日数（穴埋め枠。所属インスタンスで決まる注意書きの数字）。 */
+  grace: number;
 }
 
 /**
@@ -107,6 +111,7 @@ export function CalendarView({
   initialYear,
   initialMonth,
   isOwner,
+  grace,
 }: CalendarViewProps) {
   const router = useRouter();
   const [year, setYear] = useState(initialYear);
@@ -314,7 +319,8 @@ export function CalendarView({
           1ヶ月間毎日投稿すれば、カレンダーが埋まって皆勤賞の称号が得られます。皆勤賞はSHAMEZOにおける最高の栄誉です。
         </p>
         <p>
-          もし投稿を忘れてしまっても大丈夫。同じ月の後日に1日2枚以上投稿すれば、2枚目の投稿で忘れた日の投稿を「穴埋め」できます（ただし、穴埋めのための投稿は1日につき1回まで・月につき4回まで）。
+          もし投稿を忘れてしまっても大丈夫。同じ月の後日に1日2枚以上投稿すれば、2枚目の投稿で忘れた日の投稿を「穴埋め」できます（ただし、穴埋めのための投稿は1日につき1回まで・月につき{grace}回まで
+          {grace === PERFECT_MONTH_GRACE_HOME && `（${DEFAULT_INSTANCE} ユーザー限定特典／通常は月3回まで）`}）。
         </p>
 
         {/* マーカーの凡例 */}

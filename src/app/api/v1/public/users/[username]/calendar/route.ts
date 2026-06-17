@@ -14,6 +14,7 @@ import {
   currentMonthMakeupStatus,
   daysInMonthOf,
   isPerfectMonth,
+  perfectMonthGrace,
   type MakeupMatch,
 } from "@/lib/achievements/perfectMonth";
 
@@ -217,19 +218,21 @@ export async function GET(
 
     if (!isFutureMonth) {
       const daysInMonth = daysInMonthOf(year, month);
+      // 未投稿許容日数（穴埋め枠）はカレンダーの持ち主の所属インスタンスで決まる。
+      const grace = perfectMonthGrace(domain);
       // 日(1-31)→投稿数。穴埋めの日付順マッチング・達成判定の単一ソースに渡す。
       const dayCounts: Record<number, number> = {};
       for (const [dayStr, d] of Object.entries(days)) dayCounts[Number(dayStr)] = d.count;
       const count = (d: number) => dayCounts[d] ?? 0;
 
-      isPerfectAttendance = isPerfectMonth({ daysInMonth, dayCounts });
+      isPerfectAttendance = isPerfectMonth({ daysInMonth, dayCounts, grace });
 
       // 穴埋め対応（古い穴 ← 後日のダブル）。当月は今日まで、過去月は月末まで。
       let matches: MakeupMatch[];
       let callout: "today" | "tomorrow" | null = null;
       if (isCurrentMonth) {
         const todayDayNum = Number(toJstDateString(now).slice(8, 10));
-        const status = currentMonthMakeupStatus({ daysInMonth, todayDayNum, dayCounts });
+        const status = currentMonthMakeupStatus({ daysInMonth, todayDayNum, dayCounts, grace });
         matches = status.matches;
         // コールアウトは「まだ皆勤に届く範囲で、未埋めの穴が残る」ときだけ。
         if (status.unfilled > 0 && status.stillAchievable) {
