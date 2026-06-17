@@ -277,9 +277,11 @@ export async function processOneMention(
   // STEP2: ユーザー検索（コマンド解析より先に実行してデフォルト設定を取得）
   const user = await findUserByAcct(notification.account.acct, botInstanceDomain);
   if (!user) {
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+    const loginLine = appUrl ? `\n${appUrl}` : "";
     return handleErrorBeforeUser(
       ErrorCodes.NOT_FOUND,
-      "このサービスにアカウント登録されていません。サービスページでログインしてください。"
+      `SHAMEZOにアカウント登録すると、Botにメンションするだけで画像に文字入れできます。下記ページからお使いのアカウントでログインしてご利用ください。${loginLine}`
     );
   }
 
@@ -298,7 +300,7 @@ export async function processOneMention(
       },
     });
     const message = withRequestId && requestId
-      ? `${errorMessage} (${requestId})`
+      ? `${errorMessage}\n何度も同じエラーになる場合は、Request ID: ${requestId}を添えてお問い合わせください。`
       : errorMessage;
     await sendBotReply(statusId, replyToAcct, message, originalVisibility);
     return { statusId, success: false, skipped: false, error: errorMessage, errorCode };
@@ -367,7 +369,7 @@ export async function processOneMention(
     console.error(`[mention] 画像fetch失敗:`, error);
     return handleError(
       ErrorCodes.INTERNAL_ERROR,
-      "画像の取得に失敗しました。",
+      "画像の取得に失敗しました。再投稿してみてください。",
       true
     );
   }
@@ -392,7 +394,7 @@ export async function processOneMention(
     console.error(`[mention] 画像処理失敗:`, error);
     return handleError(
       ErrorCodes.IMAGE_PROCESS_FAILED,
-      "画像の処理に失敗しました。",
+      "画像の処理に失敗しました。再投稿してみてください。",
       true
     );
   }
@@ -430,12 +432,12 @@ export async function processOneMention(
     });
   } catch (error) {
     console.error(`[mention] 保存/投稿失敗:`, error);
-    return handleError(ErrorCodes.INTERNAL_ERROR, "画像の保存に失敗しました。", true);
+    return handleError(ErrorCodes.INTERNAL_ERROR, "画像の保存に失敗しました。再投稿してみてください。", true);
   }
 
   if (published.postError) {
     console.error(`[mention] 再投稿失敗: ${published.postError}`);
-    return handleError(ErrorCodes.INTERNAL_ERROR, "投稿に失敗しました。", true);
+    return handleError(ErrorCodes.INTERNAL_ERROR, "投稿に失敗しました。再投稿してみてください。", true);
   }
 
   const imageId = published.imageId;
