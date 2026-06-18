@@ -21,4 +21,4 @@ export const announcements: Announcement[] = [
 ];
 
 // お知らせの有効期間（日数）
-export const ANNOUNCEMENT_EXPIRY_DAYS = 21;
+export const ANNOUNCEMENT_EXPIRY_DAYS = 10;
