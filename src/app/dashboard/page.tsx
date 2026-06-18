@@ -98,8 +98,8 @@ export default async function DashboardPage() {
   // 自分の /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）
   const selfSeg = userPathSegment(user.username, user.instance.domain);
   const totalFavorites = favoritesAgg._sum.favoriteCount ?? 0;
-  // 直近20投稿からランダムに最大4枚
-  const previewImages = pickRandomSample(recentPublicImages, 4);
+  // 直近20投稿からランダムに最大5枚（モバイル4列/PC5列。5枚目はモバイルでは非表示）
+  const previewImages = pickRandomSample(recentPublicImages, 5);
   const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
   // Bot設定を環境変数から取得
@@ -359,12 +359,14 @@ export default async function DashboardPage() {
               <div className="relative mt-3">
                 <div className="absolute -top-1.5 left-[16.66%] h-3 w-3 -translate-x-1/2 rotate-45 border-l border-t bg-background" />
                 <div className="rounded-lg border bg-background p-3">
-                  <div className="grid grid-cols-4 gap-2">
-                    {previewImages.map((img) => (
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                    {previewImages.map((img, index) => (
                       <Link
                         key={img.id}
                         href={`/u/${userPathSegment(img.user.username, img.user.instance.domain)}/status/${img.id}`}
-                        className="block overflow-hidden rounded-md border transition-opacity hover:opacity-80"
+                        className={`overflow-hidden rounded-md border transition-opacity hover:opacity-80 ${
+                          index === 4 ? "hidden sm:block" : "block"
+                        }`}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
