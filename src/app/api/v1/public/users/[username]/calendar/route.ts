@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { parseUserHandle } from "@/lib/userHandle";
 import { toJstDateString } from "@/lib/streak";
+import { CACHE_PUBLIC_MEDIUM } from "@/lib/http";
 import {
   computeMakeups,
   currentMonthMakeupStatus,
@@ -267,7 +268,7 @@ export async function GET(
 
     return NextResponse.json(response, {
       headers: {
-        "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+        "Cache-Control": CACHE_PUBLIC_MEDIUM,
       },
     });
   } catch (error) {

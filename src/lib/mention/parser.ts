@@ -15,6 +15,15 @@ import {
   FONT_LABELS,
   ARRANGEMENT_LABELS,
 } from "@/types";
+import {
+  POSITION_MAP,
+  COLOR_MAP,
+  SIZE_MAP,
+  FONT_MAP,
+  ARRANGEMENT_MAP,
+  VISIBILITY_MAP,
+  decodeHtmlEntities,
+} from "@/lib/options/maps";
 
 // コマンドで指定可能なvisibility（public/unlistedのみ）
 export type CommandVisibility = "public" | "unlisted";
@@ -46,48 +55,8 @@ export interface UserDefaults {
   arrangement?: string | null;
 }
 
-// オプションのマッピング（email parserと同じ）
-const POSITION_MAP: Record<string, Position> = {
-  "上": "top",
-  "下": "bottom",
-  "左": "left",
-  "右": "right",
-};
-
-const COLOR_MAP: Record<string, Color> = {
-  "白": "white",
-  "赤": "red",
-  "青": "blue",
-  "緑": "green",
-  "黄": "yellow",
-  "茶": "brown",
-  "桃": "pink",
-  "橙": "orange",
-};
-
-const SIZE_MAP: Record<string, Size> = {
-  "小": "small",
-  "中": "medium",
-  "大": "large",
-  "特大": "extra-large",
-};
-
-const FONT_MAP: Record<string, FontFamily> = {
-  "ふい字": "hui-font",
-  "ゴシック": "noto-sans-jp",
-  "ラノベ": "light-novel-pop",
-};
-
-const ARRANGEMENT_MAP: Record<string, Arrangement> = {
-  "ネオン": "neon",
-  "ハンコ": "stamp",
-};
-
-// コマンドで指定可能なvisibility（public/unlistedのみ）
-const VISIBILITY_MAP: Record<string, CommandVisibility> = {
-  "public": "public",
-  "unlisted": "unlisted",
-};
+// オプションマップ（POSITION/COLOR/SIZE/FONT/ARRANGEMENT/VISIBILITY）と
+// decodeHtmlEntities は @/lib/options/maps から import（email parser と共通）。
 
 const FALLBACK_OPTIONS: ParsedMentionOptions = {
   position: "top",
@@ -112,47 +81,6 @@ function buildDefaultOptions(userDefaults?: UserDefaults): ParsedMentionOptions 
     debug: FALLBACK_OPTIONS.debug,
     keep: FALLBACK_OPTIONS.keep,
   };
-}
-
-// HTMLエンティティのデコード
-const HTML_ENTITIES: Record<string, string> = {
-  "&lt;": "<",
-  "&gt;": ">",
-  "&amp;": "&",
-  "&quot;": "\"",
-  "&apos;": "'",
-  "&#39;": "'",
-  "&nbsp;": " ",
-  "&copy;": "\u00A9",
-  "&reg;": "\u00AE",
-  "&trade;": "\u2122",
-  "&ndash;": "\u2013",
-  "&mdash;": "\u2014",
-  "&lsquo;": "\u2018",
-  "&rsquo;": "\u2019",
-  "&ldquo;": "\u201C",
-  "&rdquo;": "\u201D",
-  "&hellip;": "\u2026",
-  "&yen;": "\u00A5",
-};
-
-function decodeHtmlEntities(text: string): string {
-  let decoded = text;
-  for (const [entity, char] of Object.entries(HTML_ENTITIES)) {
-    decoded = decoded.split(entity).join(char);
-  }
-
-  // 数値エンティティをデコード (&#123; や &#x7B;)
-  decoded = decoded.replace(/&#(\d+);/g, (_, code) => {
-    const num = parseInt(code, 10);
-    return num > 0 && num < 0x10ffff ? String.fromCodePoint(num) : "";
-  });
-  decoded = decoded.replace(/&#x([0-9a-fA-F]+);/g, (_, code) => {
-    const num = parseInt(code, 16);
-    return num > 0 && num < 0x10ffff ? String.fromCodePoint(num) : "";
-  });
-
-  return decoded;
 }
 
 /**

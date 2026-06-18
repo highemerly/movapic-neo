@@ -6,19 +6,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getAvatarUrl } from "@/lib/avatar";
-
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 100;
+import { parsePageLimit, cursorPageArgs, slicePage } from "@/lib/pagination";
+import { CACHE_PUBLIC_SHORT } from "@/lib/http";
+import { PUBLIC_IMAGE_LIST_SELECT } from "@/lib/db/selects";
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const cursor = searchParams.get("cursor");
-    const limitParam = searchParams.get("limit");
-    const limit = Math.min(
-      Math.max(1, parseInt(limitParam || String(DEFAULT_LIMIT), 10)),
-      MAX_LIMIT
-    );
+    const limit = parsePageLimit(searchParams.get("limit"));
 
     // サーバー（インスタンス）絞り込み。カンマ区切りで複数指定可。
     const instancesParam = searchParams.get("instances");
@@ -34,38 +30,11 @@ export async function GET(request: NextRequest) {
         }),
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: limit + 1,
-      ...(cursor && {
-        cursor: { id: cursor },
-        skip: 1,
-      }),
-      select: {
-        id: true,
-        storageKey: true,
-        width: true,
-        height: true,
-        overlayText: true,
-        position: true,
-        favoriteCount: true,
-        createdAt: true,
-        user: {
-          select: {
-            username: true,
-            displayName: true,
-            avatarUrl: true,
-            instance: {
-              select: {
-                domain: true,
-              },
-            },
-          },
-        },
-      },
+      ...cursorPageArgs(cursor, limit),
+      select: PUBLIC_IMAGE_LIST_SELECT,
     });
 
-    const hasMore = images.length > limit;
-    const result = hasMore ? images.slice(0, -1) : images;
-    const nextCursor = hasMore ? result[result.length - 1]?.id : null;
+    const { result, hasMore, nextCursor } = slicePage(images, limit);
 
     return NextResponse.json(
       {
@@ -90,7 +59,7 @@ export async function GET(request: NextRequest) {
       },
       {
         headers: {
-          "Cache-Control": "public, max-age=10, stale-while-revalidate=30",
+          "Cache-Control": CACHE_PUBLIC_SHORT,
         },
       }
     );

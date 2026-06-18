@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
 import { ImageCard } from "@/components/gallery/ImageCard";
-import { MasonryGrid } from "@/components/gallery/MasonryGrid";
-import { GalleryLayoutToggle } from "@/components/gallery/GalleryLayoutToggle";
-import { useGalleryLayout } from "@/hooks/useGalleryLayout";
+import { GalleryGrid } from "@/components/gallery/GalleryGrid";
+import { useInfiniteImages } from "@/hooks/useInfiniteImages";
 
 interface GalleryImage {
   id: string;
@@ -31,106 +29,41 @@ export function UserGalleryClient({
   username,
   pinnedImageIds = [],
 }: UserGalleryClientProps) {
-  const [images, setImages] = useState(initialImages);
-  const [isLoading, setIsLoading] = useState(false);
-  const [nextCursor, setNextCursor] = useState<string | null>(
-    initialImages.length >= 20 ? initialImages[initialImages.length - 1]?.id : null
-  );
-  const loaderRef = useRef<HTMLDivElement>(null);
-  const [layout] = useGalleryLayout();
-
-  const loadMore = useCallback(async () => {
-    if (!nextCursor || isLoading) return;
-
-    setIsLoading(true);
-    try {
+  const { images, isLoading, nextCursor, loaderRef } = useInfiniteImages<GalleryImage>({
+    initialImages,
+    initialCursor:
+      initialImages.length >= 20
+        ? initialImages[initialImages.length - 1]?.id ?? null
+        : null,
+    dedupe: true,
+    fetchPage: async (cursor) => {
       const response = await fetch(
-        `/api/v1/public/users/${username}/images?cursor=${nextCursor}&limit=20`
+        `/api/v1/public/users/${username}/images?cursor=${cursor}&limit=20`
       );
       if (!response.ok) throw new Error("Failed to load more");
-
-      const data = await response.json();
-      setImages((prev) => {
-        const seen = new Set(prev.map((img) => img.id));
-        const fresh = (data.images as GalleryImage[]).filter(
-          (img) => !seen.has(img.id)
-        );
-        return [...prev, ...fresh];
-      });
-      setNextCursor(data.hasMore ? data.nextCursor : null);
-    } catch (error) {
-      console.error("Load more error:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [nextCursor, isLoading, username]);
-
-  useEffect(() => {
-    const loader = loaderRef.current;
-    if (!loader || !nextCursor) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          loadMore();
-        }
-      },
-      { rootMargin: "200px" }
-    );
-
-    observer.observe(loader);
-    return () => observer.disconnect();
-  }, [nextCursor, loadMore]);
-
-  if (images.length === 0) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        まだ画像がありません
-      </div>
-    );
-  }
+      return response.json();
+    },
+  });
 
   return (
-    <div className="relative">
-      <GalleryLayoutToggle />
-      {layout === "packed" ? (
-        <MasonryGrid
-          items={images}
-          aspect={(image) => image.width / image.height}
-          getKey={(image) => image.id}
-          renderItem={(image) => (
-            <ImageCard
-              image={image}
-              publicUrl={publicUrl}
-              username={username}
-              isPinned={pinnedImageIds.includes(image.id)}
-              fill
-            />
-          )}
+    <GalleryGrid
+      images={images}
+      getKey={(image) => image.id}
+      aspect={(image) => image.width / image.height}
+      emptyMessage="まだ画像がありません"
+      endMessage="すべての画像を表示しました"
+      isLoading={isLoading}
+      nextCursor={nextCursor}
+      loaderRef={loaderRef}
+      renderItem={(image, fill) => (
+        <ImageCard
+          image={image}
+          publicUrl={publicUrl}
+          username={username}
+          isPinned={pinnedImageIds.includes(image.id)}
+          fill={fill}
         />
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1">
-          {images.map((image) => (
-            <ImageCard
-              key={image.id}
-              image={image}
-              publicUrl={publicUrl}
-              username={username}
-              isPinned={pinnedImageIds.includes(image.id)}
-            />
-          ))}
-        </div>
       )}
-
-      {/* 無限スクロール用のローダー */}
-      <div ref={loaderRef} className="mt-8 text-center py-4">
-        {isLoading && (
-          <span className="text-muted-foreground">読み込み中...</span>
-        )}
-        {!nextCursor && images.length > 0 && (
-          <span className="text-muted-foreground text-sm">すべての画像を表示しました</span>
-        )}
-      </div>
-    </div>
+    />
   );
 }

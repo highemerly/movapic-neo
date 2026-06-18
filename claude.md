@@ -116,8 +116,8 @@ App Router の `<Link>` はビューポート進入で対象ルートの RSC ペ
 - **処理**: R2アップロード → DB保存 → Fediverse投稿（localの場合はスキップ）
 - **レスポンス**: `{ success, imageId, imagePageUrl, postUrl? }`
 
-### POST /api/v1/ingest/email（内部API・旧 `/api/v1/email-generate`）
-- worker-front が配信。旧パスは後方互換エイリアスとして当面存置（「リリース後クリーンアップ」参照）
+### POST /api/v1/ingest/email（内部API）
+- worker-front が配信。
 - Cloudflare Email Workerから転送されたraw emailを処理（元画像をR2一時領域へ置き、生成〜投稿は worker(consumer) へ enqueue）
 - `X-API-Key`ヘッダーで認証、`X-Email-Prefix`でユーザー特定
 - 件名からオプション解析（例: "上 赤 大"）、本文がテキスト、添付が画像

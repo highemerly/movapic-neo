@@ -8,7 +8,8 @@ import { getCurrentUserWithValidation } from "@/lib/auth/session";
 import { decryptToken } from "@/lib/auth/tokens";
 import { reverseGeocode } from "@/lib/geocode/gsi";
 import { finalizeImage } from "@/lib/compute/client";
-import { publishImage, PublishVisibility } from "@/lib/publish/publishImage";
+import { publishImage } from "@/lib/publish/publishImage";
+import { normalizeVisibility } from "@/lib/visibility";
 import {
   Position,
   FontFamily,
@@ -122,8 +123,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 公開範囲を正規化（フォーム値は null や任意文字列になりうる）
-    const publishVisibility: PublishVisibility =
-      visibility === "local" ? "local" : visibility === "unlisted" ? "unlisted" : "public";
+    const publishVisibility = normalizeVisibility(visibility);
 
     // 保存→投稿（投稿失敗でも画像は残す＝web/email共通ポリシー）
     const result = await publishImage({

@@ -6,9 +6,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { parseUserHandle } from "@/lib/userHandle";
-
-const DEFAULT_LIMIT = 20;
-const MAX_LIMIT = 100;
+import { parsePageLimit, cursorPageArgs, slicePage } from "@/lib/pagination";
+import { CACHE_PUBLIC_SHORT } from "@/lib/http";
 
 export async function GET(
   request: NextRequest,
@@ -34,13 +33,9 @@ export async function GET(
 
     const searchParams = request.nextUrl.searchParams;
     const cursor = searchParams.get("cursor");
-    const limitParam = searchParams.get("limit");
     const startDateParam = searchParams.get("startDate");
     const endDateParam = searchParams.get("endDate");
-    const limit = Math.min(
-      Math.max(1, parseInt(limitParam || String(DEFAULT_LIMIT), 10)),
-      MAX_LIMIT
-    );
+    const limit = parsePageLimit(searchParams.get("limit"));
 
     // 日付フィルタを構築
     const dateFilter: { gte?: Date; lt?: Date } = {};
@@ -64,11 +59,7 @@ export async function GET(
         ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      take: limit + 1,
-      ...(cursor && {
-        cursor: { id: cursor },
-        skip: 1,
-      }),
+      ...cursorPageArgs(cursor, limit),
       select: {
         id: true,
         storageKey: true,
@@ -83,9 +74,7 @@ export async function GET(
       },
     });
 
-    const hasMore = images.length > limit;
-    const result = hasMore ? images.slice(0, -1) : images;
-    const nextCursor = hasMore ? result[result.length - 1]?.id : null;
+    const { result, hasMore, nextCursor } = slicePage(images, limit);
 
     return NextResponse.json(
       {
@@ -99,7 +88,7 @@ export async function GET(
       },
       {
         headers: {
-          "Cache-Control": "public, max-age=10, stale-while-revalidate=30",
+          "Cache-Control": CACHE_PUBLIC_SHORT,
         },
       }
     );

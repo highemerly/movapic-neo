@@ -1,6 +1,7 @@
 "use client";
 
 import { ImageCard } from "./ImageCard";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface ImageGridProps {
   images: Array<{
@@ -20,11 +21,7 @@ interface ImageGridProps {
 
 export function ImageGrid({ images, publicUrl, username, showDelete, onDelete }: ImageGridProps) {
   if (images.length === 0) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        まだ画像がありません
-      </div>
-    );
+    return <EmptyState message="まだ画像がありません" />;
   }
 
   return (

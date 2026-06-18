@@ -217,7 +217,7 @@ export function verifyMiAuthSignature(
  * リクエスト署名を生成（HMAC-SHA256）
  * Cloudflare Worker等の内部サービスからのリクエスト認証に使用
  */
-export function generateRequestSignature(
+function generateRequestSignature(
   timestamp: number,
   bodyHash: string,
   secret: string

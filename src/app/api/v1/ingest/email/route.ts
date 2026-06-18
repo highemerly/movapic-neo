@@ -1,23 +1,25 @@
 /**
  * メール取り込みエンドポイント（producer）
- * POST /api/v1/ingest/email（旧 /api/v1/email-generate）
+ * POST /api/v1/ingest/email
  *
  * Cloudflare Workerから転送されたraw emailを受け取り、元画像をR2一時領域へ置いて
  * Graphile Worker に enqueue するだけ。文字入れ〜投稿は worker(consumer) 側で実行。
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { randomUUID, timingSafeEqual } from "crypto";
+import { randomUUID } from "crypto";
 import { parseEmail } from "@/lib/email/parser";
 import { uploadImage } from "@/lib/storage/storage";
 import { enqueueEmail } from "@/lib/queue";
 import { verifyRequestSignature, hashRequestBody } from "@/lib/auth/crypto";
+import { timingSafeEqualString } from "@/lib/auth/internalAuth";
+import { generateRequestId } from "@/lib/http";
 import prisma from "@/lib/db";
 import { MAX_TEXT_LENGTH, MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from "@/types";
 import { ErrorCodes, errorResponse, handleUnknownError } from "@/lib/errors";
 
 export async function POST(request: NextRequest) {
-  const requestId = `email-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const requestId = generateRequestId("email");
 
   try {
     // リクエストボディを取得
@@ -26,13 +28,7 @@ export async function POST(request: NextRequest) {
     // 内部APIキー検証（タイミング攻撃対策: 長さチェック + timingSafeEqual）
     const apiKey = request.headers.get("X-API-Key");
     const expectedApiKey = process.env.INTERNAL_API_KEY ?? "";
-    const apiKeyBuf = Buffer.from(apiKey ?? "");
-    const expectedApiKeyBuf = Buffer.from(expectedApiKey);
-    if (
-      !expectedApiKey ||
-      apiKeyBuf.length !== expectedApiKeyBuf.length ||
-      !timingSafeEqual(apiKeyBuf, expectedApiKeyBuf)
-    ) {
+    if (!expectedApiKey || !timingSafeEqualString(apiKey ?? "", expectedApiKey)) {
       return errorResponse(
         ErrorCodes.AUTH_INVALID,
         "認証に失敗しました",

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
-import { Check, Loader2 } from "lucide-react";
+import { SaveStatus, type SaveStatusState } from "@/components/ui/save-status";
 
 const BIO_MAX_LENGTH = 40;
 const SAVE_DEBOUNCE_MS = 800;
@@ -13,7 +13,7 @@ interface BioEditFormProps {
   initialBio: string | null;
 }
 
-type SaveState = "idle" | "saving" | "saved" | "error";
+type SaveState = SaveStatusState;
 
 export function BioEditForm({ initialBio }: BioEditFormProps) {
   const router = useRouter();
@@ -66,23 +66,10 @@ export function BioEditForm({ initialBio }: BioEditFormProps) {
       <div className="flex justify-between items-center gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <Label htmlFor="bio-input">プロフィール</Label>
-          {isOverLimit && (
+          {isOverLimit ? (
             <span className="text-xs text-destructive truncate">{BIO_MAX_LENGTH}文字以内で入力してください</span>
-          )}
-          {!isOverLimit && saveState === "saving" && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              保存中...
-            </span>
-          )}
-          {!isOverLimit && saveState === "saved" && (
-            <span className="flex items-center gap-1 text-xs text-green-600">
-              <Check className="h-3 w-3" />
-              保存しました
-            </span>
-          )}
-          {!isOverLimit && saveState === "error" && error && (
-            <span className="text-xs text-destructive truncate">{error}</span>
+          ) : (
+            <SaveStatus state={saveState} error={error} />
           )}
         </div>
         <span className={`text-xs flex-shrink-0 ${isOverLimit ? "text-destructive" : "text-muted-foreground"}`}>

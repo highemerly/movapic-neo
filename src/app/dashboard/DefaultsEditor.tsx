@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { SaveStatus, type SaveStatusState } from "@/components/ui/save-status";
+import { ToggleSwitch } from "@/components/ui/toggle-switch";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { OptionsPanel } from "@/components/OptionsPanel";
 import { VisibilityPicker } from "@/components/VisibilityPicker";
@@ -37,7 +38,7 @@ interface DefaultsEditorProps {
   instanceDomain: string;
 }
 
-type SaveState = "idle" | "saving" | "saved" | "error";
+type SaveState = SaveStatusState;
 
 const SAVE_DEBOUNCE_MS = 400;
 
@@ -234,43 +235,16 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
         <div className="flex-1 min-w-0">
           <p className="text-sm flex items-center flex-wrap gap-x-2">
             設定を保存する
-            {saveState === "saving" && (
-              <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                保存中...
-              </span>
-            )}
-            {saveState === "saved" && (
-              <span className="flex items-center gap-1 text-xs font-normal text-green-600">
-                <Check className="h-3 w-3" />
-                保存しました
-              </span>
-            )}
-            {saveState === "error" && error && (
-              <span className="text-xs font-normal text-destructive">{error}</span>
-            )}
+            <SaveStatus state={saveState} error={error} />
           </p>
           <p className="text-xs text-muted-foreground">
             文字の合成オプションなど好みの設定を保存しておき、初期値として読み込みます。投稿時に変更可能です。原則、全ての投稿方法（Web、Bot、メール）が対象となります。
           </p>
         </div>
-        <div
-          className={`relative flex-shrink-0 w-11 h-6 rounded-full border transition-colors ${
-            saveEnabled ? "bg-primary border-primary" : "bg-input border-border"
-          } ${isTogglingSave ? "opacity-60" : ""}`}
-        >
-          <div
-            className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-              saveEnabled ? "translate-x-6" : "translate-x-1"
-            }`}
-          />
-        </div>
-        <input
-          type="checkbox"
+        <ToggleSwitch
           checked={saveEnabled}
           onChange={handleToggleSave}
           disabled={isTogglingSave}
-          className="sr-only"
         />
       </label>
 
@@ -329,43 +303,16 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
           <p className="text-sm flex items-center flex-wrap gap-x-2">
             元投稿を残す
             <span className="text-xs font-normal text-muted-foreground">（Bot投稿のみ）</span>
-            {mentionKeepSaveState === "saving" && (
-              <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                保存中...
-              </span>
-            )}
-            {mentionKeepSaveState === "saved" && (
-              <span className="flex items-center gap-1 text-xs font-normal text-green-600">
-                <Check className="h-3 w-3" />
-                保存しました
-              </span>
-            )}
-            {mentionKeepSaveState === "error" && mentionKeepError && (
-              <span className="text-xs font-normal text-destructive">{mentionKeepError}</span>
-            )}
+            <SaveStatus state={mentionKeepSaveState} error={mentionKeepError} />
           </p>
           <p className="text-xs text-muted-foreground">
             Botにメンションを送って投稿したとき、写真の投稿が正常に完了しても、元の投稿を自動で削除しません。
           </p>
         </div>
-        <div
-          className={`relative flex-shrink-0 w-11 h-6 rounded-full border transition-colors ${
-            mentionKeep ? "bg-primary border-primary" : "bg-input border-border"
-          } ${isMentionKeepSaving ? "opacity-60" : ""}`}
-        >
-          <div
-            className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-              mentionKeep ? "translate-x-6" : "translate-x-1"
-            }`}
-          />
-        </div>
-        <input
-          type="checkbox"
+        <ToggleSwitch
           checked={mentionKeep}
           onChange={handleToggleMentionKeep}
           disabled={isMentionKeepSaving}
-          className="sr-only"
         />
       </label>
     </div>

@@ -2,14 +2,15 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2 } from "lucide-react";
+import { SaveStatus, type SaveStatusState } from "@/components/ui/save-status";
+import { ToggleSwitch } from "@/components/ui/toggle-switch";
 
 interface LocationMapToggleProps {
   initialEnabled: boolean;
   username: string;
 }
 
-type SaveState = "idle" | "saving" | "saved" | "error";
+type SaveState = SaveStatusState;
 
 /**
  * 地図機能の公開オプトイントグル。
@@ -57,21 +58,7 @@ export function LocationMapToggle({ initialEnabled, username }: LocationMapToggl
         <div className="flex-1 min-w-0">
           <p className="text-sm flex items-center flex-wrap gap-x-2">
             地図を公開する
-            {saveState === "saving" && (
-              <span className="flex items-center gap-1 text-xs font-normal text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                保存中...
-              </span>
-            )}
-            {saveState === "saved" && (
-              <span className="flex items-center gap-1 text-xs font-normal text-green-600">
-                <Check className="h-3 w-3" />
-                保存しました
-              </span>
-            )}
-            {saveState === "error" && error && (
-              <span className="text-xs font-normal text-destructive">{error}</span>
-            )}
+            <SaveStatus state={saveState} error={error} />
           </p>
           <p className="text-xs text-muted-foreground">
             都道府県別の投稿数をユーザーページで他のユーザーに公開します（投稿時に位置情報を明示的に含めた画像のみが集計対象です）。
@@ -85,24 +72,7 @@ export function LocationMapToggle({ initialEnabled, username }: LocationMapToggl
             </a>
           )}
         </div>
-        <div
-          className={`relative flex-shrink-0 w-11 h-6 rounded-full border transition-colors ${
-            enabled ? "bg-primary border-primary" : "bg-input border-border"
-          } ${isSaving ? "opacity-60" : ""}`}
-        >
-          <div
-            className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-              enabled ? "translate-x-6" : "translate-x-1"
-            }`}
-          />
-        </div>
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={handleToggle}
-          disabled={isSaving}
-          className="sr-only"
-        />
+        <ToggleSwitch checked={enabled} onChange={handleToggle} disabled={isSaving} />
       </label>
     </div>
   );

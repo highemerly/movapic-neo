@@ -1,14 +1,14 @@
 /**
  * メンション取り込みエンドポイント（producer）
- * POST /api/v1/ingest/mention（旧 /api/v1/mention-process）。CronJob/将来のstreamingから呼ばれる。
+ * POST /api/v1/ingest/mention。CronJob/将来のstreamingから呼ばれる。
  *
  * ここでは Mastodon 通知を fetch して Graphile Worker に enqueue するだけ。
  * 実際の画像処理・投稿は worker(consumer) 側の process-mention タスクで実行される。
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { pollAndEnqueueMentions } from "@/lib/mention/ingest";
+import { timingSafeEqualString } from "@/lib/auth/internalAuth";
 
 const getBotInstanceUrl = () => process.env.MASTODON_BOT_INSTANCE_URL || "https://handon.club";
 const getBotAccessToken = () => process.env.MASTODON_BOT_ACCESS_TOKEN || "";
@@ -30,12 +30,7 @@ export async function POST(request: NextRequest) {
   }
 
   // タイミング攻撃対策のため、長さチェック + timingSafeEqual で比較
-  const apiKeyBuf = Buffer.from(apiKey ?? "");
-  const expectedApiKeyBuf = Buffer.from(expectedApiKey);
-  if (
-    apiKeyBuf.length !== expectedApiKeyBuf.length ||
-    !timingSafeEqual(apiKeyBuf, expectedApiKeyBuf)
-  ) {
+  if (!timingSafeEqualString(apiKey ?? "", expectedApiKey)) {
     console.error("[mention-process] Invalid API key");
     return NextResponse.json(
       { success: false, error: "Unauthorized" },

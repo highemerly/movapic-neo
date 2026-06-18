@@ -25,6 +25,7 @@ import {
   handleImageProcessError,
   handleUnknownError,
 } from "@/lib/errors";
+import { generateRequestId } from "@/lib/http";
 
 // 画像処理のタイムアウト（ミリ秒）
 const PROCESS_TIMEOUT_MS = 21000;
@@ -42,7 +43,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, requestId: string): Pro
 }
 
 export async function POST(request: NextRequest) {
-  const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const requestId = generateRequestId();
 
   // レート制限チェック
   const clientIp = getClientIp(request);

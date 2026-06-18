@@ -5,6 +5,15 @@
 
 import { simpleParser, ParsedMail, Attachment } from "mailparser";
 import { Position, FontFamily, Color, Size, Arrangement, Visibility } from "@/types";
+import {
+  POSITION_MAP,
+  COLOR_MAP,
+  SIZE_MAP,
+  FONT_MAP,
+  ARRANGEMENT_MAP,
+  VISIBILITY_MAP,
+  decodeHtmlEntities,
+} from "@/lib/options/maps";
 
 /** 位置情報コマンドの解析結果（メール投稿のみ。none=保存しない） */
 export type EmailLocationOption = "none" | "pref" | "city";
@@ -49,49 +58,8 @@ export interface ParsedEmail {
   } | null;
 }
 
-// オプションのマッピング
-const POSITION_MAP: Record<string, Position> = {
-  "上": "top",
-  "下": "bottom",
-  "左": "left",
-  "右": "right",
-};
-
-const COLOR_MAP: Record<string, Color> = {
-  "白": "white",
-  "赤": "red",
-  "青": "blue",
-  "緑": "green",
-  "黄": "yellow",
-  "茶": "brown",
-  "桃": "pink",
-  "橙": "orange",
-};
-
-const SIZE_MAP: Record<string, Size> = {
-  "小": "small",
-  "中": "medium",
-  "大": "large",
-  "特大": "extra-large",
-};
-
-const FONT_MAP: Record<string, FontFamily> = {
-  "ふい字": "hui-font",
-  "ゴシック": "noto-sans-jp",
-  "ラノベ": "light-novel-pop",
-};
-
-const ARRANGEMENT_MAP: Record<string, Arrangement> = {
-  "ネオン": "neon",
-  "ハンコ": "stamp",
-};
-
-// 公開範囲コマンド。Bot投稿（メンション）とキーワードを揃える（public/unlisted）。
-// localはサービス内のみ保存で投稿の意図と矛盾するため件名では指定不可。
-const VISIBILITY_MAP: Record<string, Visibility> = {
-  "public": "public",
-  "unlisted": "unlisted",
-};
+// 共通のオプションマップ（POSITION/COLOR/SIZE/FONT/ARRANGEMENT/VISIBILITY）は
+// @/lib/options/maps から import。メール固有のカメラ・位置情報マップのみ以下に定義。
 
 // カメラ機種コマンド。「カメラ」で保存、「カメラなし」で保存しない（ユーザー設定を上書き）。
 const CAMERA_MAP: Record<string, EmailCameraOption> = {
@@ -133,50 +101,6 @@ function buildDefaultOptions(userDefaults?: EmailUserDefaults): ParsedEmailOptio
     cameraOption: (userDefaults?.cameraOption as EmailCameraOption) || FALLBACK_OPTIONS.cameraOption,
     locationOption: "none",
   };
-}
-
-/**
- * HTMLエンティティをデコード
- */
-const HTML_ENTITIES: Record<string, string> = {
-  "&lt;": "<",
-  "&gt;": ">",
-  "&amp;": "&",
-  "&quot;": "\"",
-  "&apos;": "'",
-  "&#39;": "'",
-  "&nbsp;": " ",
-  "&copy;": "\u00A9",
-  "&reg;": "\u00AE",
-  "&trade;": "\u2122",
-  "&ndash;": "\u2013",
-  "&mdash;": "\u2014",
-  "&lsquo;": "\u2018",
-  "&rsquo;": "\u2019",
-  "&ldquo;": "\u201C",
-  "&rdquo;": "\u201D",
-  "&hellip;": "\u2026",
-  "&yen;": "\u00A5",
-};
-
-function decodeHtmlEntities(text: string): string {
-  // 名前付きエンティティをデコード
-  let decoded = text;
-  for (const [entity, char] of Object.entries(HTML_ENTITIES)) {
-    decoded = decoded.split(entity).join(char);
-  }
-
-  // 数値エンティティをデコード (&#123; や &#x7B;)
-  decoded = decoded.replace(/&#(\d+);/g, (_, code) => {
-    const num = parseInt(code, 10);
-    return num > 0 && num < 0x10ffff ? String.fromCodePoint(num) : "";
-  });
-  decoded = decoded.replace(/&#x([0-9a-fA-F]+);/g, (_, code) => {
-    const num = parseInt(code, 16);
-    return num > 0 && num < 0x10ffff ? String.fromCodePoint(num) : "";
-  });
-
-  return decoded;
 }
 
 /**

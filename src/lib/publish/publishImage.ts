@@ -20,10 +20,13 @@ import {
 import {
   postToMastodon,
   postToMisskey,
-  MastodonVisibility,
-  MisskeyVisibility,
   PostResult,
 } from "@/lib/fediverse/post";
+import {
+  type PublishVisibility,
+  toMastodonVisibility,
+  toMisskeyVisibility,
+} from "@/lib/visibility";
 import {
   Position,
   FontFamily,
@@ -36,8 +39,8 @@ import { evaluateAndGrant, GrantedAchievement } from "@/lib/achievements/engine"
 import { userPathSegment } from "@/lib/userHandle";
 import type { PostFacts } from "@/lib/achievements/catalog";
 
-/** サービス内の公開範囲（UI/DBと同じ値） */
-export type PublishVisibility = "public" | "unlisted" | "local";
+// PublishVisibility は @/lib/visibility に集約。後方互換のため再エクスポートする。
+export type { PublishVisibility } from "@/lib/visibility";
 
 export interface PublishUser {
   id: string;
@@ -161,7 +164,7 @@ export async function postImageToFediverse(input: {
     input;
 
   if (user.instance.type === "mastodon") {
-    const v: MastodonVisibility = visibility === "unlisted" ? "unlisted" : "public";
+    const v = toMastodonVisibility(visibility);
     return postToMastodon(
       user.instance.domain,
       user.accessToken,
@@ -176,7 +179,7 @@ export async function postImageToFediverse(input: {
 
   if (user.instance.type === "misskey") {
     // Misskey では unlisted が home に相当
-    const v: MisskeyVisibility = visibility === "unlisted" ? "home" : "public";
+    const v = toMisskeyVisibility(visibility);
     return postToMisskey(
       user.instance.domain,
       user.accessToken,
