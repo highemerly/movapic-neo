@@ -50,7 +50,13 @@ export function UserGalleryClient({
       if (!response.ok) throw new Error("Failed to load more");
 
       const data = await response.json();
-      setImages((prev) => [...prev, ...data.images]);
+      setImages((prev) => {
+        const seen = new Set(prev.map((img) => img.id));
+        const fresh = (data.images as GalleryImage[]).filter(
+          (img) => !seen.has(img.id)
+        );
+        return [...prev, ...fresh];
+      });
       setNextCursor(data.hasMore ? data.nextCursor : null);
     } catch (error) {
       console.error("Load more error:", error);
