@@ -27,7 +27,7 @@ import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
-import { User, CalendarDays, Camera, MapPin, Reply, Share2 } from "lucide-react";
+import { User, CalendarDays, Camera, MapPin, Reply, Share2, Globe, Mail, Bot } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -240,6 +240,16 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     ? `https://${currentUser.instance.domain}/share?text=${encodeURIComponent(shareText)}`
     : `https://anypost.dev/share?t=${encodeURIComponent(shareText)}`;
 
+  const formattedCreatedAt = new Date(image.createdAt).toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZone: "Asia/Tokyo",
+  });
+
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain, avatarUrl: getAvatarUrl(currentUser.avatarUrl) } : null} />
@@ -369,8 +379,9 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         )}
 
         {/* メタ情報（日時・ソース・設定） */}
-        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-          <p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
             {image.postUrl ? (
               <a
                 href={image.postUrl}
@@ -378,29 +389,21 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
                 rel="noopener noreferrer"
                 className="hover:underline"
               >
-                {new Date(image.createdAt).toLocaleString("ja-JP", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  timeZone: "Asia/Tokyo",
-                })}
+                {formattedCreatedAt}
               </a>
             ) : (
-              new Date(image.createdAt).toLocaleString("ja-JP", {
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-                timeZone: "Asia/Tokyo",
-              })
+              formattedCreatedAt
             )}
-            <span className="ml-2">
-              {image.source === "email" ? (
-                "メール"
-              ) : image.source === "mention" ? (
+          </span>
+          <span className="inline-flex items-center gap-1">
+            {image.source === "email" ? (
+              <>
+                <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                メール
+              </>
+            ) : image.source === "mention" ? (
+              <>
+                <Bot className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 <a
                   href={`https://${image.user.instance.domain}`}
                   target="_blank"
@@ -409,13 +412,16 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
                 >
                   {image.user.instance.domain}
                 </a>
-              ) : (
+              </>
+            ) : (
+              <>
+                <Globe className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 <Link href="/create" className="hover:underline">
                   Web
                 </Link>
-              )}
-            </span>
-          </p>
+              </>
+            )}
+          </span>
           <ImageOptionsButton
             position={image.position}
             color={image.color}
