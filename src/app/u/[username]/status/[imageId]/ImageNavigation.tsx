@@ -17,7 +17,7 @@ interface NavImage {
 interface ImageNavigationProps {
   prevImage: NavImage | null;
   nextImage: NavImage | null;
-  from?: "public";
+  from?: string;
   publicUrl: string;
 }
 

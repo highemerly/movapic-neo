@@ -280,6 +280,7 @@ export default async function UserMapPage({
                         }}
                         publicUrl={publicUrl}
                         username={seg}
+                        from="user-map"
                       />
                     ))}
                   </div>

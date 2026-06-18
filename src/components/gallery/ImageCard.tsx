@@ -25,13 +25,16 @@ interface ImageCardProps {
   isPinned?: boolean;
   /** トリミングなし表示（Justified レイアウト用）。親要素のサイズに収める */
   fill?: boolean;
+  /** 画像ページへ付与する from クエリ（例: "user-map"）。未指定なら付けない */
+  from?: string;
 }
 
-export function ImageCard({ image, publicUrl, username, showDelete, onDelete, isPinned, fill }: ImageCardProps) {
+export function ImageCard({ image, publicUrl, username, showDelete, onDelete, isPinned, fill, from }: ImageCardProps) {
   const confirm = useConfirm();
   const [isDeleting, setIsDeleting] = useState(false);
   const imageUrl = `${publicUrl}/${image.storageKey}`;
-  const detailUrl = username ? `/u/${username}/status/${image.id}` : imageUrl;
+  const base = username ? `/u/${username}/status/${image.id}` : imageUrl;
+  const detailUrl = username && from ? `${base}?from=${from}` : base;
 
   const handleDelete = async () => {
     if (!onDelete) return;

@@ -252,6 +252,21 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     timeZone: "Asia/Tokyo",
   });
 
+  // 「戻る」リンクの遷移先とラベル（遷移元タブを from クエリで区別）
+  const galleryName = image.user.displayName || username;
+  let backUrl = `/u/${username}`;
+  let backLabel = `${galleryName} のギャラリーに戻る`;
+  if (from === "public") {
+    backUrl = "/public";
+    backLabel = "公開タイムラインに戻る";
+  } else if (from === "user-calendar") {
+    backUrl = `/u/${username}/calendar`;
+    backLabel = `${galleryName} のカレンダーに戻る`;
+  } else if (from === "user-map") {
+    backUrl = `/u/${username}/map`;
+    backLabel = `${galleryName} の地図に戻る`;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain, avatarUrl: getAvatarUrl(currentUser.avatarUrl) } : null} />
@@ -260,9 +275,9 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
       <main className="container mx-auto max-w-2xl px-4 py-2">
         {/* ヘッダー */}
         <div className="mb-2">
-          <Link href={isFromPublic ? "/public" : `/u/${username}`}>
+          <Link href={backUrl}>
             <Button variant="ghost" size="sm">
-              ← {isFromPublic ? "公開タイムラインに戻る" : `${image.user.displayName || username} のギャラリーに戻る`}
+              ← {backLabel}
             </Button>
           </Link>
         </div>
@@ -513,7 +528,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           <ImageNavigation
             prevImage={prevImage}
             nextImage={nextImage}
-            from={isFromPublic ? "public" : undefined}
+            from={from}
             publicUrl={publicUrl}
           />
         </div>

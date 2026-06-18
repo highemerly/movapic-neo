@@ -293,11 +293,13 @@ export function CalendarView({
                 onClick={() => {
                   if (day && data?.days[day]) {
                     router.push(
-                      `/u/${username}/status/${data.days[day].latest.id}`,
+                      `/u/${username}/status/${data.days[day].latest.id}?from=user-calendar`,
                     );
                   } else if (filled) {
                     // 穴埋め済みセルは「埋めた日の2枚目の写真」へ遷移
-                    router.push(`/u/${username}/status/${filled.image.id}`);
+                    router.push(
+                      `/u/${username}/status/${filled.image.id}?from=user-calendar`,
+                    );
                   }
                 }}
               />
