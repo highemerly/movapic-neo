@@ -5,10 +5,10 @@ import { getAvatarUrl } from "@/lib/avatar";
 import prisma from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth/session";
-import { DeleteButton } from "./DeleteButton";
 import { DeleteLocationButton } from "./DeleteLocationButton";
 import { ImageNavigation } from "./ImageNavigation";
 import { ImageOptionsButton } from "./ImageOptionsButton";
+import { ImageActionsMenu } from "./ImageActionsMenu";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
 import {
@@ -16,7 +16,6 @@ import {
   favoriteErrorMessage,
   type CachedFavoriter,
 } from "@/lib/fediverse/favorite";
-import { PinButton } from "@/components/pin/PinButton";
 import { Footer } from "@/components/Footer";
 import { parseUserHandle } from "@/lib/userHandle";
 import { NewUserGuide } from "@/components/onboarding/NewUserGuide";
@@ -28,7 +27,7 @@ import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
-import { User, CalendarDays } from "lucide-react";
+import { User, CalendarDays, Camera, MapPin, Reply, Share2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -219,6 +218,28 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   // 自分の画像かどうか
   const isOwner = currentUser?.id === image.userId;
 
+  // 返信リンク。Mastodon 4.x で /interact/:id は削除済み。スレッド返信へ繋ぐ唯一のURL方式は
+  // 「閲覧者自身のサーバー」の authorize_interaction（純正の返信ボタンも内部でここに行き着く）。
+  // 閲覧者の Mastodon サーバーで元投稿の uri を解決して開く → in-reply-to で返信できる。
+  // 条件は閲覧者自身がそのサーバーWebにログイン中であること（未ログインならサインイン画面を挟む）。
+  // 閲覧者が Mastodon でない/未ログインのときは元投稿URLを直接開くフォールバック。
+  // postUrl が無い local 投稿は非表示。uri は作者が Misskey でも AP uri として解決できる。
+  const replyUrl =
+    currentUser?.instance.type === "mastodon" && image.postUrl
+      ? `https://${currentUser.instance.domain}/authorize_interaction?uri=${encodeURIComponent(image.postUrl)}`
+      : (image.postUrl ?? null);
+
+  // シェアリンク。本文はページの <title>（タイトルテンプレート %s | SHAMEZO ＝
+  // 「<投稿テキスト> | SHAMEZO」）＋ページURL（OGカードで画像＋テキストが表示される）。
+  // ログイン中は閲覧者自身のサーバーの /share?text=（Mastodon・Misskey両対応）の作文画面を開く。
+  // 未ログインは閲覧者のサーバーが不明なので anypost.dev/share?t=（投稿先サーバーを選べる）へ。
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
+  const pageUrl = `${appUrl}/u/${username}/status/${imageId}`;
+  const shareText = `${image.overlayText} | SHAMEZO\n${pageUrl}`;
+  const shareUrl = currentUser
+    ? `https://${currentUser.instance.domain}/share?text=${encodeURIComponent(shareText)}`
+    : `https://anypost.dev/share?t=${encodeURIComponent(shareText)}`;
+
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain, avatarUrl: getAvatarUrl(currentUser.avatarUrl) } : null} />
@@ -235,7 +256,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         </div>
 
         {/* 画像 */}
-        <div className="mb-4">
+        <div className="mb-2">
           <div className="rounded-lg overflow-hidden bg-muted">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -247,7 +268,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         </div>
 
         {/* テキスト */}
-        <div className="mb-4">
+        <div className="mb-2">
           <p className="text-base whitespace-pre-wrap break-words">{image.overlayText}</p>
         </div>
 
@@ -281,27 +302,53 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           </div>
         ) : null}
 
-        {/* ピン留め・削除ボタン（自分の画像のみ） */}
-        {isOwner && (
-          <div className="mt-2 flex items-center gap-2">
-            <PinButton imageId={imageId} initialIsPinned={!!image.pinnedAt} />
-            <DeleteButton imageId={imageId} username={username} />
-          </div>
-        )}
+        {/* 返信・その他メニュー（ピン留め・削除、将来の通報） */}
+        <div className="mt-2 flex items-center gap-2">
+          {replyUrl && (
+            <a
+              href={replyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-1 items-center justify-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
+              title="自分のサーバーで投稿を開いて返信する"
+            >
+              <Reply className="h-4 w-4 shrink-0" />
+              <span className="text-xs font-medium whitespace-nowrap">返信・ブースト</span>
+            </a>
+          )}
+          {shareUrl && (
+            <a
+              href={shareUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-1 items-center justify-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
+              title="この画像ページをシェアする"
+            >
+              <Share2 className="h-4 w-4" />
+              <span className="text-xs font-medium">投稿</span>
+            </a>
+          )}
+          <ImageActionsMenu
+            imageId={imageId}
+            username={username}
+            isOwner={isOwner}
+            initialIsPinned={!!image.pinnedAt}
+          />
+        </div>
 
         {/* EXIF情報（カメラ機種・撮影場所）。投稿者本人のみ撮影場所だけ削除可能。 */}
         {(image.cameraModel || image.locationPrefecture) && (
           <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
             {image.cameraModel && (
-              <span>
-                📷 {image.cameraModel}{image.cameraMake && !image.cameraModel.startsWith(image.cameraMake) ? `（${image.cameraMake}）` : ""}
+              <span className="inline-flex items-center gap-1">
+                <Camera className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                {image.cameraModel}{image.cameraMake && !image.cameraModel.startsWith(image.cameraMake) ? `（${image.cameraMake}）` : ""}
               </span>
             )}
-            {image.cameraModel && image.locationPrefecture && <span aria-hidden>·</span>}
             {image.locationPrefecture && (
               <span className="inline-flex items-center gap-1">
-                <span>
-                  📍{" "}
+                <span className="inline-flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
                   <Link
                     href={`/u/${username}/map?prefecture=${encodeURIComponent(image.locationPrefecture)}`}
                     className="hover:underline"
@@ -322,7 +369,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         )}
 
         {/* メタ情報（日時・ソース・設定） */}
-        <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
           <p>
             {image.postUrl ? (
               <a
@@ -380,7 +427,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
 
         {/* 投稿者情報（王冠が頭上に出るぶん、王冠ありのときだけ上パディングを確保） */}
         <div
-          className={`flex items-center gap-2 mt-4 px-3 pb-3 bg-muted rounded-lg ${
+          className={`flex items-center gap-2 mt-2 px-3 pb-3 bg-muted rounded-lg ${
             posterPerfectAttendance ? "pt-5" : "pt-3"
           }`}
         >

@@ -45,10 +45,10 @@ export function ImageOptionsButton({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="p-1 rounded hover:bg-muted transition-colors"
+          className="inline-flex items-center justify-center -m-1.5 p-2 rounded-md hover:bg-muted transition-colors"
           title="投稿オプション"
         >
-          <Settings2 className="w-3.5 h-3.5 text-muted-foreground" />
+          <Settings2 className="w-4 h-4 text-muted-foreground" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[140px]">
