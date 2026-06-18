@@ -15,6 +15,7 @@ import { useRef, useState } from "react";
 import Link from "@/components/Link";
 import { useRouter } from "next/navigation";
 import { Plus, Minus, RotateCcw } from "lucide-react";
+import { markPrefScroll } from "@/components/ScrollIntoViewOnSelect";
 import { JAPAN_TILE_GRID, PREFECTURE_BY_CODE } from "@/lib/geocode/prefectures";
 import japanSvg from "@/lib/geocode/japan-svg-paths.json";
 
@@ -150,7 +151,10 @@ export function PrefectureHeatmap({
         <JapanSvg
           data={data}
           max={max}
-          onSelect={(name) => router.push(hrefFor(name))}
+          onSelect={(name) => {
+            markPrefScroll();
+            router.push(hrefFor(name));
+          }}
           selectedPrefecture={selectedPrefecture}
         />
       )}
@@ -249,7 +253,11 @@ function TileGrid({
             >
               {entry ? (
                 // iOS Safari でセル幅が潰れないよう Link を block 化
-                <Link href={hrefFor(pref.name)} className="block h-full w-full">
+                <Link
+                  href={hrefFor(pref.name)}
+                  onClick={() => markPrefScroll()}
+                  className="block h-full w-full"
+                >
                   {inner}
                 </Link>
               ) : (

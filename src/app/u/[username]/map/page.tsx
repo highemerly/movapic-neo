@@ -9,6 +9,7 @@ import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
 import { ExpandReveal } from "@/components/ExpandReveal";
+import { ScrollIntoViewOnSelect } from "@/components/ScrollIntoViewOnSelect";
 import { calculateStreak } from "@/lib/streak";
 import { getRankCounts } from "@/lib/achievements/counts";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
@@ -232,10 +233,16 @@ export default async function UserMapPage({
             />
           )}
 
+          {/* 都道府県クリックで画像一覧（下部）へスムーズスクロール */}
+          <ScrollIntoViewOnSelect
+            value={selectedPrefecture}
+            targetId="prefecture-images"
+          />
+
           {/* 選択中の都道府県の画像一覧（選択ごとに下へ「うにょー」と展開） */}
           {selectedPrefecture && (
             <ExpandReveal key={selectedPrefecture} className="mt-6">
-              <section>
+              <section id="prefecture-images" className="scroll-mt-4">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <h3 className="text-sm font-semibold">
                     {selectedPrefecture}の写真
