@@ -1,13 +1,13 @@
 /**
  * サムネイル生成ロジック
- * カレンダー表示用の96x96pxサムネイルを生成
+ * カレンダー表示用の128x128pxサムネイルを生成
  */
 
 import sharp from "sharp";
 import { Position } from "@/types";
 
-const THUMBNAIL_SIZE = 96;
-const THUMBNAIL_QUALITY = 75;
+const THUMBNAIL_SIZE = 128;
+const THUMBNAIL_QUALITY = 80;
 
 /**
  * 文字位置に応じたクロップ位置を決定
@@ -46,7 +46,7 @@ function getCropPosition(
  * サムネイル画像を生成
  * @param imageBuffer 元画像のBuffer
  * @param position 文字の位置（クロップ位置決定に使用）
- * @returns WebP形式の96x96pxサムネイル
+ * @returns WebP形式の128x128pxサムネイル
  */
 export async function generateThumbnail(
   imageBuffer: Buffer,

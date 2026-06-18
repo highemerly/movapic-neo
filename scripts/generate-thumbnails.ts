@@ -14,8 +14,13 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
-import sharp from "sharp";
-import { getImage, uploadImage } from "@/lib/storage/storage";
+import {
+  getImage,
+  uploadImage,
+  generateThumbnailKey,
+} from "@/lib/storage/storage";
+import { generateThumbnail } from "@/lib/thumbnail";
+import { Position } from "@/types";
 
 // PrismaClientを初期化（アダプターパターン）
 const connectionString = process.env.DATABASE_URL;
@@ -27,68 +32,6 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 const BATCH_SIZE = 100;
-const THUMBNAIL_SIZE = 96;
-const THUMBNAIL_QUALITY = 75;
-
-// クロップ位置を決定
-function getCropPosition(
-  position: string,
-  width: number,
-  height: number,
-  size: number
-): { left: number; top: number } {
-  switch (position) {
-    case "bottom":
-      return {
-        left: 0,
-        top: Math.max(0, height - size),
-      };
-    case "right":
-      return {
-        left: Math.max(0, width - size),
-        top: 0,
-      };
-    case "top":
-    case "left":
-    default:
-      return {
-        left: 0,
-        top: 0,
-      };
-  }
-}
-
-// サムネイルを生成
-async function generateThumbnail(
-  imageBuffer: Buffer,
-  position: string
-): Promise<Buffer> {
-  const image = sharp(imageBuffer);
-  const metadata = await image.metadata();
-
-  const width = metadata.width || THUMBNAIL_SIZE;
-  const height = metadata.height || THUMBNAIL_SIZE;
-  const cropSize = Math.min(width, height);
-  const { left, top } = getCropPosition(position, width, height, cropSize);
-
-  return await sharp(imageBuffer)
-    .extract({
-      left,
-      top,
-      width: cropSize,
-      height: cropSize,
-    })
-    .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
-    .webp({ quality: THUMBNAIL_QUALITY })
-    .toBuffer();
-}
-
-// サムネイルキーを生成
-function generateThumbnailKey(storageKey: string): string {
-  const lastDot = storageKey.lastIndexOf(".");
-  const basePath = lastDot > 0 ? storageKey.substring(0, lastDot) : storageKey;
-  return `${basePath}_thumb.webp`;
-}
 
 async function main() {
   // --force オプションで全画像を再生成
@@ -151,7 +94,10 @@ async function main() {
 
         // サムネイルを生成
         const thumbnailKey = generateThumbnailKey(image.storageKey);
-        const thumbnailBuffer = await generateThumbnail(imageBuffer, image.position);
+        const thumbnailBuffer = await generateThumbnail(
+          imageBuffer,
+          image.position as Position
+        );
 
         // ストレージにアップロード
         await uploadImage(thumbnailBuffer, thumbnailKey, "image/webp");
