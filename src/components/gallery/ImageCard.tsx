@@ -23,9 +23,11 @@ interface ImageCardProps {
   showDelete?: boolean;
   onDelete?: (id: string) => void;
   isPinned?: boolean;
+  /** トリミングなし表示（Justified レイアウト用）。親要素のサイズに収める */
+  fill?: boolean;
 }
 
-export function ImageCard({ image, publicUrl, username, showDelete, onDelete, isPinned }: ImageCardProps) {
+export function ImageCard({ image, publicUrl, username, showDelete, onDelete, isPinned, fill }: ImageCardProps) {
   const confirm = useConfirm();
   const [isDeleting, setIsDeleting] = useState(false);
   const imageUrl = `${publicUrl}/${image.storageKey}`;
@@ -52,12 +54,13 @@ export function ImageCard({ image, publicUrl, username, showDelete, onDelete, is
   };
 
   return (
-    <div className="group relative bg-muted rounded-lg overflow-hidden">
-      <Link href={detailUrl} target={username ? undefined : "_blank"} rel={username ? undefined : "noopener noreferrer"} className="block">
+    <div className={`group relative bg-muted rounded-lg overflow-hidden ${fill ? "h-full w-full" : ""}`}>
+      <Link href={detailUrl} target={username ? undefined : "_blank"} rel={username ? undefined : "noopener noreferrer"} className={fill ? "block h-full w-full" : "block"}>
         <ThumbnailImage
           src={imageUrl}
           alt={image.overlayText}
           position={image.position}
+          fill={fill}
           className="group-hover:opacity-90 transition-opacity"
         />
       </Link>

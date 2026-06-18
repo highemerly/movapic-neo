@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "@/components/Link";
 import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
 import { FavoriteOverlay } from "@/components/favorite/FavoriteOverlay";
+import { MasonryGrid } from "@/components/gallery/MasonryGrid";
+import { GalleryLayoutToggle } from "@/components/gallery/GalleryLayoutToggle";
+import { useGalleryLayout } from "@/hooks/useGalleryLayout";
 import { userPathSegment } from "@/lib/userHandle";
 
 interface TimelineImage {
@@ -41,6 +44,7 @@ export function PublicTimelineClient({
     initialImages.length >= 20 ? initialImages[initialImages.length - 1]?.id : null
   );
   const loaderRef = useRef<HTMLDivElement>(null);
+  const [layout] = useGalleryLayout();
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || isLoading) return;
@@ -88,12 +92,24 @@ export function PublicTimelineClient({
   }
 
   return (
-    <div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1">
-        {images.map((image) => (
-          <TimelineImageCard key={image.id} image={image} publicUrl={publicUrl} />
-        ))}
-      </div>
+    <div className="relative">
+      <GalleryLayoutToggle />
+      {layout === "packed" ? (
+        <MasonryGrid
+          items={images}
+          aspect={(image) => image.width / image.height}
+          getKey={(image) => image.id}
+          renderItem={(image) => (
+            <TimelineImageCard image={image} publicUrl={publicUrl} fill />
+          )}
+        />
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1">
+          {images.map((image) => (
+            <TimelineImageCard key={image.id} image={image} publicUrl={publicUrl} />
+          ))}
+        </div>
+      )}
 
       {/* 無限スクロール用のローダー */}
       <div ref={loaderRef} className="mt-8 text-center py-4">
@@ -111,20 +127,23 @@ export function PublicTimelineClient({
 function TimelineImageCard({
   image,
   publicUrl,
+  fill,
 }: {
   image: TimelineImage;
   publicUrl: string;
+  fill?: boolean;
 }) {
   const imageUrl = `${publicUrl}/${image.storageKey}`;
 
   const detailUrl = `/u/${userPathSegment(image.user.username, image.user.instance)}/status/${image.id}?from=public`;
 
   return (
-    <Link href={detailUrl} className="block relative rounded-lg overflow-hidden group">
+    <Link href={detailUrl} className={`relative rounded-lg overflow-hidden group ${fill ? "block h-full w-full" : "block"}`}>
       <ThumbnailImage
         src={imageUrl}
         alt={image.overlayText}
         position={image.position}
+        fill={fill}
         className="group-hover:opacity-90 transition-opacity"
       />
       {/* 投稿者オーバーレイ */}

@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ImageCard } from "@/components/gallery/ImageCard";
+import { MasonryGrid } from "@/components/gallery/MasonryGrid";
+import { GalleryLayoutToggle } from "@/components/gallery/GalleryLayoutToggle";
+import { useGalleryLayout } from "@/hooks/useGalleryLayout";
 
 interface GalleryImage {
   id: string;
@@ -34,6 +37,7 @@ export function UserGalleryClient({
     initialImages.length >= 20 ? initialImages[initialImages.length - 1]?.id : null
   );
   const loaderRef = useRef<HTMLDivElement>(null);
+  const [layout] = useGalleryLayout();
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || isLoading) return;
@@ -81,18 +85,36 @@ export function UserGalleryClient({
   }
 
   return (
-    <div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1">
-        {images.map((image) => (
-          <ImageCard
-            key={image.id}
-            image={image}
-            publicUrl={publicUrl}
-            username={username}
-            isPinned={pinnedImageIds.includes(image.id)}
-          />
-        ))}
-      </div>
+    <div className="relative">
+      <GalleryLayoutToggle />
+      {layout === "packed" ? (
+        <MasonryGrid
+          items={images}
+          aspect={(image) => image.width / image.height}
+          getKey={(image) => image.id}
+          renderItem={(image) => (
+            <ImageCard
+              image={image}
+              publicUrl={publicUrl}
+              username={username}
+              isPinned={pinnedImageIds.includes(image.id)}
+              fill
+            />
+          )}
+        />
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1">
+          {images.map((image) => (
+            <ImageCard
+              key={image.id}
+              image={image}
+              publicUrl={publicUrl}
+              username={username}
+              isPinned={pinnedImageIds.includes(image.id)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* 無限スクロール用のローダー */}
       <div ref={loaderRef} className="mt-8 text-center py-4">
