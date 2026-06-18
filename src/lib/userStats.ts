@@ -22,13 +22,13 @@ export interface UserProfileStats {
 
 export async function getUserProfileStats(userId: string): Promise<UserProfileStats> {
   const [imageCount, postDates, prefectures, achievements] = await Promise.all([
-    prisma.image.count({ where: { userId, isPublic: true } }),
+    prisma.image.count({ where: { userId, isPublic: true, isDisabled: false } }),
     prisma.image.findMany({
-      where: { userId, isPublic: true },
+      where: { userId, isPublic: true, isDisabled: false },
       select: { createdAt: true },
     }),
     prisma.image.findMany({
-      where: { userId, isPublic: true, locationPrefecture: { not: null } },
+      where: { userId, isPublic: true, isDisabled: false, locationPrefecture: { not: null } },
       select: { locationPrefecture: true },
       distinct: ["locationPrefecture"],
     }),

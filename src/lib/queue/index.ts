@@ -18,8 +18,10 @@ import {
   taskList,
   TASK_PROCESS_MENTION,
   TASK_PROCESS_EMAIL,
+  TASK_NOTIFY_REPORT,
   type ProcessMentionPayload,
   type ProcessEmailPayload,
+  type NotifyReportPayload,
 } from "./tasks";
 
 const MAX_ATTEMPTS = 3;
@@ -59,6 +61,17 @@ export async function enqueueMention(
 export async function enqueueEmail(payload: ProcessEmailPayload): Promise<void> {
   const utils = await getWorkerUtils();
   await utils.addJob(TASK_PROCESS_EMAIL, payload, {
+    maxAttempts: MAX_ATTEMPTS,
+  });
+}
+
+/** 通報の管理者通知ジョブを enqueue。reportId で dedup（同一通報の二重通知を防ぐ）。 */
+export async function enqueueReportNotification(
+  payload: NotifyReportPayload
+): Promise<void> {
+  const utils = await getWorkerUtils();
+  await utils.addJob(TASK_NOTIFY_REPORT, payload, {
+    jobKey: `report:${payload.reportId}`,
     maxAttempts: MAX_ATTEMPTS,
   });
 }

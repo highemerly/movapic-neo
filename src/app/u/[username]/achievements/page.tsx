@@ -45,9 +45,9 @@ export default async function AchievementsPage({
 
   const [totalImageCount, postDates, achievements, ladderValues] =
     await Promise.all([
-      prisma.image.count({ where: { userId: user.id, isPublic: true } }),
+      prisma.image.count({ where: { userId: user.id, isPublic: true, isDisabled: false } }),
       prisma.image.findMany({
-        where: { userId: user.id, isPublic: true },
+        where: { userId: user.id, isPublic: true, isDisabled: false },
         select: { createdAt: true },
       }),
       prisma.achievement.findMany({

@@ -14,6 +14,8 @@ import { extractExif } from "@/lib/exif/parser";
 import { reverseGeocode } from "@/lib/geocode/gsi";
 import { decryptToken } from "@/lib/auth/tokens";
 import { processOneMention } from "@/lib/mention/processor";
+import { getAdminAccts } from "@/lib/auth/admin";
+import { sendBotDirectMessage } from "@/lib/bot/notify";
 import type { MastodonNotification } from "@/lib/mention/fetcher";
 import type {
   Position,
@@ -26,6 +28,7 @@ import type {
 
 export const TASK_PROCESS_MENTION = "process-mention";
 export const TASK_PROCESS_EMAIL = "process-email";
+export const TASK_NOTIFY_REPORT = "notify-report";
 
 export interface ProcessMentionPayload {
   notification: MastodonNotification;
@@ -50,6 +53,10 @@ export interface ProcessEmailPayload {
   /** producer が R2 一時領域にアップロードした元画像のキー */
   sourceStorageKey: string;
   sourceContentType: string;
+}
+
+export interface NotifyReportPayload {
+  reportId: string;
 }
 
 /**
@@ -162,7 +169,42 @@ const processEmailTask: Task = async (payload) => {
   );
 };
 
+/**
+ * 通報の管理者通知。
+ * 通報1件ごとに、管理者 acct 宛へ Bot から direct で「新しい通報」を知らせる。
+ * 対応は管理者が /admin/reports で行う（この通知では何も画像に起きない）。
+ */
+const notifyReportTask: Task = async (payload) => {
+  const { reportId } = payload as NotifyReportPayload;
+
+  const report = await prisma.report.findUnique({
+    where: { id: reportId },
+    select: { reason: true },
+  });
+
+  // 通報が既に削除済み（画像削除に伴う cascade など）なら何もしない
+  if (!report) return;
+
+  const accts = getAdminAccts();
+  if (accts.length === 0) {
+    console.warn("[notify-report] 管理者(ADMIN_ACCTS)未設定のため通知をスキップ");
+    return;
+  }
+
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
+  const reportsUrl = `${appUrl}/admin/reports`;
+
+  const message = [
+    "🚩 新しい通報があります",
+    `理由: ${report.reason}`,
+    `一覧: ${reportsUrl}`,
+  ].join("\n");
+
+  await sendBotDirectMessage(accts, message);
+};
+
 export const taskList: TaskList = {
   [TASK_PROCESS_MENTION]: processMentionTask,
   [TASK_PROCESS_EMAIL]: processEmailTask,
+  [TASK_NOTIFY_REPORT]: notifyReportTask,
 };

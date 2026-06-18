@@ -71,10 +71,10 @@ export default async function CalendarPage({
   const [totalImageCount, postDates, rankCounts, perfectAttendance] =
     await Promise.all([
       prisma.image.count({
-        where: { userId: user.id, isPublic: true },
+        where: { userId: user.id, isPublic: true, isDisabled: false },
       }),
       prisma.image.findMany({
-        where: { userId: user.id, isPublic: true },
+        where: { userId: user.id, isPublic: true, isDisabled: false },
         select: { createdAt: true },
       }),
       getRankCounts(user.id),

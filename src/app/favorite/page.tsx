@@ -23,7 +23,7 @@ export default async function FavoritePage() {
   const viewerAcct = `${currentUser.username}@${currentUser.instance.domain}`;
   const images = await prisma.image.findMany({
     where: {
-      isPublic: true,
+      isPublic: true, isDisabled: false,
       favoritersCache: {
         array_contains: [{ acct: viewerAcct }] as Prisma.InputJsonValue,
       },

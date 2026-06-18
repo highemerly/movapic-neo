@@ -43,15 +43,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       width: true,
       height: true,
       isPublic: true,
+      isDisabled: true,
       user: { select: { username: true, displayName: true, instance: { select: { domain: true } } } },
     },
   });
 
-  // 非公開・不存在・ハンドル（username@domain）不一致はデフォルト（noindex扱い）
+  // 非公開・取り下げ・不存在・ハンドル（username@domain）不一致はデフォルト（noindex扱い）
   const { username: cleanUsername, domain } = parseUserHandle(username);
   if (
     !image ||
     !image.isPublic ||
+    image.isDisabled ||
     image.user.username !== cleanUsername ||
     image.user.instance.domain !== domain
   ) {
@@ -128,8 +130,8 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     },
   });
 
-  // 画像が見つからない、または非公開の場合
-  if (!image || !image.isPublic) {
+  // 画像が見つからない、非公開、または管理者により取り下げられた場合
+  if (!image || !image.isPublic || image.isDisabled) {
     notFound();
   }
 
@@ -343,6 +345,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             username={username}
             isOwner={isOwner}
             initialIsPinned={!!image.pinnedAt}
+            canReport={!!currentUser && !isOwner}
           />
         </div>
 

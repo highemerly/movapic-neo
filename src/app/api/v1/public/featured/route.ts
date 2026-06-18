@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 
     // 公開画像の総数を取得
     const totalCount = await prisma.image.count({
-      where: { isPublic: true },
+      where: { isPublic: true, isDisabled: false },
     });
 
     if (totalCount === 0) {
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     // ランダムな位置から画像を取得
     const images = await prisma.image.findMany({
-      where: { isPublic: true },
+      where: { isPublic: true, isDisabled: false },
       orderBy: { createdAt: "desc" },
       skip: randomOffset,
       take: limit,

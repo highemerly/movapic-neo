@@ -53,7 +53,7 @@ export default async function UserGalleryPage({
   const pinnedImages = await prisma.image.findMany({
     where: {
       userId: user.id,
-      isPublic: true,
+      isPublic: true, isDisabled: false,
       pinnedAt: { not: null },
     },
     orderBy: { pinnedAt: "desc" },
@@ -76,7 +76,7 @@ export default async function UserGalleryPage({
   const images = await prisma.image.findMany({
     where: {
       userId: user.id,
-      isPublic: true,
+      isPublic: true, isDisabled: false,
       id: { notIn: pinnedImageIds },
     },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -104,10 +104,10 @@ export default async function UserGalleryPage({
   const [totalImageCount, postDates, rankCounts, perfectAttendance] =
     await Promise.all([
       prisma.image.count({
-        where: { userId: user.id, isPublic: true },
+        where: { userId: user.id, isPublic: true, isDisabled: false },
       }),
       prisma.image.findMany({
-        where: { userId: user.id, isPublic: true },
+        where: { userId: user.id, isPublic: true, isDisabled: false },
         select: { createdAt: true },
       }),
       getRankCounts(user.id),

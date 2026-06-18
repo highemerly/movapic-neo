@@ -147,7 +147,7 @@ export async function GET(
     const currentUser = await getCurrentUser();
 
     const image = await prisma.image.findUnique({
-      where: { id: imageId, isPublic: true },
+      where: { id: imageId, isPublic: true, isDisabled: false },
       include: { user: { include: { instance: true } } },
     });
 
@@ -203,7 +203,7 @@ async function handleToggle(
   }
 
   const image = await prisma.image.findUnique({
-    where: { id: imageId, isPublic: true },
+    where: { id: imageId, isPublic: true, isDisabled: false },
     include: { user: { include: { instance: true } } },
   });
 

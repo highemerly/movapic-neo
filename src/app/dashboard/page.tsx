@@ -81,7 +81,7 @@ export default async function DashboardPage() {
     }),
     // 「みんなの投稿」プレビュー用に直近の公開投稿を取得（この中からランダムで4枚出す）
     prisma.image.findMany({
-      where: { isPublic: true },
+      where: { isPublic: true, isDisabled: false },
       orderBy: { createdAt: "desc" },
       take: 20,
       select: {

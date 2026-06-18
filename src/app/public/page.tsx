@@ -26,7 +26,7 @@ export default async function PublicTimelinePage({
   // 最新の公開画像を取得
   const images = await prisma.image.findMany({
     where: {
-      isPublic: true,
+      isPublic: true, isDisabled: false,
       ...(instanceDomains.length > 0 && {
         user: { instance: { domain: { in: instanceDomains } } },
       }),

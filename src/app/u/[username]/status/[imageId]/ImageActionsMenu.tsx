@@ -8,16 +8,18 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { ReportDialog } from "./ReportDialog";
 
 interface ImageActionsMenuProps {
   imageId: string;
   username: string;
   isOwner: boolean;
   initialIsPinned: boolean;
+  /** 通報可能か（ログイン済み かつ 自分の画像でない） */
+  canReport: boolean;
 }
 
 /**
@@ -30,12 +32,14 @@ export function ImageActionsMenu({
   username,
   isOwner,
   initialIsPinned,
+  canReport,
 }: ImageActionsMenuProps) {
   const router = useRouter();
   const confirm = useConfirm();
   const [isPinned, setIsPinned] = useState(initialIsPinned);
   const [isPinning, setIsPinning] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const handlePin = useCallback(async () => {
     if (isPinning) return;
@@ -184,15 +188,29 @@ export function ImageActionsMenu({
               <Trash2 className="mr-2 h-4 w-4" />
               削除
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
           </>
         )}
-        {/* 通報機能は別途実装予定。メニューの置き場所だけ確保しておく。 */}
-        <DropdownMenuItem disabled>
-          <Flag className="mr-2 h-4 w-4" />
-          通報（準備中）
-        </DropdownMenuItem>
+        {/* 通報は全ユーザー向け（自分の画像/未ログイン時は非表示）。 */}
+        {canReport && (
+          <DropdownMenuItem
+            className="text-red-600 focus:text-red-600"
+            onSelect={(e) => {
+              e.preventDefault();
+              setReportOpen(true);
+            }}
+          >
+            <Flag className="mr-2 h-4 w-4" />
+            通報
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
+      {canReport && (
+        <ReportDialog
+          imageId={imageId}
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+        />
+      )}
     </DropdownMenu>
   );
 }

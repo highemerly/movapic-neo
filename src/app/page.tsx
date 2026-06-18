@@ -18,7 +18,7 @@ import { userPathSegment } from "@/lib/userHandle";
 const getFeaturedImages = unstable_cache(
   async () =>
     prisma.image.findMany({
-      where: { isPublic: true },
+      where: { isPublic: true, isDisabled: false },
       orderBy: { createdAt: "desc" },
       take: 16,
       select: {

@@ -57,10 +57,10 @@ export default async function UserMapPage({
   const [totalImageCount, postDates, rankCounts, perfectAttendance] =
     await Promise.all([
       prisma.image.count({
-        where: { userId: user.id, isPublic: true },
+        where: { userId: user.id, isPublic: true, isDisabled: false },
       }),
       prisma.image.findMany({
-        where: { userId: user.id, isPublic: true },
+        where: { userId: user.id, isPublic: true, isDisabled: false },
         select: { createdAt: true },
       }),
       getRankCounts(user.id),
@@ -120,7 +120,7 @@ export default async function UserMapPage({
   const locImages = await prisma.image.findMany({
     where: {
       userId: user.id,
-      isPublic: true,
+      isPublic: true, isDisabled: false,
       locationPrefecture: { not: null },
     },
     orderBy: { createdAt: "desc" },
@@ -166,7 +166,7 @@ export default async function UserMapPage({
     ? await prisma.image.findMany({
         where: {
           userId: user.id,
-          isPublic: true,
+          isPublic: true, isDisabled: false,
           locationPrefecture: selectedPrefecture,
         },
         orderBy: { createdAt: "desc" },
