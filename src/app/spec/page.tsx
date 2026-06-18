@@ -38,7 +38,7 @@ export default async function SpecPage() {
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">テキスト</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li>文字数: 1〜140文字</li>
+                    <li>文字数: 1〜140文字（空白のみの入力は不可）</li>
                   </ul>
                 </div>
               </div>
@@ -112,9 +112,9 @@ export default async function SpecPage() {
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">画像処理</p>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                <li>iOSで撮影した画像は、向き（Orientation）を自動補正します</li>
-                <li>写真に含まれる撮影位置情報・撮影日時・撮影カメラ機種などのメタデータ（EXIF）は常に削除してアップロードされます</li>
-                <li>AVIF形式で圧縮します（同時に生成されるサムネイル画像はWebp）</li>
+                <li>Orientationタグを持つ画像（主にスマートフォンで撮影したもの）は、向きを自動補正します</li>
+                <li>画像： AVIF形式（quality 80・effort 2）で出力を試みますが、ファイルサイズの上限を超える場合、品質を段階的に下げて再エンコードすることがあります</li>
+                <li>サムネイル： WebP形式（128×128px・WebP・quality 80）で出力します</li>
               </ul>
             </div>
 
@@ -193,12 +193,12 @@ export default async function SpecPage() {
                     <tr className="border-b border-border">
                       <td className="py-2 pr-4">Mastodon</td>
                       <td className="py-2 pr-4">AVIF</td>
-                      <td className="py-2">高圧縮・高画質。Mastodonの画像サイズ制限（16MB）に最適化</td>
+                      <td className="py-2">高圧縮・高画質。インスタンスのアップロード上限（多くは16MB前後）に収まるよう自動最適化</td>
                     </tr>
                     <tr className="border-b border-border">
                       <td className="py-2 pr-4">Misskey</td>
                       <td className="py-2 pr-4">AVIF</td>
-                      <td className="py-2">高圧縮・高画質。Misskeyの画像サイズ制限（50MB）に最適化</td>
+                      <td className="py-2">高圧縮・高画質。インスタンスのアップロード上限に収まるよう自動最適化</td>
                     </tr>
                     <tr>
                       <td className="py-2 pr-4">その他</td>
@@ -220,7 +220,7 @@ export default async function SpecPage() {
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">Bot投稿（メンション投稿）</p>
               <p className="text-sm text-muted-foreground">
-                Bot宛にメンション付きで画像とコメントを送信すると、文字を合成して投稿可能です。BotはWebsocketを利用してメンションを確認しているため、ほぼ即座に処理されるはずです。処理が正常に完了した場合、元投稿は削除される仕組みとなっています（設定で変更可能）。
+                Bot宛にメンション付きで画像とコメントを送信すると、文字を合成して投稿可能です。BotはWebSocket（Mastodon Streaming API）でメンションを即時受信するため、ほぼ即座に処理されます。接続が切れた場合でも、定期的なポーリングで取りこぼしを補完します。処理が正常に完了した場合、元投稿は削除される仕組みとなっています（設定で変更可能）。
               </p>
             </div>
 

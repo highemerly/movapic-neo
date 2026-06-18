@@ -177,7 +177,7 @@ Mastodon上でBotアカウントにメンションすることで画像生成・
 - **Botアカウント**: `@movapic@handon.club`（環境変数で設定可能）
 - **処理フロー**:
   1. ユーザーがBotに画像付きメンションを送信
-  2. Botが通知をポーリングで取得（`src/lib/mention/fetcher.ts`）
+  2. Botが通知を取得（主経路: Mastodon Streaming API による WebSocket 即時受信 `src/lib/mention/streamer.ts`／フォールバック: 定期ポーリング `src/lib/mention/fetcher.ts`・`ingest.ts`。切断・サイレント切断時の取りこぼしを補完）
   3. メンション内容をパース（`src/lib/mention/parser.ts`）
   4. 画像処理・投稿を実行（`src/lib/mention/processor.ts`）
   5. 元投稿を削除し、処理済み画像をユーザーのアカウントで再投稿
@@ -270,7 +270,7 @@ DBの`Image.source`フィールドで投稿元を識別：
 - **皆勤賞**: その月に毎日投稿すると👑を表示（過去月のみ判定）
 
 ### サムネイル
-- **サイズ**: 96x96px（WebP形式、quality 75）
+- **サイズ**: 128x128px（WebP形式、quality 80）
 - **生成タイミング**: 投稿時（`/api/v1/post`内）
 - **クロップ位置**: 文字位置に応じた角を基準
   - top/left → 左上から
