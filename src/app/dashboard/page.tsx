@@ -14,6 +14,7 @@ import { EmailPrefixRegenerate } from "./EmailPrefixRegenerate";
 import { BioEditForm } from "./BioEditForm";
 import { DefaultsEditor } from "./DefaultsEditor";
 import { LocationMapToggle } from "./LocationMapToggle";
+import { BlockCrawlersToggle } from "./BlockCrawlersToggle";
 import { DisplayModeSelector } from "./DisplayModeSelector";
 import prisma from "@/lib/db";
 import { getUserProfileStats } from "@/lib/userStats";
@@ -61,6 +62,7 @@ export default async function DashboardPage() {
         defaultVisibility: true,
         defaultCameraOption: true,
         showLocationMap: true,
+        blockCrawlers: true,
       },
     }),
     getUserProfileStats(user.id),
@@ -419,6 +421,9 @@ export default async function DashboardPage() {
               <LocationMapToggle
                 initialEnabled={userWithPreferences?.showLocationMap ?? false}
                 username={selfSeg}
+              />
+              <BlockCrawlersToggle
+                initialEnabled={userWithPreferences?.blockCrawlers ?? false}
               />
             </div>
           </div>

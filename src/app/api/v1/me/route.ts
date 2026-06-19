@@ -8,8 +8,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/session";
 import prisma from "@/lib/db";
+import { ROBOTS_BLOCKLIST_TAG } from "@/lib/crawlers";
 
 /**
  * 認証済みユーザー向けレスポンス用ヘルパー。
@@ -59,6 +61,7 @@ export async function PATCH(request: NextRequest) {
       bio?: string | null;
       mentionKeep?: boolean;
       showLocationMap?: boolean;
+      blockCrawlers?: boolean;
     } = {};
 
     // bioの更新
@@ -106,6 +109,17 @@ export async function PATCH(request: NextRequest) {
       updateData.showLocationMap = body.showLocationMap;
     }
 
+    // blockCrawlersの更新（検索エンジン/AI Botのクロール拒否オプトイン）
+    if (body.blockCrawlers !== undefined) {
+      if (typeof body.blockCrawlers !== "boolean") {
+        return jsonNoStore(
+          { error: "blockCrawlersはboolean型である必要があります" },
+          { status: 400 }
+        );
+      }
+      updateData.blockCrawlers = body.blockCrawlers;
+    }
+
     // 更新するフィールドがない場合
     if (Object.keys(updateData).length === 0) {
       return jsonNoStore(
@@ -121,14 +135,21 @@ export async function PATCH(request: NextRequest) {
         bio: true,
         mentionKeep: true,
         showLocationMap: true,
+        blockCrawlers: true,
       },
     });
+
+    // robots.txt のブロックリストキャッシュを即時破棄（検証用にも即反映）
+    if (updateData.blockCrawlers !== undefined) {
+      revalidateTag(ROBOTS_BLOCKLIST_TAG, "max");
+    }
 
     return jsonNoStore({
       success: true,
       bio: updatedUser.bio,
       mentionKeep: updatedUser.mentionKeep,
       showLocationMap: updatedUser.showLocationMap,
+      blockCrawlers: updatedUser.blockCrawlers,
     });
   } catch (error) {
     console.error("Failed to update profile:", error);

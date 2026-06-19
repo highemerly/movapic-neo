@@ -12,13 +12,22 @@ import { calculateStreak } from "@/lib/streak";
 import { getRankCounts } from "@/lib/achievements/counts";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
+import { userPageRobotsMetadata } from "@/lib/crawlers";
 import { SuccessToast } from "@/components/SuccessToast";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
 interface UserGalleryPageProps {
   params: Promise<{ username: string }>;
   searchParams: Promise<{ deleted?: string }>;
+}
+
+export async function generateMetadata({
+  params,
+}: UserGalleryPageProps): Promise<Metadata> {
+  const { username } = await params;
+  return userPageRobotsMetadata(username);
 }
 
 export default async function UserGalleryPage({

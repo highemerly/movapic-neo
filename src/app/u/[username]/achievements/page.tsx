@@ -14,11 +14,20 @@ import { lastMonthYm, thisMonthYm } from "@/lib/achievements/lastMonthPerfect";
 import { collectLadderValues } from "@/lib/achievements/stats";
 import { calculateStreak } from "@/lib/streak";
 import { parseUserHandle } from "@/lib/userHandle";
+import { userPageRobotsMetadata } from "@/lib/crawlers";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
 interface AchievementsPageProps {
   params: Promise<{ username: string }>;
+}
+
+export async function generateMetadata({
+  params,
+}: AchievementsPageProps): Promise<Metadata> {
+  const { username } = await params;
+  return userPageRobotsMetadata(username);
 }
 
 export default async function AchievementsPage({

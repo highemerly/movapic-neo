@@ -44,7 +44,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       height: true,
       isPublic: true,
       isDisabled: true,
-      user: { select: { username: true, displayName: true, instance: { select: { domain: true } } } },
+      user: { select: { username: true, displayName: true, blockCrawlers: true, instance: { select: { domain: true } } } },
     },
   });
 
@@ -72,6 +72,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title,
     description,
+    // 投稿者がクロール拒否中なら公開画像でも検索エンジンに noindex（AI Bot は robots.txt 側）
+    ...(image.user.blockCrawlers ? { robots: { index: false, follow: false } } : {}),
     openGraph: {
       type: "article",
       siteName: "SHAMEZO",

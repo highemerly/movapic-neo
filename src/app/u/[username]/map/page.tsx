@@ -19,12 +19,21 @@ import {
 } from "@/components/map/PrefectureHeatmap";
 import { ImageCard } from "@/components/gallery/ImageCard";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
+import { userPageRobotsMetadata } from "@/lib/crawlers";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
 interface MapPageProps {
   params: Promise<{ username: string }>;
   searchParams: Promise<{ prefecture?: string }>;
+}
+
+export async function generateMetadata({
+  params,
+}: MapPageProps): Promise<Metadata> {
+  const { username } = await params;
+  return userPageRobotsMetadata(username);
 }
 
 export default async function UserMapPage({

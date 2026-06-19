@@ -49,6 +49,9 @@ model User {
   mentionKeep        Boolean   @default(false) @map("mention_keep")
   // 地図機能（ベータ）の公開オプトイン。デフォルトoff、自分の画像投稿の都道府県集計を地図で公開する
   showLocationMap    Boolean   @default(false) @map("show_location_map")
+  // 検索エンジン/AI Botのクロール拒否オプトイン。デフォルトoff（=従来どおり許可）。
+  // ON → /u/[username] 配下を検索エンジンに noindex（generateMetadata）し、AI BotをrobotsでDisallow。
+  blockCrawlers      Boolean   @default(false) @map("block_crawlers")
 
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")

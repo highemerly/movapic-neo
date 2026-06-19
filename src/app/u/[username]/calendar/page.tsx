@@ -13,12 +13,21 @@ import { getRankCounts } from "@/lib/achievements/counts";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
 import { perfectMonthGrace } from "@/lib/achievements/perfectMonth";
+import { userPageRobotsMetadata } from "@/lib/crawlers";
+import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
 interface CalendarPageProps {
   params: Promise<{ username: string }>;
   searchParams: Promise<{ year?: string; month?: string }>;
+}
+
+export async function generateMetadata({
+  params,
+}: CalendarPageProps): Promise<Metadata> {
+  const { username } = await params;
+  return userPageRobotsMetadata(username);
 }
 
 export default async function CalendarPage({
