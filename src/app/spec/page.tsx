@@ -232,6 +232,36 @@ export default async function SpecPage() {
             </div>            
 
             <div className="bg-muted rounded-lg p-4">
+              <p className="font-medium mb-3">要求する権限</p>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">Mastodon（OAuth 2.0）</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    ユーザーがMastodonサーバーを入力した場合、サーバーと連携する際に以下の権限を要求します。全てがサービス提供に必須の権限です。
+                  </p>
+                  <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                    <li>read（読み取り）：ログイン時のアカウント情報（ユーザーID・ユーザー名・表示名・プロフィール画像）の取得、投稿のお気に入り数・お気に入りしたユーザーの取得、Bot投稿機能での元投稿の取得に必要</li>
+                    <li>write:statuses（投稿の作成・削除）：生成した画像の投稿、およびBot投稿機能における元投稿の削除に必要</li>
+                    <li>write:media（メディアのアップロード）：投稿する画像のアップロードに必要</li>
+                    <li>write:favourites（お気に入りの操作）：本サービス上でのお気に入りの登録・解除を連携しサーバーに連携するために必要</li>
+                  </ul>
+                </div>
+                <div>
+                  <p className="text-ms text-muted-foreground font-medium mb-1">Misskey（MiAuth）</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    ユーザーがMisskeyサーバーを入力した場合、サーバーと連携する際に以下の権限を要求します。全てがサービス提供に必須の権限です。
+                  </p>
+                  <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                    <li>read:account（アカウント情報の読み取り）：ログイン時のアカウント情報（ユーザーID・ユーザー名・表示名・プロフィール画像）の取得に必要</li>
+                    <li>write:notes（ノートの作成・削除）：生成した画像の投稿、およびBot投稿機能における元投稿の削除に必要</li>
+                    <li>drive:write（ドライブへの書き込み）：投稿する画像のアップロードに必要</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+
+            <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">お気に入り</p>
               <p className="text-sm text-muted-foreground">
                 Fediverse上（Mastodonサーバー・Misskeyサーバー）上でのお気に入りとSHAMEZOのお気に入りは自動で同期されます。
