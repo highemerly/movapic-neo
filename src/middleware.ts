@@ -1,6 +1,70 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+// 状態変更を伴うHTTPメソッド（CSRF検証の対象）
+const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+/**
+ * CSRF多層防御: ブラウザ発のクロスサイトな状態変更リクエストを拒否する。
+ *
+ * Cookie(JWTセッション)認証 + SameSite=Lax の最後の壁として、明示的に
+ * オリジンを検証する。判定の主軸はブラウザが自動付与する Sec-Fetch-Site
+ * （プロキシ越しでも正しく計算され、追加のプリフライトも発生しない）。
+ *
+ * 「クロスサイトと確証できた時だけ」拒否する方針:
+ * - Sec-Fetch-Site / Origin がどちらも無いリクエストは非ブラウザ（メール
+ *   Worker等のサーバー間呼び出し）であり、攻撃者が被害者のCookieを送らせる
+ *   CSRF経路にはなり得ないため許可する。
+ *
+ * @returns 拒否すべきなら 403 レスポンス、許可なら null
+ */
+function rejectCrossSiteMutation(request: NextRequest): NextResponse | null {
+  if (!MUTATING_METHODS.has(request.method)) return null;
+
+  const path = request.nextUrl.pathname;
+  // サーバー間内部API（X-API-Keyで認証・ブラウザ非経由）は対象外
+  if (path.startsWith("/api/internal") || path.startsWith("/api/v1/ingest")) {
+    return null;
+  }
+
+  const secFetchSite = request.headers.get("sec-fetch-site");
+  if (secFetchSite) {
+    // same-origin / same-site / none(直接ナビゲーション) は許可、cross-site のみ拒否
+    if (secFetchSite === "cross-site") {
+      return forbidden();
+    }
+    return null;
+  }
+
+  // Sec-Fetch-Site 非対応の古いブラウザ向けフォールバック: Origin を突合
+  const origin = request.headers.get("origin");
+  if (origin) {
+    const forwardedHost = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+    const forwardedProto =
+      request.headers.get("x-forwarded-proto") ?? request.nextUrl.protocol.replace(/:$/, "");
+    const allowed = new Set(
+      [
+        request.nextUrl.origin,
+        forwardedHost ? `${forwardedProto}://${forwardedHost}` : null,
+        (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/$/, ""),
+      ].filter(Boolean) as string[]
+    );
+    if (!allowed.has(origin)) {
+      return forbidden();
+    }
+  }
+
+  // Sec-Fetch-Site も Origin も無い = 非ブラウザのサーバー間呼び出し → 許可
+  return null;
+}
+
+function forbidden(): NextResponse {
+  return NextResponse.json(
+    { success: false, error: { code: "CSRF_DETECTED", message: "Cross-site request blocked" } },
+    { status: 403 }
+  );
+}
+
 /**
  * COMPONENT_ROLE によるルート境界の強制 ＋ セキュリティヘッダー付与。
  *
@@ -23,6 +87,10 @@ export function middleware(request: NextRequest) {
       return new NextResponse(null, { status: 404 });
     }
   }
+
+  // CSRF多層防御: ブラウザ発のクロスサイトな状態変更を拒否
+  const csrfRejection = rejectCrossSiteMutation(request);
+  if (csrfRejection) return csrfRejection;
 
   const response = NextResponse.next();
 
