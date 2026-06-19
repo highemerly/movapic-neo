@@ -19,9 +19,11 @@ import {
   TASK_PROCESS_MENTION,
   TASK_PROCESS_EMAIL,
   TASK_NOTIFY_REPORT,
+  TASK_DELETE_ACCOUNT,
   type ProcessMentionPayload,
   type ProcessEmailPayload,
   type NotifyReportPayload,
+  type DeleteAccountPayload,
 } from "./tasks";
 
 const MAX_ATTEMPTS = 3;
@@ -72,6 +74,17 @@ export async function enqueueReportNotification(
   const utils = await getWorkerUtils();
   await utils.addJob(TASK_NOTIFY_REPORT, payload, {
     jobKey: `report:${payload.reportId}`,
+    maxAttempts: MAX_ATTEMPTS,
+  });
+}
+
+/** アカウント削除に伴う R2 後始末ジョブを enqueue。userId で dedup（二重投入を防ぐ）。 */
+export async function enqueueDeleteAccount(
+  payload: DeleteAccountPayload
+): Promise<void> {
+  const utils = await getWorkerUtils();
+  await utils.addJob(TASK_DELETE_ACCOUNT, payload, {
+    jobKey: `delete-account:${payload.userId}`,
     maxAttempts: MAX_ATTEMPTS,
   });
 }

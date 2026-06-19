@@ -29,6 +29,7 @@ import type {
 export const TASK_PROCESS_MENTION = "process-mention";
 export const TASK_PROCESS_EMAIL = "process-email";
 export const TASK_NOTIFY_REPORT = "notify-report";
+export const TASK_DELETE_ACCOUNT = "delete-account";
 
 export interface ProcessMentionPayload {
   notification: MastodonNotification;
@@ -57,6 +58,13 @@ export interface ProcessEmailPayload {
 
 export interface NotifyReportPayload {
   reportId: string;
+}
+
+export interface DeleteAccountPayload {
+  /** 削除済みユーザーのID（ログ用。enqueue 時点で DB からは既に削除済み） */
+  userId: string;
+  /** R2 から削除する全オブジェクトキー（出力画像＋サムネイル） */
+  storageKeys: string[];
 }
 
 /**
@@ -203,8 +211,34 @@ const notifyReportTask: Task = async (payload) => {
   await sendBotDirectMessage(accts, message);
 };
 
+/**
+ * アカウント削除に伴う Object Storage（R2）の後始末。
+ * DB のユーザー削除は API リクエスト側で同期的に完了済み（カスケードで関連行も消える）。
+ * 遅いのは R2 オブジェクトの逐次削除なので、その部分だけをこのジョブに逃がす。
+ * 既に存在しないキーや R2 一時障害は致命的ではないため、キー単位で握りつぶして続行する
+ * （孤立オブジェクトが多少残ってもアカウント削除自体は成立済み）。
+ */
+const deleteAccountTask: Task = async (payload) => {
+  const p = payload as DeleteAccountPayload;
+
+  let deleted = 0;
+  for (const key of p.storageKeys) {
+    try {
+      await deleteImage(key);
+      deleted++;
+    } catch (e) {
+      console.error(`[delete-account] R2削除に失敗: ${key}`, e);
+    }
+  }
+
+  console.log(
+    `[delete-account] user=${p.userId} R2オブジェクト ${deleted}/${p.storageKeys.length} 件を削除`
+  );
+};
+
 export const taskList: TaskList = {
   [TASK_PROCESS_MENTION]: processMentionTask,
   [TASK_PROCESS_EMAIL]: processEmailTask,
   [TASK_NOTIFY_REPORT]: notifyReportTask,
+  [TASK_DELETE_ACCOUNT]: deleteAccountTask,
 };

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "@/components/Link";
 import { getAvatarUrl } from "@/lib/avatar";
-import { Globe, Server, Heart, ChevronRight, Settings2, ShieldCheck, SlidersHorizontal, Trophy, Images, Calendar, Map as MapIcon } from "lucide-react";
+import { Globe, Server, Heart, ChevronRight, Settings2, ShieldCheck, SlidersHorizontal, Trophy, Images, Calendar, Map as MapIcon, Trash2 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/auth/LogoutButton";
@@ -16,6 +16,7 @@ import { DefaultsEditor } from "./DefaultsEditor";
 import { LocationMapToggle } from "./LocationMapToggle";
 import { BlockCrawlersToggle } from "./BlockCrawlersToggle";
 import { DisplayModeSelector } from "./DisplayModeSelector";
+import { DeleteAccountSection } from "./DeleteAccountSection";
 import prisma from "@/lib/db";
 import { getUserProfileStats } from "@/lib/userStats";
 import { userPathSegment } from "@/lib/userHandle";
@@ -445,6 +446,18 @@ export default async function DashboardPage() {
                 cameraOption: (userWithPreferences?.defaultCameraOption as "none" | "show" | null | undefined) ?? null,
                 mentionKeep: userWithPreferences?.mentionKeep ?? false,
               }}
+              instanceDomain={user.instance.domain}
+            />
+          </div>
+
+          {/* アカウント削除 */}
+          <div className="mt-4 bg-muted rounded-lg p-4">
+            <p className="text-sm font-bold mb-4 flex items-center gap-1.5">
+              <Trash2 className="h-4 w-4 text-muted-foreground" />
+              アカウント削除
+            </p>
+            <DeleteAccountSection
+              username={user.username}
               instanceDomain={user.instance.domain}
             />
           </div>
