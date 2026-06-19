@@ -182,7 +182,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
         </Button>
       </div>
       <p className="text-center text-xs text-muted-foreground">
-        Mastodon または Misskey サーバーのドメインを入力してください
+        Mastodon サーバーのドメインを入力してください
       </p>
     </form>
   );
