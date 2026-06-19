@@ -22,7 +22,8 @@ import {
   generateMiAuthSignature,
   type OAuthSessionData,
 } from "@/lib/auth/crypto";
-import { ErrorCodes, errorResponse, handleUnknownError } from "@/lib/errors";
+import { ErrorCodes, errorResponse, handleAppError, handleUnknownError } from "@/lib/errors";
+import { AppError } from "@/lib/errors/AppError";
 
 const OAUTH_SESSION_COOKIE = "oauth_session";
 const OAUTH_STATE_COOKIE = "oauth_state";
@@ -182,6 +183,10 @@ export async function POST(request: NextRequest) {
       { suggestion: "MastodonまたはMisskeyのサーバーを指定してください" }
     );
   } catch (error) {
+    // インスタンス検出などで投げられた既知のエラーはそのまま意味のあるメッセージで返す
+    if (error instanceof AppError) {
+      return handleAppError(error);
+    }
     return handleUnknownError(error);
   }
 }

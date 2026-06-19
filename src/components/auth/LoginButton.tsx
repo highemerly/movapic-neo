@@ -82,7 +82,10 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "認証の開始に失敗しました");
+        // エラーレスポンスは { success: false, error: { code, message, suggestion? } } 形式
+        const message = data.error?.message || "認証の開始に失敗しました";
+        const suggestion = data.error?.suggestion;
+        throw new Error(suggestion ? `${message}（${suggestion}）` : message);
       }
 
       window.location.href = data.url;

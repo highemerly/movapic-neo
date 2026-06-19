@@ -3,7 +3,9 @@
  */
 
 import { USER_AGENT } from "@/lib/userAgent";
-import { assertSafeRemoteHost } from "@/lib/security/ssrf";
+import { assertSafeRemoteHost, SsrfError } from "@/lib/security/ssrf";
+import { AppError } from "@/lib/errors/AppError";
+import { ErrorCodes } from "@/lib/errors/codes";
 
 const REQUEST_TIMEOUT = 15000; // 15秒
 
@@ -44,9 +46,28 @@ export async function detectInstanceType(server: string): Promise<InstanceInfo> 
   try {
     hostname = new URL(`https://${normalizedServer}`).hostname;
   } catch {
-    throw new Error("サーバー名が不正です");
+    throw new AppError(
+      ErrorCodes.VALIDATION_INVALID,
+      "サーバー名が不正です",
+      400,
+      "正しいドメイン名（例: handon.club）を入力してください"
+    );
   }
-  await assertSafeRemoteHost(hostname);
+  try {
+    await assertSafeRemoteHost(hostname);
+  } catch (e) {
+    // 名前解決できない／内部アドレス等で弾かれた場合も
+    // ユーザーには「サーバーが見つからない」として typo に気づけるよう伝える
+    if (e instanceof SsrfError) {
+      throw new AppError(
+        ErrorCodes.NOT_FOUND,
+        "サーバーが見つかりませんでした",
+        404,
+        "ドメイン名が正しいか確認し、別のサーバー（例: handon.club）で試してください"
+      );
+    }
+    throw e;
+  }
 
   // Mastodonの場合
   try {
@@ -99,7 +120,13 @@ export async function detectInstanceType(server: string): Promise<InstanceInfo> 
     // Misskeyでもない
   }
 
-  throw new Error("サポートされていないインスタンスです");
+  // ドメインに到達できない、または Mastodon/Misskey として応答しなかった
+  throw new AppError(
+    ErrorCodes.NOT_FOUND,
+    "サーバーが見つかりませんでした",
+    404,
+    "ドメイン名が正しいか確認し、別のサーバー（例: handon.club）で試してください"
+  );
 }
 
 /**
