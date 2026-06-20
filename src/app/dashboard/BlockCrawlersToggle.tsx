@@ -62,7 +62,7 @@ export function BlockCrawlersToggle({ initialEnabled }: BlockCrawlersToggleProps
             <SaveStatus state={saveState} error={error} />
           </p>
           <p className="text-xs text-muted-foreground">
-            検索エンジン・AIなどに対し、あなたのページを登録しないよう要望します。設定の反映には時間がかかります。また、要望を無視するクローラーには効果がありません。
+            検索エンジン・AIエージェントに対し、あなたのページを利用しないよう要望します。設定の反映には時間がかかります。また、要望を無視するクローラーには効果がありません。
           </p>
         </div>
         <ToggleSwitch checked={enabled} onChange={handleToggle} disabled={isSaving} />
