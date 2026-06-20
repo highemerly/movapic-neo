@@ -4,6 +4,18 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* PWA（ホーム画面起動 = standalone）時だけ適用するバリアント。
+   下部メニューバーの表示や FAB の非表示をJSなしのCSSだけで切り替える。 */
+@custom-variant standalone (@media (display-mode: standalone));
+
+/* standalone時は下部メニューバーぶんの余白を本文末尾に確保（コンテンツが隠れないように）。
+   iOSのホームインジケータ分も safe-area で足す。 */
+@media (display-mode: standalone) {
+  body {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

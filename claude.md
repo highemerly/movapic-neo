@@ -304,6 +304,17 @@ DBの`Image.source`フィールドで投稿元を識別：
 - **実績を追加・変更する手順と不変条件は [`src/lib/achievements/README.md`](src/lib/achievements/README.md) に集約**（key は永続でリネーム禁止、しきい値は `>=`、live と backfill の集計を必ず同期、等）。
 - 既存ユーザーへの反映: `DATABASE_URL=... npx tsx scripts/backfill-achievements.ts`（冪等）。
 
+## PWA対応
+ホーム画面に追加できるPWA。Push通知は**やらない**。
+
+- **インストール**: 静的 [public/manifest.json](public/manifest.json)（`display: standalone`）。アイコンはロゴと同じグラデーション／ケータイアイコンを流用しつつ、正方形向けに「SHAME ／ ZO📱」の**2行レイアウト**を [scripts/generate-pwa-icons.ts](scripts/generate-pwa-icons.ts) 内のSVGで組み、白背景に合成して生成（`npx tsx scripts/generate-pwa-icons.ts` → `public/icons/`、any/maskable/apple-touch）。manifest/appleWebApp/viewport(`viewportFit: cover`) は [src/app/layout.tsx](src/app/layout.tsx) の metadata で付与。
+- **Share Target（簡単投稿）**: 他アプリの共有メニューから画像を受け取り投稿ページへ載せる。manifest の `share_target`（`POST /share-target`）→ 最小の Service Worker [public/sw.js](public/sw.js) が画像を Cache Storage(`shared-image`/`/__shared`)へ保存し `/create?shared=1` へ303リダイレクト → [CreateClient.tsx](src/app/create/CreateClient.tsx) がマウント時にキャッシュから取り出し既存の `handleImageSelect` に流す。SWはこの用途のみ（オフラインキャッシュはしない）。SW登録は [src/components/ServiceWorkerRegister.tsx](src/components/ServiceWorkerRegister.tsx)。
+  - **iOS制約**: Web Share Target は Android Chrome等のみ。**iOS Safari の PWA では共有受信は不可**（仕様上）。iOSでもインストール・下部メニューは動作する。
+- **下部メニューバー（standalone時のみ）**: [src/components/layout/BottomNav.tsx](src/components/layout/BottomNav.tsx)。左から みんな/同じサーバー/投稿(中央・強調)/マイページ/メニュー。中央の投稿ボタンはバー上端から少しはみ出す大きめの円ボタン（`-mt-6 h-16 w-16 ring-4 ring-background`）。未ログイン時はログイン必須項目（同じサーバー・マイページ）を非表示。表示情報は DBレスな `getSessionClaims()` から layout で取得。
+  - **standalone判定はJSではなくCSSのみ**: [globals.css](src/app/globals.css) に Tailwind v4 の `@custom-variant standalone (@media (display-mode: standalone))` を定義。BottomNav は `hidden standalone:flex`、従来の [FloatingPostButton](src/components/FloatingPostButton.tsx) は `standalone:hidden` でPWA時だけ隠す（ハイドレーション不整合を避ける）。body に standalone時のみ下部余白＋`safe-area-inset-bottom`。
+  - **ヘッダーもPWA時のみスティッキー**: [SiteHeader](src/components/layout/SiteHeader.tsx) に `standalone:sticky standalone:top-0 standalone:z-30`。通常ブラウザでは従来どおり非固定。
+  - layout で cookie を読むため全ページが動的レンダリングになる（認証中心アプリのため許容）。
+
 ## 本番DBマイグレーション
 
 ```bash

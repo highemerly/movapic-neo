@@ -25,6 +25,13 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Service Worker は更新を即時反映させたいのでキャッシュさせない
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
+      },
     ];
   },
 };

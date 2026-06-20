@@ -56,7 +56,8 @@ function LogoutMenuItem() {
 export function SiteHeader({ user }: SiteHeaderProps = {}) {
   return (
     <>
-      <header className="border-b bg-background">
+      {/* PWA（standalone起動）時はヘッダーを画面上部に固定する */}
+      <header className="border-b bg-background standalone:sticky standalone:top-0 standalone:z-30">
       <div className="container mx-auto px-4 py-1 max-w-6xl">
         <div className="flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center hover:opacity-80 transition-opacity">

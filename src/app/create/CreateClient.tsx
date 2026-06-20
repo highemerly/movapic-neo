@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, X } from "lucide-react";
 import { TextInput } from "@/components/TextInput";
@@ -266,6 +266,45 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
     },
     [preferences.cameraOption],
   );
+
+  // PWA の Web Share Target 経由で共有された画像を受け取る。
+  // Service Worker が画像を Cache Storage("shared-image"/"/__shared") に置き、
+  // /create?shared=1 へ誘導してくるので、ここで取り出して通常のアップロードと
+  // 同じ handleImageSelect に流す（EXIF抽出等もそのまま再利用）。
+  const sharedConsumedRef = useRef(false);
+  useEffect(() => {
+    if (sharedConsumedRef.current) return;
+    if (typeof window === "undefined" || !("caches" in window)) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("shared") !== "1") return;
+    sharedConsumedRef.current = true;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const cache = await caches.open("shared-image");
+        const res = await cache.match("/__shared");
+        if (res && !cancelled) {
+          const blob = await res.blob();
+          const type = blob.type || "image/jpeg";
+          const ext = type.split("/")[1] || "jpg";
+          const file = new File([blob], `shared.${ext}`, { type });
+          const preview = URL.createObjectURL(file);
+          await handleImageSelect(file, preview);
+        }
+        await cache.delete("/__shared");
+      } catch (e) {
+        console.error("共有画像の読み込みに失敗しました:", e);
+      } finally {
+        // リロードで再処理されないよう URL から ?shared=1 を消す
+        router.replace("/create");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [handleImageSelect, router]);
 
   const handleReset = useCallback(() => {
     // 出力形式はインスタンス種別の自動値を保持

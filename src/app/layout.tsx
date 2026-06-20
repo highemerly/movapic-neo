@@ -1,8 +1,14 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { ConfirmProvider } from "@/components/providers/ConfirmProvider";
 import { Toaster } from "@/components/ui/sonner";
+import { BottomNav } from "@/components/layout/BottomNav";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { getSessionClaims } from "@/lib/auth/session";
+import { userPathSegment, DEFAULT_INSTANCE } from "@/lib/userHandle";
+import { getAvatarUrl } from "@/lib/avatar";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,13 +44,35 @@ export const metadata: Metadata = {
     title: SITE_NAME,
     description: SITE_DESCRIPTION,
   },
+  // PWA: ホーム画面に追加 / インストール可能化
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: SITE_NAME,
+  },
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
-export default function RootLayout({
+export const viewport: Viewport = {
+  themeColor: "#ffffff",
+  // iOSのノッチ等でも safe-area を使えるように画面いっぱいに広げる
+  viewportFit: "cover",
+};
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // PWA下部ナビ用のログイン情報（DBアクセスなし・表示専用）。
+  const claims = await getSessionClaims();
+  const selfSegment = claims?.username
+    ? userPathSegment(claims.username, claims.instanceDomain || DEFAULT_INSTANCE)
+    : null;
+
   return (
     <html lang="ja" suppressHydrationWarning>
       <body
@@ -58,6 +86,15 @@ export default function RootLayout({
         >
           <ConfirmProvider>{children}</ConfirmProvider>
           <Toaster />
+          {/* PWA（standalone起動）時のみCSSで表示される下部ナビ */}
+          <Suspense fallback={null}>
+            <BottomNav
+              selfSegment={selfSegment}
+              instanceDomain={claims?.instanceDomain ?? null}
+              avatarUrl={getAvatarUrl(claims?.avatarUrl)}
+            />
+          </Suspense>
+          <ServiceWorkerRegister />
         </ThemeProvider>
       </body>
     </html>
