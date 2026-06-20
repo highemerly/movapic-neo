@@ -70,6 +70,43 @@ function isFavoritedByViewer(
   return favoriters.some((f) => f.acct === viewerAcct);
 }
 
+// viewer自身をCachedFavoriter形に変換（お気に入りはMastodon限定なので
+// プロフィールURLは `https://{domain}/@{username}` で組み立てられる）
+function viewerToFavoriter(viewer: {
+  username: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  instance: { domain: string };
+}): CachedFavoriter {
+  return {
+    acct: `${viewer.username}@${viewer.instance.domain}`,
+    displayName: viewer.displayName,
+    avatarUrl: viewer.avatarUrl,
+    profileUrl: `https://${viewer.instance.domain}/@${viewer.username}`,
+  };
+}
+
+// オーナー側のfavoriters一覧にviewer自身を仮反映する。DBキャッシュには保存せず、
+// レスポンス用の一覧だけを補正する（federation遅延の暫定表示）。
+// - お気に入り時: 未掲載なら先頭に追加
+// - 解除時: 一覧から取り除く
+function mergeViewerFavoriter(
+  favoriters: CachedFavoriter[],
+  viewer: {
+    username: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    instance: { domain: string };
+  },
+  favourited: boolean
+): CachedFavoriter[] {
+  const viewerAcct = `${viewer.username}@${viewer.instance.domain}`;
+  const withoutViewer = favoriters.filter((f) => f.acct !== viewerAcct);
+  return favourited
+    ? [viewerToFavoriter(viewer), ...withoutViewer]
+    : withoutViewer;
+}
+
 // クライアント表示用にfavoritersを整形（avatarはプロキシ経由）
 function toClientFavoriters(favoriters: CachedFavoriter[]) {
   return favoriters.map((f) => ({
@@ -264,11 +301,21 @@ async function handleToggle(
   // 操作者への即時応答にはviewer側の結果を使う
   const synced = await syncFavoriteCache(image);
 
+  // federation遅延でオーナー側のfavourited_byにviewerがまだ載らないため、
+  // 「お気に入りした人」一覧にはviewer自身を仮追加して即時表示する（DBキャッシュ
+  // には保存しない＝次回以降のオーナー側syncが本物の反映を持ってくるまでの暫定表示）。
+  // 解除時は逆にviewerを一覧から取り除く。
+  const responseFavoriters = mergeViewerFavoriter(
+    synced.favoriters,
+    viewer,
+    action === "favourite"
+  );
+
   return NextResponse.json({
     success: true,
     favoriteCount: result.count,
     isFavorited: result.favourited,
-    favoriters: toClientFavoriters(synced.favoriters),
+    favoriters: toClientFavoriters(responseFavoriters),
     syncError: favoriteErrorMessage(synced.errorReason),
   });
 }

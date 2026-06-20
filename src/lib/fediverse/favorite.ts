@@ -9,7 +9,10 @@
 
 import { USER_AGENT } from "@/lib/userAgent";
 
-const SHORT_TIMEOUT = 4000; // 4秒
+const SHORT_TIMEOUT = 4000; // 4秒（オーナーインスタンス＝自前サーバーへの読み取り・お気に入り操作）
+// 別インスタンスの投稿解決（search?resolve=true）は、viewerインスタンスがオーナー
+// インスタンスへ連合取得しに行くため遅くなりがち。取りこぼしを減らすため長めに取る。
+const RESOLVE_TIMEOUT = 10000; // 10秒
 
 // お気に入り取得・操作の失敗理由
 // "deleted":     元の投稿が存在しない（404/410）
@@ -191,7 +194,7 @@ async function resolveViewerStatusId(params: {
       Authorization: `Bearer ${viewerToken}`,
       "User-Agent": USER_AGENT,
     },
-    signal: AbortSignal.timeout(SHORT_TIMEOUT),
+    signal: AbortSignal.timeout(RESOLVE_TIMEOUT),
   });
 
   if (!response.ok) {
