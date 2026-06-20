@@ -18,7 +18,13 @@ const RESOLVE_TIMEOUT = 10000; // 10秒
 // "deleted":     元の投稿が存在しない（404/410）
 // "forbidden":   権限不足（401/403、トークンのscope不足など）
 // "unavailable": 一時的に取得不可（タイムアウト、ネットワーク、5xx等）
-export type FavoriteErrorReason = "deleted" | "forbidden" | "unavailable";
+// "unresolved":  別インスタンスの投稿をviewer側でまだ解決できない（連合の未伝播など）。
+//                searchは成功（200）したが該当statusが見つからないケース。削除とは区別する。
+export type FavoriteErrorReason =
+  | "deleted"
+  | "forbidden"
+  | "unavailable"
+  | "unresolved";
 
 export class FavoriteError extends Error {
   reason: FavoriteErrorReason;
@@ -73,6 +79,8 @@ export function favoriteErrorMessage(
       return "お気に入り情報を取得する権限がありません。再ログインで解決する場合があります";
     case "unavailable":
       return "Mastodonサーバーに接続できず、お気に入り情報を取得できませんでした。時間をおいて再度お試しください";
+    case "unresolved":
+      return "投稿がまだあなたのサーバーに反映されていないようです。少し時間をおいて再度お試しください";
     default:
       return null;
   }
@@ -208,8 +216,10 @@ async function resolveViewerStatusId(params: {
   const data = (await response.json()) as { statuses?: MastodonStatus[] };
   const statusId = data.statuses?.[0]?.id;
   if (!statusId) {
-    // viewerインスタンスから投稿が見えない＝削除orフェデレーション失敗扱い
-    throw new FavoriteError("deleted", 404, "投稿を解決できませんでした");
+    // searchは成功したが該当statusが無い＝viewerインスタンスにまだ投稿が無い。
+    // 削除済みとは限らず、連合の未伝播やresolveの取りこぼしの可能性が高いため
+    // "unresolved" として扱い、「削除された」ではなく「未反映」のメッセージを出す。
+    throw new FavoriteError("unresolved", 404, "投稿を解決できませんでした");
   }
   return statusId;
 }

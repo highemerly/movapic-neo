@@ -282,18 +282,29 @@ async function handleToggle(
   } catch (error) {
     const reason = toFavoriteReason(error);
     console.error(`[favorite] ${action}失敗 (reason=${reason}): imageId=${imageId}`, error);
-    const status = reason === "deleted" ? 404 : reason === "forbidden" ? 403 : 502;
+    const status =
+      reason === "deleted" || reason === "unresolved"
+        ? 404
+        : reason === "forbidden"
+          ? 403
+          : 502;
     const code =
-      reason === "deleted"
+      reason === "deleted" || reason === "unresolved"
         ? ErrorCodes.NOT_FOUND
         : reason === "forbidden"
           ? ErrorCodes.AUTH_REQUIRED
           : ErrorCodes.INTERNAL_ERROR;
+    const suggestion =
+      reason === "forbidden"
+        ? { suggestion: "再ログインしてください" }
+        : reason === "unresolved"
+          ? { suggestion: "少し時間をおいて再度お試しください" }
+          : undefined;
     return errorResponse(
       code,
       favoriteErrorMessage(reason) ?? "Mastodonでのお気に入り操作に失敗しました",
       status,
-      reason === "forbidden" ? { suggestion: "再ログインしてください" } : undefined
+      suggestion
     );
   }
 

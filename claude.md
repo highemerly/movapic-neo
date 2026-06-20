@@ -134,6 +134,26 @@ App Router の `<Link>` はビューポート進入で対象ルートの RSC ペ
 - **DELETE**: お気に入り解除（認証必須）
   - レスポンス: `{ success, favoriteCount, isFavorited: false }`
 
+#### お気に入りの実体（Mastodon連携）
+お気に入りは**サービス独自のDBレコードではなく、Mastodonの favourite そのもの**。正データはオーナー（投稿者）インスタンス側にあり、サービスは `favoriteCount` / `favoritersCache`（上位40件）をキャッシュとして保持する。実装は [src/lib/fediverse/favorite.ts](src/lib/fediverse/favorite.ts) と [src/app/api/v1/images/[id]/favorite/route.ts](src/app/api/v1/images/[id]/favorite/route.ts)。Mastodonユーザー＋`postId`がある投稿のみ対象（`isFavoritable`）。
+
+- **読み取り（count / favourited_by）**: オーナーのトークンでオーナーインスタンスから取得。
+- **お気に入り操作（POST/DELETE）**: viewer（操作者）のトークンで実行。
+  - **同一インスタンス**（viewer == owner）: `postId` をそのまま使う（search不要）。
+  - **別インスタンス**（viewer != owner）: viewer側に振られたローカルstatus IDが必要。`postUrl` を keyに **`/api/v2/search?resolve=true`（viewerトークン）で毎操作ごとに解決**してから `POST /statuses/:id/favourite`。解決結果（localStatusId）は**キャッシュしていない**（現状の意図的な割り切り）。
+    - localStatusId は (viewerインスタンス × 投稿) で一意かつそのインスタンスの全ユーザー共通なので、search負荷が問題化したら `(viewerInstanceDomain, postId) → localStatusId` のキャッシュ導入が有効。**現時点では不要と判断**。
+    - resolve（federation取得を伴い遅い）だけ専用タイムアウト10秒（`RESOLVE_TIMEOUT`）、他の読み取り・操作は4秒（`SHORT_TIMEOUT`）。
+    - `authorize_interaction`（[画像ページ](src/app/u/[username]/status/[imageId]/page.tsx)の「返信/インタラクション」リンクで使用）は**ブラウザをviewerインスタンスUIへ飛ばす対話フロー**で、トークンでの非対話お気に入りには使えない。サーバー側ワンクリックは search 経由が標準。
+- **楽観表示**: POST/DELETE成功時、レスポンスの favoriters一覧に viewer自身を仮追加/除外する（[route.ts](src/app/api/v1/images/[id]/favorite/route.ts) `mergeViewerFavoriter`）。**DBキャッシュには保存しない**ため、リロードするとオーナー側syncが本物の連合反映を持ってくるまで一旦消える（federation遅延＋上位40件の壁による割り切り）。
+- **エラー分類**（`FavoriteErrorReason`）: `deleted`(404/410) / `forbidden`(401/403→再ログイン誘導) / `unavailable`(5xx・タイムアウト) / `unresolved`（search成功だが該当statusなし＝**未伝播**。「削除」ではなく「未反映なので時間をおいて」と案内）。
+
+#### お気に入りキャッシュの更新頻度（TTL）
+GET時に**TTL切れ（または未取得）のときだけ**オーナートークンでMastodonへsyncする（`computeCacheTtl`）。連打・人気投稿でのアクセス集中を抑えるため、投稿経過時間と前回のpostStatusでTTLを可変にする。
+- 直近のsyncが **4xx**: 1日（削除確定・権限不足など、再試行の意味が薄い）
+- **5xx / 接続失敗(0)**: 1時間
+- **成功(200) / 未sync**: 投稿経過時間ベース（≤5分: 1分 / ≤2時間: 5分 / ≤1日: 30分 / ≤5日: 1時間 / それ以降: 1日）
+- POST/DELETE成功時は即時にオーナー側syncを1回走らせてキャッシュを更新する。
+
 ### GET /api/v1/favorites
 - **認証**: 必須
 - **パラメータ**: cursor, limit
