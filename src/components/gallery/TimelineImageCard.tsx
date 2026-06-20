@@ -62,6 +62,7 @@ export function TimelineImageCard({
             src={image.user.avatarUrl ?? undefined}
             alt={image.user.displayName || image.user.username}
             className="w-5 h-5 rounded-full"
+            loading="lazy"
           />
         )}
         <span className="text-xs text-white truncate min-w-0">

@@ -471,6 +471,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
                   src={getAvatarUrl(image.user.avatarUrl) ?? image.user.avatarUrl}
                   alt={image.user.displayName || image.user.username}
                   className="w-10 h-10 rounded-full hover:opacity-80 transition-opacity"
+                  loading="lazy"
                 />
               </Link>
               {posterPerfectAttendance && <AttendanceCrown />}

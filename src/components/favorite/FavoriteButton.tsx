@@ -146,6 +146,7 @@ export function FavoriteButton({
                     src={favoriter.avatarUrl}
                     alt={label}
                     className="w-6 h-6 rounded-full hover:opacity-80 transition-opacity"
+                    loading="lazy"
                   />
                 ) : (
                   <div className="w-6 h-6 rounded-full bg-muted-foreground/20 flex items-center justify-center text-xs text-muted-foreground hover:opacity-80 transition-opacity">
