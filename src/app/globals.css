@@ -153,28 +153,14 @@
   .animate-crown-glow {
     animation: crown-glow 2s ease-in-out infinite;
   }
-  /* トップページの作例マーキー（横方向の連続スクロール）
-     duration は --marquee-duration で枚数に応じて上書き（未設定時は 40s） */
-  .animate-marquee {
-    animation: marquee-scroll var(--marquee-duration, 40s) linear infinite;
-    will-change: transform;
+  /* スクロールバーを非表示にする（横スクロールの作例カルーセル等で使用）。
+     スクロール自体は可能なまま、見た目だけ隠す。 */
+  .no-scrollbar {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
   }
-}
-
-@keyframes marquee-scroll {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    /* 配列を2回描画した track の半分＝1セット分だけ移動してシームレスにループ */
-    transform: translateX(-50%);
-  }
-}
-
-/* 「視差を減らす」設定時は自動スクロールを十分ゆっくりにする（完全停止はしない） */
-@media (prefers-reduced-motion: reduce) {
-  .animate-marquee {
-    animation-duration: 240s;
+  .no-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
   }
 }
 
