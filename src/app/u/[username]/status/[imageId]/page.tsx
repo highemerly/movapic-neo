@@ -331,44 +331,50 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           </div>
         ) : null}
 
-        {/* 返信・その他メニュー（ピン留め・削除、将来の通報） */}
-        <div className="mt-2 flex items-center gap-2">
-          {replyUrl && (
-            <a
-              href={replyUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex flex-1 items-center justify-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
-              title="自分のサーバーで投稿を開いて返信する"
-            >
-              <Reply className="h-4 w-4 shrink-0" />
-              <span className="text-xs font-medium whitespace-nowrap">返信・ブースト</span>
-            </a>
-          )}
-          {shareUrl && (
-            <a
-              href={shareUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex flex-1 items-center justify-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
-              title="この画像ページをシェアする"
-            >
-              <Share2 className="h-4 w-4" />
-              <span className="text-xs font-medium">投稿</span>
-            </a>
-          )}
-          <ImageActionsMenu
-            imageId={imageId}
-            username={username}
-            isOwner={isOwner}
-            initialIsPinned={!!image.pinnedAt}
-            canReport={!!currentUser && !isOwner}
-          />
-        </div>
+        {/* 返信・シェア・その他メニュー（ピン留め・削除、将来の通報）。ログインユーザーのみ表示 */}
+        {currentUser && (
+          <div className="mt-[9px] flex items-center gap-1.5">
+            {replyUrl && (
+              <a
+                href={replyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-1 items-center justify-center gap-1.5 h-[34px] px-2.5 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
+                title="あなたのサーバーでこの投稿を開きます（返信・ブースト・お気に入りができます）"
+              >
+                <Reply className="h-4 w-4 shrink-0" />
+                <span className="flex flex-col items-start leading-none">
+                  <span className="text-xs font-medium whitespace-nowrap mt-0.5">返信･引用など</span>
+                </span>
+              </a>
+            )}
+            {shareUrl && (
+              <a
+                href={shareUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-1 items-center justify-center gap-1.5 h-[34px] px-2.5 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
+                title="あなたのサーバーで、このURLを投稿します"
+              >
+                <Share2 className="h-4 w-4 shrink-0" />
+                <span className="flex flex-col items-start leading-none">
+                  <span className="text-xs font-medium whitespace-nowrap mt-0.5">URLを投稿</span>
+                </span>
+              </a>
+            )}
+            <ImageActionsMenu
+              imageId={imageId}
+              username={username}
+              isOwner={isOwner}
+              initialIsPinned={!!image.pinnedAt}
+              canReport={!isOwner}
+            />
+          </div>
+        )}
 
         {/* EXIF情報（カメラ機種・撮影場所）。投稿者本人のみ撮影場所だけ削除可能。 */}
         {(image.cameraModel || image.locationPrefecture) && (
-          <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+          <p className="mt-[9px] flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
             {image.cameraModel && (
               <span className="inline-flex items-center gap-1">
                 <Camera className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -399,7 +405,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         )}
 
         {/* メタ情報（日時・ソース・設定） */}
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        <div className="mt-[5px] flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1">
             <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
             {image.postUrl ? (
@@ -453,7 +459,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
 
         {/* 投稿者情報（王冠が頭上に出るぶん、王冠ありのときだけ上パディングを確保） */}
         <div
-          className={`flex items-center gap-2 mt-2 px-3 pb-3 bg-muted rounded-lg ${
+          className={`flex items-center gap-2 mt-[9px] px-3 pb-3 bg-muted rounded-lg ${
             posterPerfectAttendance ? "pt-5" : "pt-3"
           }`}
         >
