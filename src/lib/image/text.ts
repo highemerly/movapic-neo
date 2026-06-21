@@ -54,7 +54,7 @@ export const PUNCTUATION_CHARS = new Set(["、", "。", ",", "."]);
 // マージン比率
 export const MARGIN_RATIO = 0.05;
 // 縁取りの太さ（フォントサイズに対する比率）
-export const STROKE_WIDTH_RATIO = 0.08;
+export const STROKE_WIDTH_RATIO = 0.1;
 
 /**
  * 画像サイズに基づいてフォントサイズを計算
