@@ -12,6 +12,19 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Fediverse API のエラーレスポンスから、エラーメッセージ末尾に付ける詳細文字列を作る。
+ * 503/504（ゲートウェイの一時障害）はレスポンスbodyが巨大なHTMLエラーページのことが多く、
+ * そのまま露出しても意味がない・ノイズになるため body は読まずステータスのみ返す。
+ */
+async function fediverseErrorDetail(response: Response): Promise<string> {
+  if (response.status === 503 || response.status === 504) {
+    return `HTTP ${response.status}`;
+  }
+  const body = await response.text();
+  return `HTTP ${response.status} ${body}`;
+}
+
 export interface PostResult {
   success: boolean;
   postId?: string;
@@ -50,9 +63,8 @@ async function uploadMastodonMedia(
   });
 
   if (!response.ok) {
-    const error = await response.text();
     throw new Error(
-      `メディアのアップロードに失敗しました: HTTP ${response.status} ${error}`
+      `メディアのアップロードに失敗しました: ${await fediverseErrorDetail(response)}`
     );
   }
 
@@ -91,8 +103,9 @@ async function waitForMastodonMediaReady(
     if (res.status === 200) return; // 処理完了
     if (res.status === 206) continue; // まだ処理中
 
-    const body = await res.text();
-    throw new Error(`メディア処理に失敗しました: HTTP ${res.status} ${body}`);
+    throw new Error(
+      `メディア処理に失敗しました: ${await fediverseErrorDetail(res)}`
+    );
   }
 
   throw new Error(
@@ -143,8 +156,9 @@ export async function postToMastodon(
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`投稿に失敗しました: HTTP ${response.status} ${error}`);
+      throw new Error(
+        `投稿に失敗しました: ${await fediverseErrorDetail(response)}`
+      );
     }
 
     const data = await response.json();
@@ -186,8 +200,9 @@ async function uploadMisskeyFile(
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`ファイルのアップロードに失敗しました: ${error}`);
+    throw new Error(
+      `ファイルのアップロードに失敗しました: ${await fediverseErrorDetail(response)}`
+    );
   }
 
   const data = await response.json();
@@ -237,8 +252,9 @@ export async function postToMisskey(
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`投稿に失敗しました: ${error}`);
+      throw new Error(
+        `投稿に失敗しました: ${await fediverseErrorDetail(response)}`
+      );
     }
 
     const data = await response.json();
