@@ -30,7 +30,7 @@ export function GalleryLayoutToggle() {
   const CurrentIcon = current.Icon;
 
   return (
-    <div className="pointer-events-none sticky top-2 z-20 flex h-0 justify-end pr-1">
+    <div className="pointer-events-none sticky top-2 z-20 flex h-0 justify-end pr-1 standalone:top-[3.25rem]">
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label="表示レイアウトを変更"
