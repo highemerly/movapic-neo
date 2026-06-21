@@ -223,6 +223,7 @@ export default async function DashboardPage() {
                       src={getAvatarUrl(user.avatarUrl) ?? user.avatarUrl}
                       alt={user.displayName || user.username}
                       className="w-12 h-12 rounded-full hover:opacity-80 transition-opacity"
+                      loading="lazy"
                     />
                   </Link>
                   {perfectAttendance && <AttendanceCrown />}

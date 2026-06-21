@@ -87,6 +87,7 @@ export function BottomNav({
                 src={avatarUrl}
                 alt=""
                 className="h-5 w-5 rounded-full object-cover"
+                loading="lazy"
               />
             ) : (
               <User className="h-5 w-5" />

@@ -1,6 +1,4 @@
-"use client";
-
-import { useEffect, useRef, useState } from "react";
+import { RetryImage } from "@/components/gallery/RetryImage";
 
 interface ThumbnailImageProps {
   src: string;
@@ -40,41 +38,24 @@ export function ThumbnailImage({
   loading = "lazy",
   fill = false,
 }: ThumbnailImageProps) {
-  // 読み込み完了まではシマー（パルス）プレースホルダーで隠し、完了したらフェードイン。
-  const [loaded, setLoaded] = useState(false);
-  const ref = useRef<HTMLImageElement>(null);
-
-  useEffect(() => {
-    // キャッシュ済み等で onLoad 前に読み込み完了しているケースを拾う
-    if (ref.current?.complete) setLoaded(true);
-  }, []);
-
   // fill: 親の枠（画像と同比率）にそのまま収める＝実質トリミングなし。
   // 既定: 正方形にクロップ（拡大＋文字位置基準）。
   const containerClass = fill
-    ? "relative h-full w-full overflow-hidden"
-    : "relative aspect-square w-full overflow-hidden";
+    ? "h-full w-full overflow-hidden"
+    : "aspect-square w-full overflow-hidden";
   const imgClass = fill
     ? "absolute inset-0 h-full w-full object-cover"
     : `absolute inset-0 h-full w-full scale-[1.15] object-cover ${getPositionClasses(position)}`;
 
+  // 原本をCSSで縮小表示している（/public・/favorite は意図的にフル画像）。
+  // 重い原本は iOS Safari で一過性に読み込み失敗するため RetryImage で自動再取得する。
   return (
-    <div className={containerClass}>
-      {!loaded && (
-        <div className="absolute inset-0 animate-pulse bg-muted" aria-hidden />
-      )}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        ref={ref}
-        src={src}
-        alt={alt}
-        onLoad={() => setLoaded(true)}
-        onError={() => setLoaded(true)}
-        className={`${imgClass} transition-opacity duration-300 ${
-          loaded ? "opacity-100" : "opacity-0"
-        } ${className}`}
-        loading={loading}
-      />
-    </div>
+    <RetryImage
+      src={src}
+      alt={alt}
+      loading={loading}
+      containerClassName={containerClass}
+      imgClassName={`${imgClass} ${className}`}
+    />
   );
 }

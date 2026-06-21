@@ -1,0 +1,94 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
+const MAX_RETRIES = 2;
+
+type Status = "loading" | "loaded" | "failed";
+
+/**
+ * フルサイズ画像（縮小せず原本を表示する箇所）向けの共通 <img> ラッパー。
+ *
+ * iOS Safari は重い画像のダウンロード／デコード中に一過性で失敗（onError）し、
+ * そのままブラウザ標準の壊れた画像「？」を表示してしまうことがある。発生そのものは
+ * アプリ側で防げないため、失敗時にキャッシュバスターを付けて最大 MAX_RETRIES 回まで
+ * 自動再取得し、それでも失敗したら「？」ではなくプレースホルダ（灰色）を維持する。
+ *
+ * 縮小表示で十分な箇所（サムネイル等）はそもそもデコードが軽く問題が出ないので、
+ * このコンポーネントは原本をそのまま見せる箇所（タイムライン写真・画像詳細の本画像）専用。
+ */
+export function RetryImage({
+  src,
+  alt,
+  imgClassName = "",
+  containerClassName = "",
+  loading = "lazy",
+  showPlaceholder = true,
+}: {
+  src: string;
+  alt: string;
+  /** <img> に付与するクラス（object-cover / 位置クロップ等は呼び出し側で指定） */
+  imgClassName?: string;
+  /** ラッパー <div> に付与するクラス（aspect / サイズ等） */
+  containerClassName?: string;
+  loading?: "lazy" | "eager";
+  /** 読み込み中・失敗時にパルス／灰色のプレースホルダを内部で出すか */
+  showPlaceholder?: boolean;
+}) {
+  const [attempt, setAttempt] = useState(0);
+  const [status, setStatus] = useState<Status>("loading");
+  const ref = useRef<HTMLImageElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // src（原本URL）が変わったら状態をリセット（リスト再利用での取り違え防止）
+  useEffect(() => {
+    setAttempt(0);
+    setStatus("loading");
+  }, [src]);
+
+  // キャッシュ済み等で onLoad が来ないケースを拾う＋アンマウント時のタイマー掃除
+  useEffect(() => {
+    if (ref.current?.complete && ref.current.naturalWidth > 0) setStatus("loaded");
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, []);
+
+  // 1回目は原本URL、リトライ時はキャッシュバスターを付けて新規取得させる
+  const resolvedSrc =
+    attempt === 0 ? src : `${src}${src.includes("?") ? "&" : "?"}r=${attempt}`;
+
+  const loaded = status === "loaded";
+
+  return (
+    <div className={`relative ${containerClassName}`}>
+      {showPlaceholder && !loaded && (
+        <div
+          className={`absolute inset-0 bg-muted ${status === "failed" ? "" : "animate-pulse"}`}
+          aria-hidden
+        />
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        ref={ref}
+        src={resolvedSrc}
+        alt={alt}
+        loading={loading}
+        decoding="async"
+        onLoad={() => setStatus("loaded")}
+        onError={() => {
+          if (attempt < MAX_RETRIES) {
+            if (timer.current) clearTimeout(timer.current);
+            const next = attempt + 1;
+            timer.current = setTimeout(() => setAttempt(next), 300 * next);
+          } else {
+            setStatus("failed");
+          }
+        }}
+        className={`transition-opacity duration-300 ${
+          loaded ? "opacity-100" : "opacity-0"
+        } ${imgClassName}`}
+      />
+    </div>
+  );
+}

@@ -115,6 +115,7 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
                         src={user.avatarUrl}
                         alt=""
                         className="h-5 w-5 rounded-full object-cover"
+                        loading="lazy"
                       />
                     ) : (
                       <Images className="h-5 w-5" />

@@ -11,6 +11,7 @@ import { ImageOptionsButton } from "./ImageOptionsButton";
 import { ImageActionsMenu } from "./ImageActionsMenu";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
+import { RetryImage } from "@/components/gallery/RetryImage";
 import {
   classifyPostStatus,
   favoriteErrorMessage,
@@ -287,11 +288,12 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         {/* 画像 */}
         <div className="mb-2">
           <div className="rounded-lg overflow-hidden bg-muted">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            <RetryImage
               src={imageUrl}
               alt={image.overlayText}
-              className="w-full object-contain"
+              loading="eager"
+              imgClassName="w-full object-contain"
+              showPlaceholder={false}
             />
           </div>
         </div>
