@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
+import { InstallEntry } from "@/components/pwa/InstallEntry";
 import { PostMethodTabs } from "./PostMethodTabs";
 import { MentionSettingsForm } from "./MentionSettingsForm";
 import { EmailAddressDisplay } from "./EmailAddressDisplay";
@@ -399,6 +400,8 @@ export default async function DashboardPage() {
             <div className="space-y-4">
               <BioEditForm initialBio={userWithPreferences?.bio ?? null} />
               <DisplayModeSelector />
+              {/* 控えめなインストール導線（Android/iOS Safari・未インストール時のみ表示） */}
+              <InstallEntry />
             </div>
           </div>
 

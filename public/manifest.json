@@ -2,7 +2,7 @@
   "name": "SHAMEZO",
   "short_name": "SHAMEZO",
   "description": "写真 × ひとこと = SNSに投稿しよう。",
-  "start_url": "/dashboard",
+  "start_url": "/public",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
