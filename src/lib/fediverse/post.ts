@@ -13,6 +13,20 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
+ * Fediverseサーバーが HTTP エラー応答を返したことを表すエラー。
+ * status（サーバーが返したステータスコード）を保持し、PostResult.statusCode に伝える。
+ * タイムアウト・接続失敗（status を持たない）と区別するために使う。
+ */
+class FediverseHttpError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "FediverseHttpError";
+    this.status = status;
+  }
+}
+
+/**
  * Fediverse API のエラーレスポンスから、エラーメッセージ末尾に付ける詳細文字列を作る。
  * 503/504（ゲートウェイの一時障害）はレスポンスbodyが巨大なHTMLエラーページのことが多く、
  * そのまま露出しても意味がない・ノイズになるため body は読まずステータスのみ返す。
@@ -30,6 +44,8 @@ export interface PostResult {
   postId?: string;
   postUrl?: string;
   error?: string;
+  /** サーバーが HTTP エラー応答を返した場合のステータスコード（タイムアウト等では undefined） */
+  statusCode?: number;
 }
 
 /**
@@ -63,8 +79,9 @@ async function uploadMastodonMedia(
   });
 
   if (!response.ok) {
-    throw new Error(
-      `メディアのアップロードに失敗しました: ${await fediverseErrorDetail(response)}`
+    throw new FediverseHttpError(
+      `メディアのアップロードに失敗しました: ${await fediverseErrorDetail(response)}`,
+      response.status
     );
   }
 
@@ -103,8 +120,9 @@ async function waitForMastodonMediaReady(
     if (res.status === 200) return; // 処理完了
     if (res.status === 206) continue; // まだ処理中
 
-    throw new Error(
-      `メディア処理に失敗しました: ${await fediverseErrorDetail(res)}`
+    throw new FediverseHttpError(
+      `メディア処理に失敗しました: ${await fediverseErrorDetail(res)}`,
+      res.status
     );
   }
 
@@ -156,8 +174,9 @@ export async function postToMastodon(
     });
 
     if (!response.ok) {
-      throw new Error(
-        `投稿に失敗しました: ${await fediverseErrorDetail(response)}`
+      throw new FediverseHttpError(
+        `投稿に失敗しました: ${await fediverseErrorDetail(response)}`,
+        response.status
       );
     }
 
@@ -171,6 +190,7 @@ export async function postToMastodon(
     return {
       success: false,
       error: error instanceof Error ? error.message : "投稿に失敗しました",
+      statusCode: error instanceof FediverseHttpError ? error.status : undefined,
     };
   }
 }
@@ -200,8 +220,9 @@ async function uploadMisskeyFile(
   });
 
   if (!response.ok) {
-    throw new Error(
-      `ファイルのアップロードに失敗しました: ${await fediverseErrorDetail(response)}`
+    throw new FediverseHttpError(
+      `ファイルのアップロードに失敗しました: ${await fediverseErrorDetail(response)}`,
+      response.status
     );
   }
 
@@ -252,8 +273,9 @@ export async function postToMisskey(
     });
 
     if (!response.ok) {
-      throw new Error(
-        `投稿に失敗しました: ${await fediverseErrorDetail(response)}`
+      throw new FediverseHttpError(
+        `投稿に失敗しました: ${await fediverseErrorDetail(response)}`,
+        response.status
       );
     }
 
@@ -270,6 +292,7 @@ export async function postToMisskey(
     return {
       success: false,
       error: error instanceof Error ? error.message : "投稿に失敗しました",
+      statusCode: error instanceof FediverseHttpError ? error.status : undefined,
     };
   }
 }

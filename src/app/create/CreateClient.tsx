@@ -553,14 +553,20 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
         }
       }
 
-      // 投稿成功後、詳細ページにリダイレクト（直後の完了メッセージ用に posted=1 を付与）
+      // 投稿後、詳細ページにリダイレクト（直後の完了メッセージ用に posted=1 を付与）。
+      // SHAMEZOへの保存は成功しているので、Fediverse投稿だけ失敗した場合も遷移する
+      // （＝保存物を見せて重複投稿を防ぐ）。連合投稿の失敗は federr=1 で警告表示させる。
       if (data.imagePageUrl) {
         const path = data.imagePageUrl.replace(
           process.env.NEXT_PUBLIC_APP_URL || "",
           "",
         );
         const sep = path.includes("?") ? "&" : "?";
-        router.push(`${path}${sep}posted=1`);
+        // 連合投稿が失敗したときは federr=1（＋サーバー応答があれば fedstatus=コード）を付与
+        const federr = data.fediverseError
+          ? `&federr=1${data.fediverseErrorStatus ? `&fedstatus=${data.fediverseErrorStatus}` : ""}`
+          : "";
+        router.push(`${path}${sep}posted=1${federr}`);
       } else {
         router.push("/dashboard");
       }

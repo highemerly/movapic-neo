@@ -102,6 +102,8 @@ export interface PublishImageResult {
   postId?: string;
   /** 投稿に失敗した場合のエラー（保存自体は成否に依存しない） */
   postError?: string;
+  /** 投稿失敗がサーバーのHTTPエラー応答だった場合のステータスコード（タイムアウト等では undefined） */
+  postErrorStatus?: number;
   /** この投稿で新規獲得した実績（web投稿の演出用。保存された場合のみ） */
   newAchievements?: GrantedAchievement[];
 }
@@ -309,6 +311,8 @@ export async function publishImage(
       postUrl: postResult?.postUrl,
       postId: postResult?.postId,
       postError: postResult && !postResult.success ? postResult.error : undefined,
+      postErrorStatus:
+        postResult && !postResult.success ? postResult.statusCode : undefined,
       newAchievements,
     };
   }
@@ -325,7 +329,10 @@ export async function publishImage(
   });
 
   if (!postResult || !postResult.success) {
-    return { postError: postResult?.error ?? "投稿に失敗しました" };
+    return {
+      postError: postResult?.error ?? "投稿に失敗しました",
+      postErrorStatus: postResult?.statusCode,
+    };
   }
 
   const { storageKey } = await storeAndRecord(

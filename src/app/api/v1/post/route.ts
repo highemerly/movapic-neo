@@ -148,23 +148,17 @@ export async function POST(request: NextRequest) {
       extras: { cameraMake, cameraModel, capturedAt, locationPrefecture, locationCity },
     });
 
-    if (result.postError) {
-      // 投稿に失敗した場合も画像は保存済み。エラーメッセージとともに imageId を返す。
-      return NextResponse.json(
-        {
-          error: result.postError,
-          imageId: result.imageId,
-          imagePageUrl: result.imagePageUrl,
-        },
-        { status: 500 }
-      );
-    }
-
+    // Fediverse投稿だけが失敗したケースは「部分的成功」。
+    // 画像はSHAMEZOに保存済み（実績も付与済み）なので 500 ではなく 200 を返し、
+    // クライアントは通常どおり画像ページへ遷移して重複投稿を防ぐ。
+    // 連合投稿が失敗したことは fediverseError として伝え、警告として表示させる。
     return NextResponse.json({
       success: true,
       imageId: result.imageId,
       imagePageUrl: result.imagePageUrl,
       postUrl: result.postUrl,
+      fediverseError: result.postError,
+      fediverseErrorStatus: result.postErrorStatus,
       // この投稿で新規獲得した実績（演出用）。キーのみ返し、表示文言はクライアントが解決
       newAchievements: (result.newAchievements ?? []).map((a) => ({
         key: a.key,

@@ -23,6 +23,7 @@ import { NewUserGuide } from "@/components/onboarding/NewUserGuide";
 import { getAllowedServers } from "@/lib/auth/allowedServers";
 import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { PostSuccessToast } from "./PostSuccessToast";
+import { PostFediverseFailedToast } from "./PostFediverseFailedToast";
 import { AchievementCelebration } from "./AchievementCelebration";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import { resolveAchievement } from "@/lib/achievements/catalog";
@@ -109,14 +110,20 @@ interface PageProps {
   searchParams: Promise<{
     from?: string;
     posted?: string;
+    federr?: string;
+    fedstatus?: string;
   }>;
 }
 
 export default async function ImageDetailPage({ params, searchParams }: PageProps) {
   const { username, imageId } = await params;
-  const { from, posted } = await searchParams;
+  const { from, posted, federr, fedstatus } = await searchParams;
   const isFromPublic = from === "public";
   const justPosted = posted === "1";
+  // SHAMEZOへの保存は成功したが Fediverse 投稿だけ失敗したケース（部分的成功）
+  const fediverseFailed = justPosted && federr === "1";
+  // サーバーが返した HTTP ステータスコード（タイムアウト等では付かない）
+  const fediverseErrorStatus = fedstatus ? Number(fedstatus) : undefined;
 
   // ログインユーザーを取得
   const currentUser = await getCurrentUser();
@@ -273,7 +280,15 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain, avatarUrl: getAvatarUrl(currentUser.avatarUrl) } : null} />
-      {justPosted && <PostSuccessToast />}
+      {justPosted &&
+        (fediverseFailed ? (
+          <PostFediverseFailedToast
+            serverDomain={image.user.instance.domain}
+            statusCode={fediverseErrorStatus}
+          />
+        ) : (
+          <PostSuccessToast />
+        ))}
       {justPosted && <AchievementCelebration username={username} />}
       <main className="container mx-auto max-w-2xl px-4 py-2">
         {/* ヘッダー */}
