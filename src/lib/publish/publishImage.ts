@@ -145,11 +145,7 @@ async function evaluateAchievementsSafely(
   }
 }
 
-/**
- * サービスの visibility をプラットフォーム別 visibility に変換して投稿する。
- * local の場合は Fediverse 投稿しない（null を返す）。
- */
-export async function postImageToFediverse(input: {
+interface PostImageInput {
   user: PublishUser;
   buffer: Buffer;
   contentType: string;
@@ -157,7 +153,16 @@ export async function postImageToFediverse(input: {
   text: string;
   imagePageUrl: string;
   visibility: PublishVisibility;
-}): Promise<PostResult | null> {
+}
+
+/** 5xx 再試行前の軽いバックオフ */
+const RETRY_BACKOFF_MS = 500;
+
+/**
+ * サービスの visibility をプラットフォーム別 visibility に変換して1回だけ投稿する。
+ * local の場合は Fediverse 投稿しない（null を返す）。
+ */
+async function postImageOnce(input: PostImageInput): Promise<PostResult | null> {
   if (input.visibility === "local") {
     return null;
   }
@@ -195,6 +200,28 @@ export async function postImageToFediverse(input: {
   }
 
   return { success: false, error: "サポートされていないプラットフォームです" };
+}
+
+/**
+ * Fediverse へ投稿する。サーバーが 5xx（一時的な過負荷・障害）を返したときだけ、
+ * 同期でもう一度だけ再試行する。
+ *
+ * 5xx に限定する理由:
+ * - timeout/接続失敗（statusCode undefined）は1回で最大30秒待つため、再試行すると
+ *   /api/v1/post の応答が長引き Ingress の504に達するリスクが高い。5xxは即座に返るので軽い。
+ * - 4xx（権限不足・バリデーション等）は再試行しても結果が変わらない。
+ */
+export async function postImageToFediverse(
+  input: PostImageInput
+): Promise<PostResult | null> {
+  const first = await postImageOnce(input);
+
+  if (first && !first.success && first.statusCode && first.statusCode >= 500) {
+    await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
+    return postImageOnce(input);
+  }
+
+  return first;
 }
 
 function buildImagePageUrl(username: string, domain: string, imageId: string): string {
