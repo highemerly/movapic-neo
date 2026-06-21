@@ -53,7 +53,7 @@ export function BottomNav({
       {selfSegment && instanceDomain && (
         <NavItem
           href={`/public?instances=${encodeURIComponent(instanceDomain)}`}
-          label="同じサーバー"
+          label="サーバー"
           active={isPublicInstance}
           icon={<Server className="h-5 w-5" />}
         />
@@ -78,7 +78,7 @@ export function BottomNav({
       {selfSegment && (
         <NavItem
           href={`/u/${selfSegment}`}
-          label="マイページ"
+          label="あなた"
           active={isMyPage}
           icon={
             avatarUrl ? (
