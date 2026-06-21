@@ -32,7 +32,7 @@ export function getMonospaceCharWidth(char: string, fontSize: number): number {
   return isHalfWidthChar(char) ? fontSize * 0.5 : fontSize;
 }
 
-// 縦書き時に90度回転させる文字（括弧類・長音記号・波線）
+// 縦書き時に90度回転させる文字（括弧類・長音記号・波線・リーダー）
 export const ROTATE_CHARS = new Set([
   // 括弧類
   "（", "）", "(", ")",
@@ -45,6 +45,8 @@ export const ROTATE_CHARS = new Set([
   "ー", "―", "－", "-",
   // 波線
   "〜", "~",
+  // リーダー（3点リーダー・2点リーダー）
+  "…", "‥",
 ]);
 
 export const PUNCTUATION_CHARS = new Set(["、", "。", ",", "."]);

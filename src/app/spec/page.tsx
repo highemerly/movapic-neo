@@ -57,7 +57,7 @@ export default async function SpecPage() {
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">縦書きの処理</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li>括弧類（「」、（）、【】など）と長音記号（ー〜など）は90度回転して描画します。</li>
+                    <li>括弧類（「」、（）、【】など）・長音記号（ー〜など）・リーダー（…‥）は90度回転して描画します。</li>
                     <li>句読点（、。）は右上寄せで描画します。</li>
                   </ul>
                 </div>
