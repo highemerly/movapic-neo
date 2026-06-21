@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import Link from "@/components/Link";
 import { getAvatarUrl } from "@/lib/avatar";
 import prisma from "@/lib/db";
-import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth/session";
 import { DeleteLocationButton } from "./DeleteLocationButton";
 import { ImageNavigation } from "./ImageNavigation";
@@ -29,7 +28,7 @@ import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
-import { User, CalendarDays, Camera, MapPin, Reply, Share2, Globe, Mail, Bot } from "lucide-react";
+import { User, CalendarDays, Camera, MapPin, Reply, Share2, Globe, Mail, Bot, ChevronLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -290,13 +289,15 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           <PostSuccessToast />
         ))}
       {justPosted && <AchievementCelebration username={username} />}
-      <main className="container mx-auto max-w-2xl px-4 py-2">
+      <main className="container mx-auto max-w-2xl px-4 py-3">
         {/* ヘッダー */}
         <div className="mb-2">
-          <Link href={backUrl}>
-            <Button variant="ghost" size="sm">
-              ← {backLabel}
-            </Button>
+          <Link
+            href={backUrl}
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            {backLabel}
           </Link>
         </div>
 
