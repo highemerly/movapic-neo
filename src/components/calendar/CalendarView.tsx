@@ -7,7 +7,7 @@ import { StackedSquaresIcon } from "./StackedSquaresIcon";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isJapaneseHoliday } from "@/lib/holidays";
-import { PERFECT_MONTH_GRACE_HOME } from "@/lib/achievements/perfectMonth";
+import { PERFECT_MONTH_GRACE_HOME, PERFECT_MONTH_GRACE_DEFAULT } from "@/lib/achievements/perfectMonth";
 import { DEFAULT_INSTANCE } from "@/lib/userHandle";
 import { DayCell } from "./DayCell";
 
@@ -325,8 +325,23 @@ export function CalendarView({
           1ヶ月間毎日投稿すれば、カレンダーが埋まって皆勤賞の称号が得られます。皆勤賞はSHAMEZOにおける最高の栄誉です。
         </p>
         <p>
-          もし投稿を忘れてしまっても大丈夫。同じ月の後日に1日2枚以上投稿すれば、2枚目の投稿で忘れた日の投稿を「穴埋め」できます（ただし、穴埋めのための投稿は1日につき1回まで・月につき{grace}回まで
-          {grace === PERFECT_MONTH_GRACE_HOME && `（${DEFAULT_INSTANCE} ユーザー限定特典／通常は月3回まで）`}）。
+          もし投稿を忘れてしまっても大丈夫。同じ月の後日に1日2枚以上投稿すれば、2枚目の投稿が投稿を忘れた日の投稿を"穴埋め"できます。ただし、穴埋めのための投稿は1日につき1回まで・月につき
+          {grace === PERFECT_MONTH_GRACE_HOME ? (
+            <>
+              <span className="mx-0.5 font-bold text-muted-foreground/70 line-through">
+                {PERFECT_MONTH_GRACE_DEFAULT}
+              </span>
+              <span className="mx-0.5 text-base font-extrabold text-foreground">
+                {PERFECT_MONTH_GRACE_HOME}
+              </span>
+              回まで。
+              <span className="font-semibold text-foreground">
+                ※{DEFAULT_INSTANCE} ユーザー限定特典で条件緩和中！
+              </span>
+            </>
+          ) : (
+            `${grace}回まで。`
+          )}
         </p>
 
         {/* マーカーの凡例 */}
