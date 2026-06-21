@@ -303,6 +303,91 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           <p className="text-base whitespace-pre-wrap break-words">{image.overlayText}</p>
         </div>
 
+        {/* EXIF情報（カメラ機種・撮影場所）。投稿者本人のみ撮影場所だけ削除可能。 */}
+        {(image.cameraModel || image.locationPrefecture) && (
+          <p className="mb-[5px] flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+            {image.cameraModel && (
+              <span className="inline-flex items-center gap-1">
+                <Camera className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                {image.cameraModel}{image.cameraMake && !image.cameraModel.startsWith(image.cameraMake) ? `（${image.cameraMake}）` : ""}
+              </span>
+            )}
+            {image.locationPrefecture && (
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <Link
+                    href={`/u/${username}/map?prefecture=${encodeURIComponent(image.locationPrefecture)}`}
+                    className="hover:underline"
+                  >
+                    {image.locationPrefecture}
+                  </Link>
+                  {image.locationCity ?? ""}
+                </span>
+                {isOwner && (
+                  <DeleteLocationButton
+                    imageId={imageId}
+                    locationLabel={`${image.locationPrefecture}${image.locationCity ?? ""}`}
+                  />
+                )}
+              </span>
+            )}
+          </p>
+        )}
+
+        {/* メタ情報（日時・ソース・設定） */}
+        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            {image.postUrl ? (
+              <a
+                href={image.postUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline"
+              >
+                {formattedCreatedAt}
+              </a>
+            ) : (
+              formattedCreatedAt
+            )}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            {image.source === "email" ? (
+              <>
+                <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                メール
+              </>
+            ) : image.source === "mention" ? (
+              <>
+                <Bot className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <a
+                  href={`https://${image.user.instance.domain}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline"
+                >
+                  {image.user.instance.domain}
+                </a>
+              </>
+            ) : (
+              <>
+                <Globe className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <Link href="/create" className="hover:underline">
+                  Web
+                </Link>
+              </>
+            )}
+          </span>
+          <ImageOptionsButton
+            position={image.position}
+            color={image.color}
+            size={image.size}
+            font={image.font}
+            arrangement={image.arrangement}
+          />
+        </div>
+
         {/* お気に入り（Mastodon連携） */}
         {favoritable ? (
           <div className="mt-2 flex items-center gap-2">
@@ -373,91 +458,6 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             />
           </div>
         )}
-
-        {/* EXIF情報（カメラ機種・撮影場所）。投稿者本人のみ撮影場所だけ削除可能。 */}
-        {(image.cameraModel || image.locationPrefecture) && (
-          <p className="mt-[9px] flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-            {image.cameraModel && (
-              <span className="inline-flex items-center gap-1">
-                <Camera className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                {image.cameraModel}{image.cameraMake && !image.cameraModel.startsWith(image.cameraMake) ? `（${image.cameraMake}）` : ""}
-              </span>
-            )}
-            {image.locationPrefecture && (
-              <span className="inline-flex items-center gap-1">
-                <span className="inline-flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <Link
-                    href={`/u/${username}/map?prefecture=${encodeURIComponent(image.locationPrefecture)}`}
-                    className="hover:underline"
-                  >
-                    {image.locationPrefecture}
-                  </Link>
-                  {image.locationCity ?? ""}
-                </span>
-                {isOwner && (
-                  <DeleteLocationButton
-                    imageId={imageId}
-                    locationLabel={`${image.locationPrefecture}${image.locationCity ?? ""}`}
-                  />
-                )}
-              </span>
-            )}
-          </p>
-        )}
-
-        {/* メタ情報（日時・ソース・設定） */}
-        <div className="mt-[5px] flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            {image.postUrl ? (
-              <a
-                href={image.postUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:underline"
-              >
-                {formattedCreatedAt}
-              </a>
-            ) : (
-              formattedCreatedAt
-            )}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            {image.source === "email" ? (
-              <>
-                <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                メール
-              </>
-            ) : image.source === "mention" ? (
-              <>
-                <Bot className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                <a
-                  href={`https://${image.user.instance.domain}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:underline"
-                >
-                  {image.user.instance.domain}
-                </a>
-              </>
-            ) : (
-              <>
-                <Globe className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                <Link href="/create" className="hover:underline">
-                  Web
-                </Link>
-              </>
-            )}
-          </span>
-          <ImageOptionsButton
-            position={image.position}
-            color={image.color}
-            size={image.size}
-            font={image.font}
-            arrangement={image.arrangement}
-          />
-        </div>
 
         {/* 投稿者情報（王冠が頭上に出るぶん、王冠ありのときだけ上パディングを確保） */}
         <div
