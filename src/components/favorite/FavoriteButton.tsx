@@ -113,7 +113,7 @@ export function FavoriteButton({
           <button
             onClick={handleFavorite}
             disabled={!canFavorite || isLoading}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 border rounded-md transition-colors ${
+            className={`flex items-center gap-1.5 px-2.5 h-[37px] border rounded-md transition-colors ${
               isFavorited
                 ? "text-red-500 hover:text-red-600 border-red-200"
                 : "text-muted-foreground hover:text-red-500 border-border"

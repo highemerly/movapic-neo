@@ -341,7 +341,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
                 href={replyUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex flex-1 items-center justify-center gap-1.5 h-[34px] px-2.5 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
+                className="flex flex-1 items-center justify-center gap-1.5 h-[37px] px-2.5 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
                 title="あなたのサーバーでこの投稿を開きます（返信・ブースト・お気に入りができます）"
               >
                 <Reply className="h-4 w-4 shrink-0" />
@@ -355,7 +355,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
                 href={shareUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex flex-1 items-center justify-center gap-1.5 h-[34px] px-2.5 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
+                className="flex flex-1 items-center justify-center gap-1.5 h-[37px] px-2.5 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
                 title="あなたのサーバーで、このURLを投稿します"
               >
                 <Share2 className="h-4 w-4 shrink-0" />
@@ -498,17 +498,17 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           <div className="flex items-center gap-1">
             <Link
               href={`/u/${username}`}
-              className="p-1.5 rounded-full hover:bg-background transition-colors"
+              className="p-2.5 rounded-full hover:bg-background transition-colors"
               title="ユーザーページ"
             >
-              <User className="w-4 h-4 text-muted-foreground" />
+              <User className="w-5 h-5 text-muted-foreground" />
             </Link>
             <Link
               href={`/u/${username}/calendar`}
-              className="p-1.5 rounded-full hover:bg-background transition-colors"
+              className="p-2.5 rounded-full hover:bg-background transition-colors"
               title="カレンダー"
             >
-              <CalendarDays className="w-4 h-4 text-muted-foreground" />
+              <CalendarDays className="w-5 h-5 text-muted-foreground" />
             </Link>
           </div>
         </div>
@@ -524,7 +524,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
                 <Link
                   key={a.key}
                   href={`/u/${username}/achievements?a=${encodeURIComponent(a.key)}`}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-200/70 px-2.5 py-1 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-300/80 dark:bg-amber-900/50 dark:text-amber-200 dark:hover:bg-amber-800/60"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-200/70 px-2.5 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-300/80 dark:bg-amber-900/50 dark:text-amber-200 dark:hover:bg-amber-800/60"
                 >
                   <AchievementIcon name={a.icon} className="h-3.5 w-3.5" />
                   {a.title}
