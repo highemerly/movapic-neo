@@ -20,9 +20,9 @@ function clampAspect(value: number): number {
 // Masonry は縦長画像が縦に伸びるため、列数を少なめにして1枚を大きく＝文字を
 // 読みやすく保つ（正方形グリッドより少ない列数）。
 function columnsForWidth(width: number): number {
-  if (width < 640) return 2;
-  if (width < 1024) return 3;
-  return 3;
+  if (width < 640) return 2; // スマホ
+  if (width < 1024) return 3; // タブレット
+  return 4; // PC
 }
 
 /**

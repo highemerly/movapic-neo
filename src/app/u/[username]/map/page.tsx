@@ -111,7 +111,7 @@ export default async function UserMapPage({
               : null
           }
         />
-        <div className="container mx-auto max-w-4xl px-4 pt-4 pb-8 overflow-x-clip">
+        <div className="container mx-auto max-w-6xl px-4 pt-4 pb-8 overflow-x-clip">
           {profileHeader}
           <TabTransition tab="map">
             <div className="rounded-lg border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
@@ -120,7 +120,7 @@ export default async function UserMapPage({
           </TabTransition>
           <Footer />
         </div>
-        <FloatingPostButton maxWidthClass="max-w-4xl" />
+        <FloatingPostButton maxWidthClass="max-w-6xl" />
       </>
     );
   }
@@ -207,7 +207,7 @@ export default async function UserMapPage({
             : null
         }
       />
-      <div className="container mx-auto max-w-4xl px-4 pt-4 pb-8 overflow-x-clip">
+      <div className="container mx-auto max-w-6xl px-4 pt-4 pb-8 overflow-x-clip">
         {profileHeader}
 
         {/* 地図タブの本文（タブ切替時に横スライドで表示） */}
@@ -301,7 +301,7 @@ export default async function UserMapPage({
 
         <Footer />
       </div>
-      <FloatingPostButton maxWidthClass="max-w-4xl" />
+      <FloatingPostButton maxWidthClass="max-w-6xl" />
     </>
   );
 }

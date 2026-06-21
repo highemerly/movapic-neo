@@ -97,7 +97,7 @@ export default async function AchievementsPage({
             : null
         }
       />
-      <div className="container mx-auto px-4 pt-4 pb-8 max-w-4xl overflow-x-clip">
+      <div className="container mx-auto px-4 pt-4 pb-8 max-w-6xl overflow-x-clip">
         <UserProfileHeader
           user={{
             username: cleanUsername,
@@ -122,7 +122,7 @@ export default async function AchievementsPage({
 
         <Footer />
       </div>
-      <FloatingPostButton maxWidthClass="max-w-4xl" />
+      <FloatingPostButton maxWidthClass="max-w-6xl" />
     </>
   );
 }

@@ -227,6 +227,9 @@ export function CalendarView({
 
   return (
     <div className="w-full overflow-x-clip">
+      {/* カレンダー本体（ナビ＋グリッド）は従来幅に制限。コンテナが広いと
+          サムネイルが拡大されて粗く見えるため。凡例・説明は制限しない。 */}
+      <div className="mx-auto max-w-4xl">
       {/* ナビゲーション */}
       <div className="flex items-center justify-center gap-2 mb-3">
         <Button
@@ -309,6 +312,7 @@ export function CalendarView({
 
         {/* 皆勤賞達成バナー（達成月のみ・閲覧者全員に表示・カレンダーの下） */}
         {data?.perfectMonth?.achieved && <PerfectMonthBanner />}
+      </div>
       </div>
 
       {/* 凡例＋穴埋め制度の説明 */}
