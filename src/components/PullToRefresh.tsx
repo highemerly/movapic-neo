@@ -9,9 +9,11 @@ const subscribeNoop = () => () => {};
 const getIsIosStandalone = () =>
   (navigator as Navigator & { standalone?: boolean }).standalone === true;
 
-const THRESHOLD = 70; // この距離まで引っ張ったら更新（px）
-const MAX_PULL = 110; // インジケータが進む最大距離（px）
+const THRESHOLD = 90; // この距離まで引っ張ったら更新（px。大きいほど重い＝要・強く引く）
+const MAX_PULL = 130; // インジケータが進む最大距離（px）
+const PULL_FACTOR = 0.5; // 指の移動量→インジケータ移動量の比（小さいほど重い）
 const BASE_OFFSET = 48; // 待機位置（画面外）への引き上げ量（px）
+// 発動に必要な指の実移動量 ≒ THRESHOLD / PULL_FACTOR（現状 約180px）
 
 /**
  * iOSのホーム画面アプリ（standalone）向けの「引っ張って更新」UI。
@@ -71,7 +73,7 @@ export function PullToRefresh() {
       activeRef.current = true;
       e.preventDefault();
       // 引っ張るほど鈍くする（抵抗感）
-      const dist = Math.min(MAX_PULL, dy * 0.5);
+      const dist = Math.min(MAX_PULL, dy * PULL_FACTOR);
       updatePull(dist);
     };
 
