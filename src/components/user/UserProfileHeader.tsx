@@ -78,7 +78,7 @@ export function UserProfileHeader({
   return (
     <div className="mb-4">
       {/* ユーザー情報 */}
-      <div className="flex items-start gap-3 mb-2">
+      <div className="flex items-center gap-3 mb-2">
         {user.avatarUrl && (
           <div className="relative shrink-0">
             <Link href={`/u/${seg}`}>
@@ -86,7 +86,7 @@ export function UserProfileHeader({
               <img
                 src={user.avatarUrl}
                 alt={user.displayName || user.username}
-                className="w-12 h-12 rounded-full hover:opacity-80 transition-opacity"
+                className="w-[52px] h-[52px] rounded-full hover:opacity-80 transition-opacity"
                 loading="lazy"
               />
             </Link>
@@ -101,15 +101,15 @@ export function UserProfileHeader({
             href={`https://${user.instance.domain}/@${user.username}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex w-fit items-center gap-1 mt-1 text-[11px] leading-none text-muted-foreground hover:underline"
+            className="flex w-fit items-center gap-1 mt-[5px] text-[11px] leading-none text-muted-foreground hover:underline"
           >
             <MastodonIcon className="w-2.5 h-2.5" />
             @{user.username}@{user.instance.domain}
           </a>
           {user.bio && (
-            <p className="text-[11px] leading-tight text-muted-foreground mt-0.5 line-clamp-2">{user.bio}</p>
+            <p className="text-[11px] leading-tight text-muted-foreground mt-[3px] line-clamp-2">{user.bio}</p>
           )}
-          <div className="text-[11px] leading-tight text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-1">
+          <div className="text-[11px] leading-tight text-muted-foreground mt-[3px] flex flex-wrap items-center gap-x-1">
             <span>{imageCount}枚の画像</span>
             <span>·</span>
             <span className="inline-flex items-center gap-1.5">
@@ -145,7 +145,7 @@ export function UserProfileHeader({
                 href={tab.href}
                 prefetch
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors",
+                  "flex items-center gap-1.5 px-3 py-[13px] text-sm font-medium border-b-2 transition-colors",
                   isActive
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
