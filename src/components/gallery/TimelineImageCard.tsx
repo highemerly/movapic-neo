@@ -54,8 +54,12 @@ export function TimelineImageCard({
         fill={fill}
         className="group-hover:opacity-90 transition-opacity"
       />
-      {/* 投稿者オーバーレイ */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 pt-4 flex items-center gap-1.5">
+      {/* 投稿者オーバーレイ（お気に入り数がある時は右側に余白を確保して名前と重ならないようにする） */}
+      <div
+        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 pt-4 flex items-center gap-1.5 ${
+          image.favoriteCount > 0 ? "pr-12" : ""
+        }`}
+      >
         {image.user.avatarUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
