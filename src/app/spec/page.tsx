@@ -267,10 +267,10 @@ export default async function SpecPage() {
                 Fediverse上（Mastodonサーバー・Misskeyサーバー）上でのお気に入りとSHAMEZOのお気に入りは自動で同期されます。
               </p>
               <ul className="mt-4 list-disc list-inside text-sm text-muted-foreground space-y-1">
-                  <li>Fediverse上の情報が元データです</li>
-                  <li>SHAMEZO側から定期的に情報を取得し同期します（投稿直後はより頻繁に同期されます）</li>
-                  <li>Fediverse上でお気に入り登録した場合、SHAMEZO側にも表示されますが、若干のタイムラグがあります</li>
-                  <li>SHAMEZO上でお気に入り登録した場合、即座にFediverse上に反映されます</li>
+                  <li>Fediverseサーバー上の情報が元データです</li>
+                  <li>SHAMEZO側から投稿元のサーバーに対し、お気に入り件数などを取得します（結果はSHAMEZO側にキャッシュされており、投稿直後は比較的頻繁に取得しますが、投稿から時間が経つと頻度が落ちます）</li>
+                  <li>Fediverseサーバー上でお気に入り登録した場合、一定期間後にSHAMEZO側にも反映されます</li>
+                  <li>SHAMEZO上でお気に入り登録した場合、あなたの所属するFesiberseサーバー上でお気に入り登録を行うため、Fediverse上・SHAMEZO側の両方にほぼ即時に反映されます（連合による遅延が発生する場合があります）</li>
               </ul>
             </div>
 

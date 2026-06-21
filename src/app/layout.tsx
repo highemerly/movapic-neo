@@ -6,6 +6,7 @@ import { ConfirmProvider } from "@/components/providers/ConfirmProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { getSessionClaims } from "@/lib/auth/session";
 import { userPathSegment, DEFAULT_INSTANCE } from "@/lib/userHandle";
 import { getAvatarUrl } from "@/lib/avatar";
@@ -86,6 +87,8 @@ export default async function RootLayout({
         >
           <ConfirmProvider>{children}</ConfirmProvider>
           <Toaster />
+          {/* iOS PWA（standalone）専用の引っ張って更新。Androidはネイティブ任せ */}
+          <PullToRefresh />
           {/* PWA（standalone起動）時のみCSSで表示される下部ナビ */}
           <Suspense fallback={null}>
             <BottomNav
