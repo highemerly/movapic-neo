@@ -124,11 +124,11 @@ const POST_COUNT_TITLES: Record<number, string> = {
   10: "常連",
   20: "一人前",
   30: "文字入れ職人",
-  50: "文字入れ名人",
-  100: "文字入れ師範",
-  200: "文字入れの鉄人",
-  300: "文字入れ仙人",
-  500: "文字入れの神",
+  50: "SHAMEZO名人",
+  100: "写真師範",
+  200: "表現の鉄人",
+  300: "言の葉の仙人",
+  500: "SHAMEZOの神",
 };
 const postCount: AchievementDef[] = [5, 10, 20, 30, 50, 100, 200, 300, 500].map((n) => ({
   key: `posts:${n}`,
@@ -146,10 +146,10 @@ const postCount: AchievementDef[] = [5, 10, 20, 30, 50, 100, 200, 300, 500].map(
 // --- 連続投稿（初回到達で永続付与・炎が大きくなる） ---
 const STREAK_TITLES: Record<number, string> = {
   2: "着火",
-  7: "七日の灯",
+  7: "焚き火",
   20: "かがり火",
-  50: "烈火",
-  100: "不滅の炎",
+  50: "燃ゆる星",
+  100: "太陽",
 };
 const streak: AchievementDef[] = [2, 7, 20, 50, 100].map((n) => ({
   key: `streak:${n}`,
@@ -193,13 +193,13 @@ const FEATURES: {
 }[] = [
   { f: "neon", label: "ネオン", icon: "Sparkles", tiers: [5, 30], titles: { 5: "ネオンの灯", 30: "ネオンマスター" } },
   { f: "stamp", label: "ハンコ", icon: "Stamp", tiers: [5, 30], titles: { 5: "スタンプラリー", 30: "判子奉行" } },
-  { f: "xlarge", label: "特大文字", icon: "ALargeSmall", tiers: [5, 30], titles: { 5: "主張強め", 30: "特大マスター" } },
+  { f: "xlarge", label: "特大文字", icon: "ALargeSmall", tiers: [5, 30], titles: { 5: "主張強め", 30: "声が大きいです" } },
   {
     f: "vertical",
     label: "縦書き",
     icon: "GalleryVerticalEnd",
     tiers: [1, 5, 30, 100],
-    titles: { 1: "縦書き、はじめました", 5: "やっぱり縦書きだよね", 30: "書道師範", 100: "書聖" },
+    titles: { 1: "縦書き、はじめました", 5: "やっぱり縦書きだよね", 30: "書道初段", 100: "書道の達人" },
   },
 ];
 const featureUsage: AchievementDef[] = FEATURES.flatMap(({ f, label, icon, tiers, titles }) =>
@@ -220,7 +220,7 @@ const featureUsage: AchievementDef[] = FEATURES.flatMap(({ f, label, icon, tiers
 // --- カメラ機種 ---
 const CAMERA_TITLES: Record<number, string> = {
   2: "二刀流カメラマン",
-  5: "機材沼の住人",
+  5: "カメラコレクター",
 };
 const cameras: AchievementDef[] = [2, 5].map((n) => ({
   key: `cameras:${n}`,
