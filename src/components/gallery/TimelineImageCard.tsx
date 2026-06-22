@@ -12,6 +12,7 @@ export interface TimelineCardImage {
   height: number;
   overlayText: string;
   position: string;
+  size: string;
   favoriteCount: number;
   createdAt: string;
   user: {
@@ -24,7 +25,9 @@ export interface TimelineCardImage {
 
 /**
  * 投稿者オーバーレイ付きの画像カード（公開タイムライン / お気に入り一覧で共通）。
- * 投稿者のアバター＋名前のグラデーションとお気に入り数オーバーレイを表示する。
+ * - grid（正方形タイル, fill=false）: アバターを右下隅に小さく置く（名前・お気に入り数なし）。
+ *   右下は横書き文字の最初の文字とかぶらないため。
+ * - packed（masonry, fill=true）: 従来どおりグラデ帯＋アバター＋名前＋お気に入り数を表示。
  */
 export function TimelineImageCard({
   image,
@@ -51,30 +54,46 @@ export function TimelineImageCard({
         src={imageUrl}
         alt={image.overlayText}
         position={image.position}
+        size={image.size}
         fill={fill}
         className="group-hover:opacity-90 transition-opacity"
       />
-      {/* 投稿者オーバーレイ（お気に入り数がある時は右側に余白を確保して名前と重ならないようにする） */}
-      <div
-        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 pt-4 flex items-center gap-1.5 ${
-          image.favoriteCount > 0 ? "pr-12" : ""
-        }`}
-      >
-        {image.user.avatarUrl && (
+      {fill ? (
+        // packed（masonry）: 従来どおりグラデ帯＋アバター＋名前＋お気に入り数
+        <>
+          <div
+            className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-1.5 pt-4 flex items-center gap-1.5 ${
+              image.favoriteCount > 0 ? "pr-12" : ""
+            }`}
+          >
+            {image.user.avatarUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={image.user.avatarUrl ?? undefined}
+                alt={image.user.displayName || image.user.username}
+                className="w-5 h-5 rounded-full"
+                loading="lazy"
+              />
+            )}
+            <span className="text-xs text-white truncate min-w-0">
+              {image.user.displayName || image.user.username}
+            </span>
+          </div>
+          {/* お気に入り数オーバーレイ */}
+          <FavoriteOverlay count={image.favoriteCount} />
+        </>
+      ) : (
+        // grid（正方形タイル）: アバターを右下隅に小さく（名前・お気に入り数なし）
+        image.user.avatarUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={image.user.avatarUrl ?? undefined}
             alt={image.user.displayName || image.user.username}
-            className="w-5 h-5 rounded-full"
+            className="absolute bottom-0.5 right-0.5 w-[22px] h-[22px] rounded-full opacity-90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
             loading="lazy"
           />
-        )}
-        <span className="text-xs text-white truncate min-w-0">
-          {image.user.displayName || image.user.username}
-        </span>
-      </div>
-      {/* お気に入り数オーバーレイ */}
-      <FavoriteOverlay count={image.favoriteCount} />
+        )
+      )}
     </Link>
   );
 }

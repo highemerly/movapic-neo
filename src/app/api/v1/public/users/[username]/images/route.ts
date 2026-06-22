@@ -68,6 +68,7 @@ export async function GET(
         height: true,
         overlayText: true,
         position: true,
+        size: true,
         favoriteCount: true,
         pinnedAt: true,
         createdAt: true,

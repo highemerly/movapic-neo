@@ -15,6 +15,7 @@ interface ImageCardProps {
     height: number;
     overlayText: string;
     position: string;
+    size: string;
     favoriteCount?: number;
     createdAt: string;
   };
@@ -63,6 +64,7 @@ export function ImageCard({ image, publicUrl, username, showDelete, onDelete, is
           src={imageUrl}
           alt={image.overlayText}
           position={image.position}
+          size={image.size}
           fill={fill}
           className="group-hover:opacity-90 transition-opacity"
         />

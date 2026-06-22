@@ -15,6 +15,7 @@ export const PUBLIC_IMAGE_LIST_SELECT = {
   height: true,
   overlayText: true,
   position: true,
+  size: true,
   favoriteCount: true,
   createdAt: true,
   user: {

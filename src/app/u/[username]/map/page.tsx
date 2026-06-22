@@ -187,6 +187,7 @@ export default async function UserMapPage({
           height: true,
           overlayText: true,
           position: true,
+          size: true,
           favoriteCount: true,
           createdAt: true,
           locationCity: true,
@@ -284,6 +285,7 @@ export default async function UserMapPage({
                           height: img.height,
                           overlayText: img.overlayText,
                           position: img.position,
+                          size: img.size,
                           favoriteCount: img.favoriteCount,
                           createdAt: img.createdAt.toISOString(),
                         }}

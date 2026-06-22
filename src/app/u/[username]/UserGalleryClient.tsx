@@ -11,6 +11,7 @@ interface GalleryImage {
   height: number;
   overlayText: string;
   position: string;
+  size: string;
   favoriteCount: number;
   pinnedAt: string | null;
   createdAt: string;

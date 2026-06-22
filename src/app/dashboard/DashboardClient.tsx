@@ -11,6 +11,7 @@ interface Image {
   height: number;
   overlayText: string;
   position: string;
+  size: string;
   createdAt: string;
 }
 

@@ -11,6 +11,7 @@ interface ImageGridProps {
     height: number;
     overlayText: string;
     position: string;
+    size: string;
     createdAt: string;
   }>;
   publicUrl: string;

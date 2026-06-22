@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
         height: image.height,
         overlayText: image.overlayText,
         position: image.position,
+        size: image.size,
         favoriteCount: image.favoriteCount,
         createdAt: image.createdAt.toISOString(),
         user: {
