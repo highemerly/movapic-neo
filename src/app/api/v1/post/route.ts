@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserWithValidation } from "@/lib/auth/session";
 import { decryptToken } from "@/lib/auth/tokens";
 import { reverseGeocode } from "@/lib/geocode/gsi";
+import { userHasPostedLocation } from "@/lib/locations";
 import { finalizeImage } from "@/lib/compute/client";
 import { publishImage } from "@/lib/publish/publishImage";
 import { normalizeVisibility } from "@/lib/visibility";
@@ -99,24 +100,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 位置情報: locationOption が pref / city の時だけサーバー側で再ジオコーディングして
-    // 保存（権威データをサーバー側で確定するため、クライアントからの prefecture/city 文字列は
-    // そのまま保存せず GPS座標から逆引きする）。
+    // 位置情報: locationOption が pref / city の時だけ保存する。
+    // 2経路あり、いずれもクライアント送信の文字列はそのまま信任しない:
+    //  (A) 画像にGPS座標あり → サーバー側で再ジオコーディングして権威データを確定。
+    //  (B) GPS座標なし（手動指定）→ 送られた都道府県/市町村が「本人の過去投稿に実在する」
+    //      ときだけ採用（任意の場所の詐称を防ぐ）。一覧と同じ src/lib/locations.ts で検証。
     let locationPrefecture: string | null = null;
     let locationCity: string | null = null;
     if (locationOption === "pref" || locationOption === "city") {
       const gpsLatRaw = formData.get("gpsLatitude") as string | null;
       const gpsLngRaw = formData.get("gpsLongitude") as string | null;
-      if (gpsLatRaw != null && gpsLngRaw != null) {
-        const lat = parseFloat(gpsLatRaw);
-        const lng = parseFloat(gpsLngRaw);
-        if (Number.isFinite(lat) && Number.isFinite(lng)) {
-          const geo = await reverseGeocode(lat, lng);
-          if (geo) {
-            locationPrefecture = geo.prefecture;
-            if (locationOption === "city") {
-              locationCity = geo.city;
+      const lat = gpsLatRaw != null ? parseFloat(gpsLatRaw) : NaN;
+      const lng = gpsLngRaw != null ? parseFloat(gpsLngRaw) : NaN;
+
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        // (A) GPS座標から逆引き
+        const geo = await reverseGeocode(lat, lng);
+        if (geo) {
+          locationPrefecture = geo.prefecture;
+          if (locationOption === "city") {
+            locationCity = geo.city;
+          }
+        }
+      } else {
+        // (B) 手動指定: 過去投稿に実在する組み合わせのみ採用
+        const mPref =
+          (formData.get("locationPrefecture") as string | null)?.slice(0, 50) || null;
+        const mCity =
+          (formData.get("locationCity") as string | null)?.slice(0, 100) || null;
+        if (mPref) {
+          if (locationOption === "city") {
+            if (mCity && (await userHasPostedLocation(user.id, mPref, mCity))) {
+              locationPrefecture = mPref;
+              locationCity = mCity;
             }
+          } else if (await userHasPostedLocation(user.id, mPref, null)) {
+            locationPrefecture = mPref;
           }
         }
       }

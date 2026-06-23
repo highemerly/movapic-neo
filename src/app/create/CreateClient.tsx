@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, X } from "lucide-react";
+import { AlertCircle, X, ChevronDown } from "lucide-react";
 import { TextInput } from "@/components/TextInput";
 import { ImageUpload } from "@/components/ImageUpload";
 import { OptionsPanel } from "@/components/OptionsPanel";
@@ -191,6 +191,19 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
   } | null>(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [geocodeError, setGeocodeError] = useState<string | null>(null);
+  // GPSの無い画像のとき、過去に投稿実績のある場所だけ手動で選べるようにする。
+  // 一覧は画像選択時（GPS無しの場合のみ）に /api/v1/me/locations から1回だけ取得してキャッシュ。
+  const [pastLocations, setPastLocations] = useState<{
+    prefectures: string[];
+    cities: { prefecture: string; city: string }[];
+  } | null>(null);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+  // 手動選択中の場所（pref モード＝都道府県名 / city モード＝都道府県+市町村の組）
+  const [manualPref, setManualPref] = useState<string>("");
+  const [manualCity, setManualCity] = useState<{
+    prefecture: string;
+    city: string;
+  } | null>(null);
 
   // ローディング中の経過時間を更新（リセットは生成開始時に行う＝effect内での同期setStateを避ける）
   useEffect(() => {
@@ -258,10 +271,35 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
       setGeocoded(null);
       setGeocodeError(null);
       setExif(null);
+      setManualPref("");
+      setManualCity(null);
+      setPastLocations(null);
       const extracted = await extractExif(file);
       setExif(extracted);
       if (preferences.cameraOption === "show" && extracted?.cameraModel) {
         setCameraOption("show");
+      }
+      // GPSの無い画像だけ、手動選択用に過去の投稿地を1回取得する。
+      // GPSがある画像は従来どおり座標から逆引きするので取得不要。
+      const hasGps =
+        extracted?.gpsLatitude != null && extracted?.gpsLongitude != null;
+      if (!hasGps) {
+        setIsLoadingLocations(true);
+        try {
+          const res = await fetch("/api/v1/me/locations");
+          if (res.ok) {
+            setPastLocations(
+              (await res.json()) as {
+                prefectures: string[];
+                cities: { prefecture: string; city: string }[];
+              },
+            );
+          }
+        } catch {
+          // 取得失敗時は手動選択を出さない（従来どおり disabled のまま）
+        } finally {
+          setIsLoadingLocations(false);
+        }
       }
     },
     [preferences.cameraOption],
@@ -516,13 +554,20 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
         if (exif.cameraMake) formData.append("cameraMake", exif.cameraMake);
         if (exif.cameraModel) formData.append("cameraModel", exif.cameraModel);
       }
-      if (
-        (locationOption === "pref" || locationOption === "city") &&
-        exif?.gpsLatitude != null &&
-        exif?.gpsLongitude != null
-      ) {
-        formData.append("gpsLatitude", String(exif.gpsLatitude));
-        formData.append("gpsLongitude", String(exif.gpsLongitude));
+      if (locationOption === "pref" || locationOption === "city") {
+        const hasGps =
+          exif?.gpsLatitude != null && exif?.gpsLongitude != null;
+        if (hasGps) {
+          // GPSあり: 座標を送り、サーバー側で逆引きして確定（従来どおり）
+          formData.append("gpsLatitude", String(exif!.gpsLatitude));
+          formData.append("gpsLongitude", String(exif!.gpsLongitude));
+        } else if (locationOption === "city" && manualCity) {
+          // GPSなし: 手動選択した都道府県+市町村（サーバー側で過去投稿と照合）
+          formData.append("locationPrefecture", manualCity.prefecture);
+          formData.append("locationCity", manualCity.city);
+        } else if (locationOption === "pref" && manualPref) {
+          formData.append("locationPrefecture", manualPref);
+        }
       }
 
       const response = await fetch("/api/v1/post", {
@@ -673,14 +718,23 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
     includesLocation: locationOption !== "none",
   };
 
-  // 撮影場所の表示ラベル（注意文用）
+  // 撮影場所の表示ラベル（注意文用）。GPSありは逆引き結果、GPSなしは手動選択値を使う。
   const locationDisplayLabel = useMemo(() => {
     if (locationOption === "none") return null;
-    if (!geocoded) return null;
-    return locationOption === "city"
-      ? `${geocoded.prefecture}${geocoded.city}`
-      : geocoded.prefecture;
-  }, [locationOption, geocoded]);
+    if (geocoded) {
+      return locationOption === "city"
+        ? `${geocoded.prefecture}${geocoded.city}`
+        : geocoded.prefecture;
+    }
+    // 手動選択（GPSなし）
+    if (locationOption === "city" && manualCity) {
+      return `${manualCity.prefecture}${manualCity.city}`;
+    }
+    if (locationOption === "pref" && manualPref) {
+      return manualPref;
+    }
+    return null;
+  }, [locationOption, geocoded, manualPref, manualCity]);
 
   const isProcessing = isLoading || isPosting;
   const progressLabel = isPosting
@@ -860,8 +914,22 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
                     );
                     const disabled = isLoading || isPosting;
 
-                    // EXIFが何も無い場合は何も選べない
-                    if (!cameraText && !hasGps) {
+                    // GPSが無い画像でも、過去に投稿実績のある場所なら手動で選べる
+                    const prefAvailable =
+                      hasGps ||
+                      !!(pastLocations && pastLocations.prefectures.length > 0);
+                    const cityAvailable =
+                      hasGps ||
+                      !!(pastLocations && pastLocations.cities.length > 0);
+                    const hasManualLocations = !hasGps && (prefAvailable || cityAvailable);
+
+                    // カメラ機種もGPSも手動候補も無く、読み込み中でもない＝何も選べない
+                    if (
+                      !cameraText &&
+                      !hasGps &&
+                      !hasManualLocations &&
+                      !isLoadingLocations
+                    ) {
                       return (
                         <p className="text-xs text-muted-foreground">
                           この画像には付与できる撮影情報（カメラ機種・GPS）がありません。
@@ -902,28 +970,25 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
 
                     return (
                       <div className="space-y-5">
-                        {/* カメラ機種名 */}
-                        <div className="space-y-2">
-                          <Label>カメラの機種名</Label>
-                          <div className="flex rounded-lg border bg-muted p-1 gap-1">
-                            {segmentBtn(
-                              cameraOption === "none",
-                              () => setCameraOption("none"),
-                              "表示しない",
-                            )}
-                            {segmentBtn(
-                              cameraOption === "show",
-                              () => setCameraOption("show"),
-                              cameraShowLabel,
-                              !cameraText,
-                            )}
+                        {/* カメラ機種名（機種情報がある画像のときだけ表示。
+                            後付けはしない仕様なので、無い場合はセクションごと出さない） */}
+                        {cameraText && (
+                          <div className="space-y-2">
+                            <Label>カメラの機種名</Label>
+                            <div className="flex rounded-lg border bg-muted p-1 gap-1">
+                              {segmentBtn(
+                                cameraOption === "none",
+                                () => setCameraOption("none"),
+                                "表示しない",
+                              )}
+                              {segmentBtn(
+                                cameraOption === "show",
+                                () => setCameraOption("show"),
+                                cameraShowLabel,
+                              )}
+                            </div>
                           </div>
-                          {!cameraText && (
-                            <p className="text-[11px] text-muted-foreground">
-                              この画像にはカメラ機種情報がありません。
-                            </p>
-                          )}
-                        </div>
+                        )}
 
                         {/* 撮影場所 */}
                         <div className="space-y-2">
@@ -938,20 +1003,94 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
                               locationOption === "pref",
                               () => handleLocationOptionChange("pref"),
                               prefLabel,
-                              !hasGps,
+                              !prefAvailable,
                             )}
                             {segmentBtn(
                               locationOption === "city",
                               () => handleLocationOptionChange("city"),
                               cityLabel,
-                              !hasGps,
+                              !cityAvailable,
                             )}
                           </div>
-                          {!hasGps && (
-                            <p className="text-[11px] text-muted-foreground">
-                              この画像には位置情報がありません。特定のブラウザからアップロードした写真はブラウザの仕様により位置情報が削除されることがあります。
-                            </p>
-                          )}
+
+                          {/* GPSなし: 状況に応じた案内 */}
+                          {!hasGps &&
+                            (isLoadingLocations ? (
+                              <p className="text-[11px] text-muted-foreground">
+                                過去に投稿した場所を読み込み中…
+                              </p>
+                            ) : hasManualLocations ? (
+                              <p className="text-[11px] text-muted-foreground">
+                                この画像には位置情報がありません。過去に投稿したことのある場所から手動で選べます。
+                              </p>
+                            ) : (
+                              <p className="text-[11px] text-muted-foreground">
+                                この画像には位置情報がありません。特定のブラウザからアップロードした写真はブラウザの仕様により位置情報が削除されることがあります。位置情報付きで投稿した実績がないため、手動での設定はできません。
+                              </p>
+                            ))}
+
+                          {/* GPSなし・都道府県のみ: 過去の都道府県から選択 */}
+                          {!hasGps &&
+                            locationOption === "pref" &&
+                            pastLocations &&
+                            pastLocations.prefectures.length > 0 && (
+                              <div className="relative">
+                                <select
+                                  value={manualPref}
+                                  onChange={(e) => setManualPref(e.target.value)}
+                                  disabled={disabled}
+                                  className="w-full appearance-none rounded-lg border bg-muted px-3 py-2 pr-9 text-xs font-medium text-foreground transition-colors hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  <option value="">都道府県を選択…</option>
+                                  {pastLocations.prefectures.map((p) => (
+                                    <option key={p} value={p}>
+                                      {p}
+                                    </option>
+                                  ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                              </div>
+                            )}
+
+                          {/* GPSなし・都道府県+市町村: 過去の組み合わせから選択 */}
+                          {!hasGps &&
+                            locationOption === "city" &&
+                            pastLocations &&
+                            pastLocations.cities.length > 0 && (
+                              <div className="relative">
+                                <select
+                                  value={
+                                    manualCity
+                                      ? `${manualCity.prefecture} ${manualCity.city}`
+                                      : ""
+                                  }
+                                  onChange={(e) => {
+                                    const v = e.target.value;
+                                    if (!v) {
+                                      setManualCity(null);
+                                      return;
+                                    }
+                                    const [prefecture, city] = v.split(" ");
+                                    setManualCity({ prefecture, city });
+                                  }}
+                                  disabled={disabled}
+                                  className="w-full appearance-none rounded-lg border bg-muted px-3 py-2 pr-9 text-xs font-medium text-foreground transition-colors hover:bg-muted/70 focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  <option value="">市町村を選択…</option>
+                                  {pastLocations.cities.map((c) => (
+                                    <option
+                                      key={`${c.prefecture} ${c.city}`}
+                                      value={`${c.prefecture} ${c.city}`}
+                                    >
+                                      {c.prefecture}
+                                      {c.city}
+                                    </option>
+                                  ))}
+                                </select>
+                                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                              </div>
+                            )}
+
                           {hasGps &&
                             locationOption !== "none" &&
                             !geocoded &&
