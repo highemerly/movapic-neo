@@ -32,22 +32,21 @@
 - `src/middleware.ts` が role でルート境界を強制（compute は `/api/internal/*`＋`/api/health` のみ／非compute は `/api/internal/*` を404）。
 - 全pod の k8s probe は `/api/health`。`instrumentation.ts` が role で sharp ロードと consumer 起動をゲート。
 
-## 主な機能
+## 入力オプション（全経路共通の正規定義）
+Web/メール/Bot の各経路はこの値を参照する（各経路の指定キーワードは下記「メール投稿」「Bot投稿」参照）。
 
-### 入力
-- **テキスト**: 1〜140文字（必須、空白のみは不可）
-- **画像**: JPEG/PNG/WebP/HEIC/AVIF、最大20MB
-- **コマンド設定**:
-  - 位置: 上(default) / 右 / 左 / 下
-  - フォント: ふい字(default) / Noto Sans JP / ラノベPOP
-  - カラー: 白(default) / 赤 / 青 / 緑 / 黄 / 茶 / 桃 / 橙
-  - サイズ: 中(default) / 大 / 小 / 特大
-  - 出力形式: Mastodon(AVIF) / Misskey(AVIF) / なし(JPEG)
+| 項目 | API値 | 選択肢（先頭=default） |
+|------|-------|------------------------|
+| text | text | 1〜140文字（必須・空白のみ不可） |
+| 画像 | image | JPEG/PNG/WebP/HEIC/AVIF・最大20MB |
+| position | `top`(def) / `right` / `left` / `bottom` | 上 / 右 / 左 / 下 |
+| font | `hui-font`(def) / `noto-sans-jp` / `light-novel-pop` | ふい字 / ゴシック(Noto Sans JP) / ラノベPOP |
+| color | `white`(def) / `red` / `blue` / `green` / `yellow` / `brown` / `pink` / `orange` | 白/赤/青/緑/黄/茶/桃/橙 |
+| size | `medium`(def) / `large` / `small` / `extra-large` | 中/大/小/特大 |
+| output | `mastodon`(AVIF) / `misskey`(AVIF) / `none`(JPEG) | Mastodon / Misskey / なし |
 
-### 出力
-- 文字入れ済み画像（JPEG or AVIF）
-- 生成後に画像情報を表示（サイズ × 高さ / 形式 / ファイルサイズ）
-- ダウンロードボタンで保存
+- **アレンジ（ネオン/ハンコ）はメール・Bot経由のみ**のオプション（Web UIには無い）。
+- **出力**: 文字入れ済み画像（JPEG or AVIF）。生成後に画像情報（幅×高さ/形式/ファイルサイズ）を表示しダウンロード可。
 
 ## 設計上の重要なルール
 
@@ -57,263 +56,124 @@
 - 縦書き時は句読点・括弧の回転処理あり
 
 ### フォントサイズ
-- 画像の短辺を基準に自動計算（横書き・縦書き共通）
-  - 基準サイズ: `Math.min(width, height) / 14`（約14文字入る大きさ）
-  - 下限14px、上限500px
+- 画像の短辺基準で自動計算（横書き・縦書き共通）。基準 `Math.min(width, height) / 14`（約14文字）、下限14px・上限500px。
 - サイズ係数: 小(0.75) / 中(1.0) / 大(1.4) / 特大(2.35)
 
 ### 文字の影
-- 視認性向上のため、全ての文字に影を追加
-- 薄い色（白、緑、黄、桃、橙）→ 黒い影
-- 濃い色（赤、青、茶）→ 白い影
+- 視認性のため全文字に影を追加。薄い色（白・緑・黄・桃・橙）→黒影、濃い色（赤・青・茶）→白影。
 
 ### 画像の取り扱い
-- 生成画像はBlobURLで一時的に表示し、ページ離脱時に破棄
-- 生成後にオプションを変更すると「画像を再生成」ボタンが有効化される
-- 「最初からやり直す」ボタンで画像・テキスト・オプション全てをリセット
+- 生成画像はBlobURLで一時表示し離脱時に破棄。生成後のオプション変更で「再生成」ボタン有効化。「最初からやり直す」で全リセット。
 
 ### EXIF/メタデータ
-- Orientationタグに従い自動回転（スマホ画像対応）
-- GPS・カメラ情報等のメタデータは出力時に削除（プライバシー保護）
+- Orientationに従い自動回転（スマホ画像対応）。GPS・カメラ情報等は出力時に削除（プライバシー保護）。
 
 ### APIの制限
-- レート制限: 8秒間に1リクエスト（IPアドレス単位）
-- 処理タイムアウト: 30秒（超過時は504エラー）
-- レスポンスにContent-Lengthヘッダーを含む
+- レート制限8秒/1req（IP単位）・処理タイムアウト30秒（超過で504）・レスポンスにContent-Lengthを含む。
 
 ### RSCプリフェッチ（`?_rsc=` クエリ）
-App Router の `<Link>` はビューポート進入で対象ルートの RSC ペイロード（`?_rsc=...` 付き fetch）を自動プリフェッチする。画像カードのグリッド等で1ページ数十件のリクエストが発生したため、**原則すべてのプリフェッチをオプトアウト**する方針。
-- `next/link` を直接 import せず、必ず `import Link from "@/components/Link"`（[src/components/Link.tsx](src/components/Link.tsx)）を使う。これは `prefetch={false}` を既定にした素の転送ラッパー。`prefetch={false}` でもホバー/フォーカス時は先読みされるのでクリック体感は維持される。
-- **明示的に先読みしたい主要動線だけ** `<Link href=... prefetch>` でオプトイン。
-- プリフェッチは遷移先URLをキーに Router Cache へ入るため、**同一URLは1箇所だけ `prefetch` すれば十分**（ページ内の他の同URLリンクもキャッシュを再利用）。逆に**同じURLを複数の `<Link prefetch>` で持つと、各リンクがマウント時に同時発火してキャッシュミスし、同一ページへ `?_rsc=` リクエストが重複して飛ぶ**ので避ける。
-- 現在オプトイン済みの箇所: SiteHeaderのハンバーガーメニュー（`/dashboard`・`/create`・`/public`・`/public?instances=...`）、`/u/[username]` のタブ（一覧/カレンダー/地図/実績）、`/dashboard` の「あなたの情報」セクション内のLink（アバター＋4スタットボタン＋人気投稿。`/u/[selfSeg]` への prefetch はスタットボタン側1箇所に集約し、アバターは prefetch なし）。
+App Router の `<Link>` はビューポート進入で RSC ペイロードを自動プリフェッチし、グリッドで大量リクエストを生む。**原則すべてオプトアウト**する方針。
+- `next/link` を直接 import せず必ず `import Link from "@/components/Link"`（[src/components/Link.tsx](src/components/Link.tsx)、`prefetch={false}` 既定のラッパー）を使う。ホバー/フォーカス時は先読みされるのでクリック体感は維持。
+- 主要動線だけ `<Link prefetch>` でオプトイン。**同一URLは1箇所だけ** prefetch（複数だと同時発火でキャッシュミスし重複リクエスト）。
+- 現在のオプトイン箇所はSiteHeaderメニュー・`/u/[username]` タブ・`/dashboard` の「あなたの情報」（同URLは1箇所に集約済み）。
 
 ## API
 
 ### POST /api/v1/generate
-- **Content-Type**: multipart/form-data
-- **パラメータ**:
-  - image: File
-  - text: string（1〜140文字、空白のみ不可）
-  - position: "top" | "right" | "left" | "bottom"
-  - font: "hui-font" | "noto-sans-jp" | "light-novel-pop"
-  - color: "white" | "red" | "blue" | "green" | "yellow" | "brown" | "pink" | "orange"
-  - size: "small" | "medium" | "large" | "extra-large"
-  - output: "mastodon" | "misskey" | "none"
-- **レスポンス**: image/jpeg または image/avif（バイナリ）
-- **レスポンスヘッダー**: Content-Type, Content-Length, Content-Disposition, Cache-Control
-- **エラーレスポンス**: `{ success: false, error: { code, message, suggestion?, requestId? } }`
+- multipart/form-data。パラメータは上記「入力オプション」の API値（image/text/position/font/color/size/output）。
+- **レスポンス**: image/jpeg または image/avif（バイナリ）。ヘッダー: Content-Type, Content-Length, Content-Disposition, Cache-Control。
+- **エラー**: `{ success: false, error: { code, message, suggestion?, requestId? } }`
 
 ### POST /api/v1/post
-- **Content-Type**: multipart/form-data
-- **認証**: 必須（JWTセッション）
-- **パラメータ**:
-  - image: Blob（生成済み画像）
-  - text: string
-  - position / font / color / size / output: 生成オプション
-  - mimeType: string
-  - visibility: "public" | "unlisted" | "local"
-- **処理**: R2アップロード → DB保存 → Fediverse投稿（localの場合はスキップ）
+- multipart/form-data・**認証必須**（JWT）。
+- パラメータ: image(生成済Blob), text, position/font/color/size/output（生成オプション）, mimeType, visibility(`public`/`unlisted`/`local`)。
+- **処理**: R2アップロード → DB保存 → Fediverse投稿（local時はスキップ）。
 - **レスポンス**: `{ success, imageId, imagePageUrl, postUrl? }`
 
-### POST /api/v1/ingest/email（内部API）
-- worker-front が配信。
-- Cloudflare Email Workerから転送されたraw emailを処理（元画像をR2一時領域へ置き、生成〜投稿は worker(consumer) へ enqueue）
-- `X-API-Key`ヘッダーで認証、`X-Email-Prefix`でユーザー特定
-- 件名からオプション解析（例: "上 赤 大"）、本文がテキスト、添付が画像
-- オプション・公開範囲のデフォルトはユーザーのWeb初期設定を使用（件名指定 > ユーザー設定 > ハードコード）
-- カメラ機種・撮影場所をEXIFから保存（詳細は「メール投稿機能」セクション参照）
-- 出力形式はユーザーの連携インスタンス（Mastodon/Misskey）で自動決定
-- 生成画像はR2にアップロード、メタデータはDBに保存（source: "email"）
+### POST /api/v1/ingest/email（内部API・worker-front配信）
+- Cloudflare Email Workerから転送されたraw emailを処理（元画像をR2一時領域へ置き、生成〜投稿は consumer へ enqueue）。`X-API-Key` 認証・`X-Email-Prefix` でユーザー特定。
+- 件名→オプション、本文→テキスト、添付→画像。デフォルトは「件名指定 > ユーザー設定 > ハードコード」。出力形式は連携インスタンスで自動決定。source: "email"。詳細は「メール投稿機能」参照。
 
 ### GET/POST/DELETE /api/v1/images/[id]/favorite
-- **GET**: お気に入り状態取得（認証不要）
-  - レスポンス: `{ favoriteCount, isFavorited, recentFavoriters[] }`
-- **POST**: お気に入り登録（認証必須）
-  - レスポンス: `{ success, favoriteCount, isFavorited: true }`
-- **DELETE**: お気に入り解除（認証必須）
-  - レスポンス: `{ success, favoriteCount, isFavorited: false }`
+- **GET**（認証不要）: `{ favoriteCount, isFavorited, recentFavoriters[] }`
+- **POST**（認証必須）: `{ success, favoriteCount, isFavorited: true }`
+- **DELETE**（認証必須）: `{ success, favoriteCount, isFavorited: false }`
 
 #### お気に入りの実体（Mastodon連携）
-お気に入りは**サービス独自のDBレコードではなく、Mastodonの favourite そのもの**。正データはオーナー（投稿者）インスタンス側にあり、サービスは `favoriteCount` / `favoritersCache`（上位40件）をキャッシュとして保持する。実装は [src/lib/fediverse/favorite.ts](src/lib/fediverse/favorite.ts) と [src/app/api/v1/images/[id]/favorite/route.ts](src/app/api/v1/images/[id]/favorite/route.ts)。Mastodonユーザー＋`postId`がある投稿のみ対象（`isFavoritable`）。
+お気に入りは独自DBレコードではなく**Mastodonの favourite そのもの**。正データはオーナー（投稿者）インスタンス側にあり、サービスは `favoriteCount`/`favoritersCache`（上位40件）をキャッシュ保持。対象はMastodonユーザー＋`postId`あり（`isFavoritable`）。実装は [favorite.ts](src/lib/fediverse/favorite.ts) と [route.ts](src/app/api/v1/images/[id]/favorite/route.ts)（search解決・TTL値・タイムアウト・エラー分類・楽観表示の詳細はコード内コメント参照）。要点と**設計上の割り切り**:
+- 読み取り（count/favourited_by）はオーナートークン、操作（POST/DELETE）はviewerトークン。別インスタンスは `postUrl` を `/api/v2/search?resolve=true` で毎回解決してから favourite（localStatusId は**キャッシュしない**割り切り。負荷化したら `(viewerInstanceDomain, postId)→localStatusId` キャッシュが有効だが現時点不要）。
+- GETは**TTL切れ時のみ**オーナーsync。TTLは前回status（4xx=1日/5xx=1時間/成功=投稿経過時間ベースで可変）。POST/DELETE成功時は即時sync。
+- 楽観表示はDBに保存しないため、リロードするとオーナーsyncが連合反映を持ってくるまで一旦消える（federation遅延＋上位40件の壁による割り切り）。
 
-- **読み取り（count / favourited_by）**: オーナーのトークンでオーナーインスタンスから取得。
-- **お気に入り操作（POST/DELETE）**: viewer（操作者）のトークンで実行。
-  - **同一インスタンス**（viewer == owner）: `postId` をそのまま使う（search不要）。
-  - **別インスタンス**（viewer != owner）: viewer側に振られたローカルstatus IDが必要。`postUrl` を keyに **`/api/v2/search?resolve=true`（viewerトークン）で毎操作ごとに解決**してから `POST /statuses/:id/favourite`。解決結果（localStatusId）は**キャッシュしていない**（現状の意図的な割り切り）。
-    - localStatusId は (viewerインスタンス × 投稿) で一意かつそのインスタンスの全ユーザー共通なので、search負荷が問題化したら `(viewerInstanceDomain, postId) → localStatusId` のキャッシュ導入が有効。**現時点では不要と判断**。
-    - resolve（federation取得を伴い遅い）だけ専用タイムアウト10秒（`RESOLVE_TIMEOUT`）、他の読み取り・操作は4秒（`SHORT_TIMEOUT`）。
-    - `authorize_interaction`（[画像ページ](src/app/u/[username]/status/[imageId]/page.tsx)の「返信/インタラクション」リンクで使用）は**ブラウザをviewerインスタンスUIへ飛ばす対話フロー**で、トークンでの非対話お気に入りには使えない。サーバー側ワンクリックは search 経由が標準。
-- **楽観表示**: POST/DELETE成功時、レスポンスの favoriters一覧に viewer自身を仮追加/除外する（[route.ts](src/app/api/v1/images/[id]/favorite/route.ts) `mergeViewerFavoriter`）。**DBキャッシュには保存しない**ため、リロードするとオーナー側syncが本物の連合反映を持ってくるまで一旦消える（federation遅延＋上位40件の壁による割り切り）。
-- **エラー分類**（`FavoriteErrorReason`）: `deleted`(404/410) / `forbidden`(401/403→再ログイン誘導) / `unavailable`(5xx・タイムアウト) / `unresolved`（search成功だが該当statusなし＝**未伝播**。「削除」ではなく「未反映なので時間をおいて」と案内）。
-
-#### お気に入りキャッシュの更新頻度（TTL）
-GET時に**TTL切れ（または未取得）のときだけ**オーナートークンでMastodonへsyncする（`computeCacheTtl`）。連打・人気投稿でのアクセス集中を抑えるため、投稿経過時間と前回のpostStatusでTTLを可変にする。
-- 直近のsyncが **4xx**: 1日（削除確定・権限不足など、再試行の意味が薄い）
-- **5xx / 接続失敗(0)**: 1時間
-- **成功(200) / 未sync**: 投稿経過時間ベース（≤5分: 1分 / ≤2時間: 5分 / ≤1日: 30分 / ≤5日: 1時間 / それ以降: 1日）
-- POST/DELETE成功時は即時にオーナー側syncを1回走らせてキャッシュを更新する。
-
-### GET /api/v1/favorites
-- **認証**: 必須
-- **パラメータ**: cursor, limit
-- **レスポンス**: `{ images[], nextCursor, hasMore }`
-- 自分がお気に入り登録した画像一覧を最新順で取得
+### GET /api/v1/favorites（認証必須）
+- パラメータ cursor, limit。レスポンス `{ images[], nextCursor, hasMore }`。自分のお気に入り一覧を最新順で取得。
 
 ### GET /api/v1/public/users/[username]/calendar
-- **パラメータ**: year, month
-- **レスポンス**:
-  ```typescript
-  {
-    year: number
-    month: number
-    days: { [day: number]: { count, latest: { id, thumbnailKey, storageKey, position } } }
-    hasPrevMonth: boolean
-    hasNextMonth: boolean
-    isPerfectAttendance: boolean  // 皆勤賞（その月毎日投稿）
-  }
-  ```
-- カレンダー表示用の月別画像データ
+- パラメータ year, month。レスポンスは `days`（日ごとの件数＋最新画像）と `hasPrevMonth`/`hasNextMonth`/`isPerfectAttendance`（皆勤賞）を含むカレンダー用月別データ。
 
 ## メール投稿機能
-- **Cloudflare Email Worker** (`workers/email-forwarder/`): メールを受信しraw dataをAPIへ転送
-- **メールパーサー** (`src/lib/email/parser.ts`): 件名→オプション、本文→テキスト、添付→画像
-- **オプション指定**: 件名にスペース区切りで日本語キーワード
-  - 位置: 上/下/左/右
-  - 色: 白/赤/青/緑/黄/茶/桃/橙
-  - サイズ: 小/中/大/特大
-  - フォント: ふい字/ゴシック/ラノベ
-  - アレンジ: ネオン/ハンコ
-  - 公開範囲: public/unlisted（Bot投稿と共通。localは件名指定不可、ユーザー設定からのみ）
-  - カメラ機種: カメラ（保存する）/カメラなし（保存しない）
-  - 位置情報（メール投稿のみ）: 都道府県/市町村（EXIFのGPSから逆ジオコーディングして保存）
-- **デフォルト値**: 件名で未指定のオプションはユーザーのWeb初期設定（`defaultPosition`/`defaultVisibility`/`defaultCameraOption`等）を使用し、それも未設定ならハードコードのデフォルト（優先順位: 件名 > ユーザー設定 > フォールバック）
-- **撮影情報（EXIF）**: サーバー側で元画像を解析。カメラ機種は解決後の`cameraOption`が`"show"`のときのみ保存。撮影場所は件名コマンド指定時のみ保存（GPS座標自体は保存しない）
+- **Cloudflare Email Worker** (`workers/email-forwarder/`): メールを受信しraw dataをAPIへ転送。
+- **パーサー** (`src/lib/email/parser.ts`): 件名→オプション、本文→テキスト、添付→画像。
+- **件名オプション**（スペース区切り・日本語キーワード。値は「入力オプション」表に対応）:
+  - 位置: 上/下/左/右 ・ 色: 白/赤/青/緑/黄/茶/桃/橙 ・ サイズ: 小/中/大/特大 ・ フォント: ふい字/ゴシック/ラノベ ・ アレンジ: ネオン/ハンコ
+  - 公開範囲: public/unlisted（localは件名指定不可・ユーザー設定からのみ）
+  - カメラ機種: カメラ（保存）/カメラなし（保存しない）
+  - 位置情報（**メール投稿のみ**）: 都道府県/市町村（EXIFのGPSから逆ジオコーディングして保存）
+- **デフォルト**: 未指定はユーザーのWeb初期設定（`defaultPosition`/`defaultVisibility`/`defaultCameraOption` 等）→ 無ければハードコード（優先順位: 件名 > ユーザー設定 > フォールバック）。
+- **撮影情報**: サーバー側でEXIF解析。カメラ機種は `cameraOption` が `"show"` のときのみ保存。撮影場所は件名コマンド指定時のみ保存（GPS座標自体は保存しない）。
 
 ## Bot投稿機能（メンション投稿）
-Mastodon上でBotアカウントにメンションすることで画像生成・投稿を行う機能。
+Mastodon上でBotにメンションして画像生成・投稿する機能。
 
 ### 仕組み
-- **Botアカウント**: `@movapic@handon.club`（環境変数で設定可能）
-- **処理フロー**:
-  1. ユーザーがBotに画像付きメンションを送信
-  2. Botが通知を取得（主経路: Mastodon Streaming API による WebSocket 即時受信 `src/lib/mention/streamer.ts`／フォールバック: 定期ポーリング `src/lib/mention/fetcher.ts`・`ingest.ts`。切断・サイレント切断時の取りこぼしを補完）
-  3. メンション内容をパース（`src/lib/mention/parser.ts`）
-  4. 画像処理・投稿を実行（`src/lib/mention/processor.ts`）
-  5. 元投稿を削除し、処理済み画像をユーザーのアカウントで再投稿
-  6. DBに保存（source: "mention"）
+- **Botアカウント**: `@movapic@handon.club`（環境変数で設定可能）。
+- **フロー**: ①画像付きメンション受信 → ②通知取得（主: Streaming API WebSocket `src/lib/mention/streamer.ts`／フォールバック: ポーリング `fetcher.ts`・`ingest.ts` で取りこぼし補完）→ ③パース `parser.ts` → ④画像処理・投稿 `processor.ts` → ⑤元投稿削除しユーザーアカウントで再投稿 → ⑥DB保存（source: "mention"）。
 
 ### コマンド形式
-```
-@movapic [オプション] テキスト
-```
+`@movapic [オプション] テキスト`（`[...]` 内にスペース区切り）
+- オプション値はメール投稿と同じ（位置/色/サイズ/フォント/アレンジ）。公開範囲 public/unlisted（未指定はユーザー設定）。
+- 特殊: `debug`（開始・完了をBotがリプライ通知）/ `keep`（元投稿を削除せず保持）。
+- 例: `@movapic [上 赤 大] こんにちは` / `@movapic [下 ネオン debug] テスト` / `@movapic [keep unlisted] 元投稿を残す`
 
-### オプション指定（`[...]`内にスペース区切り）
-- **位置**: 上/下/左/右
-- **色**: 白/赤/青/緑/黄/茶/桃/橙
-- **サイズ**: 小/中/大/特大
-- **フォント**: ふい字/ゴシック/ラノベ
-- **アレンジ**: ネオン/ハンコ
-- **公開範囲**: public/unlisted（指定なしの場合はユーザー設定を使用）
-- **特殊コマンド**:
-  - `debug`: 処理開始・完了時にBotからリプライで通知
-  - `keep`: 元投稿を削除せずに保持
-
-### 例
-```
-@movapic [上 赤 大] こんにちは
-@movapic [下 ネオン debug] テスト投稿
-@movapic [keep unlisted] 元投稿を残す
-```
-
-### 制約
-- 画像は1枚のみ添付可能（動画・GIF不可）
-- テキストは1〜140文字
-- ユーザーは事前にサービスにログイン済みである必要がある
-- リトライは最大2回まで、失敗時はBotがリプライでエラー通知
-
-### 出力形式
-ユーザーの連携インスタンスに基づいて自動決定：
-- Mastodonユーザー → AVIF（Mastodon形式）
-- Misskeyユーザー → AVIF（Misskey形式）
-
-### 環境変数
-- `MASTODON_BOT_INSTANCE_URL`: BotインスタンスのURL（例: `https://handon.club`）
-- `MASTODON_BOT_INSTANCE_DOMAIN`: Botインスタンスのドメイン（例: `handon.club`）
-- `MASTODON_BOT_ACCESS_TOKEN`: Botのアクセストークン
-- `MASTODON_BOT_ACCT`: Botのアカウント名（例: `movapic`）
+### 制約・出力
+- 画像1枚のみ（動画・GIF不可）・テキスト1〜140文字・ユーザーは事前ログイン必須・リトライ最大2回（失敗時Botがリプライ通知）。
+- 出力形式は連携インスタンスで自動決定（Mastodon/Misskey ともAVIF）。
+- 環境変数: `MASTODON_BOT_INSTANCE_URL` / `MASTODON_BOT_INSTANCE_DOMAIN` / `MASTODON_BOT_ACCESS_TOKEN` / `MASTODON_BOT_ACCT`。
 
 ## 投稿ソース（source）
-DBの`Image.source`フィールドで投稿元を識別：
-
-| 値 | 説明 | 画像ページ表示 |
-|----|------|----------------|
-| `web` | Web投稿ページから投稿 | 🌐 Web投稿 |
-| `email` | メール経由で投稿 | 📧 メール投稿 |
-| `mention` | Bot（メンション）経由で投稿 | 🤖 Bot投稿 |
+DBの`Image.source`で投稿元を識別: `web`(🌐 Web投稿) / `email`(📧 メール投稿) / `mention`(🤖 Bot投稿)。
 
 ## 公開範囲（Visibility）
-投稿時に選択可能な公開範囲：
-
 | 値 | 表示名 | Fediverse投稿 | サービス保存 | 公開TL表示 |
 |----|--------|---------------|--------------|------------|
 | `public` | 公開 | 公開投稿 | ✅ | ✅ |
-| `unlisted` | 非収載 | 非収載投稿（Misskey: home） | ✅ | ✅ |
+| `unlisted` | 非収載 | 非収載（Misskey: home） | ✅ | ✅ |
 | `local` | このサービスのみ | ❌ | ✅ | ✅ |
 
-- Mastodon: `public` / `unlisted` をそのまま使用
-- Misskey: `unlisted` → `home` に変換（Misskeyの「ホーム」が非収載相当）
+- Mastodon: `public`/`unlisted` をそのまま使用。Misskey: `unlisted` → `home`（非収載相当）。
 
 ## Fediverse認証
-- **対応プラットフォーム**: Mastodon（OAuth 2.0）/ Misskey（MiAuth）
-- **インスタンス検出**: nodeinfo取得で自動判定
-- **セッション**: JWT（7日間有効）、httpOnly Cookie
-
-### 認証API
-- **POST /api/auth/fediverse/register**: 認証開始（サーバー名から自動でMastodon/Misskeyを判定し認可URLを返す）
-- **GET /api/auth/fediverse/callback/mastodon**: Mastodon OAuthコールバック
-- **GET /api/auth/fediverse/callback/misskey**: Misskey MiAuthコールバック
-- **POST /api/auth/logout**: ログアウト（Cookie削除）
-
-### 認証フロー
-1. ユーザーがサーバー名を入力 → `/api/auth/fediverse/register`
-2. Mastodon: 動的クライアント登録 → OAuth認可画面へリダイレクト
-3. Misskey: MiAuthセッション生成 → MiAuth認可画面へリダイレクト
-4. コールバックでトークン取得 → ユーザー作成/更新 → JWTセッション発行
+- 対応: Mastodon（OAuth 2.0）/ Misskey（MiAuth）。インスタンス検出はnodeinfoで自動判定。セッションはJWT（7日・httpOnly Cookie）。
+- **API**: `POST /api/auth/fediverse/register`（サーバー名から種別判定し認可URL返却）/ `GET .../callback/mastodon` / `GET .../callback/misskey` / `POST /api/auth/logout`。
+- **フロー**: サーバー名入力 → register（Mastodonは動的クライアント登録、Misskeyは MiAuthセッション生成）→ 認可画面 → コールバックでトークン取得 → ユーザー作成/更新 → JWT発行。
 
 ## カレンダー機能
-ユーザーページから閲覧できる投稿カレンダー。
-
-### 機能
-- 月別カレンダー表示（投稿日にサムネイル表示）
-- 日付クリックでその日の全画像をモーダル表示
-- **皆勤賞**: その月に毎日投稿すると👑を表示（過去月のみ判定）
-
-### サムネイル
-- **サイズ**: 128x128px（WebP形式、quality 80）
-- **生成タイミング**: 投稿時（`/api/v1/post`内）
-- **クロップ位置**: 文字位置に応じた角を基準
-  - top/left → 左上から
-  - bottom → 左下から
-  - right → 右上から
-- **既存画像のサムネイル生成**: `npx tsx scripts/generate-thumbnails.ts`
+- 月別カレンダー表示（投稿日にサムネイル）。日付クリックでその日の全画像をモーダル表示。**皆勤賞**: その月毎日投稿で👑（過去月のみ判定）。
+- **サムネイル**: 128x128px WebP・quality 80。投稿時（`/api/v1/post`内）に生成。クロップ位置は文字位置に応じた角基準（top/left→左上、bottom→左下、right→右上）。既存画像は `npx tsx scripts/generate-thumbnails.ts`。
 
 ## 実績・通知機能
-- ユーザーページの「実績」タブ（誰でも閲覧可）と、ヘッダーのベル通知（ログインユーザーのみ）。
-- 付与は「投稿した瞬間」に確定する条件のみ。web/email/mention の3経路すべてが収束する `publishImage.ts` に1箇所フック。
-- **実績を追加・変更する手順と不変条件は [`src/lib/achievements/README.md`](src/lib/achievements/README.md) に集約**（key は永続でリネーム禁止、しきい値は `>=`、live と backfill の集計を必ず同期、等）。
+- ユーザーページの「実績」タブ（誰でも閲覧可）＋ヘッダーのベル通知（ログインユーザーのみ）。
+- 付与は「投稿した瞬間」に確定する条件のみ。web/email/mention が収束する `publishImage.ts` に1箇所フック。
+- **追加・変更の手順と不変条件は [`src/lib/achievements/README.md`](src/lib/achievements/README.md) に集約**（keyは永続でリネーム禁止、しきい値は `>=`、live と backfill の集計を必ず同期 等）。
 - 既存ユーザーへの反映: `DATABASE_URL=... npx tsx scripts/backfill-achievements.ts`（冪等）。
 
 ## PWA対応
-ホーム画面に追加できるPWA。Push通知は**やらない**。
-
-- **インストール**: 静的 [public/manifest.json](public/manifest.json)（`display: standalone`）。アイコンはロゴと同じグラデーション／ケータイアイコンを流用しつつ、正方形向けに「SHAME ／ ZO📱」の**2行レイアウト**を [scripts/generate-pwa-icons.ts](scripts/generate-pwa-icons.ts) 内のSVGで組み、白背景に合成して生成（`npx tsx scripts/generate-pwa-icons.ts` → `public/icons/`、any/maskable/apple-touch）。manifest/appleWebApp/viewport(`viewportFit: cover`) は [src/app/layout.tsx](src/app/layout.tsx) の metadata で付与。
-- **Share Target（簡単投稿）**: 他アプリの共有メニューから画像を受け取り投稿ページへ載せる。manifest の `share_target`（`POST /share-target`）→ 最小の Service Worker [public/sw.js](public/sw.js) が画像を Cache Storage(`shared-image`/`/__shared`)へ保存し `/create?shared=1` へ303リダイレクト → [CreateClient.tsx](src/app/create/CreateClient.tsx) がマウント時にキャッシュから取り出し既存の `handleImageSelect` に流す。SWはこの用途のみ（オフラインキャッシュはしない）。SW登録は [src/components/ServiceWorkerRegister.tsx](src/components/ServiceWorkerRegister.tsx)。
-  - **iOS制約**: Web Share Target は Android Chrome等のみ。**iOS Safari の PWA では共有受信は不可**（仕様上）。iOSでもインストール・下部メニューは動作する。
-- **下部メニューバー（standalone時のみ）**: [src/components/layout/BottomNav.tsx](src/components/layout/BottomNav.tsx)。左から みんな/同じサーバー/投稿(中央・強調)/マイページ/メニュー。中央の投稿ボタンはバー上端から少しはみ出す大きめの円ボタン（`-mt-6 h-16 w-16 ring-4 ring-background`）。未ログイン時はログイン必須項目（同じサーバー・マイページ）を非表示。表示情報は DBレスな `getSessionClaims()` から layout で取得。
-  - **standalone判定はJSではなくCSSのみ**: [globals.css](src/app/globals.css) に Tailwind v4 の `@custom-variant standalone (@media (display-mode: standalone))` を定義。BottomNav は `hidden standalone:flex`、従来の [FloatingPostButton](src/components/FloatingPostButton.tsx) は `standalone:hidden` でPWA時だけ隠す（ハイドレーション不整合を避ける）。body に standalone時のみ下部余白＋`safe-area-inset-bottom`。
-  - **ヘッダーもPWA時のみスティッキー**: [SiteHeader](src/components/layout/SiteHeader.tsx) に `standalone:sticky standalone:top-0 standalone:z-30`。通常ブラウザでは従来どおり非固定。
-  - layout で cookie を読むため全ページが動的レンダリングになる（認証中心アプリのため許容）。
+ホーム画面追加対応のPWA。Push通知は**やらない**。
+- **インストール**: 静的 [manifest.json](public/manifest.json)（`display: standalone`）。アイコンは `npx tsx scripts/generate-pwa-icons.ts` で生成（`public/icons/`、any/maskable/apple-touch）。metadata（manifest/appleWebApp/viewport）は [layout.tsx](src/app/layout.tsx)。
+- **Share Target（簡単投稿）**: 他アプリ共有メニュー → manifest `share_target`（`POST /share-target`）→ 最小SW [sw.js](public/sw.js) が画像をCache Storageへ保存し `/create?shared=1` へ303 → [CreateClient.tsx](src/app/create/CreateClient.tsx) がマウント時に取り出し `handleImageSelect` へ。SWはこの用途のみ（オフラインキャッシュなし。登録は [ServiceWorkerRegister.tsx](src/components/ServiceWorkerRegister.tsx)）。**iOS Safari の PWA では共有受信不可**（仕様上。インストール・下部メニューは動作）。
+- **下部メニューバー（standalone時のみ）**: [BottomNav.tsx](src/components/layout/BottomNav.tsx)。みんな/同じサーバー/投稿(中央強調)/マイページ/メニュー。未ログイン時はログイン必須項目を非表示。表示情報はDBレスな `getSessionClaims()` から layout で取得。
+- **standalone判定はCSSのみ**（JS不使用でハイドレーション不整合を回避）: [globals.css](src/app/globals.css) の `@custom-variant standalone`。BottomNavは `standalone:flex`、[FloatingPostButton](src/components/FloatingPostButton.tsx) は `standalone:hidden`、[SiteHeader](src/components/layout/SiteHeader.tsx) は `standalone:sticky`。
+- layout で cookie を読むため全ページが動的レンダリング（認証中心アプリのため許容）。
 
 ## 本番DBマイグレーション
 

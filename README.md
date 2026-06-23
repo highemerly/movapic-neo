@@ -40,7 +40,7 @@ Font files are stored in a private repository to prevent license violations (red
 - Text Outline
    - All text has outlines added for better visibility. Light colors (white, green, yellow, pink, orange) have black outlines, while dark colors (red, blue, brown) have white outlines.
 - Font Size
-   - Automatically calculated based on image size. The medium size is calibrated so that 16 characters fit within the shorter edge of the image.
+   - Automatically calculated based on image size. The medium size is calibrated so that roughly 14 characters fit within the shorter edge of the image.
 
 ## Posting Images
 
@@ -52,7 +52,7 @@ Post directly from a web browser. Log in with a Mastodon / Misskey account and g
 
 ### Bot Posting (Mention)
 
-Post by mentioning the bot account on Mastodon. The bot account is pre-configured and processes posts by periodically polling its mentions. Replies to the bot (containing the original unconverted image) are automatically deleted using the user's token to reduce the burden on server administrators.
+Post by mentioning the bot account on Mastodon. The bot account is pre-configured and receives mentions in real time via the Mastodon Streaming API (WebSocket), with periodic polling as a fallback to catch anything missed during disconnects. Replies to the bot (containing the original unconverted image) are automatically deleted using the user's token to reduce the burden on server administrators.
 
 Example:
 ```
