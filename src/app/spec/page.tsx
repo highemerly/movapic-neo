@@ -38,7 +38,7 @@ export default async function SpecPage() {
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">テキスト</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li>文字数: 1〜140文字（空白のみの入力は不可）</li>
+                    <li>文字数: 1〜140文字</li>
                   </ul>
                 </div>
               </div>
@@ -68,9 +68,15 @@ export default async function SpecPage() {
                   </p>
                 </div>
                 <div>
+                  <p className="text-xs text-muted-foreground font-medium mb-1">文字のスタート位置</p>
+                  <p className="text-sm text-muted-foreground">
+                    位置設定（上/下/左/右）の端から一定の余白を空けて文字を並べ始めます。マージンは短辺の約5%または10pxの大きい方となります。横方向と縦方向で同じ余白であり、文字サイズによって変動しません（※過去は変動しており、仕様変更済）。
+                  </p>
+                </div>
+                <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">フォントサイズ</p>
                   <p className="text-sm text-muted-foreground mb-3">
-                    画像のサイズに応じて自動計算されます。画像の短辺に約14文字が納まる文字サイズを基準（中）とし、設定に応じて倍率をかけて計算します（下限14px・上限500px）。
+                    画像のサイズに応じて自動計算されます。画像の短辺に約14文字が納まる文字サイズを基準（中）とし、設定に応じて倍率をかけて計算します。ただし、下限14px・上限500pxです。
                   </p>
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
@@ -112,7 +118,7 @@ export default async function SpecPage() {
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">画像処理</p>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                <li>Orientationタグを持つ画像（主にスマートフォンで撮影したもの）は、向きを自動補正します</li>
+                <li>スマートフォンで撮影した場合は Orientation タグを参照して、向きを自動補正します</li>
                 <li>画像： AVIF形式（quality 80・effort 2）で出力を試みますが、ファイルサイズの上限を超える場合、品質を段階的に下げて再エンコードすることがあります</li>
                 <li>サムネイル： WebP形式（128×128px・WebP・quality 80）で出力します</li>
               </ul>
