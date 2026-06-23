@@ -17,7 +17,6 @@ import { DefaultsEditor } from "./DefaultsEditor";
 import { LocationMapToggle } from "./LocationMapToggle";
 import { BlockCrawlersToggle } from "./BlockCrawlersToggle";
 import { DisplayModeSelector } from "./DisplayModeSelector";
-import { DeleteAccountSection } from "./DeleteAccountSection";
 import prisma from "@/lib/db";
 import { getUserProfileStats } from "@/lib/userStats";
 import { userPathSegment } from "@/lib/userHandle";
@@ -460,10 +459,15 @@ export default async function DashboardPage() {
               <Trash2 className="h-4 w-4 text-muted-foreground" />
               アカウント削除
             </p>
-            <DeleteAccountSection
-              username={user.username}
-              instanceDomain={user.instance.domain}
-            />
+            <Link
+              href="/dashboard/delete"
+              className="flex items-center justify-between gap-4 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm">アカウントを削除する</p>
+              </div>
+              <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+            </Link>
           </div>
         </section>
 
