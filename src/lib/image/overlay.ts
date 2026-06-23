@@ -129,16 +129,21 @@ function drawHorizontalText(
   const useProportional = PROPORTIONAL_FONTS.has(fontFamily);
   const useHalfWidth = MONOSPACE_FONTS.has(fontFamily);
 
+  // Xスタート: 先頭文字の左端を margin に揃える
+  // → Y方向の上端余白（margin）と同じにし、かつフォントサイズに依存しない
+  const startX = margin;
+
   // 行分割（プロポーショナル/等幅対応）
   const lines = splitTextIntoLines(ctx, text, maxWidth, useProportional, fontSize, useHalfWidth);
 
-  // Y開始位置
+  // Y開始位置（先頭行の中心。baseline=middle）
   let startY: number;
   if (position === "top") {
+    // 先頭行の上端を margin に揃える
     startY = margin + fontSize / 2;
   } else {
-    const totalHeight = lines.length * lineHeight;
-    startY = height - margin - totalHeight + fontSize / 2;
+    // 最終行の下端を height - margin に揃える（上の余白 margin と対称）
+    startY = height - margin - fontSize / 2 - (lines.length - 1) * lineHeight;
   }
 
   // 描画
@@ -147,35 +152,33 @@ function drawHorizontalText(
     const lineChars = Array.from(line);
 
     if (useProportional) {
-      // プロポーショナル: 累積幅で配置
-      let currentX = margin;
+      // プロポーショナル: 累積幅で配置（xは文字の左端）
+      let currentX = startX;
       lineChars.forEach((char) => {
         const charWidth = ctx.measureText(char).width;
-        const x = currentX + charWidth / 2;
         if (arrangement === "neon") {
-          drawNeonText(ctx, char, x, y, fontSize, textColor);
+          drawNeonText(ctx, char, currentX, y, fontSize, textColor);
         } else {
-          drawTextWithStroke(ctx, char, x, y, textColor, strokeColor, strokeWidth);
+          drawTextWithStroke(ctx, char, currentX, y, textColor, strokeColor, strokeWidth);
         }
         currentX += charWidth;
       });
     } else if (useHalfWidth) {
-      // 等幅（半角対応）: 半角は0.5幅、全角は1.0幅
-      let currentX = margin;
+      // 等幅（半角対応）: 半角は0.5幅、全角は1.0幅（xは文字の左端）
+      let currentX = startX;
       lineChars.forEach((char) => {
         const charWidth = getMonospaceCharWidth(char, fontSize);
-        const x = currentX + charWidth / 2;
         if (arrangement === "neon") {
-          drawNeonText(ctx, char, x, y, fontSize, textColor);
+          drawNeonText(ctx, char, currentX, y, fontSize, textColor);
         } else {
-          drawTextWithStroke(ctx, char, x, y, textColor, strokeColor, strokeWidth);
+          drawTextWithStroke(ctx, char, currentX, y, textColor, strokeColor, strokeWidth);
         }
         currentX += charWidth;
       });
     } else {
       // 等幅（半角非対応）: 固定幅で配置
       lineChars.forEach((char, charIndex) => {
-        const x = margin + fontSize / 2 + charIndex * fontSize;
+        const x = startX + charIndex * fontSize;
         if (arrangement === "neon") {
           drawNeonText(ctx, char, x, y, fontSize, textColor);
         } else {
@@ -232,9 +235,11 @@ function drawVerticalText(
   // X開始位置（縦書きは右から左へ）
   let startX: number;
   if (position === "right") {
+    // 右端を width - margin に揃える（実フォント幅で引く）
     startX = width - margin - fontSize;
   } else {
-    startX = margin + fontSize / 2 + (columns.length - 1) * columnWidth;
+    // 最左列の左端を margin に揃える（Y方向の上端余白と同じ・フォントサイズに依存しない）
+    startX = margin + (columns.length - 1) * columnWidth;
   }
 
   // Y開始位置（上揃え）

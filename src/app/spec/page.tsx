@@ -50,8 +50,8 @@ export default async function SpecPage() {
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">フォントの種類</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li><span className="font-medium text-foreground">Noto Sans JP</span>：文字幅はプロポーショナルフォントで表示します。</li>
-                    <li><span className="font-medium text-foreground">ふい字・ラノベPOP</span>：文字幅は等幅で表示します。ただし、半角英数字は半分の幅で表示します。</li>
+                    <li>Noto Sans JP： 文字幅はプロポーショナルフォントで表示します。</li>
+                    <li>ふい字・ラノベPOP： 文字幅は等幅で表示します。ただし、半角英数字は半分の幅で表示します。</li>
                   </ul>
                 </div>
                 <div>
