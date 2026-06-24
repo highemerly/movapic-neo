@@ -246,8 +246,10 @@ export function ImageUpload({
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  {imageFile.name}（プレビュー不可）
+                <p className="text-center text-sm text-muted-foreground">
+                  {imageFile.name}
+                  <br />
+                  （コメントを入力後プレビューを押してください）
                 </p>
               )}
               {/* 右上の×ボタン */}

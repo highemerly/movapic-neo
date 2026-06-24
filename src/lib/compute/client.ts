@@ -16,7 +16,9 @@ import type {
   Arrangement,
 } from "@/types";
 
-const COMPUTE_TIMEOUT_MS = 25000;
+// タイムアウト階層の最内: compute(18s) < generate(22s) < client(25s)。
+// 内側を先に abort させ、generate が諦めた後も compute 処理が走り続ける無駄を防ぐ。
+const COMPUTE_TIMEOUT_MS = 18000;
 
 function computeBase(): string {
   const url = process.env.COMPUTE_SERVICE_URL;

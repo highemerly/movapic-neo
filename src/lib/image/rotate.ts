@@ -14,7 +14,17 @@ export async function rotateImage(
   const inputSizeKB = Math.round(imageBuffer.length / 1024);
 
   try {
-    const rotatedBuffer = await sharp(imageBuffer).rotate().toBuffer();
+    // unlimited: HEIC/HEIF の libheif security limits(max_items=16等)を解除する
+    // （環境変数では libvips に上書きされ効かない。詳細は CLAUDE.md「HEIC対応」）。
+    const pipeline = sharp(imageBuffer, { unlimited: true }).rotate();
+    const meta = await pipeline.metadata();
+    // HEIC/HEIF(meta.format==="heif"・AVIF含む)はそのまま toBuffer すると HEIF で再エンコードされ
+    // 重く(実測 約6倍)、後続でも HEIF 再デコードが必要になる。JPEG 化して後段へ渡す（最終出力は
+    // AVIF/JPEG なので中間 JPEG95 の劣化は実用上無視できる）。非HEICは元フォーマット維持。
+    const rotatedBuffer =
+      meta.format === "heif"
+        ? await pipeline.jpeg({ quality: 95 }).toBuffer()
+        : await pipeline.toBuffer();
     return { buffer: rotatedBuffer, usedFallback: false };
   } catch (sharpError) {
     // sharpが失敗した場合、JPEGならjpeg-jsでクリーンアップを試みる

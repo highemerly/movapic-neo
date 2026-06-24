@@ -64,6 +64,7 @@ export async function processImage({
   }
 
   const rotateTime = Date.now() - rotateStart;
+  // rotate が HEIC/HEIF を JPEG 化して返すため、ここに来る rotatedBuffer は非HEIF（unlimited不要）。
   let processedImage = sharp(rotatedBuffer);
   const originalMetadata = await processedImage.metadata();
 

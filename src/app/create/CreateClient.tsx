@@ -378,7 +378,9 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
     formData.append("arrangement", formState.arrangement);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 23000);
+    // タイムアウトは外側ほど長く: compute(18s) < generate(22s) < client(25s)。
+    // サーバー(generate 22s)が処理タイムアウトを返す前にクライアントが切らないよう余裕を持たせる。
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
 
     try {
       const response = await fetch("/api/v1/generate", {

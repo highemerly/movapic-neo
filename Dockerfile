@@ -2,16 +2,20 @@ FROM node:22-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-# libheif with HEVC decoder (libde265) for HEIC support in sharp
-# libheif-hevc is REQUIRED for HEVC-compressed HEIC files (most iPhone photos)
-# python3, make, g++ are needed for node-gyp to build sharp (only in build stage)
-RUN apk add --no-cache libc6-compat vips-dev libheif-dev libde265-dev python3 make g++
+# システム libvips（>=8.17.3, vips-dev）+ HEVC デコーダ（libheif-dev/libde265-dev）。
+# prebuilt の @img/sharp-* は HEVC を内蔵せず HEIC を読めないため、これらに対して
+# sharp をソースビルドする（.npmrc の omit=optional で prebuilt を排除）。
+# pkgconf: ビルド時に vips-cpp を pkg-config で検出するため。
+# python3/make/g++: node-gyp による sharp のネイティブビルドに必要（ビルドステージのみ）。
+RUN apk add --no-cache libc6-compat vips-dev libheif-dev libde265-dev pkgconf python3 make g++
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-# Rebuild sharp from source with system libvips (HEIC support)
+# postinstall(scripts/use-system-libvips.mjs)が prebuilt の @img/sharp を除去し、
+# system libvips(libheif/libde265)へ sharp をソースビルドする（HEIC対応）。先に配置。
+COPY scripts/use-system-libvips.mjs ./scripts/use-system-libvips.mjs
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci && npm rebuild sharp
+    npm ci --foreground-scripts
 
 # Prisma client generation (separate stage for caching)
 FROM deps AS prisma

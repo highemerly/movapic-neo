@@ -27,8 +27,9 @@ import {
 } from "@/lib/errors";
 import { generateRequestId } from "@/lib/http";
 
-// 画像処理のタイムアウト（ミリ秒）
-const PROCESS_TIMEOUT_MS = 21000;
+// 画像処理のタイムアウト（ミリ秒）。
+// タイムアウトは外側ほど長く: compute(18s) < generate(22s) < client(25s)。
+const PROCESS_TIMEOUT_MS = 22000;
 
 /**
  * タイムアウト付きでPromiseを実行する
