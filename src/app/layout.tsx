@@ -57,6 +57,14 @@ export const metadata: Metadata = {
   },
 };
 
+// 真のPWA起動（standalone）かどうかを初回ペイント前に判定し <html> に data-standalone を立てる。
+// CSSの `@media (display-mode: standalone)` だけだと iOS のアプリ内ブラウザ（WebView）が
+// 全画面ゆえ standalone を誤マッチして下部ナビ等が出てしまう。iOS では WebView で立たない
+// `navigator.standalone === true`（ホーム画面PWAのみ true）で判定し、誤検知を防ぐ。
+// 非iOSは display-mode で判定（Androidのアプリ内WebViewは browser を返すため誤検知しにくい）。
+// React実行前のブロッキングscriptでDOMを変えるためハイドレーション不整合・フラッシュは出ない。
+const STANDALONE_DETECT_SCRIPT = `(function(){try{var n=navigator,ua=n.userAgent||"",isIos=/iphone|ipad|ipod/i.test(ua)||(n.platform==="MacIntel"&&n.maxTouchPoints>1),s=isIos?n.standalone===true:(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches);if(s)document.documentElement.setAttribute("data-standalone","");}catch(e){}})();`;
+
 export const viewport: Viewport = {
   themeColor: "#ffffff",
   // iOSのノッチ等でも safe-area を使えるように画面いっぱいに広げる
@@ -76,6 +84,11 @@ export default async function RootLayout({
 
   return (
     <html lang="ja" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{ __html: STANDALONE_DETECT_SCRIPT }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

@@ -16,9 +16,10 @@ type BottomNavProps = {
 /**
  * PWA（standalone起動）時のみ画面下部に表示するネイティブ風ナビゲーションバー。
  *
- * 表示制御はCSSのみ（globals.css の `standalone` カスタムバリアント）で行うため、
+ * 表示制御はCSS（globals.css の `standalone` カスタムバリアント）で行うため、
  * 通常のブラウザタブでは `hidden`、ホーム画面起動時だけ `flex` で出る。
- * JSでの display-mode 判定はしない（ハイドレーション不整合を避ける）。
+ * standalone判定は layout.tsx のブロッキングscriptが <html> に立てる data-standalone 属性ベース。
+ * `@media (display-mode: standalone)` 単独だと iOS アプリ内ブラウザ(WebView)が誤マッチするため。
  *
  * 並び（左→右）: みんな / 同じサーバー / 投稿(中央・強調) / マイページ / メニュー。
  * ログイン必須の「同じサーバー」「マイページ」は未ログイン時は出さない。

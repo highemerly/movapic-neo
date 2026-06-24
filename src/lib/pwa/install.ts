@@ -88,11 +88,16 @@ export function detectPwaPlatform(): PwaPlatform {
   return "other";
 }
 
-/** すでにホーム画面アプリ（standalone）として起動しているか。 */
+/** すでにホーム画面アプリ（standalone）として起動しているか。
+ * iOSは WebView でも `display-mode: standalone` が誤マッチするため、ホーム画面PWAでのみ
+ * true になる `navigator.standalone` だけを見る（layout.tsx の判定と同方針）。 */
 export function isStandaloneDisplay(): boolean {
   if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    (navigator as Navigator & { standalone?: boolean }).standalone === true
-  );
+  const nav = navigator as Navigator & { standalone?: boolean };
+  const isIos =
+    /iphone|ipad|ipod/i.test(nav.userAgent) ||
+    (nav.platform === "MacIntel" && nav.maxTouchPoints > 1);
+  return isIos
+    ? nav.standalone === true
+    : window.matchMedia("(display-mode: standalone)").matches;
 }

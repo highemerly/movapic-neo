@@ -5,15 +5,14 @@
 @custom-variant dark (&:is(.dark *));
 
 /* PWA（ホーム画面起動 = standalone）時だけ適用するバリアント。
-   下部メニューバーの表示や FAB の非表示をJSなしのCSSだけで切り替える。 */
-@custom-variant standalone (@media (display-mode: standalone));
+   判定は layout.tsx のブロッキングscriptが <html> に立てる data-standalone 属性で行う
+   （`@media (display-mode: standalone)` 単独だと iOS アプリ内ブラウザ=WebView が誤マッチするため）。 */
+@custom-variant standalone (&:is([data-standalone] *));
 
 /* standalone時は下部メニューバーぶんの余白を本文末尾に確保（コンテンツが隠れないように）。
    iOSのホームインジケータ分も safe-area で足す。 */
-@media (display-mode: standalone) {
-  body {
-    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
-  }
+[data-standalone] body {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom));
 }
 
 @theme inline {
