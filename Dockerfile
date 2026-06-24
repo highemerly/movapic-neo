@@ -52,9 +52,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Runtime libraries for sharp with HEIC support
 # vips: libvips.so 本体 / vips-cpp: libvips-cpp.so.42（ソースビルドした sharp が dlopen する C++ バインディング）
 # vips-heif provides HEIC support through libheif
-# libde265 is the HEVC decoder needed for iPhone HEIC files
+# libde265 is the HEVC decoder needed for iPhone HEIC files（HEIC入力デコード用）
+# libheif-aom is the AV1 ENCODER plugin for libheif — REQUIRED for AVIF output
+#   （無いと heifsave: Unsupported compression で AVIF 出力が全て失敗→500。
+#    prebuilt sharp は libaom 内蔵だったが、system libheif はデコーダのみで encoder は別パッケージ）
 # jemalloc: libvips/sharpのネイティブメモリをOSへ確実に返却させる (rss肥大化対策)
-RUN apk add --no-cache vips vips-cpp vips-heif libheif libde265 jemalloc
+RUN apk add --no-cache vips vips-cpp vips-heif libheif libde265 libheif-aom jemalloc
 
 ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
 
