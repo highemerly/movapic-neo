@@ -35,7 +35,10 @@ export async function reverseGeocode(
 ): Promise<GeocodedLocation | null> {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
-  const url = `${ENDPOINT}?lat=${lat}&lon=${lng}`;
+  // プライバシー保護のため、第三者（GSI）へは座標を小数第3位（約100m精度）に丸めて送る。
+  // 市区町村の判定にはこの精度で十分で、正確な撮影地点は復元できないようにする。
+  const round3 = (n: number) => Math.round(n * 1000) / 1000;
+  const url = `${ENDPOINT}?lat=${round3(lat)}&lon=${round3(lng)}`;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
