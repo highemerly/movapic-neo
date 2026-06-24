@@ -181,7 +181,7 @@ HEIC/HEIF は sharp が **system libvips（libheif/libde265）** でデコード
 
 - **prebuilt の `@img/sharp-*` は HEVC 非対応で HEIC を読めない**（パテント問題）。よって prebuilt を使わず **system libvips に対し sharp をソースビルド**する。仕組みは postinstall（[scripts/use-system-libvips.mjs](scripts/use-system-libvips.mjs)）: `npm install`/`npm ci` 後に `SHARP_FORCE_GLOBAL_LIBVIPS=1 npm rebuild sharp --build-from-source` →成功したら prebuilt の `@img/sharp-*` だけ削除（`@img/colour` は残す）。失敗時は prebuilt のまま続行（HEIC不可だが他は動く）。`node-addon-api`/`node-gyp` は devDeps 必須。
   - ⚠️ `.npmrc` の `omit=optional` で消す方法は**禁止**（lightningcss 等の native optional も巻き込み dev/build が壊れる）。sharp の `@img` だけ postinstall で除去する。
-- **本番(Docker)**: deps stage で `apk add vips-dev libheif-dev libde265-dev pkgconf python3 make g++` ＋ `npm ci`（postinstall がビルド・`scripts/` を先に COPY）。runner に `vips vips-heif libheif libde265`。
+- **本番(Docker)**: deps stage で `apk add vips-dev libheif-dev libde265-dev pkgconf python3 make g++` ＋ `npm ci`（postinstall がビルド・`scripts/` を先に COPY）。runner に `vips vips-cpp vips-heif libheif libde265`（⚠️ `vips-cpp` はソースビルドした sharp が dlopen する `libvips-cpp.so.42` を提供。欠けると runner で `ERR_DLOPEN_FAILED: libvips-cpp.so.42` でcompute起動不能になる）。
 - **ローカル(mac)**: `brew install vips` してから `npm install`（postinstall が自動ビルド。vips が無いと HEIC だけ不可）。
 - **iref/max_items 制限**: iPhone HEIC は iref 参照が libheif の `max_items=16` を超え `Security limit exceeded` で失敗する。⚠️ 環境変数 `LIBHEIF_SECURITY_LIMITS=off` は libvips が上書きするため**効かない**。[rotate.ts](src/lib/image/rotate.ts) の入力デコード `sharp(imageBuffer, { unlimited: true })` で解除する。
 - **rotate は HEIC/HEIF を JPEG 化して後段へ渡す**（HEIF 再エンコード回避で約6倍速。実測）。よって HEIF をデコードするのは rotate のこの1箇所だけで、後続 [imageProcessor.ts](src/lib/imageProcessor.ts) は JPEG を扱う＝unlimited 不要。
