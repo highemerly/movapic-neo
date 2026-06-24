@@ -131,6 +131,7 @@ export default async function UserGalleryPage({
       {deleted === "mastodon" && (
         <SuccessToast message="Mastodonの投稿も削除しました" />
       )}
+      {deleted === "1" && <SuccessToast message="画像を削除しました" />}
       <SiteHeader
         user={
           currentUser

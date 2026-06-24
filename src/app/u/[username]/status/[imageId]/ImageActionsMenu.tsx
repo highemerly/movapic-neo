@@ -141,7 +141,9 @@ export function ImageActionsMenu({
 
       // 成功トーストは遷移先のユーザーページで表示する（投稿完了時と同じ方式）。
       router.push(
-        deletedMastodon ? `/u/${username}?deleted=mastodon` : `/u/${username}`
+        deletedMastodon
+          ? `/u/${username}?deleted=mastodon`
+          : `/u/${username}?deleted=1`
       );
       router.refresh();
     } catch (error) {
