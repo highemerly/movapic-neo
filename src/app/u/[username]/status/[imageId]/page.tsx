@@ -71,7 +71,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const description = `${authorName} さんの投稿`;
 
   return {
-    title,
+    // HTMLの <title>（テンプレート %s | SHAMEZO）には投稿者名を含める。
+    // OG/Twitterカードのタイトルは本文のみ（下記 title）のまま。
+    title: `${title} - ${authorName}`,
     description,
     // 投稿者がクロール拒否中なら公開画像でも検索エンジンに noindex（AI Bot は robots.txt 側）
     ...(image.user.blockCrawlers ? { robots: { index: false, follow: false } } : {}),
