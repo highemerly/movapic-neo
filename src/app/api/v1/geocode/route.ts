@@ -34,7 +34,11 @@ export async function POST(request: NextRequest) {
 
   const result = await reverseGeocode(lat, lng);
   if (!result) {
-    return NextResponse.json({ error: "撮影場所を特定できませんでした" }, { status: 404 });
+    // GSI は日本国内専用のため、海外・海上などは特定できず {} を返す（→ null）。
+    return NextResponse.json(
+      { error: "撮影場所を特定できませんでした（海外・海上などは未対応です）" },
+      { status: 404 }
+    );
   }
 
   return NextResponse.json(result);
