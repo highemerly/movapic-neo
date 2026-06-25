@@ -34,7 +34,7 @@ export default async function NotificationsPage() {
             className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
-            メニュー
+            ダッシュボード
           </Link>
         </div>
 

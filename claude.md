@@ -61,7 +61,7 @@ Readme参照
 App Router の `<Link>` はビューポート進入で RSC ペイロードを自動プリフェッチし、グリッドで大量リクエストを生む。**原則すべてオプトアウト**する方針。
 - `next/link` を直接 import せず必ず `import Link from "@/components/Link"`（[src/components/Link.tsx](src/components/Link.tsx)、`prefetch={false}` 既定のラッパー）を使う。ホバー/フォーカス時は先読みされるのでクリック体感は維持。
 - 主要動線だけ `<Link prefetch>` でオプトイン。**同一URLは1箇所だけ** prefetch（複数だと同時発火でキャッシュミスし重複リクエスト）。
-- 現在のオプトイン箇所はSiteHeaderメニュー・`/u/[username]` タブ・`/dashboard` の「あなたの情報」（同URLは1箇所に集約済み）。
+- 現在のオプトイン箇所は `/u/[username]` タブ・`/dashboard` の「あなたの情報」（同URLは1箇所に集約済み）。ヘッダー／下部ナビのメニューは共有スライドメニュー（[AppMenu.tsx](src/components/layout/AppMenu.tsx)）に統合済みで、メニュー内リンクは既定 prefetch 無効（ホバー/フォーカス先読みのみ）。
 
 ## API
 

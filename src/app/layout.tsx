@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { ConfirmProvider } from "@/components/providers/ConfirmProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { BottomNav } from "@/components/layout/BottomNav";
+import { MenuProvider } from "@/components/layout/AppMenu";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { getSessionClaims } from "@/lib/auth/session";
@@ -98,18 +99,34 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ConfirmProvider>{children}</ConfirmProvider>
+          {/* ヘッダーのハンバーガーと下部ナビ「メニュー」の両方から開く共有スライドメニュー。
+              開閉状態は Context で共有し、Sheet 本体は MenuProvider 内に1つだけ描画する。
+              MenuProvider 自体は suspend しない（children は通常通り描画）。search params に
+              依存する Sheet 本体／BottomNav はそれぞれ内部で Suspense 境界を持つ。
+              ログアウトの確認モーダル（useConfirm）が Sheet からも使えるよう、ConfirmProvider で
+              MenuProvider ごと包む。 */}
+          <ConfirmProvider>
+            <MenuProvider
+              isLoggedIn={claims != null}
+              selfSegment={selfSegment}
+              username={claims?.username ?? null}
+              instanceDomain={claims?.instanceDomain ?? null}
+              avatarUrl={getAvatarUrl(claims?.avatarUrl)}
+            >
+              {children}
+              {/* PWA（standalone起動）時のみCSSで表示される下部ナビ */}
+              <Suspense fallback={null}>
+                <BottomNav
+                  selfSegment={selfSegment}
+                  instanceDomain={claims?.instanceDomain ?? null}
+                  avatarUrl={getAvatarUrl(claims?.avatarUrl)}
+                />
+              </Suspense>
+            </MenuProvider>
+          </ConfirmProvider>
           <Toaster />
           {/* iOS PWA（standalone）専用の引っ張って更新。Androidはネイティブ任せ */}
           <PullToRefresh />
-          {/* PWA（standalone起動）時のみCSSで表示される下部ナビ */}
-          <Suspense fallback={null}>
-            <BottomNav
-              selfSegment={selfSegment}
-              instanceDomain={claims?.instanceDomain ?? null}
-              avatarUrl={getAvatarUrl(claims?.avatarUrl)}
-            />
-          </Suspense>
           <ServiceWorkerRegister />
         </ThemeProvider>
       </body>

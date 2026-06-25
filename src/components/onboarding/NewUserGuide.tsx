@@ -31,7 +31,7 @@ export function NewUserGuide({ isLoggedIn, allowedServers }: NewUserGuideProps) 
         </Link>
         <Link href="/dashboard" className="block flex-1">
           <Button variant="outline" className="w-full">
-            メニューへ
+            ダッシュボードへ
           </Button>
         </Link>
       </section>

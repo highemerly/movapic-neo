@@ -2,7 +2,8 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import Link from "@/components/Link";
-import { Globe, Server, ImagePlus, User, LayoutDashboard } from "lucide-react";
+import { Globe, Server, ImagePlus, User, Menu } from "lucide-react";
+import { useMenu } from "./AppMenu";
 
 type BottomNavProps = {
   /** ログインユーザーの /u/ パスセグメント（未ログインは null）。「マイページ」用 */
@@ -29,6 +30,7 @@ type BottomNavProps = {
  *
  * 並び（左→右）: みんな / 同じサーバー / 投稿(中央・強調) / マイページ / メニュー。
  * ログイン必須の「同じサーバー」「マイページ」は未ログイン時は出さない。
+ * 「メニュー」はページ遷移ではなく、ヘッダーと共有のスライドメニュー（AppMenu）を開く。
  */
 export function BottomNav({
   selfSegment,
@@ -38,12 +40,12 @@ export function BottomNav({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const hasInstancesParam = searchParams.has("instances");
+  const { isOpen, open } = useMenu();
 
   const isPublicAll = pathname === "/public" && !hasInstancesParam;
   const isPublicInstance = pathname === "/public" && hasInstancesParam;
   const isCreate = pathname === "/create";
   const isMyPage = selfSegment != null && pathname.startsWith(`/u/${selfSegment}`);
-  const isDashboard = pathname === "/dashboard";
 
   return (
     <nav
@@ -101,12 +103,18 @@ export function BottomNav({
         />
       )}
 
-      <NavItem
-        href="/dashboard"
-        label="メニュー"
-        active={isDashboard}
-        icon={<LayoutDashboard className="h-5 w-5" />}
-      />
+      <button
+        type="button"
+        onClick={open}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
+        className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] transition-colors ${
+          isOpen ? "text-primary" : "text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        <Menu className="h-5 w-5" />
+        <span className="leading-none">メニュー</span>
+      </button>
     </nav>
   );
 }

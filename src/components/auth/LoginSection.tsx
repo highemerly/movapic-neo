@@ -12,7 +12,7 @@ interface LoginSectionProps {
 function getLoginRequiredMessage(returnTo: string): string {
   if (returnTo === "/create") return "写真を投稿するにはログインが必要です";
   if (returnTo === "/favorite") return "お気に入りを見るにはログインが必要です";
-  if (returnTo === "/dashboard") return "メニューを見るにはログインが必要です";
+  if (returnTo === "/dashboard") return "ダッシュボードを見るにはログインが必要です";
   if (returnTo === "/settings") return "設定を変更するにはログインが必要です";
   return "このページを使うにはログインが必要です";
 }
