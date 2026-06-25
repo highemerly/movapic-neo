@@ -2,8 +2,9 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import Link from "@/components/Link";
-import { Globe, Server, ImagePlus, User, Menu } from "lucide-react";
+import { ImagePlus, User, Menu } from "lucide-react";
 import { useMenu } from "./AppMenu";
+import { getPrimaryNavItems } from "./primaryNav";
 
 type BottomNavProps = {
   /** ログインユーザーの /u/ パスセグメント（未ログインは null）。「マイページ」用 */
@@ -42,10 +43,26 @@ export function BottomNav({
   const hasInstancesParam = searchParams.has("instances");
   const { isOpen, open } = useMenu();
 
-  const isPublicAll = pathname === "/public" && !hasInstancesParam;
-  const isPublicInstance = pathname === "/public" && hasInstancesParam;
   const isCreate = pathname === "/create";
-  const isMyPage = selfSegment != null && pathname.startsWith(`/u/${selfSegment}`);
+
+  // href・現在地判定はヘッダーのインラインナビと共有（primaryNav）。
+  // 下部ナビはここから「みんな／サーバー／マイページ」だけを使い、
+  // 中央の投稿ボタンとメニューボタンは独自に描画する。
+  const items = getPrimaryNavItems({
+    isLoggedIn: selfSegment != null,
+    selfSegment,
+    instanceDomain,
+  });
+  const publicItem = items.find((i) => i.key === "public");
+  const instanceItem = items.find((i) => i.key === "instance");
+  const myPageItem = items.find((i) => i.key === "mypage");
+
+  // 「あなた」タブはユーザーページ配下（カレンダー/実績/地図等）を含むセクション全体を表すため、
+  // primaryNav の完全一致（マイページ単独ページ用）ではなく startsWith で広く判定する。
+  const isMyPageSection =
+    selfSegment != null &&
+    (pathname === `/u/${selfSegment}` ||
+      pathname.startsWith(`/u/${selfSegment}/`));
 
   return (
     <nav
@@ -54,19 +71,21 @@ export function BottomNav({
         isCreate ? "create-has-image:hidden" : ""
       }`}
     >
-      <NavItem
-        href="/public"
-        label="みんな"
-        active={isPublicAll}
-        icon={<Globe className="h-5 w-5" />}
-      />
-
-      {selfSegment && instanceDomain && (
+      {publicItem && (
         <NavItem
-          href={`/public?instances=${encodeURIComponent(instanceDomain)}`}
+          href={publicItem.href}
+          label="みんな"
+          active={publicItem.isActive(pathname, hasInstancesParam)}
+          icon={<publicItem.Icon className="h-5 w-5" />}
+        />
+      )}
+
+      {instanceItem && (
+        <NavItem
+          href={instanceItem.href}
           label="サーバー"
-          active={isPublicInstance}
-          icon={<Server className="h-5 w-5" />}
+          active={instanceItem.isActive(pathname, hasInstancesParam)}
+          icon={<instanceItem.Icon className="h-5 w-5" />}
         />
       )}
 
@@ -82,11 +101,11 @@ export function BottomNav({
         <span className="sr-only">投稿</span>
       </Link>
 
-      {selfSegment && (
+      {myPageItem && (
         <NavItem
-          href={`/u/${selfSegment}`}
+          href={myPageItem.href}
           label="あなた"
-          active={isMyPage}
+          active={isMyPageSection}
           icon={
             avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element

@@ -34,7 +34,7 @@ export function NotificationBell() {
           size="icon"
           className="relative text-muted-foreground hover:text-foreground"
         >
-          <Bell className="h-[18px] w-[18px]" />
+          <Bell className="size-5" />
           {hasUnseen && (
             <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-red-500" />
           )}
