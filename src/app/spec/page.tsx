@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "@/components/Link";
+import { History, ChevronRight } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
@@ -23,6 +25,16 @@ export default async function SpecPage() {
             <h2 className="text-lg font-semibold">技術仕様</h2>
             <span className="text-xs text-muted-foreground">v{version}</span>
           </div>
+          <Link
+            href="/spec/release-note"
+            className="flex items-center justify-between gap-4 bg-muted rounded-lg p-4 mb-4 hover:bg-muted/70 transition-colors"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <History className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+              <span className="text-sm font-medium">リリースノート（更新履歴）</span>
+            </div>
+            <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+          </Link>
           <div className="space-y-4">
 
             <div className="bg-muted rounded-lg p-4">
