@@ -14,12 +14,18 @@ type BottomNavProps = {
 };
 
 /**
- * PWA（standalone起動）時のみ画面下部に表示するネイティブ風ナビゲーションバー。
+ * 画面下部に表示するネイティブ風ナビゲーションバー。
  *
- * 表示制御はCSS（globals.css の `standalone` カスタムバリアント）で行うため、
- * 通常のブラウザタブでは `hidden`、ホーム画面起動時だけ `flex` で出る。
- * standalone判定は layout.tsx のブロッキングscriptが <html> に立てる data-standalone 属性ベース。
- * `@media (display-mode: standalone)` 単独だと iOS アプリ内ブラウザ(WebView)が誤マッチするため。
+ * 表示制御はCSS（Tailwind）で行う:
+ * - モバイル幅（<768px）では常に表示（`flex`）。
+ * - PC（md以上）では原則非表示（`md:hidden`）だが、standalone（PWA）起動時だけ表示
+ *   （`standalone:md:flex`）。standalone判定は layout.tsx のブロッキングscriptが
+ *   <html> に立てる data-standalone 属性ベース（`@media (display-mode: standalone)` 単独だと
+ *   iOS アプリ内ブラウザ(WebView)が誤マッチするため）。
+ *
+ * ただし投稿ページ（/create）で画像アップロード後は「プレビュー/投稿」アクションを優先するため隠す
+ * （画像未選択＝アクションが無いうちは表示する）。CreateClient が <html> に立てる
+ * data-create-has-image 属性を `create-has-image` バリアントで拾って隠す。
  *
  * 並び（左→右）: みんな / 同じサーバー / 投稿(中央・強調) / マイページ / メニュー。
  * ログイン必須の「同じサーバー」「マイページ」は未ログイン時は出さない。
@@ -42,7 +48,9 @@ export function BottomNav({
   return (
     <nav
       aria-label="メインナビゲーション"
-      className="standalone:flex fixed inset-x-0 bottom-0 z-40 hidden items-stretch justify-around border-t bg-background pb-[env(safe-area-inset-bottom)]"
+      className={`flex md:hidden standalone:md:flex fixed inset-x-0 bottom-0 z-40 items-stretch justify-around border-t bg-background pb-[env(safe-area-inset-bottom)] ${
+        isCreate ? "create-has-image:hidden" : ""
+      }`}
     >
       <NavItem
         href="/public"
@@ -66,12 +74,8 @@ export function BottomNav({
         aria-label="写真を投稿"
         className="flex flex-1 flex-col items-center justify-center"
       >
-        <span
-          className={`-mt-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition-transform active:scale-95 ${
-            isCreate ? "ring-primary/30" : ""
-          }`}
-        >
-          <ImagePlus className="h-7 w-7" />
+        <span className="-mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition-transform active:scale-95">
+          <ImagePlus className="h-6 w-6" />
         </span>
         <span className="sr-only">投稿</span>
       </Link>
@@ -122,7 +126,7 @@ function NavItem({
     <Link
       href={href}
       aria-current={active ? "page" : undefined}
-      className={`flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[10px] transition-colors ${
+      className={`flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] transition-colors ${
         active ? "text-primary" : "text-muted-foreground hover:text-foreground"
       }`}
     >

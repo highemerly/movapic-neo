@@ -2,7 +2,7 @@ import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getAvatarUrl } from "@/lib/avatar";
 import { PublicTimelineClient } from "./PublicTimelineClient";
-import { InstanceFilterBar } from "./InstanceFilterBar";
+import { TimelineTabs } from "@/components/timeline/TimelineTabs";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { FloatingPostButton } from "@/components/FloatingPostButton";
@@ -63,14 +63,16 @@ export default async function PublicTimelinePage({
   return (
     <>
       <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain, avatarUrl: getAvatarUrl(currentUser.avatarUrl) } : null} />
-      <div className="container mx-auto px-4 pt-4 pb-8 max-w-6xl">
-        <div className="flex items-center gap-3 mb-4">
-          <h1 className="text-2xl font-bold shrink-0">みんなの写真</h1>
-          <InstanceFilterBar
-            ownInstance={currentUser?.instance.domain ?? null}
-            selected={instanceDomains[0] ?? null}
-          />
-        </div>
+      <div className="container mx-auto px-4 pt-2 pb-8 max-w-6xl">
+        <h1 className="text-2xl font-bold">みんなの写真</h1>
+        <TimelineTabs
+          ownInstance={currentUser?.instance.domain ?? null}
+          active={
+            instanceDomains[0] && instanceDomains[0] === currentUser?.instance.domain
+              ? "own"
+              : "all"
+          }
+        />
 
         <PublicTimelineClient
           // サーバー絞り込みが変わったら再マウントして state（images/cursor）を作り直す。

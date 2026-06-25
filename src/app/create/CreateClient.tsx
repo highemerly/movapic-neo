@@ -252,6 +252,21 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
     };
   }, [resultUrl]);
 
+  // 画像アップロード後はプレビュー/投稿アクションが出るので、下部ナビ（BottomNav）を隠すための
+  // 目印を <html> に立てる（画像未選択のうちはナビを表示しておく）。CSS の create-has-image
+  // バリアントが拾う。離脱時・画像未選択時は属性を外す。
+  useEffect(() => {
+    const el = document.documentElement;
+    if (formState.imageFile) {
+      el.setAttribute("data-create-has-image", "");
+    } else {
+      el.removeAttribute("data-create-has-image");
+    }
+    return () => {
+      el.removeAttribute("data-create-has-image");
+    };
+  }, [formState.imageFile]);
+
   const handleImageSelect = useCallback(
     async (file: File, preview: string) => {
       setFormState((prev) => ({

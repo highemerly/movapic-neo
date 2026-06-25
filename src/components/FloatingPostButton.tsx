@@ -18,8 +18,9 @@ export function FloatingPostButton({
 }) {
   return (
     // 全幅の透明レイヤー。コンテンツのクリックを邪魔しないよう pointer-events-none。
-    // PWA（standalone起動）時は下部メニューバーの投稿ボタンに役割を譲り、FABは隠す。
-    <div className="pointer-events-none fixed inset-x-0 bottom-2 z-40 standalone:hidden">
+    // モバイル幅（<768px）では下部メニューバーの投稿ボタンに役割を譲るため FAB は隠す。
+    // PC（md以上）では表示するが、standalone（PWA）起動時だけは下部バーがあるので隠す。
+    <div className="pointer-events-none fixed inset-x-0 bottom-2 z-40 hidden md:block standalone:md:hidden">
       {/* ページ本文と同じ中央寄せコンテナ。スマホは px-6(=従来 right-6 相当)、
           PC は px-4 にしてコンテンツ box の右端に揃える。 */}
       <div
