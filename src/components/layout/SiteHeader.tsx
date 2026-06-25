@@ -25,8 +25,10 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
 
   return (
     <>
-      {/* ヘッダーは固定せず常に普通にスクロールする（PWA含む）。 */}
-      <header className="border-b bg-background">
+      {/* ヘッダーは原則スクロールするが、フッター（BottomNav）が消えるPC幅の非standalone時だけ
+          sticky にする（BottomNav は md+・非standalone で非表示＝下部ナビが無い条件と一致）。
+          standalone（PWA）は md+ でも BottomNav が出るので static に戻す。 */}
+      <header className="border-b bg-background md:sticky md:top-0 md:z-40 standalone:md:static">
         <div className="container mx-auto px-4 py-1 max-w-6xl">
           <div className="flex items-center justify-between">
             <Link href="/dashboard" className="flex items-center hover:opacity-80 transition-opacity">
