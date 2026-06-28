@@ -73,7 +73,7 @@ function forbidden(): NextResponse {
  * - web / worker-front: /api/internal/* を 404（内部APIは compute だけが提供）
  * - 未設定(dev all-in-one): 制限なし
  */
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const role = process.env.COMPONENT_ROLE;
   const path = request.nextUrl.pathname;
   const isInternal = path.startsWith("/api/internal");
