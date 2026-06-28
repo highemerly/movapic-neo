@@ -92,7 +92,7 @@ export interface MakeupMatch {
 }
 
 /**
- * ダブル投稿による穴埋めのマッチングを計算（純粋）。
+ * ダブル投稿による穴埋めのマッチングを計算（純粋・内部ヘルパー）。
  * 日 1..lastDay を時系列に走査し、未投稿日(=0枚, d<=holeLastDay)を pending hole に積み、
  * ダブル投稿日(>=2枚)で「最も古い pending hole（必ずその日より前）」を1つ消費して対応づける。
  * ＝各ダブルは自分より前の未投稿日を1つだけ埋める（将来日は埋められない）。
@@ -101,8 +101,13 @@ export interface MakeupMatch {
  * - 月全体の判定: holeLastDay = lastDay = daysInMonth。
  * - 当月の表示: lastDay = 今日, holeLastDay = 今日-1（今日はまだ穴ではないが、今日のダブルで
  *   過去の穴を埋められるので lastDay には含める）。
+ *
+ * NOTE: これは grace 上限を知らない低レベル関数。穴埋め枠の上限は呼び出し側ではなく
+ * この perfectMonth.ts 内（isPerfectMonth / makeupsForCalendar）でのみ適用する。
+ * カレンダー表示は computeMakeups を直接呼ばず makeupsForCalendar を使うこと
+ * （= grace ルールを1ファイルに閉じ込め、表示と判定の食い違いを防ぐ）。
  */
-export function computeMakeups(args: {
+function computeMakeups(args: {
   lastDay: number;
   holeLastDay: number;
   count: (day: number) => number;
@@ -120,6 +125,28 @@ export function computeMakeups(args: {
     }
   }
   return matches;
+}
+
+/**
+ * カレンダー表示用の穴埋め一覧（純粋）。当月・過去月の両方を1本で扱う。
+ * computeMakeups の最古優先マッチを grace 件までにキャップして返す（holeDay 昇順）。
+ * これにより「皆勤賞は不成立なのにカレンダーに穴埋めマークが grace 個より多く出る」
+ * 食い違いを防ぐ。穴埋め枠の上限ルールはこの関数と isPerfectMonth のみが持つ。
+ *
+ * - 過去月: todayDayNum = null（月末まで＝lastDay/holeLastDay とも daysInMonth）。
+ * - 当月: todayDayNum = JST の今日の日(1-31)。穴は「今日より前」、ダブルは今日まで含める。
+ */
+export function makeupsForCalendar(args: {
+  daysInMonth: number;
+  todayDayNum: number | null;
+  dayCounts: DayCounts;
+  grace: number;
+}): MakeupMatch[] {
+  const { daysInMonth, todayDayNum, grace } = args;
+  const count = toCountFn(args.dayCounts);
+  const lastDay = todayDayNum ?? daysInMonth;
+  const holeLastDay = todayDayNum != null ? todayDayNum - 1 : daysInMonth;
+  return computeMakeups({ lastDay, holeLastDay, count }).slice(0, grace);
 }
 
 /**

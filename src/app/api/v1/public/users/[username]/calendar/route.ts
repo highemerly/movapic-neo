@@ -11,10 +11,10 @@ import { parseUserHandle } from "@/lib/userHandle";
 import { toJstDateString } from "@/lib/streak";
 import { CACHE_PUBLIC_MEDIUM } from "@/lib/http";
 import {
-  computeMakeups,
   currentMonthMakeupStatus,
   daysInMonthOf,
   isPerfectMonth,
+  makeupsForCalendar,
   perfectMonthGrace,
   type MakeupMatch,
 } from "@/lib/achievements/perfectMonth";
@@ -224,24 +224,21 @@ export async function GET(
       // 日(1-31)→投稿数。穴埋めの日付順マッチング・達成判定の単一ソースに渡す。
       const dayCounts: Record<number, number> = {};
       for (const [dayStr, d] of Object.entries(days)) dayCounts[Number(dayStr)] = d.count;
-      const count = (d: number) => dayCounts[d] ?? 0;
 
       isPerfectAttendance = isPerfectMonth({ daysInMonth, dayCounts, grace });
 
-      // 穴埋め対応（古い穴 ← 後日のダブル）。当月は今日まで、過去月は月末まで。
-      let matches: MakeupMatch[];
+      // 穴埋め対応（古い穴 ← 後日のダブル・grace 件まで）。当月は今日まで、過去月は月末まで。
+      // 表示用マッチは makeupsForCalendar に一本化（grace 上限を perfectMonth.ts 内に閉じ込める）。
+      const todayDayNum = isCurrentMonth ? Number(toJstDateString(now).slice(8, 10)) : null;
+      const matches: MakeupMatch[] = makeupsForCalendar({ daysInMonth, todayDayNum, dayCounts, grace });
       let callout: "today" | "tomorrow" | null = null;
-      if (isCurrentMonth) {
-        const todayDayNum = Number(toJstDateString(now).slice(8, 10));
+      if (isCurrentMonth && todayDayNum != null) {
         const status = currentMonthMakeupStatus({ daysInMonth, todayDayNum, dayCounts, grace });
-        matches = status.matches;
         // コールアウトは「まだ皆勤に届く範囲で、未埋めの穴が残る」ときだけ。
         if (status.unfilled > 0 && status.stillAchievable) {
           if (!status.todayUsedMakeup) callout = "today";
           else if (todayDayNum < daysInMonth) callout = "tomorrow";
         }
-      } else {
-        matches = computeMakeups({ lastDay: daysInMonth, holeLastDay: daysInMonth, count });
       }
 
       // 各穴埋めに、埋めた日の「2枚目に投稿した写真」を添える（dayImages は新しい順なので末尾-1）。

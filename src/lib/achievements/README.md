@@ -90,10 +90,11 @@ npm run build             # 本番ビルド（新ルート・静的解析）
 
 **達成条件（穴埋め制度・日付順）**: 「毎日投稿」ではなく「未投稿を grace 日まで許容し、忘れた過去日を **同月の "後日" の2枚以上投稿（ダブル投稿）** で穴埋めする」。
 **grace は投稿者の所属インスタンスで決まる**（`perfectMonthGrace(domain)`：ホームインスタンス handon.club は4日・その他は3日。サービス発祥の handon.club を少しだけ優遇）。判定・進捗・カレンダー注意書きはすべて **その実績の持ち主（投稿者本人）の所属ドメイン** 基準で grace を解決する（閲覧者ではない）。
-穴埋めは日付の前後を見る: ダブル投稿日 D は **D より前の未投稿日のみ** 埋められる（将来日は埋められない＝月末日を忘れると後日が無く埋まらない）。1日のダブルは1日分だけ。`computeMakeups`（古い穴から後日のダブルへ貪欲に対応づける最大マッチング）の件数が `missing(= 月の日数 - distinctDays)` 以上で、かつ `missing <= grace` なら達成（`perfectMonth.ts` の `isPerfectMonth`）。`missing=0`（完全皆勤）は常に成立し、旧「毎日投稿」達成者と後方互換。投稿が増えても穴埋めマッチは単調増加・missing は単調減少で判定は真→偽に戻らないため、当月でも達成時点で付与・👑表示できる。
+穴埋めは日付の前後を見る: ダブル投稿日 D は **D より前の未投稿日のみ** 埋められる（将来日は埋められない＝月末日を忘れると後日が無く埋まらない）。1日のダブルは1日分だけ。`computeMakeups`（古い穴から後日のダブルへ貪欲に対応づける最大マッチング・**grace を知らない内部関数**）の件数が `missing(= 月の日数 - distinctDays)` 以上で、かつ `missing <= grace` なら達成（`perfectMonth.ts` の `isPerfectMonth`）。`missing=0`（完全皆勤）は常に成立し、旧「毎日投稿」達成者と後方互換。投稿が増えても穴埋めマッチは単調増加・missing は単調減少で判定は真→偽に戻らないため、当月でも達成時点で付与・👑表示できる。
+**grace 上限のルールは `perfectMonth.ts` の中だけが持つ**（`isPerfectMonth` の `missing <= grace` 判定と、表示用の `makeupsForCalendar`）。`computeMakeups` は非公開ヘルパーで、外部（カレンダーAPI等）から直接呼ばない——直呼びすると grace 上限を呼び出し側に再実装する羽目になり、過去に「皆勤賞は不成立なのにカレンダーへ穴埋めマークが grace 個より多く出る」食い違いを生んだ。
 
 - 判定・進捗・しきい値・通知ゲートはすべて `perfectMonth.ts` に集約。catalog/stats/backfill/カレンダーAPI/engine は **必ずここを呼ぶ**（式を各所に再実装しない）。grace は呼び出し側が `perfectMonthGrace(投稿者ドメイン)` で求めて渡す（live=`publishImage`→`evaluateAndGrant` が `input.user.instance.domain`、backfill=ユーザーの `instance.domain`、カレンダーAPI=`parseUserHandle` の domain）。
-- カレンダーAPI（`/api/v1/public/users/[username]/calendar`）は `isPerfectMonth` で `isPerfectAttendance` を、`computeMakeups`/`currentMonthMakeupStatus` で穴埋め対応とコールアウトを返す。未来月以外（過去月・当月）で計算。
+- カレンダーAPI（`/api/v1/public/users/[username]/calendar`）は `isPerfectMonth` で `isPerfectAttendance` を、`makeupsForCalendar`（穴埋め一覧・grace 件まで cap・当月/過去月共通）と `currentMonthMakeupStatus`（当月コールアウト判定）で穴埋め表示とコールアウトを返す。未来月以外（過去月・当月）で計算。
 - カレンダーUI: 2枚以上投稿した日（穴埋め元）は金リング＋枚数バッジ。**埋まった空き日**は「埋めた日の2枚目に投稿した写真」をサムネにして緑（透明度高め）で塗り、右上に「{何日}日」を出し、その画像ページへリンクする。当月で未埋めの穴が残り皆勤がまだ可能なら穴埋めを促すコールアウト（`callout`: `"today"`＝本日2枚で埋められる／`"tomorrow"`＝今日は穴埋め済みなので翌日）を出す。
 
 **穴埋め推奨通知（type=`makeup-reminder`）／カレンダー注意書き**: 通知は `shouldRemindMakeup(skippedSoFar, unfilled)`（未投稿1日以上・まだ埋まっていない穴がある・`skippedSoFar <= MAKEUP_REMINDER_MAX_SKIPPED`(=5)）で出す。`unfilled` は `currentMonthMakeupStatus` の日付順マッチングで厳密に数える。
