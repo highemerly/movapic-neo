@@ -4,7 +4,6 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getAvatarUrl } from "@/lib/avatar";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
-import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
 import { AchievementsView } from "@/components/achievements/AchievementsView";
@@ -122,7 +121,6 @@ export default async function AchievementsPage({
 
         <Footer />
       </div>
-      <FloatingPostButton maxWidthClass="max-w-6xl" />
     </>
   );
 }

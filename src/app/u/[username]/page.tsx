@@ -5,7 +5,6 @@ import { getAvatarUrl } from "@/lib/avatar";
 import { UserGalleryClient } from "./UserGalleryClient";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
-import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
 import { calculateStreak } from "@/lib/streak";
@@ -184,7 +183,6 @@ export default async function UserGalleryPage({
 
         <Footer />
       </div>
-      <FloatingPostButton maxWidthClass="max-w-6xl" />
     </>
   );
 }

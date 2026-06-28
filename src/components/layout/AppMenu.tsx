@@ -5,7 +5,9 @@ import {
   Suspense,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -31,6 +33,9 @@ import {
   LogOut,
   LogIn,
   User,
+  Menu,
+  X,
+  type LucideIcon,
 } from "lucide-react";
 import {
   Sheet,
@@ -40,14 +45,20 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { useUnseenNotifications } from "./useUnseenNotifications";
 
 /**
- * ヘッダーのハンバーガーと下部ナビ「メニュー」の両方から開く共有スライドメニュー。
+ * メニューの2つの姿:
+ * - スマホ幅（md未満）: ヘッダーのハンバーガー／下部ナビ「メニュー」から開く全高スライドシート
+ *   （AppMenuSheet）。開閉状態は MenuContext で共有。
+ * - PC幅（md+）: 画面右端に常駐する折りたたみレール（AppRail）。既定はアイコンのみの細い列
+ *   （layout.tsx が `md:pr-[60px]` で同じ幅を確保＝コンテンツに重ならない）。レール上端の
+ *   ハンバーガーを押すと左へ拡幅してラベル付きメニューになる（アイコンの位置は固定のまま）。
  *
- * ヘッダー（各ページ内に描画される SiteHeader）と下部ナビ（layout 内の BottomNav）の
- * どちらからでも同じメニューを開けるよう、開閉状態を Context で共有し、Sheet 本体は
- * layout に1つだけ描画する（MenuProvider が内包）。表示データ（ログイン有無・selfSegment 等）は
- * layout の getSessionClaims()／getAvatarUrl() から供給する（DBアクセスなし）。
+ * 表示データ（ログイン有無・selfSegment 等）は layout の getSessionClaims()／getAvatarUrl()
+ * から供給する（DBアクセスなし）。シートとレールはどちらも useMenuSections() で同じ項目定義を
+ * 共有するので、項目の追加はそこ1箇所で済む（アカウント／投稿ボタン／ログアウト／ログインのみ
+ * 各UIで個別装飾）。
  */
 
 type MenuNav = {
@@ -97,14 +108,206 @@ export function MenuProvider({
   return (
     <MenuContext.Provider value={value}>
       {children}
-      {/* AppMenuSheet は useSearchParams（active判定）を使うため Suspense 境界が必要。
-          Provider 本体は suspend させず children を通常描画する。 */}
+      {/* AppMenuSheet（スマホ）も AppRail（PC）も useSearchParams（active判定）を使うため
+          Suspense 境界が必要。Provider 本体は suspend させず children を通常描画する。 */}
       <Suspense fallback={null}>
         <AppMenuSheet isOpen={isOpen} setOpen={setOpen} nav={nav} />
+        <AppRail nav={nav} />
       </Suspense>
     </MenuContext.Provider>
   );
 }
+
+// ---------------------------------------------------------------------------
+// 項目定義（シート・レール共有）
+// ---------------------------------------------------------------------------
+
+type MenuItem = {
+  key: string;
+  href: string;
+  label: string;
+  Icon: LucideIcon;
+  active: boolean;
+  /** 外部リンク（新規タブで開く）。お問い合わせ等に使用 */
+  external?: boolean;
+  /**
+   * 主要項目。PCの折りたたみレールでは true のものだけ常時表示し、false は展開時のみ表示する
+   * （縦に長くなりすぎてスクロールバーが出るのを防ぐ）。スマホのシートは全項目を表示するため
+   * このフラグを無視する。
+   */
+  primary: boolean;
+};
+
+type MenuSectionData = {
+  key: string;
+  title: string;
+  items: MenuItem[];
+};
+
+/**
+ * リンク系のセクション（みんなの写真／あなたの情報／一般）を現在地（active）込みで返す。
+ * アカウント欄・「写真を投稿」・ログアウト・ログインは挙動が特殊なので各UI側で個別に描画する。
+ * usePathname / useSearchParams を使うので呼び出しは Suspense 境界内であること。
+ */
+function useMenuSections(nav: MenuNav): MenuSectionData[] {
+  const pathname = usePathname();
+  const hasInstancesParam = useSearchParams().has("instances");
+  const { isLoggedIn, selfSegment, instanceDomain } = nav;
+  const userBase = selfSegment ? `/u/${selfSegment}` : null;
+
+  const sections: MenuSectionData[] = [];
+
+  const everyone: MenuItem[] = [
+    {
+      key: "all",
+      href: "/public",
+      label: "すべて",
+      Icon: Globe,
+      active: pathname === "/public" && !hasInstancesParam,
+      primary: true,
+    },
+  ];
+  if (instanceDomain) {
+    everyone.push({
+      key: "instance",
+      href: `/public?instances=${encodeURIComponent(instanceDomain)}`,
+      label: instanceDomain,
+      Icon: Server,
+      active: pathname === "/public" && hasInstancesParam,
+      primary: true,
+    });
+  }
+  if (isLoggedIn) {
+    everyone.push({
+      key: "favorite",
+      href: "/favorite",
+      label: "お気に入り",
+      Icon: Heart,
+      active: pathname === "/favorite",
+      primary: true,
+    });
+  }
+  sections.push({ key: "everyone", title: "みんなの写真", items: everyone });
+
+  if (isLoggedIn && userBase) {
+    sections.push({
+      key: "you",
+      title: "あなたの情報",
+      items: [
+        {
+          key: "dashboard",
+          href: "/dashboard",
+          label: "ダッシュボード",
+          Icon: LayoutDashboard,
+          active: pathname === "/dashboard",
+          primary: false,
+        },
+        {
+          key: "notifications",
+          href: "/dashboard/notifications",
+          label: "通知",
+          Icon: Bell,
+          active: pathname === "/dashboard/notifications",
+          primary: true,
+        },
+        {
+          key: "photos",
+          href: userBase,
+          label: "写真",
+          Icon: Images,
+          active: pathname === userBase,
+          primary: true,
+        },
+        {
+          key: "calendar",
+          href: `${userBase}/calendar`,
+          label: "カレンダー",
+          Icon: Calendar,
+          active: pathname === `${userBase}/calendar`,
+          primary: true,
+        },
+        {
+          key: "map",
+          href: `${userBase}/map`,
+          label: "地図",
+          Icon: MapIcon,
+          active: pathname.startsWith(`${userBase}/map`),
+          primary: false,
+        },
+        {
+          key: "achievements",
+          href: `${userBase}/achievements`,
+          label: "実績",
+          Icon: Trophy,
+          active: pathname === `${userBase}/achievements`,
+          primary: true,
+        },
+      ],
+    });
+  }
+
+  sections.push({
+    key: "general",
+    title: "一般",
+    items: [
+      {
+        key: "announcements",
+        href: "/announcements",
+        label: "お知らせ",
+        Icon: Megaphone,
+        active: pathname.startsWith("/announcements"),
+        primary: false,
+      },
+      {
+        key: "terms",
+        href: "/terms",
+        label: "利用規約",
+        Icon: ScrollText,
+        active: pathname === "/terms",
+        primary: false,
+      },
+      {
+        key: "privacy",
+        href: "/privacy",
+        label: "プライバシーポリシー",
+        Icon: ShieldCheck,
+        active: pathname === "/privacy",
+        primary: false,
+      },
+      {
+        key: "spec",
+        href: "/spec",
+        label: "技術仕様",
+        Icon: Code,
+        active: pathname === "/spec",
+        primary: false,
+      },
+      {
+        key: "license",
+        href: "/license",
+        label: "フォントライセンス",
+        Icon: Type,
+        active: pathname === "/license",
+        primary: false,
+      },
+      {
+        key: "contact",
+        href: "https://highemerly.net/contact.html",
+        label: "お問い合わせ",
+        Icon: Mail,
+        active: false,
+        external: true,
+        primary: false,
+      },
+    ],
+  });
+
+  return sections;
+}
+
+// ---------------------------------------------------------------------------
+// スマホ幅: 全高スライドシート
+// ---------------------------------------------------------------------------
 
 function AppMenuSheet({
   isOpen,
@@ -116,9 +319,7 @@ function AppMenuSheet({
   nav: MenuNav;
 }) {
   const { isLoggedIn, selfSegment, username, instanceDomain, avatarUrl } = nav;
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const hasInstancesParam = searchParams.has("instances");
+  const sections = useMenuSections(nav);
   const close = useCallback(() => setOpen(false), [setOpen]);
 
   const userBase = selfSegment ? `/u/${selfSegment}` : null;
@@ -187,128 +388,21 @@ function AppMenuSheet({
             写真を投稿
           </Link>
 
-          {/* みんなの写真 */}
-          <MenuSection title="みんなの写真">
-            <MenuLink
-              href="/public"
-              icon={<Globe className="h-5 w-5" />}
-              label="すべて"
-              active={pathname === "/public" && !hasInstancesParam}
-              onNavigate={close}
-            />
-            {instanceDomain && (
-              <MenuLink
-                href={`/public?instances=${encodeURIComponent(instanceDomain)}`}
-                icon={<Server className="h-5 w-5" />}
-                label={instanceDomain}
-                active={pathname === "/public" && hasInstancesParam}
-                onNavigate={close}
-              />
-            )}
-            {isLoggedIn && (
-              <MenuLink
-                href="/favorite"
-                icon={<Heart className="h-5 w-5" />}
-                label="お気に入り"
-                active={pathname === "/favorite"}
-                onNavigate={close}
-              />
-            )}
-          </MenuSection>
-
-          {/* あなたの情報（ログイン時のみ） */}
-          {isLoggedIn && userBase && (
-            <MenuSection title="あなたの情報">
-              <MenuLink
-                href="/dashboard"
-                icon={<LayoutDashboard className="h-5 w-5" />}
-                label="ダッシュボード"
-                active={pathname === "/dashboard"}
-                onNavigate={close}
-              />
-              <MenuLink
-                href="/dashboard/notifications"
-                icon={<Bell className="h-5 w-5" />}
-                label="通知"
-                active={pathname === "/dashboard/notifications"}
-                onNavigate={close}
-              />
-              <MenuLink
-                href={userBase}
-                icon={<Images className="h-5 w-5" />}
-                label="写真"
-                active={pathname === userBase}
-                onNavigate={close}
-              />
-              <MenuLink
-                href={`${userBase}/calendar`}
-                icon={<Calendar className="h-5 w-5" />}
-                label="カレンダー"
-                active={pathname === `${userBase}/calendar`}
-                onNavigate={close}
-              />
-              <MenuLink
-                href={`${userBase}/map`}
-                icon={<MapIcon className="h-5 w-5" />}
-                label="地図"
-                active={pathname.startsWith(`${userBase}/map`)}
-                onNavigate={close}
-              />
-              <MenuLink
-                href={`${userBase}/achievements`}
-                icon={<Trophy className="h-5 w-5" />}
-                label="実績"
-                active={pathname === `${userBase}/achievements`}
-                onNavigate={close}
-              />
+          {sections.map((section) => (
+            <MenuSection key={section.key} title={section.title}>
+              {section.items.map((item) => (
+                <MenuLink
+                  key={item.key}
+                  href={item.href}
+                  icon={<item.Icon className="h-5 w-5" />}
+                  label={item.label}
+                  active={item.active}
+                  external={item.external}
+                  onNavigate={close}
+                />
+              ))}
             </MenuSection>
-          )}
-
-          {/* 一般（ログイン有無に関わらず表示。旧フッターの各リンク） */}
-          <MenuSection title="一般">
-            <MenuLink
-              href="/announcements"
-              icon={<Megaphone className="h-5 w-5" />}
-              label="お知らせ"
-              active={pathname.startsWith("/announcements")}
-              onNavigate={close}
-            />
-            <MenuLink
-              href="/terms"
-              icon={<ScrollText className="h-5 w-5" />}
-              label="利用規約"
-              active={pathname === "/terms"}
-              onNavigate={close}
-            />
-            <MenuLink
-              href="/privacy"
-              icon={<ShieldCheck className="h-5 w-5" />}
-              label="プライバシーポリシー"
-              active={pathname === "/privacy"}
-              onNavigate={close}
-            />
-            <MenuLink
-              href="/spec"
-              icon={<Code className="h-5 w-5" />}
-              label="技術仕様"
-              active={pathname === "/spec"}
-              onNavigate={close}
-            />
-            <MenuLink
-              href="/license"
-              icon={<Type className="h-5 w-5" />}
-              label="フォントライセンス"
-              active={pathname === "/license"}
-              onNavigate={close}
-            />
-            <MenuLink
-              href="https://highemerly.net/contact.html"
-              icon={<Mail className="h-5 w-5" />}
-              label="お問い合わせ"
-              external
-              onNavigate={close}
-            />
-          </MenuSection>
+          ))}
 
           {/* ログアウトは一覧の最下部（一般のさらに下）に区切って配置 */}
           {isLoggedIn && (
@@ -449,6 +543,315 @@ function LogoutButton() {
       </span>
       <span className="min-w-0 truncate">
         {isLoading ? "処理中..." : "ログアウト"}
+      </span>
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PC幅: 折りたたみレール
+// ---------------------------------------------------------------------------
+
+/** 折りたたみ時のレール幅（px）。layout.tsx の `md:pr-[60px]` と必ず一致させること。 */
+const RAIL_COLLAPSED = 60;
+
+function AppRail({ nav }: { nav: MenuNav }) {
+  const { isLoggedIn, selfSegment, username, avatarUrl } = nav;
+  const sections = useMenuSections(nav);
+  const pathname = usePathname();
+  const userBase = selfSegment ? `/u/${selfSegment}` : null;
+
+  // 通知の未読ドット（PCはヘッダーのベルを廃し、このレールの「通知」だけで既読管理する）。
+  const { hasUnseen, markSeen } = useUnseenNotifications();
+
+  const [expanded, setExpanded] = useState(false);
+  const collapse = useCallback(() => setExpanded(false), []);
+
+  // 画面遷移したら閉じる（リンクを踏んだ後に開きっぱなしにしない）。
+  const prevPath = useRef(pathname);
+  useEffect(() => {
+    if (prevPath.current !== pathname) {
+      prevPath.current = pathname;
+      setExpanded(false);
+    }
+  }, [pathname]);
+
+  // 展開中は Escape で閉じる。
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setExpanded(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expanded]);
+
+  return (
+    <>
+      {/* 展開中だけ有効なクリックでも閉じられるオーバーレイ（PC幅のみ）。 */}
+      <button
+        type="button"
+        aria-hidden
+        tabIndex={-1}
+        onClick={collapse}
+        className={`hidden md:block fixed inset-0 z-40 bg-black/20 transition-opacity duration-200 ${
+          expanded ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+      />
+
+      <div
+        className={`hidden md:flex fixed right-0 top-0 bottom-0 z-50 flex-col border-l bg-background transition-[width] duration-200 ${
+          expanded ? "w-64 shadow-xl" : "w-[60px]"
+        }`}
+        style={{ width: expanded ? undefined : RAIL_COLLAPSED }}
+      >
+        {/* 上端: 開閉トグル（ハンバーガー／×）。アイコンは右端固定で、ラベルが左に出る。 */}
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label={expanded ? "メニューを閉じる" : "メニューを開く"}
+          className="flex h-12 shrink-0 items-center justify-end gap-3 border-b pl-3 pr-[18px] text-foreground transition-colors hover:bg-accent"
+        >
+          <RailLabel expanded={expanded}>{expanded ? "閉じる" : "メニュー"}</RailLabel>
+          <span className="order-2 flex h-6 w-6 shrink-0 items-center justify-center">
+            {expanded ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </span>
+        </button>
+
+        {/* 本文（縦スクロール）。画面が極端に低くて溢れる場合でもスクロールバーは出さず、
+            スクロール自体は可能にする（no-scrollbar）。 */}
+        <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain py-2">
+          {/* アカウント（ログイン時） */}
+          {isLoggedIn && userBase && (
+            <RailRow
+              href={userBase}
+              label={username || "マイページ"}
+              expanded={expanded}
+              icon={
+                avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={avatarUrl}
+                    alt=""
+                    className="h-6 w-6 rounded-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted">
+                    <User className="h-4 w-4" />
+                  </span>
+                )
+              }
+            />
+          )}
+
+          {/* 写真を投稿（強調） */}
+          <RailRow
+            href="/create"
+            label="写真を投稿"
+            highlight
+            expanded={expanded}
+            icon={<ImagePlus className="h-5 w-5" />}
+          />
+
+          {sections.map((section) => {
+            // 折りたたみ時は主要項目のみ。展開時は全項目だが主要を先頭に固定して並べる
+            // （主要アイコンの縦位置が開閉でズレないように。増えた非主要は下に追加される）。
+            const items = expanded
+              ? [...section.items].sort(
+                  (a, b) => Number(b.primary) - Number(a.primary)
+                )
+              : section.items.filter((item) => item.primary);
+            // 折りたたみ時に主要項目が無いセクション（「一般」など）は丸ごと隠す。
+            if (items.length === 0) return null;
+            return (
+              <div key={section.key} className="mt-1 border-t pt-1 pb-4">
+                {/* セクション見出し: テキストは展開時のみ表示（折りたたみ時は透明）。
+                    高さ(h-4)は常に確保し、開閉で下の項目が縦にズレないようにする。 */}
+                <h2
+                  className={`h-4 overflow-hidden pl-3 pr-[18px] text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground transition-opacity duration-150 ${
+                    expanded ? "opacity-100" : "opacity-0"
+                  }`}
+                >
+                  {section.title}
+                </h2>
+                {items.map((item) => {
+                  const isNotifications = item.key === "notifications";
+                  return (
+                    <RailRow
+                      key={item.key}
+                      href={item.href}
+                      label={item.label}
+                      active={item.active}
+                      external={item.external}
+                      expanded={expanded}
+                      icon={<item.Icon className="h-5 w-5" />}
+                      badge={isNotifications && hasUnseen}
+                      onNavigate={isNotifications ? markSeen : undefined}
+                    />
+                  );
+                })}
+              </div>
+            );
+          })}
+
+          {/* ログアウトは展開時のみ（折りたたみ時は隠して縦幅を節約）。
+              未ログイン時のログインは主要動線なので常時表示。 */}
+          {isLoggedIn ? (
+            expanded && (
+              <div className="mt-1 border-t pt-1">
+                <RailLogout expanded={expanded} />
+              </div>
+            )
+          ) : (
+            <div className="mt-1 border-t pt-1">
+              <RailRow
+                href="/"
+                label="ログイン"
+                expanded={expanded}
+                icon={<LogIn className="h-5 w-5" />}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** レール内の行ラベル。折りたたみ時は透明化（アイコン位置は右端固定のまま）。 */
+function RailLabel({
+  expanded,
+  children,
+}: {
+  expanded: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      className={`order-1 max-w-[168px] truncate whitespace-nowrap text-sm transition-opacity duration-150 ${
+        expanded ? "opacity-100" : "opacity-0"
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
+function RailRow({
+  href,
+  external,
+  label,
+  icon,
+  active = false,
+  highlight = false,
+  expanded,
+  badge = false,
+  onNavigate,
+}: {
+  href: string;
+  external?: boolean;
+  label: string;
+  icon: React.ReactNode;
+  active?: boolean;
+  /** 「写真を投稿」用の強調。 */
+  highlight?: boolean;
+  expanded: boolean;
+  /** 未読を示す赤ドットをアイコン右上に出す（通知用）。 */
+  badge?: boolean;
+  /** クリック時のフック（通知の既読化など）。遷移自体は href が担う。 */
+  onNavigate?: () => void;
+}) {
+  const cls = `flex h-11 items-center justify-end gap-3 pl-3 pr-[18px] transition-colors ${
+    highlight
+      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+      : active
+        ? "bg-accent text-primary"
+        : "text-foreground hover:bg-accent"
+  }`;
+  const inner = (
+    <>
+      <span
+        className={`order-1 max-w-[168px] truncate whitespace-nowrap text-sm ${
+          highlight ? "font-semibold" : ""
+        } transition-opacity duration-150 ${expanded ? "opacity-100" : "opacity-0"}`}
+      >
+        {label}
+      </span>
+      <span className="relative order-2 flex h-6 w-6 shrink-0 items-center justify-center">
+        {icon}
+        {badge && (
+          <span className="absolute right-0 top-0 h-1.5 w-1.5 rounded-full bg-red-500" />
+        )}
+      </span>
+    </>
+  );
+
+  if (external) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        title={label}
+        className={cls}
+      >
+        {inner}
+      </a>
+    );
+  }
+  return (
+    <Link
+      href={href}
+      title={label}
+      aria-current={active ? "page" : undefined}
+      onClick={onNavigate}
+      className={cls}
+    >
+      {inner}
+    </Link>
+  );
+}
+
+function RailLogout({ expanded }: { expanded: boolean }) {
+  const confirm = useConfirm();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleLogout = async () => {
+    if (
+      !(await confirm({
+        title: "ログアウト",
+        description: "ログアウトします。よろしいですか？",
+        confirmText: "ログアウト",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Logout error:", error);
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleLogout}
+      disabled={isLoading}
+      title="ログアウト"
+      className="flex h-11 w-full items-center justify-end gap-3 pl-3 pr-[18px] text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+    >
+      <RailLabel expanded={expanded}>
+        {isLoading ? "処理中..." : "ログアウト"}
+      </RailLabel>
+      <span className="order-2 flex h-6 w-6 shrink-0 items-center justify-center">
+        <LogOut className="h-5 w-5" />
       </span>
     </button>
   );

@@ -5,7 +5,6 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getAvatarUrl } from "@/lib/avatar";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
-import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
 import { ExpandReveal } from "@/components/ExpandReveal";
@@ -120,7 +119,6 @@ export default async function UserMapPage({
           </TabTransition>
           <Footer />
         </div>
-        <FloatingPostButton maxWidthClass="max-w-6xl" />
       </>
     );
   }
@@ -303,7 +301,6 @@ export default async function UserMapPage({
 
         <Footer />
       </div>
-      <FloatingPostButton maxWidthClass="max-w-6xl" />
     </>
   );
 }

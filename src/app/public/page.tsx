@@ -5,7 +5,6 @@ import { PublicTimelineClient } from "./PublicTimelineClient";
 import { TimelineTabs } from "@/components/timeline/TimelineTabs";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
-import { FloatingPostButton } from "@/components/FloatingPostButton";
 
 // 動的レンダリングを強制
 export const dynamic = "force-dynamic";
@@ -101,7 +100,6 @@ export default async function PublicTimelinePage({
 
         <Footer />
       </div>
-      <FloatingPostButton />
     </>
   );
 }

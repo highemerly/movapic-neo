@@ -7,7 +7,6 @@ import { FavoritesClient } from "./FavoritesClient";
 import { TimelineTabs } from "@/components/timeline/TimelineTabs";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
-import { FloatingPostButton } from "@/components/FloatingPostButton";
 
 export const dynamic = "force-dynamic";
 
@@ -88,7 +87,6 @@ export default async function FavoritePage() {
 
         <Footer />
       </div>
-      <FloatingPostButton />
     </>
   );
 }

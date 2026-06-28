@@ -1,14 +1,11 @@
 "use client";
 
-import { Suspense } from "react";
 import Link from "@/components/Link";
 import Image from "next/image";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { userPathSegment, DEFAULT_INSTANCE } from "@/lib/userHandle";
 import { AnnouncementBar } from "./AnnouncementBar";
 import { NotificationBell } from "./NotificationBell";
-import { HeaderNav } from "./HeaderNav";
 import { useMenu } from "./AppMenu";
 
 type SiteHeaderProps = {
@@ -23,14 +20,9 @@ type SiteHeaderProps = {
 
 export function SiteHeader({ user }: SiteHeaderProps = {}) {
   // メニューの中身（アカウント欄・各動線）は layout の MenuProvider から供給され、
-  // ハンバーガーは共有スライドメニューを開くだけ。
+  // ハンバーガーは共有スライドメニューを開くだけ。PC幅（md+）はメニューを右端の
+  // 折りたたみレール（AppRail）に集約しているため、ここのハンバーガーは md 未満のみ表示。
   const { open } = useMenu();
-
-  // PC幅インラインナビ（HeaderNav）用。selfSegment は username＋ドメインから算出
-  // （未ログインは null）。
-  const selfSegment = user
-    ? userPathSegment(user.username, user.instanceDomain || DEFAULT_INSTANCE)
-    : null;
 
   return (
     <>
@@ -38,26 +30,25 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
           sticky にする（BottomNav は md+・非standalone で非表示＝下部ナビが無い条件と一致）。
           standalone（PWA）は md+ でも BottomNav が出るので static に戻す。 */}
       <header className="border-b bg-background md:sticky md:top-0 md:z-40 standalone:md:static">
-        <div className="container mx-auto px-4 py-1 max-w-6xl">
-          <div className="flex items-center justify-between">
+        <div className="container mx-auto px-4 max-w-6xl">
+          {/* 行の高さは PC レール（AppRail）の開閉トグル（h-12）と揃える。スマホも同じ。 */}
+          <div className="flex h-12 items-center justify-between">
             <Link href="/dashboard" className="flex items-center hover:opacity-80 transition-opacity">
               <Image src="/shamezo_logo.svg" alt="SHAMEZO" width={160} height={29} priority />
             </Link>
 
             <div className="flex items-center gap-2">
-              {/* PC幅のみインライン表示する主要動線（アイコンのみ）。
-                  useSearchParams を使うため Suspense 境界で包む。 */}
-              <Suspense fallback={null}>
-                <HeaderNav
-                  isLoggedIn={user != null}
-                  selfSegment={selfSegment}
-                  instanceDomain={user?.instanceDomain ?? null}
-                />
-              </Suspense>
-              {user && <NotificationBell />}
+              {/* 通知ベルは md 未満のみ。PC幅は右端レール（AppRail）の「通知」に既読管理ごと集約。 */}
+              {user && (
+                <span className="md:hidden">
+                  <NotificationBell />
+                </span>
+              )}
+              {/* ハンバーガーは md 未満のみ。PC幅は右端の折りたたみレール（AppRail）に集約。 */}
               <Button
                 variant="outline"
                 size="icon"
+                className="md:hidden"
                 onClick={open}
                 aria-haspopup="dialog"
               >

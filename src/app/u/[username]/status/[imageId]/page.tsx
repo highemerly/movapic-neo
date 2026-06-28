@@ -20,7 +20,6 @@ import { Footer } from "@/components/Footer";
 import { parseUserHandle } from "@/lib/userHandle";
 import { NewUserGuide } from "@/components/onboarding/NewUserGuide";
 import { getAllowedServers } from "@/lib/auth/allowedServers";
-import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { PostSuccessToast } from "./PostSuccessToast";
 import { PostFediverseFailedToast } from "./PostFediverseFailedToast";
 import { AchievementCelebration } from "./AchievementCelebration";
@@ -571,7 +570,6 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         <Footer />
       </main>
       {/* 非ログインユーザーには投稿FABを出さない（ガイドのログイン導線へ誘導） */}
-      {currentUser && <FloatingPostButton maxWidthClass="max-w-2xl" />}
     </div>
   );
 }

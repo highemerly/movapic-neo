@@ -113,7 +113,11 @@ export default async function RootLayout({
               instanceDomain={claims?.instanceDomain ?? null}
               avatarUrl={getAvatarUrl(claims?.avatarUrl)}
             >
-              {children}
+              {/* PC幅（md+）は右端をメニューの折りたたみレール（AppRail）専用列として確保する。
+                  レール本体は AppRail（MenuProvider 内）が `fixed right-0` の幅60pxで描画し、
+                  ここで同じ幅ぶん右パディングを空けてコンテンツが重ならないようにする。
+                  幅を変える場合は AppMenu の RAIL_COLLAPSED と必ず合わせること。 */}
+              <div className="md:pr-[60px]">{children}</div>
               {/* PWA（standalone起動）時のみCSSで表示される下部ナビ */}
               <Suspense fallback={null}>
                 <BottomNav

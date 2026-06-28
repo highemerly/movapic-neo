@@ -5,7 +5,6 @@ import { getAvatarUrl } from "@/lib/avatar";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
-import { FloatingPostButton } from "@/components/FloatingPostButton";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
 import { calculateStreak } from "@/lib/streak";
@@ -142,7 +141,6 @@ export default async function CalendarPage({
 
         <Footer />
       </div>
-      <FloatingPostButton maxWidthClass="max-w-6xl" />
     </>
   );
 }
