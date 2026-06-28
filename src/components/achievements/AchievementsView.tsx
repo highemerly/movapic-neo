@@ -213,12 +213,15 @@ function DetailBody({
   grantedMap,
   ladderValues,
   perfectMonths,
+  perfectMonthGrace,
   celebrate = false,
 }: {
   entry: Entry;
   grantedMap: Map<string, string>;
   ladderValues: Record<string, number>;
   perfectMonths: GrantedItem[];
+  /** このユーザーの皆勤賞の未投稿許容日数（所属インスタンスで決まる）。 */
+  perfectMonthGrace: number;
   /** 獲得演出中はアイコンをポップさせる（ディープリンク到達時のみ true） */
   celebrate?: boolean;
 }) {
@@ -319,7 +322,7 @@ function DetailBody({
       rank={any ? "gold" : null}
       achieved={any}
       celebrate={celebrate}
-      description="1ヶ月の間毎日1枚以上投稿すると獲得できます（月4日までは救済措置があり、別日に穴埋め投稿も可能です）"
+      description={`1ヶ月の間毎日1枚以上投稿すると獲得できます（月${perfectMonthGrace}日までは救済措置があり、別日に穴埋め投稿も可能です）`}
     >
       {any ? (
         <ul className="space-y-1.5">
@@ -402,9 +405,12 @@ function DetailShell({
 export function AchievementsView({
   granted,
   ladderValues,
+  perfectMonthGrace,
 }: {
   granted: GrantedItem[];
   ladderValues: Record<string, number>;
+  /** このユーザーの皆勤賞の未投稿許容日数（所属インスタンスで決まる。説明文の数字に使う）。 */
+  perfectMonthGrace: number;
 }) {
   const grantedMap = useMemo(
     () => new Map(granted.map((g) => [g.key, g.grantedAt])),
@@ -531,6 +537,7 @@ export function AchievementsView({
               grantedMap={grantedMap}
               ladderValues={ladderValues}
               perfectMonths={perfectMonths}
+              perfectMonthGrace={perfectMonthGrace}
               celebrate={celebrate}
             />
           )}

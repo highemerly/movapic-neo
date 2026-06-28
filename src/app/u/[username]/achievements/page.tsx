@@ -8,7 +8,7 @@ import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
 import { AchievementsView } from "@/components/achievements/AchievementsView";
 import { countRanks } from "@/lib/achievements/catalog";
-import { perfectMonthKey } from "@/lib/achievements/perfectMonth";
+import { perfectMonthKey, perfectMonthGrace } from "@/lib/achievements/perfectMonth";
 import { lastMonthYm, thisMonthYm } from "@/lib/achievements/lastMonthPerfect";
 import { collectLadderValues } from "@/lib/achievements/stats";
 import { calculateStreak } from "@/lib/streak";
@@ -116,7 +116,11 @@ export default async function AchievementsPage({
 
         {/* 実績一覧（タブ切替時に横スライドで表示） */}
         <TabTransition tab="achievements">
-          <AchievementsView granted={granted} ladderValues={ladderValues} />
+          <AchievementsView
+            granted={granted}
+            ladderValues={ladderValues}
+            perfectMonthGrace={perfectMonthGrace(user.instance.domain)}
+          />
         </TabTransition>
 
         <Footer />
