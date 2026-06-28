@@ -1,7 +1,7 @@
 /**
  * 直接enqueue検証スクリプト（worker のドレイン確認用）
  *
- * producer（email-generate の HMAC 署名 / mention-process の実Botトークン）を迂回して、
+ * producer（email-generate の HMAC 署名 / 定期ジョブの実Botトークン取得）を迂回して、
  * worker タスク（process-mention / process-email）に直接ジョブを積む。
  *
  * 使い方:

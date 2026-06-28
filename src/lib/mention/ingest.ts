@@ -1,9 +1,9 @@
 /**
  * メンションの取り込み（fetch → enqueue）共通ロジック。
  *
- * cron 経由の producer（/api/v1/ingest/mention）と、streaming 接続時のキャッチアップ
- * （src/lib/mention/streamer.ts）の双方から呼ばれる。重い画像処理・投稿は
- * Graphile Worker の process-mention タスク側で実行される。
+ * 定期ジョブ（crontab の periodic タスク。src/lib/periodic/index.ts）と、streaming
+ * 接続時のキャッチアップ（src/lib/mention/streamer.ts）の双方から呼ばれる。重い画像処理・
+ * 投稿は Graphile Worker の process-mention タスク側で実行される。
  */
 
 import {

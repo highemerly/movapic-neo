@@ -3,7 +3,7 @@
  *
  * 役割分担:
  * - streaming（このファイル）: 低レイテンシでメンションを受信し即 enqueue する主経路。
- * - cron（/api/v1/ingest/mention を数分ごとにポーリング）: 安全網。
+ * - 定期ジョブ（crontab で 30分ごとに since_id ポーリング。src/lib/periodic/index.ts）: 安全網。
  *   再接続中のギャップ・サイレント切断・インスタンス側 streaming 停止を取りこぼさない。
  * - dedup は jobKey=mention:statusId で担保されるため、両経路の二重受信は安全。
  *

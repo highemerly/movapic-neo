@@ -20,6 +20,7 @@ import {
   TASK_PROCESS_EMAIL,
   TASK_NOTIFY_REPORT,
   TASK_DELETE_ACCOUNT,
+  TASK_PERIODIC,
   type ProcessMentionPayload,
   type ProcessEmailPayload,
   type NotifyReportPayload,
@@ -27,6 +28,13 @@ import {
 } from "./tasks";
 
 const MAX_ATTEMPTS = 3;
+
+/**
+ * 定期ジョブの crontab。worker-front の常駐ランナー自身が 30分ごとに `periodic`
+ * タスクを enqueue する（k8s CronJob・curl Pod・HTTP 往復は不要）。
+ * worker-front は必ず1Pod のため発火重複は起きない。
+ */
+const CRONTAB = `*/30 * * * * ${TASK_PERIODIC}`;
 
 function getConnectionString(): string {
   const cs = process.env.DATABASE_URL;
@@ -107,9 +115,13 @@ export async function runWorker(): Promise<void> {
     // LISTEN/NOTIFY で即時起床。取りこぼし対策に短いポーリングも併用される。
     pollInterval: 2000,
     taskList,
+    // 定期ジョブのスケジューラ（30分ごとに periodic タスクを enqueue）。
+    crontab: CRONTAB,
   });
 
-  console.log(`[worker] Graphile Worker started (concurrency=${concurrency})`);
+  console.log(
+    `[worker] Graphile Worker started (concurrency=${concurrency}, crontab="${CRONTAB}")`
+  );
 
   runner.promise.catch((err) => {
     console.error("[worker] runner crashed:", err);

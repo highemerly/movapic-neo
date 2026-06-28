@@ -25,7 +25,7 @@
 本番環境（pic.handon.club）は k8s (VKE) 構成で、FluxによるGitOps管理。
 同一のDockerイメージを `COMPONENT_ROLE`（`web` | `worker-front` | `compute`、未設定=ローカルall-in-one）で起動分離する3-tier。
 - web: ページ＋軽量API（producer）。
-- worker-front: `/api/v1/generate`・`/api/v1/post`・`/api/v1/ingest/*` を配信＋Graphile Worker consumer（bot/emailジョブ）。**sharp/skia を呼ばない**。Redis的な役割（レート制限、Workerの管理）を担っており、必ず1Pod。
+- worker-front: `/api/v1/generate`・`/api/v1/post`・`/api/v1/ingest/email` を配信＋Graphile Worker consumer（bot/emailジョブ）＋定期ジョブのスケジューラ（graphile-worker の crontab で 30分ごとに `periodic` タスクを enqueue＝メンション取りこぼし回収など。「定期ジョブ」参照）。**sharp/skia を呼ばない**。Redis的な役割（レート制限、Workerの管理）を担っており、必ず1Pod。
 - **compute**: 画像生成専用のステートレス内部サービス。外部Ingressなし、秘密情報を持たない（`COMPUTE_API_KEY` のみ）。内部API: `POST /api/internal/render`（文字入れ生成＝processImage）/ `POST /api/internal/finalize`（mime判定＋寸法＋サムネ）。worker-front は `src/lib/compute/client.ts` 経由で呼ぶ。
 - `src/middleware.ts` が role でルート境界を強制（compute は `/api/internal/*`＋`/api/health` のみ／非compute は `/api/internal/*` を404）。
 - 全pod の k8s probe は `/api/health`。`instrumentation.ts` が role で sharp ロードと consumer 起動をゲート。
@@ -113,7 +113,7 @@ Mastodon上でBotにメンションして画像生成・投稿する機能。
 
 ### 仕組み
 - **Botアカウント**: `@movapic@handon.club`（環境変数で設定可能）。
-- **フロー**: ①画像付きメンション受信 → ②通知取得（主: Streaming API WebSocket `src/lib/mention/streamer.ts`／フォールバック: ポーリング `fetcher.ts`・`ingest.ts` で取りこぼし補完）→ ③パース `parser.ts` → ④画像処理・投稿 `processor.ts` → ⑤元投稿削除しユーザーアカウントで再投稿 → ⑥DB保存（source: "mention"）。
+- **フロー**: ①画像付きメンション受信 → ②通知取得（主: Streaming API WebSocket `src/lib/mention/streamer.ts`／フォールバック: 定期ジョブによる since_id ポーリング `fetcher.ts`・`ingest.ts` で取りこぼし補完。「定期ジョブ」参照）→ ③パース `parser.ts` → ④画像処理・投稿 `processor.ts` → ⑤元投稿削除しユーザーアカウントで再投稿 → ⑥DB保存（source: "mention"）。
 
 ### コマンド形式
 `@movapic [オプション] テキスト`（`[...]` 内にスペース区切り）
@@ -125,6 +125,14 @@ Mastodon上でBotにメンションして画像生成・投稿する機能。
 - 画像1枚のみ（動画・GIF不可）・テキスト1〜140文字・ユーザーは事前ログイン必須・リトライ最大2回（失敗時Botがリプライ通知）。
 - 出力形式は連携インスタンスで自動決定（Mastodon/Misskey ともAVIF）。
 - 環境変数: `MASTODON_BOT_INSTANCE_URL` / `MASTODON_BOT_INSTANCE_DOMAIN` / `MASTODON_BOT_ACCESS_TOKEN` / `MASTODON_BOT_ACCT`。
+
+## 定期ジョブ
+30分ごとの定期メンテナンス。**graphile-worker の crontab で worker-front 常駐ランナー自身が `periodic` タスクを enqueue** する（k8s CronJob・curl Pod・cloudflare 経由の HTTP 往復は無し＝完全にプロセス内部へ閉じている）。worker-front は必ず1Pod のため発火重複なし。
+- 単一ディスパッチャ `periodic`（[tasks.ts](src/lib/queue/tasks.ts)）が複数サブジョブを順に回す。実体は [src/lib/periodic/index.ts](src/lib/periodic/index.ts) の `runPeriodicJobs()`。各サブジョブは try/catch で隔離（1つ失敗しても他は続行）。crontab 文字列は [src/lib/queue/index.ts](src/lib/queue/index.ts) の `CRONTAB`。
+- **現状のサブジョブ**:
+  - `mention-poll`: メンション取りこぼし回収（since_id ポーリング→`process-mention` を enqueue。dedup は jobKey=mention:statusId）。
+  - `tmp-cleanup`: オブジェクトストレージ `tmp/` の一時ファイルを30分経過で削除。メール投稿の元画像は producer が `tmp/email/{uuid}` に保存し worker が成功時のみ削除するため、投稿失敗（リトライ上限超過等）で残留する分を回収する。実装は `listExpiredObjects`（[storage.ts](src/lib/storage/storage.ts)・LastModified判定）＋ `deleteImage`。出力画像/サムネは `{year}/{month}/{day}/` プレフィックスなので混在しない。
+- **追加予定**（未実装）: お気に入り未取得かつ投稿後2時間経過分の取得 ／ 定期判定でのみ付与できる実績。`periodicJobs` 配列に1要素足すだけ。
 
 ## 投稿ソース（source）
 DBの`Image.source`で投稿元を識別: `web`(🌐 Web投稿) / `email`(📧 メール投稿) / `mention`(🤖 Bot投稿)。

@@ -14,6 +14,7 @@ import { extractExif } from "@/lib/exif/parser";
 import { reverseGeocode } from "@/lib/geocode/gsi";
 import { decryptToken } from "@/lib/auth/tokens";
 import { processOneMention } from "@/lib/mention/processor";
+import { runPeriodicJobs } from "@/lib/periodic";
 import { getAdminAccts } from "@/lib/auth/admin";
 import { sendBotDirectMessage } from "@/lib/bot/notify";
 import type { MastodonNotification } from "@/lib/mention/fetcher";
@@ -30,6 +31,7 @@ export const TASK_PROCESS_MENTION = "process-mention";
 export const TASK_PROCESS_EMAIL = "process-email";
 export const TASK_NOTIFY_REPORT = "notify-report";
 export const TASK_DELETE_ACCOUNT = "delete-account";
+export const TASK_PERIODIC = "periodic";
 
 export interface ProcessMentionPayload {
   notification: MastodonNotification;
@@ -236,9 +238,19 @@ const deleteAccountTask: Task = async (payload) => {
   );
 };
 
+/**
+ * 定期メンテナンス（crontab で 30分ごとに enqueue される単一ディスパッチャ）。
+ * メンション取りこぼし回収などの複数サブジョブを順に回す。各サブジョブの失敗は
+ * runPeriodicJobs 内部で隔離されるため、ここで throw されるのは想定外障害のみ。
+ */
+const periodicTask: Task = async () => {
+  await runPeriodicJobs();
+};
+
 export const taskList: TaskList = {
   [TASK_PROCESS_MENTION]: processMentionTask,
   [TASK_PROCESS_EMAIL]: processEmailTask,
   [TASK_NOTIFY_REPORT]: notifyReportTask,
   [TASK_DELETE_ACCOUNT]: deleteAccountTask,
+  [TASK_PERIODIC]: periodicTask,
 };

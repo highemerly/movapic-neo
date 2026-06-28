@@ -10,6 +10,7 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
 
 let s3Client: S3Client | null = null;
@@ -173,6 +174,47 @@ export async function getImage(storageKey: string): Promise<Buffer | null> {
     }
     throw error;
   }
+}
+
+/**
+ * 指定プレフィックス配下で、最終更新（LastModified）から maxAgeMs を超えたオブジェクトの
+ * キー一覧を返す。tmp/* 一時領域の定期クリーンアップ用。
+ * ページングに対応する（IsTruncated を辿って全件走査）。
+ */
+export async function listExpiredObjects(
+  prefix: string,
+  maxAgeMs: number
+): Promise<string[]> {
+  const client = getS3Client();
+  const bucketName = resolveBucketName();
+  const cutoff = Date.now() - maxAgeMs;
+
+  const expired: string[] = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const response = await client.send(
+      new ListObjectsV2Command({
+        Bucket: bucketName,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    );
+
+    for (const obj of response.Contents ?? []) {
+      // ディレクトリプレースホルダ（キー末尾が "/"）は除外
+      if (!obj.Key || obj.Key.endsWith("/")) continue;
+      if (obj.LastModified && obj.LastModified.getTime() < cutoff) {
+        expired.push(obj.Key);
+      }
+    }
+
+    continuationToken = response.IsTruncated
+      ? response.NextContinuationToken
+      : undefined;
+  } while (continuationToken);
+
+  return expired;
 }
 
 /**
