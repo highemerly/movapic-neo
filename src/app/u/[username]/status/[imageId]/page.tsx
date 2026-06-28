@@ -27,7 +27,7 @@ import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
-import { User, CalendarDays, Camera, MapPin, Reply, Share2, Globe, Mail, Bot, ChevronLeft } from "lucide-react";
+import { User, CalendarDays, Camera, MapPin, Reply, Share2, Globe, Mail, Bot, ChevronLeft, Trophy } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -320,6 +320,26 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           <p className="text-base whitespace-pre-wrap break-words">{image.overlayText}</p>
         </div>
 
+        {/* この投稿で獲得した実績（コメント直下。各リンクはその実績の詳細モーダルを開く） */}
+        {earnedAchievements.length > 0 && (
+          <p className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-amber-700 dark:text-amber-400">
+            <Trophy
+              className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-600"
+              aria-label="この投稿で獲得した実績"
+            />
+            {earnedAchievements.map((a) => (
+              <Link
+                key={a.key}
+                href={`/u/${username}/achievements?a=${encodeURIComponent(a.key)}`}
+                className="inline-flex items-center gap-1 hover:underline"
+              >
+                <AchievementIcon name={a.icon} className="h-3.5 w-3.5" />
+                {a.title}
+              </Link>
+            ))}
+          </p>
+        )}
+
         {/* EXIF情報（カメラ機種・撮影場所）。投稿者本人のみ撮影場所だけ削除可能。 */}
         {(image.cameraModel || image.locationPrefecture) && (
           <p className="mb-[5px] flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
@@ -529,27 +549,6 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             </Link>
           </div>
         </div>
-
-        {/* この投稿で獲得した実績（各チップはその実績の詳細モーダルを開く） */}
-        {earnedAchievements.length > 0 && (
-          <div className="mt-4 rounded-lg border border-amber-300/60 bg-amber-50 p-3 dark:border-amber-800/50 dark:bg-amber-950/30">
-            <p className="mb-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
-              🏆 この投稿で実績を獲得しました
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {earnedAchievements.map((a) => (
-                <Link
-                  key={a.key}
-                  href={`/u/${username}/achievements?a=${encodeURIComponent(a.key)}`}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-200/70 px-2.5 py-1.5 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-300/80 dark:bg-amber-900/50 dark:text-amber-200 dark:hover:bg-amber-800/60"
-                >
-                  <AchievementIcon name={a.icon} className="h-3.5 w-3.5" />
-                  {a.title}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* 前後の画像ナビゲーション */}
         <div className="mt-8">
