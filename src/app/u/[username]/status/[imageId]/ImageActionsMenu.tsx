@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pin, Trash2, Flag } from "lucide-react";
+import { MoreHorizontal, Pin, Trash2, Flag, Share } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { ReportDialog } from "./ReportDialog";
+import { useNativeShare, type NativeShareParams } from "./useNativeShare";
 
 interface ImageActionsMenuProps {
   imageId: string;
@@ -20,6 +21,10 @@ interface ImageActionsMenuProps {
   initialIsPinned: boolean;
   /** 通報可能か（ログイン済み かつ 自分の画像でない） */
   canReport: boolean;
+  /** トリガー（ミートボール）に足すクラス（非ログイン時に狭い画面のみ表示する等） */
+  triggerClassName?: string;
+  /** 狭い画面でメニュー内に出すネイティブ共有（広い画面では行内のボタンが担当） */
+  nativeShare?: NativeShareParams;
 }
 
 /**
@@ -33,9 +38,15 @@ export function ImageActionsMenu({
   isOwner,
   initialIsPinned,
   canReport,
+  triggerClassName,
+  nativeShare,
 }: ImageActionsMenuProps) {
   const router = useRouter();
   const confirm = useConfirm();
+  // フックは常に呼ぶ（nativeShare 未指定時はダミー値。visible 判定で出し分け）
+  const native = useNativeShare(
+    nativeShare ?? { imageUrl: "", mimeType: "", fileBaseName: "", text: "", url: "" }
+  );
   const [isPinned, setIsPinned] = useState(initialIsPinned);
   const [isPinning, setIsPinning] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -156,13 +167,26 @@ export function ImageActionsMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className="flex shrink-0 items-center justify-center h-[37px] w-[37px] border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
+          className={`flex shrink-0 items-center justify-center h-[40px] w-[40px] border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border ${triggerClassName ?? ""}`}
           title="その他"
         >
           <MoreHorizontal className="h-4 w-4" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[160px]">
+        {/* ネイティブ共有は狭い画面だけメニュー内に出す（広い画面は行内のボタンが担当） */}
+        {nativeShare && native.visible && (
+          <DropdownMenuItem
+            className="min-[380px]:hidden"
+            onSelect={(e) => {
+              e.preventDefault();
+              native.share();
+            }}
+          >
+            <Share className="mr-2 h-4 w-4" />
+            他のアプリで共有
+          </DropdownMenuItem>
+        )}
         {isOwner && (
           <>
             <DropdownMenuItem

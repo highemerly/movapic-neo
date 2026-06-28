@@ -324,12 +324,34 @@ function AppMenuSheet({
 
   const userBase = selfSegment ? `/u/${selfSegment}` : null;
 
+  // iOS（Safari・PWA standalone 共通）対策。内側スクロール領域が末端（先頭=0／最下端）に
+  // ピッタリ達すると、iOS はその後のタッチをラバーバンド用に奪い、Radix Dialog の
+  // react-remove-scroll がそれを preventDefault するためスクロールがロックする
+  //（＝下まで送ると二度と上に戻れなくなる）。touchstart の瞬間に scrollTop を境界から 1px だけ
+  // 内側へずらし、常に「中間」状態にしておくことでロックに入らせない（iNoBounce と同手法）。
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const nudgeFromEdge = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const max = el.scrollHeight - el.clientHeight;
+    if (max <= 0) return; // オーバーフローしていない（スクロール不要）なら何もしない
+    if (el.scrollTop <= 0) {
+      el.scrollTop = 1;
+    } else if (el.scrollTop >= max) {
+      el.scrollTop = max - 1;
+    }
+  }, []);
+
   return (
     <Sheet open={isOpen} onOpenChange={setOpen}>
       <SheetContent
         side="right"
         // 幅は控えめに。画面の残り（オーバーレイ）を広く取り、タップで閉じやすくする。
-        className="w-[72%] max-w-[17rem]"
+        // 高さは 100dvh（動的ビューポート）で実画面ぴったりに固定する。共有 variant の
+        // `inset-y-0 h-full` は iOS（特に Safari）だと fixed 要素がレイアウトビューポート基準に
+        // なり下端がツールバー裏に潜って内側スクロール領域の高さ計算が不安定になる。bottom-auto +
+        // h-[100dvh] で top 基準の可視高さに収め、末端判定（nudgeFromEdge）を安定させる。
+        className="w-[72%] max-w-[17rem] bottom-auto h-[100dvh]"
         // メニューに説明文は不要。明示的に undefined を渡して Radix の
         // 「Missing Description or aria-describedby」警告を抑制する。
         aria-describedby={undefined}
@@ -376,8 +398,13 @@ function AppMenuSheet({
 
         {/* 本文（スクロール可能）。
             min-h-0: flex の子で overflow を効かせ、内容が増えてもフッターが画面外に出ないようにする。
-            overscroll-contain: iOS でスクロール末端からの連鎖を断ち、上に戻れなくなる現象を防ぐ。 */}
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            overscroll-contain: スクロール末端からの連鎖を断つ。
+            onTouchStart=nudgeFromEdge: iOS で末端ロック（下まで送ると上に戻れない）を防ぐ。 */}
+        <div
+          ref={scrollRef}
+          onTouchStart={nudgeFromEdge}
+          className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+        >
           {/* 写真を投稿（ボタン風・強調） */}
           <Link
             href="/create"

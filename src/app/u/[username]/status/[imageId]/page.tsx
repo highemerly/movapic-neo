@@ -23,11 +23,12 @@ import { getAllowedServers } from "@/lib/auth/allowedServers";
 import { PostSuccessToast } from "./PostSuccessToast";
 import { PostFediverseFailedToast } from "./PostFediverseFailedToast";
 import { AchievementCelebration } from "./AchievementCelebration";
+import { NativeShareButton } from "./NativeShareButton";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
-import { User, CalendarDays, Camera, MapPin, Reply, Share2, Globe, Mail, Bot, ChevronLeft, Trophy } from "lucide-react";
+import { User, CalendarDays, Camera, MapPin, Reply, Repeat2, Bookmark, Share2, Globe, Mail, Bot, ChevronLeft, Trophy } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -427,7 +428,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
 
         {/* お気に入り（Mastodon連携） */}
         {favoritable ? (
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-[10px] flex items-center gap-2">
             <FavoriteButton
               imageId={imageId}
               initialCount={image.favoriteCount}
@@ -450,55 +451,84 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             />
           </div>
         ) : !isMisskey ? (
-          <div className="mt-2 text-[11px] text-muted-foreground/70">
+          <div className="mt-[10px] text-[11px] text-muted-foreground/70">
             Mastodon に投稿されていないため、お気に入り機能は使えません。
           </div>
         ) : null}
 
-        {/* 返信・シェア・その他メニュー（ピン留め・削除、将来の通報）。ログインユーザーのみ表示 */}
-        {currentUser && (
-          <div className="mt-[9px] flex items-center gap-1.5">
-            {replyUrl && (
+        {/* 返信・シェア・その他メニュー（ピン留め・削除、将来の通報）。
+            返信／リンク投稿はログインユーザーのみ。ネイティブ共有とミートボールは
+            非ログインでも出すため、行自体は常に描画する。 */}
+        <div className="mt-[10px] flex items-center gap-1">
+          {/* 返信ボタンが出るケースは横が窮屈になるので、両ボタンを2行＋小さめ文字にして
+              320px 幅でも収める（高さは h-[40px] 固定のまま変えない）。 */}
+            {currentUser && replyUrl && (
               <a
                 href={replyUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex flex-1 items-center justify-center gap-1.5 h-[37px] px-2.5 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
-                title="あなたのサーバーでこの投稿を開きます（返信・ブースト・お気に入りができます）"
+                className="flex flex-auto items-center justify-center gap-1 h-[40px] px-1 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
+                title="あなたのサーバーでこの投稿を開きます（返信・ブースト・ブックマーク・お気に入りができます）"
               >
-                <Reply className="h-4 w-4 shrink-0" />
-                <span className="flex flex-col items-start leading-none">
-                  <span className="text-xs font-medium whitespace-nowrap mt-0.5">返信･引用など</span>
+                <span className="flex shrink-0 items-center gap-0.5">
+                  <Reply className="h-4 w-4" />
+                  <Repeat2 className="h-4 w-4" />
+                  <Bookmark className="h-4 w-4" />
+                </span>
+                <span className="flex flex-col items-start leading-tight text-[10px] font-medium">
+                  <span>あなたの</span>
+                  <span>サーバーで開く</span>
                 </span>
               </a>
             )}
-            {shareUrl && (
+            {currentUser && shareUrl && (
               <a
                 href={shareUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex flex-1 items-center justify-center gap-1.5 h-[37px] px-2.5 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
+                className={`flex items-center justify-center gap-1.5 h-[40px] border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border ${replyUrl ? "flex-auto px-1.5" : "flex-1 px-2.5"}`}
                 title="あなたのサーバーで、このURLを投稿します"
               >
                 <Share2 className="h-4 w-4 shrink-0" />
-                <span className="flex flex-col items-start leading-none">
-                  <span className="text-xs font-medium whitespace-nowrap mt-0.5">URLを投稿</span>
-                </span>
+                {replyUrl ? (
+                  <span className="flex flex-col items-start leading-tight text-[10px] font-medium">
+                    <span>リンクを</span>
+                    <span>投稿</span>
+                  </span>
+                ) : (
+                  <span className="flex flex-col items-start leading-none">
+                    <span className="text-xs font-medium whitespace-nowrap mt-0.5">リンクを投稿</span>
+                  </span>
+                )}
               </a>
             )}
+            <NativeShareButton
+              imageUrl={imageUrl}
+              mimeType={image.mimeType}
+              fileBaseName={`shamezo-${imageId}`}
+              text={image.overlayText}
+              url={pageUrl}
+            />
             <ImageActionsMenu
               imageId={imageId}
               username={username}
               isOwner={isOwner}
               initialIsPinned={!!image.pinnedAt}
-              canReport={!isOwner}
+              canReport={!!currentUser && !isOwner}
+              triggerClassName={currentUser ? undefined : "min-[380px]:hidden"}
+              nativeShare={{
+                imageUrl,
+                mimeType: image.mimeType,
+                fileBaseName: `shamezo-${imageId}`,
+                text: image.overlayText,
+                url: pageUrl,
+              }}
             />
           </div>
-        )}
 
         {/* 投稿者情報（王冠が頭上に出るぶん、王冠ありのときだけ上パディングを確保） */}
         <div
-          className={`flex items-center gap-2 mt-[9px] px-3 pb-3 bg-muted rounded-lg ${
+          className={`flex items-center gap-2 mt-3 px-3 pb-3 bg-muted rounded-lg ${
             posterPerfectAttendance ? "pt-5" : "pt-3"
           }`}
         >
