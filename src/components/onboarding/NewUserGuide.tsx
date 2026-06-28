@@ -23,15 +23,10 @@ export function NewUserGuide({ isLoggedIn, allowedServers }: NewUserGuideProps) 
   // ログイン済みユーザーには公開TLへの導線だけを軽く出す
   if (isLoggedIn) {
     return (
-      <section className="mt-4 flex gap-2">
-        <Link href="/public" className="block flex-1">
+      <section className="mt-4">
+        <Link href="/public" className="block">
           <Button variant="outline" className="w-full">
             みんなの写真をみる
-          </Button>
-        </Link>
-        <Link href="/dashboard" className="block flex-1">
-          <Button variant="outline" className="w-full">
-            ダッシュボードへ
           </Button>
         </Link>
       </section>
