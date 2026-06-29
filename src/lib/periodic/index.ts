@@ -25,12 +25,16 @@ interface PeriodicJob {
 const TMP_MAX_AGE_MS = 30 * 60 * 1000;
 
 /** お気に入りフォールバックsyncの1回あたり最大件数（初回展開時の thundering herd を防ぐ） */
-const FAVORITE_SYNC_BATCH = 20;
+const FAVORITE_SYNC_BATCH = 30;
 /**
  * フォールバックsyncの同時実行数。まずは 1（逐次）で安全側に倒す。
  * 連携先インスタンスへの集中・レート制限の踏み抜きを避ける。負荷が問題化したら上げる。
  */
 const FAVORITE_SYNC_CONCURRENCY = 1;
+/** 各バッチ（同時実行ぶん）の間に挟むウェイト。連携先への負荷をさらに薄める */
+const FAVORITE_SYNC_GAP_MS = 500;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Bot メンションの取りこぼし回収。
@@ -145,8 +149,9 @@ const favoriteSyncJob: PeriodicJob = {
     const now = Date.now();
     let synced = 0;
     let failed = 0;
-    // 連携先インスタンスへ一度に殺到させないよう、少数ずつ並列で回す
+    // 連携先インスタンスへ一度に殺到させないよう、少数ずつ＋バッチ間ウェイトで回す
     for (let i = 0; i < rows.length; i += FAVORITE_SYNC_CONCURRENCY) {
+      if (i > 0) await sleep(FAVORITE_SYNC_GAP_MS);
       const chunk = rows.slice(i, i + FAVORITE_SYNC_CONCURRENCY);
       const results = await Promise.all(
         chunk.map(async ({ id }) => {
