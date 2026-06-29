@@ -200,7 +200,7 @@ function useMenuSections(nav: MenuNav): MenuSectionData[] {
           label: "ダッシュボード",
           Icon: LayoutDashboard,
           active: pathname === "/dashboard",
-          primary: false,
+          primary: true,
         },
         {
           key: "notifications",
@@ -722,26 +722,25 @@ function AppRail({ nav }: { nav: MenuNav }) {
               </div>
             );
           })}
-
-          {/* ログアウトは展開時のみ（折りたたみ時は隠して縦幅を節約）。
-              未ログイン時のログインは主要動線なので常時表示。 */}
-          {isLoggedIn ? (
-            expanded && (
-              <div className="mt-1 border-t pt-1">
-                <RailLogout expanded={expanded} />
-              </div>
-            )
-          ) : (
-            <div className="mt-1 border-t pt-1">
-              <RailRow
-                href="/"
-                label="ログイン"
-                expanded={expanded}
-                icon={<LogIn className="h-5 w-5" />}
-              />
-            </div>
-          )}
         </div>
+
+        {/* ログアウト／ログインはスクロール領域の外に出してレール下端へ固定。
+            折りたたみ時は主要項目のみで本文が短くなるが、ここは下端固定なので
+            開閉どちらでも縦位置が変わらない（折りたたみ時はアイコンのみ）。 */}
+        {isLoggedIn ? (
+          <div className="shrink-0 border-t pt-1 pb-2">
+            <RailLogout expanded={expanded} />
+          </div>
+        ) : (
+          <div className="shrink-0 border-t pt-1 pb-2">
+            <RailRow
+              href="/"
+              label="ログイン"
+              expanded={expanded}
+              icon={<LogIn className="h-5 w-5" />}
+            />
+          </div>
+        )}
       </div>
     </>
   );
