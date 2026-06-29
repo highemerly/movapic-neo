@@ -267,7 +267,9 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   });
 
   // 「戻る」リンクの遷移先とラベル（遷移元タブを from クエリで区別）
-  const galleryName = image.user.displayName || username;
+  // displayName 未設定時は username にフォールバック。params の username は URL エンコード済み
+  // （@ が %40 に化ける）ため、DB のクリーンな image.user.username を使う。
+  const galleryName = image.user.displayName || image.user.username;
   let backUrl = `/u/${username}`;
   let backLabel = `${galleryName} のギャラリーに戻る`;
   if (from === "public") {
