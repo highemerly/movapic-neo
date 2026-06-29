@@ -255,13 +255,15 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   // シェアボタン側のレイアウト切り替えに使う（インタラクションボタンが出るか）
   const hasInteractButton = !!mastodonReplyUrl || !!misskeyOpenPostUrl;
 
-  // シェアリンク。本文はページの <title>（タイトルテンプレート %s | SHAMEZO ＝
-  // 「<投稿テキスト> | SHAMEZO」）＋ページURL（OGカードで画像＋テキストが表示される）。
+  // シェアリンク。本文はページの <title>（generateMetadata の「<投稿テキスト> - <投稿者名>」
+  // ＋テンプレート %s | SHAMEZO ＝「<投稿テキスト> - <投稿者名> | SHAMEZO」）に揃える
+  // ＋ページURL（OGカードで画像＋テキストが表示される）。
   // ログイン中は閲覧者自身のサーバーの /share?text=（Mastodon・Misskey両対応）の作文画面を開く。
   // 未ログインは閲覧者のサーバーが不明なので anypost.dev/share?t=（投稿先サーバーを選べる）へ。
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
   const pageUrl = `${appUrl}/u/${username}/status/${imageId}`;
-  const shareText = `${image.overlayText} | SHAMEZO\n${pageUrl}`;
+  const shareAuthorName = image.user.displayName || image.user.username;
+  const shareText = `${image.overlayText} - ${shareAuthorName} | SHAMEZO\n${pageUrl}`;
   const shareUrl = currentUser
     ? `https://${currentUser.instance.domain}/share?text=${encodeURIComponent(shareText)}`
     : `https://anypost.dev/share?t=${encodeURIComponent(shareText)}`;
