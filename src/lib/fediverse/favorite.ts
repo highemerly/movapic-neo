@@ -16,6 +16,7 @@
  */
 
 import { USER_AGENT } from "@/lib/userAgent";
+import { apShowNoteId, ApShowError } from "@/lib/fediverse/misskey";
 
 const SHORT_TIMEOUT = 4000; // 4秒（オーナーインスタンス＝自前サーバーへの読み取り・お気に入り操作）
 // 別インスタンスの投稿解決（search?resolve=true）は、viewerインスタンスがオーナー
@@ -428,23 +429,18 @@ async function resolveMisskeyNoteId(params: FavoriteActionParams): Promise<strin
     return postId;
   }
 
-  const response = await fetch(`https://${viewerDomain}/api/ap/show`, {
-    method: "POST",
-    headers: MISSKEY_HEADERS,
-    body: JSON.stringify({ i: viewerToken, uri: postUrl }),
-    signal: AbortSignal.timeout(RESOLVE_TIMEOUT),
-  });
-
-  if (!response.ok) {
+  let noteId: string | null;
+  try {
+    noteId = await apShowNoteId(viewerDomain, viewerToken, postUrl, RESOLVE_TIMEOUT);
+  } catch (error) {
+    const status = error instanceof ApShowError ? error.status : 0;
     throw new FavoriteError(
-      classifyPostStatus(response.status)!,
-      response.status,
-      `投稿の解決に失敗: ${response.status}`
+      classifyPostStatus(status)!,
+      status,
+      `投稿の解決に失敗: ${status}`
     );
   }
 
-  const data = (await response.json()) as { type?: string; object?: { id?: string } };
-  const noteId = data.object?.id;
   if (!noteId) {
     // ap/showは成功したが note を取得できない＝viewerインスタンスにまだ未連合。
     // Mastodon側と同様 "unresolved"（未反映）として扱う。

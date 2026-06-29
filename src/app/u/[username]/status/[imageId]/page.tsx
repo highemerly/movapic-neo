@@ -8,6 +8,7 @@ import { DeleteLocationButton } from "./DeleteLocationButton";
 import { ImageNavigation } from "./ImageNavigation";
 import { ImageOptionsButton } from "./ImageOptionsButton";
 import { ImageActionsMenu } from "./ImageActionsMenu";
+import { MisskeyOpenButton } from "./MisskeyOpenButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
 import { RetryImage } from "@/components/gallery/RetryImage";
@@ -234,16 +235,23 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   // 自分の画像かどうか
   const isOwner = currentUser?.id === image.userId;
 
-  // 返信リンク。Mastodon 4.x で /interact/:id は削除済み。スレッド返信へ繋ぐ唯一のURL方式は
-  // 「閲覧者自身のサーバー」の authorize_interaction（純正の返信ボタンも内部でここに行き着く）。
-  // 閲覧者の Mastodon サーバーで元投稿の uri を解決して開く → in-reply-to で返信できる。
-  // 条件は閲覧者自身がそのサーバーWebにログイン中であること（未ログインならサインイン画面を挟む）。
-  // 閲覧者が Mastodon でない/未ログインのときは元投稿URLを直接開くフォールバック。
-  // postUrl が無い local 投稿は非表示。uri は作者が Misskey でも AP uri として解決できる。
-  const replyUrl =
+  // 「あなたのサーバーで開く」動線。閲覧者自身のサーバーで元投稿を解決して開き、
+  // 返信・リノート・お気に入り等ができるようにする。条件は閲覧者がそのサーバーWebに
+  // ログイン中であること。postUrl が無い local 投稿は非表示。
+  // - Mastodon: authorize_interaction で uri を解決して即開ける（純正の返信ボタンもここに行き着く）。
+  //   Mastodon 4.x で /interact/:id は削除済みのため、この方式が唯一。
+  // - Misskey: authorize_interaction 相当が無いため、クリック時に ap/show 解決して
+  //   /notes/{id} を開く（MisskeyOpenButton がオンデマンドで解決）。
+  const mastodonReplyUrl =
     currentUser?.instance.type === "mastodon" && image.postUrl
       ? `https://${currentUser.instance.domain}/authorize_interaction?uri=${encodeURIComponent(image.postUrl)}`
-      : (image.postUrl ?? null);
+      : null;
+  const misskeyOpenPostUrl =
+    currentUser?.instance.type === "misskey" && image.postUrl
+      ? image.postUrl
+      : null;
+  // シェアボタン側のレイアウト切り替えに使う（インタラクションボタンが出るか）
+  const hasInteractButton = !!mastodonReplyUrl || !!misskeyOpenPostUrl;
 
   // シェアリンク。本文はページの <title>（タイトルテンプレート %s | SHAMEZO ＝
   // 「<投稿テキスト> | SHAMEZO」）＋ページURL（OGカードで画像＋テキストが表示される）。
@@ -463,11 +471,9 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         <div className="mt-[10px] flex items-center gap-1">
           {/* 返信ボタンが出るケースは横が窮屈になるので、両ボタンを2行＋小さめ文字にして
               320px 幅でも収める（高さは h-[40px] 固定のまま変えない）。 */}
-            {currentUser && replyUrl && (
+            {currentUser && mastodonReplyUrl && (
               <a
-                href={replyUrl}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={mastodonReplyUrl}
                 className="flex flex-auto items-center justify-center gap-1 h-[40px] px-1 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
                 title="あなたのサーバーでこの投稿を開きます（返信・ブースト・ブックマーク・お気に入りができます）"
               >
@@ -482,16 +488,19 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
                 </span>
               </a>
             )}
+            {currentUser && misskeyOpenPostUrl && (
+              <MisskeyOpenButton postUrl={misskeyOpenPostUrl} />
+            )}
             {currentUser && shareUrl && (
               <a
                 href={shareUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`flex items-center justify-center gap-1.5 h-[40px] border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border ${replyUrl ? "flex-auto px-1.5" : "flex-1 px-2.5"}`}
+                className={`flex items-center justify-center gap-1.5 h-[40px] border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border ${hasInteractButton ? "flex-auto px-1.5" : "flex-1 px-2.5"}`}
                 title="あなたのサーバーで、このURLを投稿します"
               >
                 <Share2 className="h-4 w-4 shrink-0" />
-                {replyUrl ? (
+                {hasInteractButton ? (
                   <span className="flex flex-col items-start leading-tight text-[10px] font-medium">
                     <span>リンクを</span>
                     <span>投稿</span>
