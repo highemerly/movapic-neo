@@ -13,6 +13,7 @@ import { pollAndEnqueueMentions } from "@/lib/mention/ingest";
 import { listExpiredObjects, deleteImage } from "@/lib/storage/storage";
 import prisma from "@/lib/db";
 import { syncFavoriteCache } from "@/lib/fediverse/favoriteSync";
+import { isFavoriteSyncDue } from "@/lib/fediverse/favoritePolicy";
 
 interface PeriodicJob {
   /** ログ識別用の名前 */
@@ -25,8 +26,11 @@ const TMP_MAX_AGE_MS = 30 * 60 * 1000;
 
 /** お気に入りフォールバックsyncの1回あたり最大件数（初回展開時の thundering herd を防ぐ） */
 const FAVORITE_SYNC_BATCH = 20;
-/** フォールバックsyncの同時実行数（連携先インスタンスへの集中を避ける） */
-const FAVORITE_SYNC_CONCURRENCY = 5;
+/**
+ * フォールバックsyncの同時実行数。まずは 1（逐次）で安全側に倒す。
+ * 連携先インスタンスへの集中・レート制限の踏み抜きを避ける。負荷が問題化したら上げる。
+ */
+const FAVORITE_SYNC_CONCURRENCY = 1;
 
 /**
  * Bot メンションの取りこぼし回収。
@@ -98,13 +102,11 @@ const tmpCleanup: PeriodicJob = {
  * 通常お気に入りは画像詳細ページの GET（TTL切れ時）で同期されるが、詳細ページに
  * 一度もアクセスが無い投稿は取りこぼされる。それを定期的に拾うのがこのジョブ。
  *
- * 共通の足切り（SQLで選別）:
- *   - 投稿（createdAt）から1日以上経過
- *   - かつ「最後のsyncから12時間以上経過」または「一度もsyncしていない」
- *     （4xx/5xxが12時間以内に記録されていれば対象外＝失敗の再試行は12時間間隔に絞る）
+ * 発火条件の正は isFavoriteSyncDue()（favoritePolicy.ts・ユニットテスト済み）。
+ * 下の SQL はそれと同じ条件を DB 側で先に絞る最適化（バックカタログ全件ロード回避＋LIMIT）で、
+ * 取得後に isFavoriteSyncDue() で最終ゲートする（SQL と TS が万一ズレても TS が正）。
  *
- * 発火タイミングは2つ。どちらも「成功syncが1回走ったら、その段（1日／14日）では二度と発火
- * しない」よう COALESCE(...,false) で締める（never-synced・NULL は false 側に倒れ必ず対象）:
+ * 発火タイミングは2つ（詳細は isFavoriteSyncDue のコメント参照）:
  *   - fire1: 1日経過後にまだ成功syncが無い → 投稿が落ち着いた頃のfavを1回拾う
  *   - fire2: 14日経過後にまだ「14日以降の成功sync」が無い → 成熟後の最終syncを1回拾い、以後停止
  * これにより、ページが一度も開かれない投稿でも day1 と day14 で各1回ずつ同期され、
@@ -139,6 +141,8 @@ const favoriteSyncJob: PeriodicJob = {
     `;
     if (rows.length === 0) return;
 
+    // SQL 抽出時点と TS 判定時点で now がぶれないよう、1回だけ now を固定して使う
+    const now = Date.now();
     let synced = 0;
     let failed = 0;
     // 連携先インスタンスへ一度に殺到させないよう、少数ずつ並列で回す
@@ -154,6 +158,8 @@ const favoriteSyncJob: PeriodicJob = {
           if (!image || !image.isPublic || image.isDisabled || !image.postId) {
             return null;
           }
+          // 発火条件の最終ゲート（isFavoriteSyncDue が正。SQL はあくまで前段の絞り込み）
+          if (!isFavoriteSyncDue(image, now)) return null;
           // syncFavoriteCache は内部で例外を握り errorReason を返す（throw しない）
           return syncFavoriteCache(image);
         })

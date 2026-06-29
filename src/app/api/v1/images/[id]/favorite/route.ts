@@ -25,44 +25,7 @@ import {
   readCache,
   type ImageForFavorite,
 } from "@/lib/fediverse/favoriteSync";
-
-// 投稿経過時間ベースのTTL（fav数が動きやすい投稿直後ほど短く）
-const MIN_MS = 60_000;
-const HOUR_MS = 60 * MIN_MS;
-const DAY_MS = 24 * HOUR_MS;
-
-/** 成熟と見なす日数。これを過ぎたらfav数はほぼ動かないので最終syncを1回だけ行い停止する */
-const MATURE_DAYS = 14;
-
-// 最後のsync結果（postStatus）と投稿経過時間からTTLを算出
-// - 4xx（429除く）: 1日（削除確定・権限不足など、頻繁に再試行する意味が薄い）
-// - 429 / 5xx / 0(接続失敗): 1時間（レート制限・一時障害。少し置いて再試行）
-// - 200 / null: 投稿経過時間ベース。
-//   14日超は「成熟後（createdAt+14日 以降）のsyncが既にあれば Infinity＝停止」。
-//   まだ成熟後syncが無ければ 0（=即stale）を返し、次のGETで最終syncを1回だけ走らせる。
-//   ※ 年齢だけで停止すると、若い頃のsyncしか無い古い投稿を開いたとき古い値が出続けるため、
-//     「成熟後に1回syncできたら停止」を syncedAt 基準で判定する。
-function computeCacheTtl(
-  postCreatedAt: Date,
-  postStatus: number | null,
-  favoritesSyncedAt: Date | null
-): number {
-  if (postStatus !== null) {
-    if (postStatus === 429 || postStatus === 0 || (postStatus >= 500 && postStatus < 600))
-      return HOUR_MS;
-    if (postStatus >= 400 && postStatus < 500) return DAY_MS;
-  }
-  const age = Date.now() - postCreatedAt.getTime();
-  if (age <= 5 * MIN_MS) return 1 * MIN_MS;
-  if (age <= 1 * HOUR_MS) return 5 * MIN_MS;
-  if (age <= 3 * HOUR_MS) return 10 * MIN_MS;
-  if (age <= 1 * DAY_MS) return 1 * HOUR_MS;
-  if (age <= MATURE_DAYS * DAY_MS) return 1 * DAY_MS;
-  const matureMark = postCreatedAt.getTime() + MATURE_DAYS * DAY_MS;
-  const hasMatureSync =
-    !!favoritesSyncedAt && favoritesSyncedAt.getTime() >= matureMark;
-  return hasMatureSync ? Infinity : 0;
-}
+import { shouldSyncOnGet } from "@/lib/fediverse/favoritePolicy";
 
 // この投稿がお気に入り可能か（Fediverseに投稿済み＝postIdがある投稿のみ。local投稿は対象外）
 function isFavoritable(image: ImageForFavorite): boolean {
@@ -154,21 +117,14 @@ export async function GET(
       : null;
 
     // TTL切れ（または未取得）ならMastodonからSync
-    if (favoritable) {
-      const ttl = computeCacheTtl(
-        image.createdAt,
-        image.postStatus,
-        image.favoritesSyncedAt
-      );
-      const isStale =
-        !image.favoritesSyncedAt ||
-        Date.now() - image.favoritesSyncedAt.getTime() > ttl;
-      if (isStale) {
-        const result = await syncFavoriteCache(image);
-        count = result.count;
-        favoriters = result.favoriters;
-        errorReason = result.errorReason;
-      }
+    if (
+      favoritable &&
+      shouldSyncOnGet(image.createdAt, image.postStatus, image.favoritesSyncedAt)
+    ) {
+      const result = await syncFavoriteCache(image);
+      count = result.count;
+      favoriters = result.favoriters;
+      errorReason = result.errorReason;
     }
 
     return NextResponse.json({
