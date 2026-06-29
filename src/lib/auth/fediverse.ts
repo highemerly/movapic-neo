@@ -314,7 +314,10 @@ export function getMisskeyAuthorizationUrl(
   const params = new URLSearchParams({
     name: "SHAMEZO",
     callback: callbackUrl,
-    permission: "read:account,write:notes,drive:write",
+    // read:account=ユーザー情報, write:notes=投稿/削除, write:drive=画像アップロード,
+    // write:reactions=お気に入り（リアクション）操作
+    // ※ Misskeyの権限名は全て write:xxx / read:xxx の語順（drive:write は無効kind）
+    permission: "read:account,write:notes,write:drive,write:reactions",
   });
 
   return `https://${server}/miauth/${sessionId}?${params.toString()}`;

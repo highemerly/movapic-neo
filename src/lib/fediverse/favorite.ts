@@ -1,10 +1,18 @@
 /**
- * Mastodonのお気に入り連携
+ * Fediverse（Mastodon / Misskey）のお気に入り連携
  *
- * - 読み取り（count / favourited_by）: オーナーのトークンで取得（オーナーインスタンスが正データ）
- * - お気に入り操作: viewerのトークンで実行。別インスタンスはsearch?resolveで投稿を解決してから操作
+ * Mastodonの「favourite」と Misskeyの「リアクション（❤️）」を1つの概念として扱う。
+ * 連合上は favourite ⇔ リアクション が相互に伝播するため、Mastodon⇔Misskey をまたいだ
+ * お気に入りも成立する（MisskeyからMastodonへ送る Like は favourite として扱われる）。
  *
- * Mastodonの状態次第で遅延・失敗しうるため、短めのタイムアウトで呼び出すこと。
+ * - 読み取り（count / 一覧 上位40件）: オーナーのトークンで取得（オーナーインスタンスが正データ）
+ *   - Mastodon: /statuses/:id（count）＋ /favourited_by（一覧）
+ *   - Misskey:  notes/show（reactionCount）＋ notes/reactions（一覧）
+ * - お気に入り操作: viewerのトークンで実行。別インスタンスは投稿を解決してから操作
+ *   - Mastodon: /api/v2/search?resolve=true → /statuses/:id/favourite|unfavourite
+ *   - Misskey:  /api/ap/show（uri解決）→ notes/reactions/create|delete
+ *
+ * 連携先の状態次第で遅延・失敗しうるため、短めのタイムアウトで呼び出すこと。
  */
 
 import { USER_AGENT } from "@/lib/userAgent";
@@ -74,11 +82,11 @@ export function favoriteErrorMessage(
 ): string | null {
   switch (reason) {
     case "deleted":
-      return "元のMastodon投稿が見つかりません（削除された可能性があります）";
+      return "元の投稿が見つかりません（削除された可能性があります）";
     case "forbidden":
       return "お気に入り情報を取得する権限がありません。再ログインで解決する場合があります";
     case "unavailable":
-      return "Mastodonサーバーに接続できず、お気に入り情報を取得できませんでした。時間をおいて再度お試しください";
+      return "連携先サーバーに接続できず、お気に入り情報を取得できませんでした。時間をおいて再度お試しください";
     case "unresolved":
       return "投稿がまだあなたのサーバーに反映されていないようです。少し時間をおいて再度お試しください";
     default:
@@ -179,6 +187,126 @@ export async function fetchMastodonFavoriteData(
   };
 }
 
+// ---- Misskey（リアクションで favourite を代替）----------------------------
+
+// Mastodonのfavouriteに対応させるリアクション。Unicode絵文字なので、Misskey間でも
+// Mastodonへ連合する際も「いいね/favourite」として伝わる（カスタム絵文字は連合先で化けるため避ける）。
+const MISSKEY_REACTION = "❤️";
+
+// Misskey Note（必要なフィールドのみ）
+interface MisskeyNote {
+  id: string;
+  // 合計リアクション数。古い実装等で欠ける場合は reactions の合算でフォールバック。
+  reactionCount?: number;
+  reactions?: Record<string, number>;
+  // トークン付きで取得したときの自分のリアクション（未リアクションは null/undefined）
+  myReaction?: string | null;
+}
+
+// Misskey User（必要なフィールドのみ）
+interface MisskeyUserLite {
+  username: string;
+  host: string | null; // ローカルユーザーは null
+  name?: string | null;
+  avatarUrl?: string | null;
+}
+
+interface MisskeyReaction {
+  id: string;
+  type: string; // リアクション絵文字
+  user: MisskeyUserLite;
+}
+
+function sumReactions(note: MisskeyNote): number {
+  if (typeof note.reactionCount === "number") return note.reactionCount;
+  if (note.reactions) {
+    return Object.values(note.reactions).reduce((a, b) => a + b, 0);
+  }
+  return 0;
+}
+
+function mapMisskeyFavoriter(
+  user: MisskeyUserLite,
+  ownerDomain: string
+): CachedFavoriter {
+  // リモートユーザーは host を、ローカルユーザーはオーナードメインを補う。
+  // Misskey/Mastodon ともユーザーページは https://{host}/@{username} で開ける。
+  const host = user.host || ownerDomain;
+  return {
+    acct: `${user.username}@${host}`,
+    displayName: user.name || null,
+    avatarUrl: user.avatarUrl || null,
+    profileUrl: `https://${host}/@${user.username}`,
+  };
+}
+
+const MISSKEY_HEADERS = {
+  "Content-Type": "application/json",
+  "User-Agent": USER_AGENT,
+};
+
+/**
+ * オーナー（Misskey）インスタンスから、投稿のリアクション情報
+ * （合計数 + リアクションしたユーザー上位40件）を取得する。失敗時は例外を投げる。
+ */
+export async function fetchMisskeyFavoriteData(
+  ownerDomain: string,
+  ownerToken: string,
+  postId: string
+): Promise<FavoriteData> {
+  const [noteRes, reactionsRes] = await Promise.all([
+    fetch(`https://${ownerDomain}/api/notes/show`, {
+      method: "POST",
+      headers: MISSKEY_HEADERS,
+      body: JSON.stringify({ i: ownerToken, noteId: postId }),
+      signal: AbortSignal.timeout(SHORT_TIMEOUT),
+    }),
+    fetch(`https://${ownerDomain}/api/notes/reactions`, {
+      method: "POST",
+      headers: MISSKEY_HEADERS,
+      body: JSON.stringify({ i: ownerToken, noteId: postId, limit: 40 }),
+      signal: AbortSignal.timeout(SHORT_TIMEOUT),
+    }),
+  ]);
+
+  if (!noteRes.ok) {
+    throw new FavoriteError(
+      classifyPostStatus(noteRes.status)!,
+      noteRes.status,
+      `note取得に失敗: ${noteRes.status}`
+    );
+  }
+  if (!reactionsRes.ok) {
+    throw new FavoriteError(
+      classifyPostStatus(reactionsRes.status)!,
+      reactionsRes.status,
+      `reactions取得に失敗: ${reactionsRes.status}`
+    );
+  }
+
+  const note = (await noteRes.json()) as MisskeyNote;
+  const reactions = (await reactionsRes.json()) as MisskeyReaction[];
+
+  return {
+    count: sumReactions(note),
+    favoriters: reactions.map((r) => mapMisskeyFavoriter(r.user, ownerDomain)),
+  };
+}
+
+/**
+ * オーナーのインスタンス種別に応じてお気に入り情報を取得する。
+ */
+export function fetchFavoriteData(
+  ownerType: string,
+  ownerDomain: string,
+  ownerToken: string,
+  postId: string
+): Promise<FavoriteData> {
+  return ownerType === "misskey"
+    ? fetchMisskeyFavoriteData(ownerDomain, ownerToken, postId)
+    : fetchMastodonFavoriteData(ownerDomain, ownerToken, postId);
+}
+
 /**
  * viewerインスタンス上でのstatus IDを解決する
  * 同一インスタンスならpostIdをそのまま、別インスタンスはsearch?resolveで解決
@@ -225,6 +353,7 @@ async function resolveViewerStatusId(params: {
 }
 
 interface FavoriteActionParams {
+  viewerType: string; // "mastodon" | "misskey"
   viewerDomain: string;
   viewerToken: string;
   ownerDomain: string;
@@ -265,12 +394,111 @@ async function toggleFavorite(
   };
 }
 
-/** viewerのトークンで投稿をお気に入り登録 */
-export function favoriteMastodonStatus(params: FavoriteActionParams) {
-  return toggleFavorite(params, "favourite");
+/**
+ * viewer（Misskey）インスタンス上でのnoteIdを解決する。
+ * 同一インスタンスならpostIdをそのまま、別インスタンスは ap/show で uri から解決。
+ */
+async function resolveMisskeyNoteId(params: FavoriteActionParams): Promise<string> {
+  const { viewerDomain, viewerToken, ownerDomain, postId, postUrl } = params;
+
+  if (viewerDomain === ownerDomain) {
+    return postId;
+  }
+
+  const response = await fetch(`https://${viewerDomain}/api/ap/show`, {
+    method: "POST",
+    headers: MISSKEY_HEADERS,
+    body: JSON.stringify({ i: viewerToken, uri: postUrl }),
+    signal: AbortSignal.timeout(RESOLVE_TIMEOUT),
+  });
+
+  if (!response.ok) {
+    throw new FavoriteError(
+      classifyPostStatus(response.status)!,
+      response.status,
+      `投稿の解決に失敗: ${response.status}`
+    );
+  }
+
+  const data = (await response.json()) as { type?: string; object?: { id?: string } };
+  const noteId = data.object?.id;
+  if (!noteId) {
+    // ap/showは成功したが note を取得できない＝viewerインスタンスにまだ未連合。
+    // Mastodon側と同様 "unresolved"（未反映）として扱う。
+    throw new FavoriteError("unresolved", 404, "投稿を解決できませんでした");
+  }
+  return noteId;
+}
+
+async function toggleMisskeyReaction(
+  params: FavoriteActionParams,
+  action: "favourite" | "unfavourite"
+): Promise<{ favourited: boolean; count: number }> {
+  const noteId = await resolveMisskeyNoteId(params);
+
+  const endpoint =
+    action === "favourite" ? "notes/reactions/create" : "notes/reactions/delete";
+  const body =
+    action === "favourite"
+      ? { i: params.viewerToken, noteId, reaction: MISSKEY_REACTION }
+      : { i: params.viewerToken, noteId };
+
+  const response = await fetch(`https://${params.viewerDomain}/api/${endpoint}`, {
+    method: "POST",
+    headers: MISSKEY_HEADERS,
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(SHORT_TIMEOUT),
+  });
+
+  if (!response.ok) {
+    // 冪等性: お気に入り済みで再リアクション（ALREADY_REACTED）、未リアクションで解除
+    // （NOT_REACTED）は「既に望む状態」なので成功扱いにする。
+    const detail = await response.text().catch(() => "");
+    const alreadyInDesiredState =
+      (action === "favourite" && detail.includes("ALREADY_REACTED")) ||
+      (action === "unfavourite" && detail.includes("NOT_REACTED"));
+    if (!alreadyInDesiredState) {
+      throw new FavoriteError(
+        classifyPostStatus(response.status)!,
+        response.status,
+        `リアクション操作に失敗: ${response.status}`
+      );
+    }
+  }
+
+  // Misskeyの reactions/create|delete は204でcountを返さないため、操作後の最新状態を
+  // viewer側から取り直して即時表示に使う（federation遅延はオーナー側syncで後追い補正）。
+  let count = 0;
+  let favourited = action === "favourite";
+  try {
+    const showRes = await fetch(`https://${params.viewerDomain}/api/notes/show`, {
+      method: "POST",
+      headers: MISSKEY_HEADERS,
+      body: JSON.stringify({ i: params.viewerToken, noteId }),
+      signal: AbortSignal.timeout(SHORT_TIMEOUT),
+    });
+    if (showRes.ok) {
+      const note = (await showRes.json()) as MisskeyNote;
+      count = sumReactions(note);
+      favourited = !!note.myReaction;
+    }
+  } catch {
+    // 取得失敗時は楽観値（操作が成功した前提）を返す
+  }
+
+  return { favourited, count };
+}
+
+/** viewerのトークンで投稿をお気に入り登録（Mastodon=favourite / Misskey=リアクション） */
+export function favoriteStatus(params: FavoriteActionParams) {
+  return params.viewerType === "misskey"
+    ? toggleMisskeyReaction(params, "favourite")
+    : toggleFavorite(params, "favourite");
 }
 
 /** viewerのトークンで投稿のお気に入りを解除 */
-export function unfavoriteMastodonStatus(params: FavoriteActionParams) {
-  return toggleFavorite(params, "unfavourite");
+export function unfavoriteStatus(params: FavoriteActionParams) {
+  return params.viewerType === "misskey"
+    ? toggleMisskeyReaction(params, "unfavourite")
+    : toggleFavorite(params, "unfavourite");
 }

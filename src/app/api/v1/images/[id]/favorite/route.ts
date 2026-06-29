@@ -1,8 +1,8 @@
 /**
- * お気に入りエンドポイント（Mastodon連携）
- * GET    /api/v1/images/:id/favorite - キャッシュ取得＋TTL切れ時にMastodonからSync（誰でも可）
- * POST   /api/v1/images/:id/favorite - viewerのトークンでMastodonにお気に入り登録
- * DELETE /api/v1/images/:id/favorite - viewerのトークンでMastodonのお気に入りを解除
+ * お気に入りエンドポイント（Fediverse連携：Mastodon=favourite / Misskey=リアクション）
+ * GET    /api/v1/images/:id/favorite - キャッシュ取得＋TTL切れ時にオーナーからSync（誰でも可）
+ * POST   /api/v1/images/:id/favorite - viewerのトークンでお気に入り登録
+ * DELETE /api/v1/images/:id/favorite - viewerのトークンでお気に入りを解除
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,9 +13,9 @@ import { decryptToken } from "@/lib/auth/tokens";
 import { getAvatarUrl } from "@/lib/avatar";
 import { ErrorCodes, errorResponse, handleUnknownError } from "@/lib/errors";
 import {
-  fetchMastodonFavoriteData,
-  favoriteMastodonStatus,
-  unfavoriteMastodonStatus,
+  fetchFavoriteData,
+  favoriteStatus,
+  unfavoriteStatus,
   toFavoriteReason,
   toFavoriteHttpStatus,
   classifyPostStatus,
@@ -51,9 +51,10 @@ type ImageForFavorite = Prisma.ImageGetPayload<{
   include: { user: { include: { instance: true } } };
 }>;
 
-// この投稿がお気に入り可能か（Mastodonのstatusが存在する投稿のみ）
+// この投稿がお気に入り可能か（Fediverseに投稿済み＝postIdがある投稿のみ。local投稿は対象外）
 function isFavoritable(image: ImageForFavorite): boolean {
-  return image.user.instance.type === "mastodon" && !!image.postId;
+  const t = image.user.instance.type;
+  return (t === "mastodon" || t === "misskey") && !!image.postId;
 }
 
 function readCache(image: ImageForFavorite): CachedFavoriter[] {
@@ -70,7 +71,7 @@ function isFavoritedByViewer(
   return favoriters.some((f) => f.acct === viewerAcct);
 }
 
-// viewer自身をCachedFavoriter形に変換（お気に入りはMastodon限定なので
+// viewer自身をCachedFavoriter形に変換（Mastodon/Misskeyとも
 // プロフィールURLは `https://{domain}/@{username}` で組み立てられる）
 function viewerToFavoriter(viewer: {
   username: string;
@@ -123,13 +124,14 @@ interface SyncResult {
   errorReason: FavoriteErrorReason | null;
 }
 
-// オーナーのトークンでMastodonからお気に入り情報を取得し、キャッシュを更新
+// オーナーのトークンでFediverse（Mastodon/Misskey）からお気に入り情報を取得し、キャッシュを更新
 // 成功/失敗いずれもpostStatusとfavoritesSyncedAtを記録する。次回のTTLはcomputeCacheTtlが
 // postStatusに応じて延長する（4xx→1日、5xx/接続失敗→1時間）→ 結果的に連打を防げる
 async function syncFavoriteCache(image: ImageForFavorite): Promise<SyncResult> {
   try {
     const ownerToken = decryptToken(image.user.accessToken);
-    const data = await fetchMastodonFavoriteData(
+    const data = await fetchFavoriteData(
+      image.user.instance.type,
       image.user.instance.domain,
       ownerToken,
       image.postId!
@@ -256,19 +258,20 @@ async function handleToggle(
     );
   }
 
-  if (viewer.instance.type !== "mastodon") {
+  if (viewer.instance.type !== "mastodon" && viewer.instance.type !== "misskey") {
     return errorResponse(
       ErrorCodes.VALIDATION_INVALID,
-      "お気に入りはMastodonアカウントでのみ利用できます",
+      "お気に入りはMastodon・Misskeyアカウントで利用できます",
       400
     );
   }
 
-  // viewerのトークンでMastodonにお気に入り操作
+  // viewerのトークンでFediverse（Mastodon=favourite / Misskey=リアクション）にお気に入り操作
   let result: { favourited: boolean; count: number };
   try {
     const viewerToken = decryptToken(viewer.accessToken);
     const actionParams = {
+      viewerType: viewer.instance.type,
       viewerDomain: viewer.instance.domain,
       viewerToken,
       ownerDomain: image.user.instance.domain,
@@ -277,8 +280,8 @@ async function handleToggle(
     };
     result =
       action === "favourite"
-        ? await favoriteMastodonStatus(actionParams)
-        : await unfavoriteMastodonStatus(actionParams);
+        ? await favoriteStatus(actionParams)
+        : await unfavoriteStatus(actionParams);
   } catch (error) {
     const reason = toFavoriteReason(error);
     console.error(`[favorite] ${action}失敗 (reason=${reason}): imageId=${imageId}`, error);

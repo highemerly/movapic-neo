@@ -272,7 +272,8 @@ export default async function SpecPage() {
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                     <li>read:account（アカウント情報の読み取り）：ログイン時のアカウント情報（ユーザーID・ユーザー名・表示名・プロフィール画像）の取得に必要</li>
                     <li>write:notes（ノートの作成・削除）：生成した画像の投稿、およびBot投稿機能における元投稿の削除に必要</li>
-                    <li>drive:write（ドライブへの書き込み）：投稿する画像のアップロードに必要</li>
+                    <li>write:drive（ドライブへの書き込み）：投稿する画像のアップロードに必要</li>
+                    <li>write:reactions（リアクションの操作）：お気に入り（リアクション）の登録・解除に必要</li>
                   </ul>
                 </div>
               </div>

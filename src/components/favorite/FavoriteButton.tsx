@@ -37,7 +37,7 @@ export function FavoriteButton({
   const [isLoading, setIsLoading] = useState(false);
   const [showAnimation, setShowAnimation] = useState(false);
 
-  // マウント時にMastodonの最新状態へ同期（サーバー側でTTL切れ時のみMastodonにアクセス）
+  // マウント時にFediverseの最新状態へ同期（サーバー側でTTL切れ時のみオーナーへアクセス）
   const hasSynced = useRef(false);
   useEffect(() => {
     if (hasSynced.current) return;

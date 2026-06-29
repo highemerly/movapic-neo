@@ -155,10 +155,12 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   // 投稿者が直近（先月/今月）の皆勤賞を取っていればアバターに王冠を表示
   const posterPerfectAttendance = await hasRecentPerfectAttendance(image.user.id);
 
-  // Mastodonお気に入りキャッシュから初期表示データを算出
-  // お気に入り可能 = Mastodonのstatusが存在する投稿のみ（local投稿・Misskeyは対象外）
-  const favoritable = image.user.instance.type === "mastodon" && !!image.postId;
-  const isMisskey = image.user.instance.type === "misskey";
+  // お気に入りキャッシュから初期表示データを算出
+  // お気に入り可能 = Fediverseに投稿済み（postIdがある）投稿のみ（local投稿は対象外）
+  const favoritable =
+    (image.user.instance.type === "mastodon" ||
+      image.user.instance.type === "misskey") &&
+    !!image.postId;
   const cachedFavoriters =
     (image.favoritersCache as unknown as CachedFavoriter[] | null) ?? [];
   const viewerAcct = currentUser
@@ -173,7 +175,8 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   // 削除確定（404/410）が分かっている時はトグル不可
   const canFavorite =
     !!currentUser &&
-    currentUser.instance.type === "mastodon" &&
+    (currentUser.instance.type === "mastodon" ||
+      currentUser.instance.type === "misskey") &&
     persistedReason !== "deleted";
 
   // 前後の画像を取得
@@ -426,7 +429,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           />
         </div>
 
-        {/* お気に入り（Mastodon連携） */}
+        {/* お気に入り（Fediverse連携：Mastodon=favourite / Misskey=リアクション） */}
         {favoritable ? (
           <div className="mt-[10px] flex items-center gap-2">
             <FavoriteButton
@@ -446,13 +449,9 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
                   ? "この投稿は削除されているため操作できません"
                   : !currentUser
                     ? "ログインするとお気に入りできます"
-                    : "お気に入りはMastodonアカウントで利用できます"
+                    : "お気に入りはMastodon・Misskeyアカウントで利用できます"
               }
             />
-          </div>
-        ) : !isMisskey ? (
-          <div className="mt-[10px] text-[11px] text-muted-foreground/70">
-            Mastodon に投稿されていないため、お気に入り機能は使えません。
           </div>
         ) : null}
 
