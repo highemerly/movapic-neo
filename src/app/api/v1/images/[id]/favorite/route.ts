@@ -6,59 +6,68 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { getCurrentUser, getCurrentUserWithValidation } from "@/lib/auth/session";
 import prisma from "@/lib/db";
 import { decryptToken } from "@/lib/auth/tokens";
 import { getAvatarUrl } from "@/lib/avatar";
 import { ErrorCodes, errorResponse, handleUnknownError } from "@/lib/errors";
 import {
-  fetchFavoriteData,
   favoriteStatus,
   unfavoriteStatus,
   toFavoriteReason,
-  toFavoriteHttpStatus,
   classifyPostStatus,
   favoriteErrorMessage,
   type CachedFavoriter,
   type FavoriteErrorReason,
 } from "@/lib/fediverse/favorite";
-import { reconcileFavoriteNotificationSafely } from "@/lib/notifications/favoriteNotifications";
+import {
+  syncFavoriteCache,
+  readCache,
+  type ImageForFavorite,
+} from "@/lib/fediverse/favoriteSync";
 
 // 投稿経過時間ベースのTTL（fav数が動きやすい投稿直後ほど短く）
 const MIN_MS = 60_000;
 const HOUR_MS = 60 * MIN_MS;
 const DAY_MS = 24 * HOUR_MS;
 
+/** 成熟と見なす日数。これを過ぎたらfav数はほぼ動かないので最終syncを1回だけ行い停止する */
+const MATURE_DAYS = 14;
+
 // 最後のsync結果（postStatus）と投稿経過時間からTTLを算出
-// - 4xx: 1日（削除確定・権限不足など、頻繁に再試行する意味が薄い）
-// - 5xx / 0(接続失敗): 1時間
-// - 200 / null: 投稿経過時間ベース
-function computeCacheTtl(postCreatedAt: Date, postStatus: number | null): number {
+// - 4xx（429除く）: 1日（削除確定・権限不足など、頻繁に再試行する意味が薄い）
+// - 429 / 5xx / 0(接続失敗): 1時間（レート制限・一時障害。少し置いて再試行）
+// - 200 / null: 投稿経過時間ベース。
+//   14日超は「成熟後（createdAt+14日 以降）のsyncが既にあれば Infinity＝停止」。
+//   まだ成熟後syncが無ければ 0（=即stale）を返し、次のGETで最終syncを1回だけ走らせる。
+//   ※ 年齢だけで停止すると、若い頃のsyncしか無い古い投稿を開いたとき古い値が出続けるため、
+//     「成熟後に1回syncできたら停止」を syncedAt 基準で判定する。
+function computeCacheTtl(
+  postCreatedAt: Date,
+  postStatus: number | null,
+  favoritesSyncedAt: Date | null
+): number {
   if (postStatus !== null) {
+    if (postStatus === 429 || postStatus === 0 || (postStatus >= 500 && postStatus < 600))
+      return HOUR_MS;
     if (postStatus >= 400 && postStatus < 500) return DAY_MS;
-    if (postStatus === 0 || (postStatus >= 500 && postStatus < 600)) return HOUR_MS;
   }
   const age = Date.now() - postCreatedAt.getTime();
   if (age <= 5 * MIN_MS) return 1 * MIN_MS;
-  if (age <= 2 * HOUR_MS) return 5 * MIN_MS;
-  if (age <= 1 * DAY_MS) return 30 * MIN_MS;
-  if (age <= 5 * DAY_MS) return 1 * HOUR_MS;
-  return 1 * DAY_MS;
+  if (age <= 1 * HOUR_MS) return 5 * MIN_MS;
+  if (age <= 3 * HOUR_MS) return 10 * MIN_MS;
+  if (age <= 1 * DAY_MS) return 1 * HOUR_MS;
+  if (age <= MATURE_DAYS * DAY_MS) return 1 * DAY_MS;
+  const matureMark = postCreatedAt.getTime() + MATURE_DAYS * DAY_MS;
+  const hasMatureSync =
+    !!favoritesSyncedAt && favoritesSyncedAt.getTime() >= matureMark;
+  return hasMatureSync ? Infinity : 0;
 }
-
-type ImageForFavorite = Prisma.ImageGetPayload<{
-  include: { user: { include: { instance: true } } };
-}>;
 
 // この投稿がお気に入り可能か（Fediverseに投稿済み＝postIdがある投稿のみ。local投稿は対象外）
 function isFavoritable(image: ImageForFavorite): boolean {
   const t = image.user.instance.type;
   return (t === "mastodon" || t === "misskey") && !!image.postId;
-}
-
-function readCache(image: ImageForFavorite): CachedFavoriter[] {
-  return (image.favoritersCache as unknown as CachedFavoriter[] | null) ?? [];
 }
 
 // viewerのacctがキャッシュに含まれるか
@@ -118,65 +127,6 @@ function toClientFavoriters(favoriters: CachedFavoriter[]) {
   }));
 }
 
-interface SyncResult {
-  count: number;
-  favoriters: CachedFavoriter[];
-  errorReason: FavoriteErrorReason | null;
-}
-
-// オーナーのトークンでFediverse（Mastodon/Misskey）からお気に入り情報を取得し、キャッシュを更新
-// 成功/失敗いずれもpostStatusとfavoritesSyncedAtを記録する。次回のTTLはcomputeCacheTtlが
-// postStatusに応じて延長する（4xx→1日、5xx/接続失敗→1時間）→ 結果的に連打を防げる
-async function syncFavoriteCache(image: ImageForFavorite): Promise<SyncResult> {
-  try {
-    const ownerToken = decryptToken(image.user.accessToken);
-    const data = await fetchFavoriteData(
-      image.user.instance.type,
-      image.user.instance.domain,
-      ownerToken,
-      image.postId!
-    );
-    // 更新前の状態（差分の基準）を退避してから上書きする
-    const previousFavoriters = readCache(image);
-    const wasFirstSync = !image.favoritesSyncedAt;
-    await prisma.image.update({
-      where: { id: image.id },
-      data: {
-        favoriteCount: data.count,
-        favoritersCache: data.favoriters as unknown as Prisma.InputJsonValue,
-        favoritesSyncedAt: new Date(),
-        postStatus: 200,
-      },
-    });
-    // 「お気に入りされた」通知を差分更新（失敗してもsync本体は止めない）
-    await reconcileFavoriteNotificationSafely({
-      imageId: image.id,
-      ownerUserId: image.userId,
-      ownerAcct: `${image.user.username}@${image.user.instance.domain}`,
-      wasFirstSync,
-      previousFavoriters,
-      currentFavoriters: data.favoriters,
-      count: data.count,
-    });
-    return { count: data.count, favoriters: data.favoriters, errorReason: null };
-  } catch (error) {
-    const httpStatus = toFavoriteHttpStatus(error);
-    console.error(
-      `[favorite] sync失敗 (status=${httpStatus}): imageId=${image.id}`,
-      error
-    );
-    await prisma.image.update({
-      where: { id: image.id },
-      data: { favoritesSyncedAt: new Date(), postStatus: httpStatus },
-    });
-    return {
-      count: image.favoriteCount,
-      favoriters: readCache(image),
-      errorReason: toFavoriteReason(error),
-    };
-  }
-}
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -205,7 +155,11 @@ export async function GET(
 
     // TTL切れ（または未取得）ならMastodonからSync
     if (favoritable) {
-      const ttl = computeCacheTtl(image.createdAt, image.postStatus);
+      const ttl = computeCacheTtl(
+        image.createdAt,
+        image.postStatus,
+        image.favoritesSyncedAt
+      );
       const isStale =
         !image.favoritesSyncedAt ||
         Date.now() - image.favoritesSyncedAt.getTime() > ttl;

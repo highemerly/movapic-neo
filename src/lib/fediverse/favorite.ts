@@ -52,6 +52,7 @@ export class FavoriteError extends Error {
  * - 2xx: null（成功）
  * - 404/410: deleted
  * - 401/403: forbidden
+ * - 429: unavailable（レート制限。一時的なので5xxと同じ「時間をおいて再試行」扱い）
  * - その他4xx: forbidden扱い
  * - 5xx / 0(接続失敗): unavailable
  */
@@ -62,6 +63,7 @@ export function classifyPostStatus(
   if (status >= 200 && status < 300) return null;
   if (status === 404 || status === 410) return "deleted";
   if (status === 401 || status === 403) return "forbidden";
+  if (status === 429) return "unavailable";
   if (status >= 400 && status < 500) return "forbidden";
   if (status === 0 || (status >= 500 && status < 600)) return "unavailable";
   return "unavailable";

@@ -11,6 +11,8 @@
 
 import { pollAndEnqueueMentions } from "@/lib/mention/ingest";
 import { listExpiredObjects, deleteImage } from "@/lib/storage/storage";
+import prisma from "@/lib/db";
+import { syncFavoriteCache } from "@/lib/fediverse/favoriteSync";
 
 interface PeriodicJob {
   /** ログ識別用の名前 */
@@ -20,6 +22,11 @@ interface PeriodicJob {
 
 /** tmp/* 一時ファイルを残留とみなすしきい値（30分） */
 const TMP_MAX_AGE_MS = 30 * 60 * 1000;
+
+/** お気に入りフォールバックsyncの1回あたり最大件数（初回展開時の thundering herd を防ぐ） */
+const FAVORITE_SYNC_BATCH = 20;
+/** フォールバックsyncの同時実行数（連携先インスタンスへの集中を避ける） */
+const FAVORITE_SYNC_CONCURRENCY = 5;
 
 /**
  * Bot メンションの取りこぼし回収。
@@ -86,13 +93,93 @@ const tmpCleanup: PeriodicJob = {
 };
 
 /**
+ * お気に入り情報のフォールバック sync。
+ *
+ * 通常お気に入りは画像詳細ページの GET（TTL切れ時）で同期されるが、詳細ページに
+ * 一度もアクセスが無い投稿は取りこぼされる。それを定期的に拾うのがこのジョブ。
+ *
+ * 共通の足切り（SQLで選別）:
+ *   - 投稿（createdAt）から1日以上経過
+ *   - かつ「最後のsyncから12時間以上経過」または「一度もsyncしていない」
+ *     （4xx/5xxが12時間以内に記録されていれば対象外＝失敗の再試行は12時間間隔に絞る）
+ *
+ * 発火タイミングは2つ。どちらも「成功syncが1回走ったら、その段（1日／14日）では二度と発火
+ * しない」よう COALESCE(...,false) で締める（never-synced・NULL は false 側に倒れ必ず対象）:
+ *   - fire1: 1日経過後にまだ成功syncが無い → 投稿が落ち着いた頃のfavを1回拾う
+ *   - fire2: 14日経過後にまだ「14日以降の成功sync」が無い → 成熟後の最終syncを1回拾い、以後停止
+ * これにより、ページが一度も開かれない投稿でも day1 と day14 で各1回ずつ同期され、
+ * 14日以降の成功syncが入った時点で（GET側の Infinity 停止と歩調を合わせて）恒久的に止まる。
+ * 失敗（4xx/5xx）は post_status≠200 のままなので、成功するまで12時間間隔で再試行され続ける。
+ */
+const favoriteSyncJob: PeriodicJob = {
+  name: "favorite-sync",
+  run: async () => {
+    const rows = await prisma.$queryRaw<{ id: string }[]>`
+      SELECT id FROM images
+      WHERE is_public = true
+        AND is_disabled = false
+        AND post_id IS NOT NULL
+        AND created_at <= now() - interval '1 day'
+        AND (favorites_synced_at IS NULL OR favorites_synced_at <= now() - interval '12 hours')
+        AND (
+          NOT COALESCE(
+            post_status = 200 AND favorites_synced_at >= created_at + interval '1 day',
+            false
+          )
+          OR (
+            created_at <= now() - interval '14 days'
+            AND NOT COALESCE(
+              post_status = 200 AND favorites_synced_at >= created_at + interval '14 days',
+              false
+            )
+          )
+        )
+      ORDER BY favorites_synced_at ASC NULLS FIRST
+      LIMIT ${FAVORITE_SYNC_BATCH}
+    `;
+    if (rows.length === 0) return;
+
+    let synced = 0;
+    let failed = 0;
+    // 連携先インスタンスへ一度に殺到させないよう、少数ずつ並列で回す
+    for (let i = 0; i < rows.length; i += FAVORITE_SYNC_CONCURRENCY) {
+      const chunk = rows.slice(i, i + FAVORITE_SYNC_CONCURRENCY);
+      const results = await Promise.all(
+        chunk.map(async ({ id }) => {
+          const image = await prisma.image.findUnique({
+            where: { id },
+            include: { user: { include: { instance: true } } },
+          });
+          // 取得〜選別の間に削除/非公開化された場合はスキップ
+          if (!image || !image.isPublic || image.isDisabled || !image.postId) {
+            return null;
+          }
+          // syncFavoriteCache は内部で例外を握り errorReason を返す（throw しない）
+          return syncFavoriteCache(image);
+        })
+      );
+      for (const r of results) {
+        if (r === null) continue;
+        if (r.errorReason) failed++;
+        else synced++;
+      }
+    }
+
+    if (synced || failed) {
+      console.log(
+        `[periodic] favorite-sync: candidates=${rows.length} synced=${synced} failed=${failed}`
+      );
+    }
+  },
+};
+
+/**
  * 実行する定期ジョブ一覧。先頭から順に実行される。
  *
  * 今後ここに足す予定（実装は別途）:
- *   - お気に入り情報を一度も取得しておらず、かつ投稿後2時間が経過した投稿の取得
  *   - 定期判定でしか付与できない実績の判定
  */
-const periodicJobs: PeriodicJob[] = [mentionPoll, tmpCleanup];
+const periodicJobs: PeriodicJob[] = [mentionPoll, tmpCleanup, favoriteSyncJob];
 
 /** 全ての定期ジョブを順に実行する。各ジョブの失敗は隔離され、他のジョブには波及しない。 */
 export async function runPeriodicJobs(): Promise<void> {
