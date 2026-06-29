@@ -104,20 +104,25 @@ export function ImageActionsMenu({
         throw new Error(data.error || "削除に失敗しました");
       }
 
-      // サービスからの削除は完了。Mastodonに投稿が残っている場合は、
+      // サービスからの削除は完了。連携先（Mastodon/Misskey）に投稿が残っている場合は、
       // 続けて「そちらも削除しますか？」を尋ねる。
       const data: {
-        mastodonStatus?: { statusId: string; statusUrl: string | null } | null;
+        remoteStatus?: {
+          statusId: string;
+          statusUrl: string | null;
+          platform: "mastodon" | "misskey";
+        } | null;
       } = await response.json().catch(() => ({}));
 
-      let deletedMastodon = false;
-      const mastodonStatus = data.mastodonStatus;
-      if (mastodonStatus) {
+      let deletedRemote = false;
+      const remoteStatus = data.remoteStatus;
+      if (remoteStatus) {
+        const platformName =
+          remoteStatus.platform === "misskey" ? "Misskey" : "Mastodon";
         const deleteRemote = await confirm({
-          title: "Mastodonの投稿も削除",
-          description:
-            "この画像はMastodonにも投稿されています。Mastodon側の投稿も削除しますか？",
-          confirmText: "Mastodonからも削除",
+          title: `${platformName}の投稿も削除`,
+          description: `この画像は${platformName}にも投稿されています。${platformName}側の投稿も削除しますか？`,
+          confirmText: `${platformName}からも削除`,
           cancelText: "残しておく",
           destructive: true,
         });
@@ -129,22 +134,22 @@ export function ImageActionsMenu({
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ statusId: mastodonStatus.statusId }),
+                body: JSON.stringify({ statusId: remoteStatus.statusId }),
               }
             );
             if (!remoteResponse.ok) {
               const remoteData = await remoteResponse.json().catch(() => ({}));
               throw new Error(
-                remoteData.error || "Mastodon投稿の削除に失敗しました"
+                remoteData.error || `${platformName}投稿の削除に失敗しました`
               );
             }
-            deletedMastodon = true;
+            deletedRemote = true;
           } catch (error) {
             // サービス側の画像は既に削除済みなので、ここでは通知のみ
             toast.error(
               error instanceof Error
                 ? error.message
-                : "Mastodon投稿の削除に失敗しました"
+                : `${platformName}投稿の削除に失敗しました`
             );
           }
         }
@@ -152,8 +157,8 @@ export function ImageActionsMenu({
 
       // 成功トーストは遷移先のユーザーページで表示する（投稿完了時と同じ方式）。
       router.push(
-        deletedMastodon
-          ? `/u/${username}?deleted=mastodon`
+        deletedRemote
+          ? `/u/${username}?deleted=remote`
           : `/u/${username}?deleted=1`
       );
       router.refresh();

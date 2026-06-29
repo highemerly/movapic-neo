@@ -1,8 +1,8 @@
 /**
- * Mastodon投稿削除エンドポイント
+ * Fediverse投稿削除エンドポイント（Mastodon=status / Misskey=note）
  * POST /api/v1/fediverse/delete-status
  *
- * 画像削除後に「Mastodonに残っている投稿も削除する」をユーザーが選んだときに呼ぶ。
+ * 画像削除後に「連携先に残っている投稿も削除する」をユーザーが選んだときに呼ぶ。
  * ユーザー自身のアクセストークンで、ユーザーのインスタンスの投稿を削除する。
  * （画像のDBレコードは既に削除済みのため、statusId はクライアントから受け取る。
  *  自分のトークンでは自分の投稿しか削除できないため、これは安全。）
@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserWithValidation } from "@/lib/auth/session";
 import { decryptToken } from "@/lib/auth/tokens";
-import { deleteMastodonStatus } from "@/lib/fediverse/delete";
+import { deleteFediverseStatus } from "@/lib/fediverse/delete";
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,9 +21,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
 
-    if (user.instance.type !== "mastodon") {
+    if (user.instance.type !== "mastodon" && user.instance.type !== "misskey") {
       return NextResponse.json(
-        { error: "Mastodonアカウントではありません" },
+        { error: "対応していないアカウント種別です" },
         { status: 400 }
       );
     }
@@ -45,7 +45,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "削除に失敗しました" }, { status: 500 });
     }
 
-    const ok = await deleteMastodonStatus(
+    const ok = await deleteFediverseStatus(
+      user.instance.type,
       user.instance.domain,
       accessToken,
       statusId
@@ -53,14 +54,14 @@ export async function POST(request: NextRequest) {
 
     if (!ok) {
       return NextResponse.json(
-        { error: "Mastodon投稿の削除に失敗しました" },
+        { error: "連携先の投稿の削除に失敗しました" },
         { status: 502 }
       );
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Failed to delete Mastodon status:", error);
+    console.error("Failed to delete fediverse status:", error);
     return NextResponse.json({ error: "削除に失敗しました" }, { status: 500 });
   }
 }

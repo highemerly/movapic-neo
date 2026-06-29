@@ -127,8 +127,8 @@ export default async function UserGalleryPage({
 
   return (
     <>
-      {deleted === "mastodon" && (
-        <SuccessToast message="Mastodonの投稿も削除しました" />
+      {deleted === "remote" && (
+        <SuccessToast message="連携先の投稿も削除しました" />
       )}
       {deleted === "1" && <SuccessToast message="画像を削除しました" />}
       <SiteHeader

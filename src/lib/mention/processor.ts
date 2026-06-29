@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { renderImage, finalizeImage } from "@/lib/compute/client";
 import { publishImage, PublishVisibility } from "@/lib/publish/publishImage";
 import { MastodonVisibility } from "@/lib/fediverse/post";
+import { deleteFediverseStatus } from "@/lib/fediverse/delete";
 import { decryptToken } from "@/lib/auth/tokens";
 import { MastodonNotification } from "./fetcher";
 import { parseMentionContent, formatOptionsSummary, ParsedMentionOptions } from "./parser";
@@ -116,38 +117,19 @@ async function fetchImage(url: string): Promise<Buffer> {
 }
 
 /**
- * URIからオリジナルのステータスIDを抽出
- * 例: https://handon.club/users/username/statuses/123456 → 123456
+ * URIからオリジナルの投稿ID（Mastodon=statusId / Misskey=noteId）を抽出
+ * 例（Mastodon）: https://handon.club/users/username/statuses/123456 → 123456
+ * 例（Misskey）:  https://mi.hiyoko.club/notes/9abcdef → 9abcdef
  */
-function extractStatusIdFromUri(uri: string): string | null {
+function extractStatusIdFromUri(uri: string, instanceType: string): string | null {
+  if (instanceType === "misskey") {
+    // Misskey形式: https://instance/notes/ID（IDは英数字）
+    const misskeyMatch = uri.match(/\/notes\/([a-zA-Z0-9]+)\/?$/);
+    return misskeyMatch ? misskeyMatch[1] : null;
+  }
   // Mastodon形式: https://instance/users/username/statuses/ID
   const mastodonMatch = uri.match(/\/statuses\/(\d+)$/);
-  if (mastodonMatch) {
-    return mastodonMatch[1];
-  }
-  return null;
-}
-
-/**
- * 元投稿を削除（ユーザーのトークンで、ユーザーのインスタンスから）
- */
-async function deleteOriginalStatus(
-  userInstanceDomain: string,
-  accessToken: string,
-  originalStatusId: string
-): Promise<void> {
-  const response = await fetch(`https://${userInstanceDomain}/api/v1/statuses/${originalStatusId}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "User-Agent": USER_AGENT,
-    },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT),
-  });
-
-  if (!response.ok) {
-    console.error(`[mention] 元投稿削除失敗: ${response.status}`);
-  }
+  return mastodonMatch ? mastodonMatch[1] : null;
 }
 
 /**
@@ -444,17 +426,26 @@ export async function processOneMention(
 
   // STEP10: 元投稿削除（effectiveKeepがfalseの場合のみ）
   if (!effectiveKeep) {
-    // URIからオリジナルのステータスIDを抽出
-    const originalStatusId = extractStatusIdFromUri(notification.status!.uri);
+    // URIからオリジナルの投稿ID（Mastodon=statusId / Misskey=noteId）を抽出
+    const originalStatusId = extractStatusIdFromUri(
+      notification.status!.uri,
+      user.instance.type
+    );
     if (originalStatusId) {
       try {
-        await deleteOriginalStatus(user.instance.domain, user.accessToken, originalStatusId);
+        // user.accessToken は findUserByAcct で復号済み
+        await deleteFediverseStatus(
+          user.instance.type,
+          user.instance.domain,
+          user.accessToken,
+          originalStatusId
+        );
       } catch (error) {
         console.error(`[mention] 元投稿削除失敗:`, error);
         // 元投稿削除失敗はログのみ、処理は続行
       }
     } else {
-      console.warn(`[mention] URIからステータスIDを抽出できませんでした: ${notification.status!.uri}`);
+      console.warn(`[mention] URIから投稿IDを抽出できませんでした: ${notification.status!.uri}`);
     }
   }
 
