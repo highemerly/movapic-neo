@@ -246,6 +246,33 @@ const MISSKEY_HEADERS = {
 };
 
 /**
+ * Misskeyのエラーを分類する。
+ *
+ * Misskeyは削除済みノートも権限不足も大半を HTTP 400 で返すため、HTTPステータスだけでは
+ * deleted と forbidden を区別できない。レスポンスボディの error.code で判別する。
+ * さらに、後段（syncのpostStatus保存→次回GETでの classifyPostStatus 復元、TTL算出）が
+ * Mastodonのステータス前提で動くため、Mastodon相当のステータス（deleted→404 / forbidden→403）
+ * に正規化して返す。
+ */
+function classifyMisskeyError(
+  bodyText: string,
+  status: number
+): { reason: FavoriteErrorReason; status: number } {
+  if (bodyText.includes("NO_SUCH_NOTE")) {
+    return { reason: "deleted", status: 404 };
+  }
+  if (
+    bodyText.includes("AUTHENTICATION_FAILED") ||
+    bodyText.includes("CREDENTIAL_REQUIRED") ||
+    bodyText.includes("PERMISSION_DENIED") ||
+    bodyText.includes("ACCESS_DENIED")
+  ) {
+    return { reason: "forbidden", status: 403 };
+  }
+  return { reason: classifyPostStatus(status) ?? "unavailable", status };
+}
+
+/**
  * オーナー（Misskey）インスタンスから、投稿のリアクション情報
  * （合計数 + リアクションしたユーザー上位40件）を取得する。失敗時は例外を投げる。
  */
@@ -270,18 +297,14 @@ export async function fetchMisskeyFavoriteData(
   ]);
 
   if (!noteRes.ok) {
-    throw new FavoriteError(
-      classifyPostStatus(noteRes.status)!,
-      noteRes.status,
-      `note取得に失敗: ${noteRes.status}`
-    );
+    const text = await noteRes.text().catch(() => "");
+    const { reason, status } = classifyMisskeyError(text, noteRes.status);
+    throw new FavoriteError(reason, status, `note取得に失敗: ${noteRes.status}`);
   }
   if (!reactionsRes.ok) {
-    throw new FavoriteError(
-      classifyPostStatus(reactionsRes.status)!,
-      reactionsRes.status,
-      `reactions取得に失敗: ${reactionsRes.status}`
-    );
+    const text = await reactionsRes.text().catch(() => "");
+    const { reason, status } = classifyMisskeyError(text, reactionsRes.status);
+    throw new FavoriteError(reason, status, `reactions取得に失敗: ${reactionsRes.status}`);
   }
 
   const note = (await noteRes.json()) as MisskeyNote;
@@ -458,11 +481,8 @@ async function toggleMisskeyReaction(
       (action === "favourite" && detail.includes("ALREADY_REACTED")) ||
       (action === "unfavourite" && detail.includes("NOT_REACTED"));
     if (!alreadyInDesiredState) {
-      throw new FavoriteError(
-        classifyPostStatus(response.status)!,
-        response.status,
-        `リアクション操作に失敗: ${response.status}`
-      );
+      const { reason, status } = classifyMisskeyError(detail, response.status);
+      throw new FavoriteError(reason, status, `リアクション操作に失敗: ${response.status}`);
     }
   }
 
