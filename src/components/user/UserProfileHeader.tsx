@@ -4,6 +4,7 @@ import Link from "@/components/Link";
 import { Images, Calendar, Map as MapIcon, Trophy, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
+import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
 import { userPathSegment } from "@/lib/userHandle";
 
@@ -24,6 +25,7 @@ interface UserProfileHeaderProps {
     createdAt: string;
     instance: {
       domain: string;
+      type: string;
     };
   };
   imageCount: number;
@@ -46,6 +48,9 @@ export function UserProfileHeader({
 }: UserProfileHeaderProps) {
   // /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）
   const seg = userPathSegment(user.username, user.instance.domain);
+
+  // インスタンス種別に応じたアイコン（Misskey/Mastodon）
+  const InstanceIcon = user.instance.type === "misskey" ? MisskeyIcon : MastodonIcon;
 
   // 地図タブは常に表示（オプトイン未済でも表示し、遷移先で公開設定の有無に応じた案内を出す）
   const tabs: Tab[] = [
@@ -103,7 +108,7 @@ export function UserProfileHeader({
             rel="noopener noreferrer"
             className="flex w-fit items-center gap-1 mt-[5px] text-[11px] leading-none text-muted-foreground hover:underline"
           >
-            <MastodonIcon className="w-2.5 h-2.5" />
+            <InstanceIcon className="w-2.5 h-2.5" />
             @{user.username}@{user.instance.domain}
           </a>
           {user.bio && (

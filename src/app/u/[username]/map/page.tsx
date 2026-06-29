@@ -84,7 +84,7 @@ export default async function UserMapPage({
         avatarUrl: getAvatarUrl(user.avatarUrl),
         bio: user.bio,
         createdAt: user.createdAt.toISOString(),
-        instance: { domain: user.instance.domain },
+        instance: { domain: user.instance.domain, type: user.instance.type },
       }}
       imageCount={totalImageCount}
       goldCount={rankCounts.gold}
