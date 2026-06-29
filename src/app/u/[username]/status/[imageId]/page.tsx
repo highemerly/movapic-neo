@@ -29,6 +29,8 @@ import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
+import { MastodonIcon } from "@/components/icons/MastodonIcon";
+import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import { User, CalendarDays, Camera, MapPin, Reply, Repeat2, Bookmark, Share2, Globe, Mail, Bot, ChevronLeft, Trophy } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -278,6 +280,10 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   // displayName 未設定時は username にフォールバック。params の username は URL エンコード済み
   // （@ が %40 に化ける）ため、DB のクリーンな image.user.username を使う。
   const galleryName = image.user.displayName || image.user.username;
+
+  // 投稿者の所属インスタンス種別に応じたアイコン（Misskey/Mastodon）
+  const PosterInstanceIcon =
+    image.user.instance.type === "misskey" ? MisskeyIcon : MastodonIcon;
   let backUrl = `/u/${username}`;
   let backLabel = `${galleryName} のギャラリーに戻る`;
   if (from === "public") {
@@ -567,9 +573,10 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               href={`https://${image.user.instance.domain}/@${image.user.username}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="block text-xs text-muted-foreground hover:underline truncate"
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:underline truncate"
             >
-              @{image.user.username}@{image.user.instance.domain}
+              <PosterInstanceIcon className="w-3 h-3 shrink-0" />
+              <span className="truncate">@{image.user.username}@{image.user.instance.domain}</span>
             </a>
           </div>
           <div className="flex items-center gap-1">
