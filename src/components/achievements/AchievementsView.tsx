@@ -256,6 +256,9 @@ function DetailBody({
     const achievedTiers = tiers.filter((d) => grantedMap.has(d.key));
     const top = achievedTiers[achievedTiers.length - 1];
     const any = achievedTiers.length > 0;
+    // 次に獲得できる段（未獲得のうち最も下の段）。1段も獲っていなければ最初の段。
+    // ここまでは称号を見せ、それより上は ？？？ で伏せる。
+    const nextTier = tiers.find((d) => !grantedMap.has(d.key));
     const unit = meta?.unit ?? "";
     const currentValue = ladderValues[entry.ladderKey] ?? 0;
     return (
@@ -288,7 +291,7 @@ function DetailBody({
                     <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-muted-foreground/40" />
                   )}
                   <span className="truncate font-medium">
-                    {done || (!any && d.key === tiers[0]?.key) ? d.title : "？？？"}
+                    {done || d.key === nextTier?.key ? d.title : "？？？"}
                   </span>
                   <span className="shrink-0 tabular-nums text-muted-foreground">
                     ({d.tier}
