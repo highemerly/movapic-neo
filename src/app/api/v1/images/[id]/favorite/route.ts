@@ -131,15 +131,22 @@ export async function GET(
       lastSyncedAt = new Date(); // この同期で更新された
     }
 
-    return NextResponse.json({
-      success: true,
-      favoritable,
-      favoriteCount: count,
-      isFavorited: isFavoritedByViewer(favoriters, currentUser),
-      favoriters: toClientFavoriters(favoriters),
-      lastSyncedAt: lastSyncedAt?.toISOString() ?? null,
-      syncError: favoriteErrorMessage(errorReason),
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        favoritable,
+        favoriteCount: count,
+        isFavorited: isFavoritedByViewer(favoriters, currentUser),
+        favoriters: toClientFavoriters(favoriters),
+        lastSyncedAt: lastSyncedAt?.toISOString() ?? null,
+        syncError: favoriteErrorMessage(errorReason),
+      },
+      {
+        // ブラウザで60秒キャッシュ。isFavorited 等は viewer 依存なので private
+        // （CDN/共有プロキシが他ユーザーへ配らないように）
+        headers: { "Cache-Control": "private, max-age=60" },
+      }
+    );
   } catch (error) {
     return handleUnknownError(error);
   }

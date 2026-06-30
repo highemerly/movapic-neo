@@ -91,6 +91,8 @@ Misskey は削除も権限不足も HTTP 400 で返すため、`classifyMisskeyE
 
 POST/DELETE 成功時は TTL に関係なく**必ず即同期**する。
 
+GET レスポンスには最終同期時刻 `lastSyncedAt`（ISO8601／未同期は null）を含む。また `Cache-Control: private, max-age=60` を付与してブラウザに60秒キャッシュさせる（`isFavorited` 等が viewer 依存のため共有キャッシュ不可＝`private`）。
+
 ## 6. 定期フォールバック同期（`favoriteSyncJob`）
 
 画像詳細ページに**一度もアクセスが無い投稿**は GET 経由の同期に乗らない。これを 30分ごとの定期ジョブで拾う。発火条件の**正は `isFavoriteSyncDue()`（純粋関数・テスト済み）**。SQL（`FAVORITE_SYNC_WHERE`）はそれを DB 側で先に絞るための最適化で、取得後に `isFavoriteSyncDue()` で最終ゲートする（SQL と TS が万一ズレても TS が正）。
