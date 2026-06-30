@@ -8,6 +8,7 @@ import type { FavoriteFeedData } from "@/components/layout/useUnseenNotification
 export function formatNotificationDate(value: string | Date): string {
   const d = typeof value === "string" ? new Date(value) : value;
   return d.toLocaleString("ja-JP", {
+    timeZone: "Asia/Tokyo",
     year: "numeric",
     month: "long",
     day: "numeric",

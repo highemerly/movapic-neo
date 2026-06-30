@@ -314,7 +314,7 @@ export default async function DashboardPage() {
             )}
             <p className="mt-3 text-xs text-muted-foreground">
               {userWithPreferences?.createdAt &&
-                `${userWithPreferences.createdAt.toLocaleDateString("ja-JP", { year: "numeric", month: "numeric", day: "numeric" })}に登録・`}
+                `${userWithPreferences.createdAt.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "numeric", day: "numeric" })}に登録・`}
               獲得お気に入り{totalFavorites}件
             </p>
           </div>

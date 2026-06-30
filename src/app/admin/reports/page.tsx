@@ -169,7 +169,7 @@ export default async function AdminReportsPage() {
                         </Link>
                       </dd>
                       <dt className="text-muted-foreground">投稿日</dt>
-                      <dd>{g.image.createdAt.toLocaleString("ja-JP")}</dd>
+                      <dd>{g.image.createdAt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</dd>
                     </dl>
                   </div>
 
@@ -194,7 +194,7 @@ export default async function AdminReportsPage() {
                               {rep.reason}
                             </dd>
                             <dt className="text-muted-foreground">通報日</dt>
-                            <dd>{rep.createdAt.toLocaleString("ja-JP")}</dd>
+                            <dd>{rep.createdAt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</dd>
                           </dl>
                         </li>
                       ))}
@@ -275,7 +275,7 @@ export default async function AdminReportsPage() {
                         </Link>
                       </dd>
                       <dt className="text-muted-foreground">投稿日</dt>
-                      <dd>{img.createdAt.toLocaleString("ja-JP")}</dd>
+                      <dd>{img.createdAt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}</dd>
                     </dl>
                     <ReportActions imageId={img.id} isDisabled mode="disabled" />
                   </div>
