@@ -37,8 +37,8 @@ export default async function SessionsPage() {
   return (
     <>
       <SiteHeader user={{ username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) }} />
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <div className="mb-4">
+      <div className="container mx-auto px-4 py-3 max-w-2xl">
+        <div className="mb-2">
           <Link
             href="/dashboard"
             className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"

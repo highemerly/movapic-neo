@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "@/components/Link";
-import { ArrowLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
@@ -56,14 +56,16 @@ export default async function ReleaseNoteDetailPage({
   return (
     <>
       <SiteHeader user={user ? { username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) } : null} />
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <Link
-          href="/spec/release-note"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          リリースノート一覧へ
-        </Link>
+      <div className="container mx-auto px-4 py-3 max-w-2xl">
+        <div className="mb-2">
+          <Link
+            href="/spec/release-note"
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            リリースノート一覧へ
+          </Link>
+        </div>
 
         <article>
           <header className="mb-6">

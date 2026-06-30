@@ -27,8 +27,8 @@ export default async function NotificationsPage() {
       <SiteHeader
         user={{ username: currentUser.username, instanceDomain: currentUser.instance.domain, avatarUrl: getAvatarUrl(currentUser.avatarUrl) }}
       />
-      <div className="container mx-auto px-4 pt-4 pb-8 max-w-xl">
-        <div className="mb-4">
+      <div className="container mx-auto px-4 py-3 max-w-xl">
+        <div className="mb-2">
           <Link
             href="/dashboard"
             className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
