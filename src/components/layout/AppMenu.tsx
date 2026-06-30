@@ -16,6 +16,7 @@ import {
   ImagePlus,
   Globe,
   Server,
+  Shuffle,
   Heart,
   LayoutDashboard,
   Bell,
@@ -131,6 +132,13 @@ type MenuItem = {
   /** 外部リンク（新規タブで開く）。お問い合わせ等に使用 */
   external?: boolean;
   /**
+   * フルページ遷移させる（next/link を使わず素の <a> で同一タブ遷移）。
+   * /random のように「アクセスのたびにサーバー側で結果が変わる」リダイレクト専用ルート向け。
+   * <Link> だとホバー時プリフェッチ＋クライアントルーターキャッシュで同じリダイレクト先が
+   * 使い回されてしまうため、毎回サーバーを叩かせてランダム性を担保する。
+   */
+  hardNav?: boolean;
+  /**
    * 主要項目。PCの折りたたみレールでは true のものだけ常時表示し、false は展開時のみ表示する
    * （縦に長くなりすぎてスクロールバーが出るのを防ぐ）。スマホのシートは全項目を表示するため
    * このフラグを無視する。
@@ -177,6 +185,17 @@ function useMenuSections(nav: MenuNav): MenuSectionData[] {
       primary: true,
     });
   }
+  everyone.push({
+    key: "random",
+    href: "/random",
+    label: "ランダム",
+    Icon: Shuffle,
+    // /random はリダイレクト専用ルート（飛んだ先は status ページ）なので常に非アクティブ
+    active: false,
+    // 毎回ランダムな結果を得るため素の <a> でフルページ遷移させる（hardNav の説明参照）
+    hardNav: true,
+    primary: true,
+  });
   if (isLoggedIn) {
     everyone.push({
       key: "favorite",
@@ -425,6 +444,7 @@ function AppMenuSheet({
                   label={item.label}
                   active={item.active}
                   external={item.external}
+                  hardNav={item.hardNav}
                   onNavigate={close}
                 />
               ))}
@@ -481,6 +501,7 @@ function MenuLink({
   label,
   active = false,
   external = false,
+  hardNav = false,
   onNavigate,
 }: {
   href: string;
@@ -489,6 +510,8 @@ function MenuLink({
   active?: boolean;
   /** 外部リンク（新規タブで開く）。お問い合わせ等に使用 */
   external?: boolean;
+  /** 素の <a> で同一タブのフルページ遷移にする（/random 用。MenuItem.hardNav 参照） */
+  hardNav?: boolean;
   onNavigate: () => void;
 }) {
   const className = `flex items-center gap-3 rounded-md px-3 py-3 text-base transition-colors ${
@@ -515,6 +538,15 @@ function MenuLink({
         onClick={onNavigate}
         className={className}
       >
+        {inner}
+      </a>
+    );
+  }
+
+  // フルページ遷移（同一タブ・プリフェッチ/ルーターキャッシュ非経由）
+  if (hardNav) {
+    return (
+      <a href={href} onClick={onNavigate} className={className}>
         {inner}
       </a>
     );
@@ -712,6 +744,7 @@ function AppRail({ nav }: { nav: MenuNav }) {
                       label={item.label}
                       active={item.active}
                       external={item.external}
+                      hardNav={item.hardNav}
                       expanded={expanded}
                       icon={<item.Icon className="h-5 w-5" />}
                       badge={isNotifications && hasUnseen}
@@ -768,6 +801,7 @@ function RailLabel({
 function RailRow({
   href,
   external,
+  hardNav = false,
   label,
   icon,
   active = false,
@@ -778,6 +812,8 @@ function RailRow({
 }: {
   href: string;
   external?: boolean;
+  /** 素の <a> で同一タブのフルページ遷移にする（/random 用。MenuItem.hardNav 参照） */
+  hardNav?: boolean;
   label: string;
   icon: React.ReactNode;
   active?: boolean;
@@ -823,6 +859,14 @@ function RailRow({
         title={label}
         className={cls}
       >
+        {inner}
+      </a>
+    );
+  }
+  // フルページ遷移（同一タブ・プリフェッチ/ルーターキャッシュ非経由）
+  if (hardNav) {
+    return (
+      <a href={href} title={label} onClick={onNavigate} className={cls}>
         {inner}
       </a>
     );
