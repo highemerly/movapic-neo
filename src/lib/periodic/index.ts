@@ -9,6 +9,7 @@
  * 1つが失敗しても他のジョブは続行する。新しい定期処理は periodicJobs に1要素足すだけ。
  */
 
+import { Prisma } from "@prisma/client";
 import { pollAndEnqueueMentions } from "@/lib/mention/ingest";
 import { listExpiredObjects, deleteImage } from "@/lib/storage/storage";
 import prisma from "@/lib/db";
@@ -18,7 +19,11 @@ import { isFavoriteSyncDue } from "@/lib/fediverse/favoritePolicy";
 interface PeriodicJob {
   /** ログ識別用の名前 */
   name: string;
-  run: () => Promise<void>;
+  /**
+   * サマリ文字列を返すと runPeriodicJobs が `[periodic] {name}: {summary} ({ms}ms)` の
+   * 形で1行ログに出す（実行時間も合成）。void を返した場合は何もしない（>1秒だけ took 行）。
+   */
+  run: () => Promise<string | void>;
 }
 
 /** tmp/* 一時ファイルを残留とみなすしきい値（30分） */
@@ -117,33 +122,49 @@ const tmpCleanup: PeriodicJob = {
  * 14日以降の成功syncが入った時点で（GET側の Infinity 停止と歩調を合わせて）恒久的に止まる。
  * 失敗（4xx/5xx）は post_status≠200 のままなので、成功するまで12時間間隔で再試行され続ける。
  */
+// 対象選別の WHERE 句（id 抽出と件数 COUNT で共有し、両者のズレを防ぐ）。
+// 条件の正は isFavoriteSyncDue()（favoritePolicy.ts）。これはそれを DB 側で先に絞る最適化。
+const FAVORITE_SYNC_WHERE = Prisma.sql`
+  is_public = true
+  AND is_disabled = false
+  AND post_id IS NOT NULL
+  AND created_at <= now() - interval '1 day'
+  AND (favorites_synced_at IS NULL OR favorites_synced_at <= now() - interval '12 hours')
+  AND (
+    NOT COALESCE(
+      post_status = 200 AND favorites_synced_at >= created_at + interval '1 day',
+      false
+    )
+    OR (
+      created_at <= now() - interval '14 days'
+      AND NOT COALESCE(
+        post_status = 200 AND favorites_synced_at >= created_at + interval '14 days',
+        false
+      )
+    )
+  )
+`;
+
 const favoriteSyncJob: PeriodicJob = {
   name: "favorite-sync",
   run: async () => {
-    const rows = await prisma.$queryRaw<{ id: string }[]>`
+    const rows = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
       SELECT id FROM images
-      WHERE is_public = true
-        AND is_disabled = false
-        AND post_id IS NOT NULL
-        AND created_at <= now() - interval '1 day'
-        AND (favorites_synced_at IS NULL OR favorites_synced_at <= now() - interval '12 hours')
-        AND (
-          NOT COALESCE(
-            post_status = 200 AND favorites_synced_at >= created_at + interval '1 day',
-            false
-          )
-          OR (
-            created_at <= now() - interval '14 days'
-            AND NOT COALESCE(
-              post_status = 200 AND favorites_synced_at >= created_at + interval '14 days',
-              false
-            )
-          )
-        )
+      WHERE ${FAVORITE_SYNC_WHERE}
       ORDER BY favorites_synced_at ASC NULLS FIRST
       LIMIT ${FAVORITE_SYNC_BATCH}
-    `;
+    `);
     if (rows.length === 0) return;
+
+    // 取りこぼし可視化用の対象総数。LIMIT に達したときだけ COUNT で総数を数える
+    // （上限未満なら取得分=全件なので、無駄な COUNT は走らせない）。
+    let total = rows.length;
+    if (rows.length === FAVORITE_SYNC_BATCH) {
+      const [{ total: t }] = await prisma.$queryRaw<{ total: number }[]>(Prisma.sql`
+        SELECT COUNT(*)::int AS total FROM images WHERE ${FAVORITE_SYNC_WHERE}
+      `);
+      total = t;
+    }
 
     // SQL 抽出時点と TS 判定時点で now がぶれないよう、1回だけ now を固定して使う
     const now = Date.now();
@@ -165,8 +186,9 @@ const favoriteSyncJob: PeriodicJob = {
           }
           // 発火条件の最終ゲート（isFavoriteSyncDue が正。SQL はあくまで前段の絞り込み）
           if (!isFavoriteSyncDue(image, now)) return null;
-          // syncFavoriteCache は内部で例外を握り errorReason を返す（throw しない）
-          return syncFavoriteCache(image);
+          // syncFavoriteCache は内部で例外を握り errorReason を返す（throw しない）。
+          // 定期ジョブ経由は成功時に1行ログを残す（GET 経由は無音）
+          return syncFavoriteCache(image, { logSuccess: true });
         })
       );
       for (const r of results) {
@@ -176,11 +198,9 @@ const favoriteSyncJob: PeriodicJob = {
       }
     }
 
-    if (synced || failed) {
-      console.log(
-        `[periodic] favorite-sync: candidates=${rows.length} synced=${synced} failed=${failed}`
-      );
-    }
+    // 候補が1件以上あれば毎回サマリを返す（runPeriodicJobs が name と実行時間を合成して出す）。
+    // candidates=処理対象/総数（総数は backlog）
+    return `candidates=${rows.length}/${total} synced=${synced} failed=${failed}`;
   },
 };
 
@@ -197,14 +217,17 @@ export async function runPeriodicJobs(): Promise<void> {
   for (const job of periodicJobs) {
     const start = Date.now();
     try {
-      await job.run();
-    } catch (err) {
-      console.error(`[periodic] ${job.name} failed:`, err);
-    } finally {
+      const summary = await job.run();
       const ms = Date.now() - start;
-      if (ms > 1000) {
+      if (summary) {
+        // サマリを返したジョブは name と実行時間を合成して1行で出す
+        console.log(`[periodic] ${job.name}: ${summary} (${ms}ms)`);
+      } else if (ms > 1000) {
+        // サマリ無しのジョブは、遅かったときだけ実行時間を出す
         console.log(`[periodic] ${job.name} took ${ms}ms`);
       }
+    } catch (err) {
+      console.error(`[periodic] ${job.name} failed:`, err);
     }
   }
 }

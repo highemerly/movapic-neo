@@ -18,6 +18,7 @@ import {
   fetchFavoriteData,
   toFavoriteReason,
   toFavoriteHttpStatus,
+  FavoriteError,
   type CachedFavoriter,
   type FavoriteErrorReason,
 } from "@/lib/fediverse/favorite";
@@ -43,7 +44,8 @@ export interface SyncResult {
  * postStatus に応じて延長する（4xx→1日、429/5xx/接続失敗→1時間）→ 結果的に連打を防げる。
  */
 export async function syncFavoriteCache(
-  image: ImageForFavorite
+  image: ImageForFavorite,
+  opts: { logSuccess?: boolean } = {}
 ): Promise<SyncResult> {
   try {
     const ownerToken = decryptToken(image.user.accessToken);
@@ -75,13 +77,24 @@ export async function syncFavoriteCache(
       currentFavoriters: data.favoriters,
       count: data.count,
     });
+    // 高頻度な GET 経由は無音。定期ジョブ経由（logSuccess）のときだけ1行残す
+    if (opts.logSuccess) {
+      console.log(
+        `[favorite] synced imageId=${image.id} count=${data.count} favoriters=${data.favoriters.length}`
+      );
+    }
     return { count: data.count, favoriters: data.favoriters, errorReason: null };
   } catch (error) {
     const httpStatus = toFavoriteHttpStatus(error);
-    console.error(
-      `[favorite] sync失敗 (status=${httpStatus}): imageId=${image.id}`,
-      error
-    );
+    if (error instanceof FavoriteError) {
+      // 想定内の分類済みエラー（404/429/5xx 等）はスタックトレース不要。1行で残す
+      console.error(
+        `[favorite] sync failed (status=${httpStatus}, reason=${error.reason}): imageId=${image.id}`
+      );
+    } else {
+      // 想定外（タイムアウト・復号/DB エラー等）はスタックトレース付きで調査可能にする
+      console.error(`[favorite] sync failed (unexpected): imageId=${image.id}`, error);
+    }
     await prisma.image.update({
       where: { id: image.id },
       data: { favoritesSyncedAt: new Date(), postStatus: httpStatus },

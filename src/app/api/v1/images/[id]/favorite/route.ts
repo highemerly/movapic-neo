@@ -17,6 +17,7 @@ import {
   toFavoriteReason,
   classifyPostStatus,
   favoriteErrorMessage,
+  FavoriteError,
   type CachedFavoriter,
   type FavoriteErrorReason,
 } from "@/lib/fediverse/favorite";
@@ -194,7 +195,15 @@ async function handleToggle(
         : await unfavoriteStatus(actionParams);
   } catch (error) {
     const reason = toFavoriteReason(error);
-    console.error(`[favorite] ${action}失敗 (reason=${reason}): imageId=${imageId}`, error);
+    if (error instanceof FavoriteError) {
+      // 想定内の分類済みエラー（404/429/5xx 等）はスタックトレース不要。1行で残す
+      console.error(
+        `[favorite] ${action} failed (status=${error.httpStatus}, reason=${reason}): imageId=${imageId}`
+      );
+    } else {
+      // 想定外（タイムアウト・復号/DB エラー等）はスタックトレース付きで調査可能にする
+      console.error(`[favorite] ${action} failed (unexpected): imageId=${imageId}`, error);
+    }
     const status =
       reason === "deleted" || reason === "unresolved"
         ? 404

@@ -170,14 +170,14 @@ export async function fetchMastodonFavoriteData(
     throw new FavoriteError(
       classifyPostStatus(statusRes.status)!,
       statusRes.status,
-      `status取得に失敗: ${statusRes.status}`
+      `failed to fetch status: ${statusRes.status}`
     );
   }
   if (!favBoyRes.ok) {
     throw new FavoriteError(
       classifyPostStatus(favBoyRes.status)!,
       favBoyRes.status,
-      `favourited_by取得に失敗: ${favBoyRes.status}`
+      `failed to fetch favourited_by: ${favBoyRes.status}`
     );
   }
 
@@ -302,12 +302,12 @@ export async function fetchMisskeyFavoriteData(
   if (!noteRes.ok) {
     const text = await noteRes.text().catch(() => "");
     const { reason, status } = classifyMisskeyError(text, noteRes.status);
-    throw new FavoriteError(reason, status, `note取得に失敗: ${noteRes.status}`);
+    throw new FavoriteError(reason, status, `failed to fetch note: ${noteRes.status}`);
   }
   if (!reactionsRes.ok) {
     const text = await reactionsRes.text().catch(() => "");
     const { reason, status } = classifyMisskeyError(text, reactionsRes.status);
-    throw new FavoriteError(reason, status, `reactions取得に失敗: ${reactionsRes.status}`);
+    throw new FavoriteError(reason, status, `failed to fetch reactions: ${reactionsRes.status}`);
   }
 
   const note = (await noteRes.json()) as MisskeyNote;
@@ -363,7 +363,7 @@ async function resolveViewerStatusId(params: {
     throw new FavoriteError(
       classifyPostStatus(response.status)!,
       response.status,
-      `投稿の解決に失敗: ${response.status}`
+      `failed to resolve status: ${response.status}`
     );
   }
 
@@ -373,7 +373,7 @@ async function resolveViewerStatusId(params: {
     // searchは成功したが該当statusが無い＝viewerインスタンスにまだ投稿が無い。
     // 削除済みとは限らず、連合の未伝播やresolveの取りこぼしの可能性が高いため
     // "unresolved" として扱い、「削除された」ではなく「未反映」のメッセージを出す。
-    throw new FavoriteError("unresolved", 404, "投稿を解決できませんでした");
+    throw new FavoriteError("unresolved", 404, "could not resolve status");
   }
   return statusId;
 }
@@ -409,7 +409,7 @@ async function toggleFavorite(
     throw new FavoriteError(
       classifyPostStatus(response.status)!,
       response.status,
-      `お気に入り操作に失敗: ${response.status}`
+      `favourite action failed: ${response.status}`
     );
   }
 
@@ -439,14 +439,14 @@ async function resolveMisskeyNoteId(params: FavoriteActionParams): Promise<strin
     throw new FavoriteError(
       classifyPostStatus(status)!,
       status,
-      `投稿の解決に失敗: ${status}`
+      `failed to resolve note: ${status}`
     );
   }
 
   if (!noteId) {
     // ap/showは成功したが note を取得できない＝viewerインスタンスにまだ未連合。
     // Mastodon側と同様 "unresolved"（未反映）として扱う。
-    throw new FavoriteError("unresolved", 404, "投稿を解決できませんでした");
+    throw new FavoriteError("unresolved", 404, "could not resolve note");
   }
   return noteId;
 }
@@ -480,7 +480,7 @@ async function toggleMisskeyReaction(
       (action === "unfavourite" && detail.includes("NOT_REACTED"));
     if (!alreadyInDesiredState) {
       const { reason, status } = classifyMisskeyError(detail, response.status);
-      throw new FavoriteError(reason, status, `リアクション操作に失敗: ${response.status}`);
+      throw new FavoriteError(reason, status, `reaction action failed: ${response.status}`);
     }
   }
 
