@@ -120,6 +120,7 @@ export default async function DashboardPage() {
     <MentionSettingsForm
       botAcct={botAcct}
       userInstanceDomain={user.instance.domain}
+      userInstanceType={user.instance.type}
     />
   );
 

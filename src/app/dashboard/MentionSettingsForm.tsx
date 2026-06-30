@@ -6,15 +6,25 @@ import { Copy, Check } from "lucide-react";
 interface MentionSettingsFormProps {
   botAcct: string;
   userInstanceDomain: string;
+  userInstanceType: string;
 }
 
 export function MentionSettingsForm({
   botAcct,
   userInstanceDomain,
+  userInstanceType,
 }: MentionSettingsFormProps) {
   const [isCopied, setIsCopied] = useState(false);
 
   const botMention = `@${botAcct}`;
+
+  // Botへのメンションは削除して再投稿される一時的な投稿なので、できるだけ目立たない公開範囲で
+  // 投稿画面を開く。Mastodon は direct（自分とBotのみ）、Misskey は home（ホーム）。
+  // どちらも /share の visibility パラメータで初期値を指定できる
+  // （Mastodon: PR #13023、Misskey: share form）。
+  const shareVisibility = userInstanceType === "misskey" ? "home" : "direct";
+  const buildShareUrl = (text: string) =>
+    `https://${userInstanceDomain}/share?text=${encodeURIComponent(text)}&visibility=${shareVisibility}`;
 
   // botAcct: "pic@handon.club" -> "https://handon.club/@pic"
   const botProfileUrl = (() => {
@@ -74,7 +84,7 @@ export function MentionSettingsForm({
             @{botAcct} マックチキン！
           </code>
           <a
-            href={`https://${userInstanceDomain}/share?text=${encodeURIComponent(`@${botAcct} マックチキン！`)}`}
+            href={buildShareUrl(`@${botAcct} マックチキン！`)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block text-xs text-primary hover:underline"
@@ -113,7 +123,7 @@ export function MentionSettingsForm({
             @{botAcct} [右 赤 ネオン] マックチキン！
           </code>
           <a
-            href={`https://${userInstanceDomain}/share?text=${encodeURIComponent(`@${botAcct} [右 赤 ネオン] マックチキン！`)}`}
+            href={buildShareUrl(`@${botAcct} [右 赤 ネオン] マックチキン！`)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block text-xs text-primary hover:underline"
