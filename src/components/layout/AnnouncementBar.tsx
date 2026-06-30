@@ -61,32 +61,36 @@ export function AnnouncementBar() {
         {unreadAnnouncements.map((announcement, index) => (
           <div
             key={announcement.id}
-            className={`px-3 py-1 text-xs flex items-center gap-1.5 ${
+            className={`py-1 text-xs ${
               announcement.type === "warning"
                 ? "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
                 : "bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200"
             } ${index > 0 ? "border-t border-inherit" : ""}`}
           >
-            {announcement.type === "warning" ? (
-              <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-            ) : (
-              <Info className="h-3 w-3 flex-shrink-0" />
-            )}
-            {(() => {
-              const href =
-                announcement.link ??
-                (announcement.detail
-                  ? `/announcements/${announcement.id}`
-                  : null);
-              const content = `(${formatDate(announcement.createdAt)}) ${announcement.message}`;
-              return href ? (
-                <Link href={href} className="underline hover:no-underline">
-                  {content}
-                </Link>
+            {/* 帯（背景色）は全幅のまま、文字の左端だけヘッダーのロゴ（SiteHeader の
+                container mx-auto px-4 max-w-6xl）と揃える。 */}
+            <div className="container mx-auto px-4 max-w-6xl flex items-center gap-1.5">
+              {announcement.type === "warning" ? (
+                <AlertTriangle className="h-3 w-3 flex-shrink-0" />
               ) : (
-                <span>{content}</span>
-              );
-            })()}
+                <Info className="h-3 w-3 flex-shrink-0" />
+              )}
+              {(() => {
+                const href =
+                  announcement.link ??
+                  (announcement.detail
+                    ? `/announcements/${announcement.id}`
+                    : null);
+                const content = `(${formatDate(announcement.createdAt)}) ${announcement.message}`;
+                return href ? (
+                  <Link href={href} className="underline hover:no-underline">
+                    {content}
+                  </Link>
+                ) : (
+                  <span>{content}</span>
+                );
+              })()}
+            </div>
           </div>
         ))}
       </div>
