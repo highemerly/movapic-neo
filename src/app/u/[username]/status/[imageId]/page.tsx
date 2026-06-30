@@ -470,13 +470,13 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           </div>
         ) : null}
 
-        {/* 返信・シェア・その他メニュー（ピン留め・削除、将来の通報）。
-            返信／リンク投稿はログインユーザーのみ。ネイティブ共有とミートボールは
-            非ログインでも出すため、行自体は常に描画する。 */}
-        <div className="mt-[10px] flex items-center gap-1">
+        {/* 返信・シェア・その他メニュー（ピン留め・削除・共有、将来の通報）。
+            いずれもログインユーザー向けの操作なので、未ログイン時は行ごと描画しない。 */}
+        {currentUser && (
+          <div className="mt-[10px] flex items-center gap-1">
           {/* 返信ボタンが出るケースは横が窮屈になるので、両ボタンを2行＋小さめ文字にして
               320px 幅でも収める（高さは h-[40px] 固定のまま変えない）。 */}
-            {currentUser && mastodonReplyUrl && (
+            {mastodonReplyUrl && (
               <a
                 href={mastodonReplyUrl}
                 className="flex flex-auto items-center justify-center gap-1 h-[40px] px-1 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
@@ -493,10 +493,10 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
                 </span>
               </a>
             )}
-            {currentUser && misskeyOpenPostUrl && (
+            {misskeyOpenPostUrl && (
               <MisskeyOpenButton postUrl={misskeyOpenPostUrl} />
             )}
-            {currentUser && shareUrl && (
+            {shareUrl && (
               <a
                 href={shareUrl}
                 target="_blank"
@@ -529,8 +529,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               username={username}
               isOwner={isOwner}
               initialIsPinned={!!image.pinnedAt}
-              canReport={!!currentUser && !isOwner}
-              triggerClassName={currentUser ? undefined : "min-[380px]:hidden"}
+              canReport={!isOwner}
               nativeShare={{
                 imageUrl,
                 mimeType: image.mimeType,
@@ -540,6 +539,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               }}
             />
           </div>
+        )}
 
         {/* 投稿者情報（王冠が頭上に出るぶん、王冠ありのときだけ上パディングを確保） */}
         <div
