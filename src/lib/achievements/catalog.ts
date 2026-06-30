@@ -10,6 +10,7 @@
 
 import { toJstDateString } from "@/lib/streak";
 import { seasonLabel } from "@/lib/seasons/catalog";
+import { countGraphemes } from "@/lib/text/grapheme";
 import {
   PERFECT_MONTH_CATEGORY,
   daysInMonthOf,
@@ -124,7 +125,9 @@ export const LADDER_META: Record<string, { label: string; unit: string }> = {
 // セクション（カテゴリ）表示順
 export const SECTIONS = ["デビュー", "投稿数", "使いこなし", "期間限定", "シークレット"] as const;
 
-const cp = (s: string) => Array.from(s).length; // コードポイント長
+// 文字数は書記素（grapheme）ベースで数える。入力バリデーション（UI/各API）と同一の
+// 数え方に統一し、絵文字1個＝1文字として実績条件（1文字 / 130文字以上）を判定する。
+const cp = (s: string) => countGraphemes(s);
 const jstHour = (d: Date) => new Date(d.getTime() + 9 * 60 * 60 * 1000).getUTCHours(); // JSTの時(0-23)
 
 // --- 累計投稿数（文字入れ師の段位） ---

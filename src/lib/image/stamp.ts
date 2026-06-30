@@ -5,7 +5,9 @@ import {
   ROTATE_CHARS,
   splitTextIntoLines,
   hexToRgb,
+  fontStack,
 } from "./text";
+import { splitGraphemes } from "@/lib/text/grapheme";
 
 /**
  * ハンコ効果で文字を描画
@@ -23,7 +25,7 @@ export function drawStampText(
   fontName: string,
   fontFamily: FontFamily
 ): void {
-  const chars = Array.from(text);
+  const chars = splitGraphemes(text);
   const isVertical = position === "left" || position === "right";
   const rgb = hexToRgb(textColor);
   const useProportional = !isVertical && PROPORTIONAL_FONTS.has(fontFamily);
@@ -64,7 +66,7 @@ export function drawStampText(
       lineWidths = lines.map((line) => ctx.measureText(line).width);
       textWidth = Math.max(...lineWidths, 0);
     } else {
-      const maxCharsInLine = Math.max(...lines.map((l) => Array.from(l).length), 0);
+      const maxCharsInLine = Math.max(...lines.map((l) => splitGraphemes(l).length), 0);
       textWidth = maxCharsInLine * fontSize;
     }
     textHeight = lines.length * horizontalLineHeight;
@@ -120,7 +122,7 @@ export function drawStampText(
   drawWobblyFrame(ctx, boxX, boxY, boxWidth, boxHeight, cornerRadius, wobbleAmount, fontSize, rgb);
 
   // フォント設定
-  ctx.font = `${fontSize}px "${fontName}"`;
+  ctx.font = fontStack(fontSize, fontName);
   ctx.textBaseline = "middle";
   ctx.textAlign = "center";
 
@@ -383,7 +385,7 @@ function drawHorizontalStampChars(
   const firstLineCenterY = boxY + padding + lineHeight / 2;
 
   lines.forEach((line, lineIndex) => {
-    const lineChars = Array.from(line);
+    const lineChars = splitGraphemes(line);
     const y = firstLineCenterY + lineIndex * lineHeight;
 
     if (useProportional) {

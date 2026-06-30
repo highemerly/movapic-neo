@@ -16,6 +16,7 @@ import { timingSafeEqualString } from "@/lib/auth/internalAuth";
 import { generateRequestId } from "@/lib/http";
 import prisma from "@/lib/db";
 import { MAX_TEXT_LENGTH, MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from "@/types";
+import { countGraphemes } from "@/lib/text/grapheme";
 import { ErrorCodes, errorResponse, handleUnknownError } from "@/lib/errors";
 
 export async function POST(request: NextRequest) {
@@ -126,7 +127,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (parsed.text.length > MAX_TEXT_LENGTH) {
+    if (countGraphemes(parsed.text) > MAX_TEXT_LENGTH) {
       return errorResponse(
         ErrorCodes.VALIDATION_TOO_LONG,
         `テキストは${MAX_TEXT_LENGTH}文字以下にしてください`,

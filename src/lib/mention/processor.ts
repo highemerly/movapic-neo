@@ -17,6 +17,7 @@ import {
   DEFAULT_ARRANGEMENT,
   type Position,
 } from "@/types";
+import { countGraphemes } from "@/lib/text/grapheme";
 import { getSeasonByKey } from "@/lib/seasons/catalog";
 import { ErrorCodes } from "@/lib/errors";
 import { USER_AGENT } from "@/lib/userAgent";
@@ -339,7 +340,7 @@ export async function processOneMention(
       "テキストを入力してください。"
     );
   }
-  if (text.length > MAX_TEXT_LENGTH) {
+  if (countGraphemes(text) > MAX_TEXT_LENGTH) {
     return handleError(
       ErrorCodes.VALIDATION_TOO_LONG,
       `テキストは${MAX_TEXT_LENGTH}文字以内で入力してください。`

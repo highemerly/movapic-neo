@@ -4,7 +4,8 @@
  */
 
 import { simpleParser, ParsedMail, Attachment } from "mailparser";
-import { Position, FontFamily, Color, Size, Arrangement, Visibility } from "@/types";
+import { Position, FontFamily, Color, Size, Arrangement, Visibility, MAX_TEXT_LENGTH } from "@/types";
+import { truncateGraphemes } from "@/lib/text/grapheme";
 import {
   POSITION_MAP,
   COLOR_MAP,
@@ -218,10 +219,8 @@ export async function parseEmail(
     text = decodeHtmlEntities(text);
   }
 
-  // 140文字に制限
-  if (text.length > 140) {
-    text = text.substring(0, 140);
-  }
+  // 140文字に制限（書記素境界で切り詰め、絵文字を途中で割らない）
+  text = truncateGraphemes(text, MAX_TEXT_LENGTH);
 
   // 添付ファイルから画像を抽出
   const image = extractImage(parsed.attachments || []);

@@ -12,7 +12,9 @@ import {
   drawTextWithStroke,
   getMonospaceCharWidth,
   isHalfWidthChar,
+  fontStack,
 } from "./text";
+import { splitGraphemes, isEmojiGrapheme } from "@/lib/text/grapheme";
 import { drawStampText } from "./stamp";
 import { drawNeonText } from "./neon";
 import { drawSeasonBackground } from "./seasons";
@@ -25,6 +27,8 @@ FontLibrary.use([
   path.join(fontsDir, "HuiFont29.ttf"),
   path.join(fontsDir, "NotoSansJP-Regular.ttf"),
   path.join(fontsDir, "LightNovelPOPv2.otf"),
+  // 絵文字（モノクロ）。本文フォントが持たない絵文字グリフをフォールバックで描画する。
+  path.join(fontsDir, "NotoEmoji-VariableFont_wght.ttf"),
 ]);
 
 // フォント名のマッピング（skia-canvasはフォントファイル内のフォント名を使用）
@@ -33,6 +37,21 @@ export const CANVAS_FONT_NAMES: Record<FontFamily, string> = {
   "noto-sans-jp": "Noto Sans CJK JP",
   "light-novel-pop": "LightNovelPopV2",
 };
+
+/**
+ * 等幅セル（幅 cellWidth）の中で絵文字を中央寄せするためのX補正。
+ * 絵文字グリフの送り幅は本文の全角セルより広いため、左端揃えのままだと
+ * 右にずれて見える。送り幅の差の半分だけ左へ寄せてセル中心に合わせる。
+ * 絵文字以外・プロポーショナル配置では 0（補正なし）。
+ */
+function emojiCellOffsetX(
+  ctx: CanvasRenderingContext2D,
+  char: string,
+  cellWidth: number
+): number {
+  if (!isEmojiGrapheme(char)) return 0;
+  return (cellWidth - ctx.measureText(char).width) / 2;
+}
 
 /**
  * テキストオーバーレイをCanvasで生成
@@ -53,7 +72,7 @@ export async function createTextOverlay(
   const ctx = canvas.getContext("2d");
 
   const fontName = CANVAS_FONT_NAMES[fontFamily];
-  ctx.font = `${fontSize}px "${fontName}"`;
+  ctx.font = fontStack(fontSize, fontName);
   ctx.textBaseline = "middle";
 
   const strokeWidth = Math.max(2, fontSize * STROKE_WIDTH_RATIO);
@@ -182,7 +201,7 @@ function drawHorizontalText(
   // 描画
   lines.forEach((line, lineIndex) => {
     const y = startY + lineIndex * lineHeight;
-    const lineChars = Array.from(line);
+    const lineChars = splitGraphemes(line);
 
     if (useProportional) {
       // プロポーショナル: 累積幅で配置（xは文字の左端）
@@ -198,9 +217,10 @@ function drawHorizontalText(
       });
     } else if (useHalfWidth) {
       // 等幅（半角対応）: 半角は0.5幅、全角は1.0幅（xは文字の左端）
+      // 絵文字は実測送り幅で左端揃え、それ以外は半角/全角の等幅セル
       let currentX = startX;
       lineChars.forEach((char) => {
-        const charWidth = getMonospaceCharWidth(char, fontSize);
+        const charWidth = getMonospaceCharWidth(ctx, char, fontSize);
         if (arrangement === "neon") {
           drawNeonText(ctx, char, currentX, y, fontSize, textColor);
         } else {
@@ -212,10 +232,11 @@ function drawHorizontalText(
       // 等幅（半角非対応）: 固定幅で配置
       lineChars.forEach((char, charIndex) => {
         const x = startX + charIndex * fontSize;
+        const drawX = x + emojiCellOffsetX(ctx, char, fontSize);
         if (arrangement === "neon") {
-          drawNeonText(ctx, char, x, y, fontSize, textColor);
+          drawNeonText(ctx, char, drawX, y, fontSize, textColor);
         } else {
-          drawTextWithStroke(ctx, char, x, y, textColor, strokeColor, strokeWidth);
+          drawTextWithStroke(ctx, char, drawX, y, textColor, strokeColor, strokeWidth);
         }
       });
     }
@@ -252,11 +273,11 @@ function drawVerticalText(
   const columns: CharInfo[][] = [];
   const paragraphs = text.split("\n");
   for (const paragraph of paragraphs) {
-    const chars = Array.from(paragraph).map((char) => ({
+    const chars = splitGraphemes(paragraph).map((char) => ({
       char,
       isPunctuation: PUNCTUATION_CHARS.has(char),
       shouldRotate: ROTATE_CHARS.has(char),
-      isHalf: useHalfWidth && isHalfWidthChar(char),
+      isHalf: useHalfWidth && !isEmojiGrapheme(char) && isHalfWidthChar(char),
     }));
     if (chars.length === 0) {
       columns.push([]);
@@ -290,9 +311,11 @@ function drawVerticalText(
 
       // 半角文字はX位置を中央に寄せる（全角の中心に揃える）
       const halfXOffset = isHalf ? fontSize * 0.25 : 0;
+      // 絵文字は送り幅が全角セルより広いため、セル中心へ寄せる補正
+      const emojiOffset = emojiCellOffsetX(ctx, char, fontSize);
 
       // 句読点は右上に配置
-      const charX = isPunctuation ? x + fontSize * 0.3 : x + halfXOffset;
+      const charX = isPunctuation ? x + fontSize * 0.3 : x + halfXOffset + emojiOffset;
       const charY = isPunctuation ? baseY - fontSize * 0.3 : baseY;
 
       if (shouldRotate) {

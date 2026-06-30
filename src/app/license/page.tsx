@@ -34,6 +34,22 @@ export default async function LicensePage() {
             </div>
 
             <div className="bg-muted rounded-lg p-4">
+              <p className="font-medium mb-1">Noto Emoji</p>
+              <p className="text-xs text-muted-foreground mb-2">Copyright © Google LLC</p>
+              <p className="text-sm text-muted-foreground mb-2">
+                絵文字の表示に使用しています。本フォントは SIL Open Font License, Version 1.1 のもとで配布されています。
+              </p>
+              <a
+                href="https://scripts.sil.org/OFL"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline"
+              >
+                https://scripts.sil.org/OFL
+              </a>
+            </div>
+
+            <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-1">ふい字</p>
               <p className="text-xs text-muted-foreground mb-2">Copyright © ふい字置き場</p>
               <p className="text-sm text-muted-foreground mb-1">

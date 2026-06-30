@@ -80,6 +80,12 @@ export default async function SpecPage() {
                   </p>
                 </div>
                 <div>
+                  <p className="text-xs text-muted-foreground font-medium mb-1">絵文字</p>
+                  <p className="text-sm text-muted-foreground">
+                    絵文字の文字入れにも対応しています。常に Noto Emoji を用いて描画します。等幅のふい字・ラノベPOPとラインがずれないよう微調整を行っています。
+                  </p>
+                </div>
+                <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">文字のスタート位置</p>
                   <p className="text-sm text-muted-foreground">
                     位置設定（上/下/左/右）の端から一定の余白を空けて文字を並べ始めます。マージンは短辺の約5%または10pxの大きい方となります。横方向と縦方向で同じ余白であり、文字サイズによって変動しません（※過去は変動しており、仕様変更済）。

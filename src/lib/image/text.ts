@@ -1,12 +1,26 @@
 import { CanvasRenderingContext2D } from "skia-canvas";
 import { FontFamily, Size, Position } from "@/types";
 import { SIZE_MULTIPLIERS } from "@/types";
+import { isEmojiGrapheme, splitGraphemes } from "@/lib/text/grapheme";
 
 // プロポーショナルフォント（横書き時のみ）
 export const PROPORTIONAL_FONTS: Set<FontFamily> = new Set(["noto-sans-jp"]);
 
 // 等幅フォント（半角文字の幅を半分にする）
 export const MONOSPACE_FONTS: Set<FontFamily> = new Set(["hui-font", "light-novel-pop"]);
+
+// 絵文字フォント（NotoEmoji-VariableFont_wght.ttf 内のファミリ名）。
+// 本文フォントが絵文字グリフを持たないため、フォントスタックの末尾に置いて
+// skia-canvas のグリフ単位フォールバックで絵文字だけこのフォントから拾う。
+export const EMOJI_FONT_FAMILY = "Noto Emoji";
+
+/**
+ * skia-canvas 用のフォント指定文字列を組み立てる。
+ * 末尾に絵文字フォントを足して絵文字を描画可能にする。
+ */
+export function fontStack(fontSize: number, fontName: string): string {
+  return `${fontSize}px "${fontName}", "${EMOJI_FONT_FAMILY}"`;
+}
 
 /**
  * 半角文字かどうかを判定
@@ -26,9 +40,16 @@ export function isHalfWidthChar(char: string): boolean {
 }
 
 /**
- * 等幅フォントでの文字幅を取得（半角は0.5、全角は1.0）
+ * 等幅フォントでの文字送り幅を取得（半角は0.5、全角は1.0）。
+ * 絵文字は送り幅が全角セルより広いため、実測した送り幅をそのまま使い、
+ * プロポーショナル同様に左端揃えで配置する（等幅セルに詰めると隣と重なるため）。
  */
-export function getMonospaceCharWidth(char: string, fontSize: number): number {
+export function getMonospaceCharWidth(
+  ctx: CanvasRenderingContext2D,
+  char: string,
+  fontSize: number
+): number {
+  if (isEmojiGrapheme(char)) return ctx.measureText(char).width;
   return isHalfWidthChar(char) ? fontSize * 0.5 : fontSize;
 }
 
@@ -99,7 +120,7 @@ export function splitTextIntoLines(
       let currentLine = "";
       let currentWidth = 0;
 
-      for (const char of paragraph) {
+      for (const char of splitGraphemes(paragraph)) {
         const charWidth = ctx.measureText(char).width;
         if (currentWidth + charWidth > maxWidth && currentLine !== "") {
           lines.push(currentLine);
@@ -118,8 +139,8 @@ export function splitTextIntoLines(
       let currentLine = "";
       let currentWidth = 0;
 
-      for (const char of paragraph) {
-        const charWidth = getMonospaceCharWidth(char, fontSize);
+      for (const char of splitGraphemes(paragraph)) {
+        const charWidth = getMonospaceCharWidth(ctx, char, fontSize);
         if (currentWidth + charWidth > maxWidth && currentLine !== "") {
           lines.push(currentLine);
           currentLine = char;
@@ -134,7 +155,7 @@ export function splitTextIntoLines(
       }
     } else {
       // 等幅（半角非対応）: 固定文字数で分割
-      const chars = Array.from(paragraph);
+      const chars = splitGraphemes(paragraph);
       const charsPerLine = Math.max(1, Math.floor(maxWidth / fontSize));
       for (let i = 0; i < chars.length; i += charsPerLine) {
         lines.push(chars.slice(i, i + charsPerLine).join(""));
