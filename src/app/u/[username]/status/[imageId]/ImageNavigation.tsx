@@ -36,7 +36,8 @@ export function ImageNavigation({
   from,
   publicUrl,
 }: ImageNavigationProps) {
-  const queryString = from ? `?from=${from}` : "";
+  // from は "user-map:東京都" のように状態（都道府県名）を含みうるので必ずエンコードする。
+  const queryString = from ? `?from=${encodeURIComponent(from)}` : "";
   // 両方ない場合は何も表示しない
   if (!prevImage && !nextImage) {
     return null;

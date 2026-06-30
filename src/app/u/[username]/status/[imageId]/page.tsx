@@ -122,7 +122,13 @@ interface PageProps {
 export default async function ImageDetailPage({ params, searchParams }: PageProps) {
   const { username, imageId } = await params;
   const { from, posted, federr, fedstatus } = await searchParams;
-  const isFromPublic = from === "public";
+  // from は遷移元タブを表す。カレンダー/地図からの遷移では "種別:状態" 形式で
+  // 元の月・都道府県を載せ、戻る導線で復元する（例 "user-calendar:2026-5" / "user-map:東京都"）。
+  // 最初の ":" のみで分割（都道府県名に ":" は含まれない）。
+  const fromSep = (from ?? "").indexOf(":");
+  const fromKind = fromSep === -1 ? (from ?? "") : from!.slice(0, fromSep);
+  const fromState = fromSep === -1 ? "" : from!.slice(fromSep + 1);
+  const isFromPublic = fromKind === "public";
   const justPosted = posted === "1";
   // SHAMEZOへの保存は成功したが Fediverse 投稿だけ失敗したケース（部分的成功）
   const fediverseFailed = justPosted && federr === "1";
@@ -288,14 +294,21 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     image.user.instance.type === "misskey" ? MisskeyIcon : MastodonIcon;
   let backUrl = `/u/${username}`;
   let backLabel = `${galleryName} のギャラリーに戻る`;
-  if (from === "public") {
+  if (fromKind === "public") {
     backUrl = "/public";
     backLabel = "公開タイムラインに戻る";
-  } else if (from === "user-calendar") {
-    backUrl = `/u/${username}/calendar`;
+  } else if (fromKind === "user-calendar") {
+    // fromState = "YYYY-M"（CalendarView が埋め込む）。遷移元の月のカレンダーへ戻す。
+    const [cy, cm] = fromState.split("-");
+    const q =
+      cy && cm
+        ? `?year=${encodeURIComponent(cy)}&month=${encodeURIComponent(cm)}`
+        : "";
+    backUrl = `/u/${username}/calendar${q}`;
     backLabel = `${galleryName} のカレンダーに戻る`;
-  } else if (from === "user-map") {
-    backUrl = `/u/${username}/map`;
+  } else if (fromKind === "user-map") {
+    // fromState = 都道府県名。遷移元の絞り込み状態へ戻す。
+    backUrl = `/u/${username}/map${fromState ? `?prefecture=${encodeURIComponent(fromState)}` : ""}`;
     backLabel = `${galleryName} の地図に戻る`;
   }
 

@@ -294,14 +294,16 @@ export function CalendarView({
                 isHoliday={day != null && isJapaneseHoliday(year, month, day)}
                 loading={loading}
                 onClick={() => {
+                  // 戻る導線で同じ月のカレンダーへ復元できるよう from に年月を載せる。
+                  const fromQ = `user-calendar:${year}-${month}`;
                   if (day && data?.days[day]) {
                     router.push(
-                      `/u/${username}/status/${data.days[day].latest.id}?from=user-calendar`,
+                      `/u/${username}/status/${data.days[day].latest.id}?from=${fromQ}`,
                     );
                   } else if (filled) {
                     // 穴埋め済みセルは「埋めた日の2枚目の写真」へ遷移
                     router.push(
-                      `/u/${username}/status/${filled.image.id}?from=user-calendar`,
+                      `/u/${username}/status/${filled.image.id}?from=${fromQ}`,
                     );
                   }
                 }}

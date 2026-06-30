@@ -35,7 +35,8 @@ export function ImageCard({ image, publicUrl, username, showDelete, onDelete, is
   const [isDeleting, setIsDeleting] = useState(false);
   const imageUrl = `${publicUrl}/${image.storageKey}`;
   const base = username ? `/u/${username}/status/${image.id}` : imageUrl;
-  const detailUrl = username && from ? `${base}?from=${from}` : base;
+  // from は "user-map:東京都" のように状態（都道府県名）を含みうるので必ずエンコードする。
+  const detailUrl = username && from ? `${base}?from=${encodeURIComponent(from)}` : base;
 
   const handleDelete = async () => {
     if (!onDelete) return;
