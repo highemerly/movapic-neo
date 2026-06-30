@@ -17,8 +17,13 @@ export const MATURE_DAYS = 14;
 
 /** フォールバックsyncの対象になる最小経過日数（投稿が落ち着く目安） */
 export const FALLBACK_MIN_AGE_MS = 1 * DAY_MS;
-/** フォールバックsyncの再試行間隔（失敗の連打を防ぐバックオフ） */
+/** フォールバックsyncの通常バックオフ（成功・未失敗時の再試行間隔） */
 export const FALLBACK_BACKOFF_MS = 12 * HOUR_MS;
+/**
+ * 直近のsyncが失敗（4xx/5xx/接続失敗＝postStatus≠200）だったときの短いバックオフ。
+ * 429やレート制限・一過性5xxは早めに回復するため、通常より短い間隔で再試行する。
+ */
+export const FALLBACK_BACKOFF_FAILED_MS = 1 * HOUR_MS;
 
 /**
  * 「createdAt + markDays 日 以降に成功（200）syncが記録されているか」。
@@ -89,12 +94,13 @@ export interface FavoriteSyncRow {
 /**
  * 定期フォールバックsyncの発火条件（worker SQL の WHERE と一致させること）。
  *
- * 共通足切り: 投稿から1日以上経過 かつ（未sync または 最後のsyncから12時間以上経過）。
+ * 共通足切り: 投稿から1日以上経過 かつ（未sync またはバックオフ経過）。
+ * バックオフは直近syncの結果で変える: 成功/通常は12時間、失敗（postStatus≠200）は1時間。
  * その上で fire1 / fire2 のどちらかが立てば発火:
  *   - fire1: 1日経過後にまだ成功syncが無い（投稿が落ち着いた頃のfavを1回拾う）
  *   - fire2: 14日経過後にまだ「14日以降の成功sync」が無い（成熟後の最終syncを1回拾い停止）
  * 成功（200）syncがその段のマークを越えると、その段は二度と発火しない。
- * 失敗（4xx/5xx）は postStatus≠200 のままなので成功するまで12時間間隔で再試行される。
+ * 失敗（4xx/5xx等）は postStatus≠200 のままなので成功するまで1時間間隔で再試行される。
  */
 export function isFavoriteSyncDue(
   row: FavoriteSyncRow,
@@ -104,7 +110,10 @@ export function isFavoriteSyncDue(
   if (age < FALLBACK_MIN_AGE_MS) return false;
 
   const syncedMs = row.favoritesSyncedAt?.getTime() ?? null;
-  const backoffOk = syncedMs === null || syncedMs <= now - FALLBACK_BACKOFF_MS;
+  // 直近syncが失敗（4xx/5xx/接続失敗）なら短いバックオフで早めに再試行する
+  const lastFailed = row.postStatus !== null && row.postStatus !== 200;
+  const backoffMs = lastFailed ? FALLBACK_BACKOFF_FAILED_MS : FALLBACK_BACKOFF_MS;
+  const backoffOk = syncedMs === null || syncedMs <= now - backoffMs;
   if (!backoffOk) return false;
 
   const fire1 = !hasSuccessfulSyncAfter(

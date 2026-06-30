@@ -129,7 +129,13 @@ const FAVORITE_SYNC_WHERE = Prisma.sql`
   AND is_disabled = false
   AND post_id IS NOT NULL
   AND created_at <= now() - interval '1 day'
-  AND (favorites_synced_at IS NULL OR favorites_synced_at <= now() - interval '12 hours')
+  AND (
+    favorites_synced_at IS NULL
+    -- バックオフ: 成功(200)は12時間、失敗(≠200)は1時間（isFavoriteSyncDue と一致）
+    OR favorites_synced_at <= now() - (
+      CASE WHEN post_status = 200 THEN interval '12 hours' ELSE interval '1 hour' END
+    )
+  )
   AND (
     NOT COALESCE(
       post_status = 200 AND favorites_synced_at >= created_at + interval '1 day',
