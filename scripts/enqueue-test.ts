@@ -140,6 +140,7 @@ async function runEmail(): Promise<void> {
       color: (args.color as Color) ?? "white",
       size: (args.size as Size) ?? "medium",
       arrangement: (args.arrangement as Arrangement) ?? "none",
+      season: (args.season as string) ?? null,
       visibility: "public",
       cameraOption: "none",
       locationOption: "none",

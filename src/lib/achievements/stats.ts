@@ -15,17 +15,17 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
   const [dateRows, featureCounts, fontGroups, colorGroups, distinctGroups] = await Promise.all([
     // 全投稿日（streak / today / monthly-distinct-days / 当日のsource種類 用）
     prisma.image.findMany({ where: { userId }, select: { createdAt: true, source: true } }),
-    // 機能別の利用回数
+    // 機能別の利用回数（season 投稿はスタイル列が中立デフォルト＝案Bの隔離のため除外）
     prisma.$transaction([
-      prisma.image.count({ where: { userId, arrangement: "neon" } }),
-      prisma.image.count({ where: { userId, arrangement: "stamp" } }),
-      prisma.image.count({ where: { userId, size: "extra-large" } }),
-      prisma.image.count({ where: { userId, position: { in: ["left", "right"] } } }),
+      prisma.image.count({ where: { userId, season: null, arrangement: "neon" } }),
+      prisma.image.count({ where: { userId, season: null, arrangement: "stamp" } }),
+      prisma.image.count({ where: { userId, season: null, size: "extra-large" } }),
+      prisma.image.count({ where: { userId, season: null, position: { in: ["left", "right"] } } }),
     ]),
-    // フォントの種類数
-    prisma.image.groupBy({ by: ["font"], where: { userId }, orderBy: { font: "asc" } }),
-    // 文字色の種類数
-    prisma.image.groupBy({ by: ["color"], where: { userId }, orderBy: { color: "asc" } }),
+    // フォントの種類数（season 投稿を除外）
+    prisma.image.groupBy({ by: ["font"], where: { userId, season: null }, orderBy: { font: "asc" } }),
+    // 文字色の種類数（season 投稿を除外）
+    prisma.image.groupBy({ by: ["color"], where: { userId, season: null }, orderBy: { color: "asc" } }),
     // distinct カメラ機種 / 都道府県 / source
     prisma.$transaction([
       prisma.image.groupBy({
@@ -92,10 +92,10 @@ export async function collectLadderValues(userId: string): Promise<Record<string
   const [dateRows, featureCounts, distinctGroups] = await Promise.all([
     prisma.image.findMany({ where: { userId }, select: { createdAt: true } }),
     prisma.$transaction([
-      prisma.image.count({ where: { userId, arrangement: "neon" } }),
-      prisma.image.count({ where: { userId, arrangement: "stamp" } }),
-      prisma.image.count({ where: { userId, size: "extra-large" } }),
-      prisma.image.count({ where: { userId, position: { in: ["left", "right"] } } }),
+      prisma.image.count({ where: { userId, season: null, arrangement: "neon" } }),
+      prisma.image.count({ where: { userId, season: null, arrangement: "stamp" } }),
+      prisma.image.count({ where: { userId, season: null, size: "extra-large" } }),
+      prisma.image.count({ where: { userId, season: null, position: { in: ["left", "right"] } } }),
     ]),
     prisma.$transaction([
       prisma.image.groupBy({
@@ -108,7 +108,7 @@ export async function collectLadderValues(userId: string): Promise<Record<string
         where: { userId, locationPrefecture: { not: null } },
         orderBy: { locationPrefecture: "asc" },
       }),
-      prisma.image.groupBy({ by: ["color"], where: { userId }, orderBy: { color: "asc" } }),
+      prisma.image.groupBy({ by: ["color"], where: { userId, season: null }, orderBy: { color: "asc" } }),
     ]),
   ]);
 

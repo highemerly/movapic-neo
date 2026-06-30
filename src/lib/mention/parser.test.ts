@@ -197,6 +197,8 @@ describe("formatOptionsSummary", () => {
       color: "white" as const,
       size: "medium" as const,
       arrangement: "none" as const,
+      season: null,
+      seasonRequested: false,
       debug: false,
       keep: false,
     };
@@ -216,6 +218,8 @@ describe("formatOptionsSummary", () => {
       color: "white" as const,
       size: "medium" as const,
       arrangement: "neon" as const,
+      season: null,
+      seasonRequested: false,
       debug: false,
       keep: false,
     };
@@ -230,6 +234,8 @@ describe("formatOptionsSummary", () => {
       color: "white" as const,
       size: "medium" as const,
       arrangement: "none" as const,
+      season: null,
+      seasonRequested: false,
       debug: false,
       keep: false,
       visibility: "unlisted" as const,
@@ -245,6 +251,8 @@ describe("formatOptionsSummary", () => {
       color: "white" as const,
       size: "medium" as const,
       arrangement: "none" as const,
+      season: null,
+      seasonRequested: false,
       debug: false,
       keep: false,
     };
@@ -259,6 +267,8 @@ describe("formatOptionsSummary", () => {
       color: "white" as const,
       size: "medium" as const,
       arrangement: "none" as const,
+      season: null,
+      seasonRequested: false,
       debug: true,
       keep: true,
     };

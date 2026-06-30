@@ -18,14 +18,16 @@ import { runPeriodicJobs } from "@/lib/periodic";
 import { getAdminAccts } from "@/lib/auth/admin";
 import { sendBotDirectMessage } from "@/lib/bot/notify";
 import type { MastodonNotification } from "@/lib/mention/fetcher";
-import type {
-  Position,
-  FontFamily,
-  Color,
-  Size,
-  Arrangement,
-  OutputFormat,
+import {
+  DEFAULT_ARRANGEMENT,
+  type Position,
+  type FontFamily,
+  type Color,
+  type Size,
+  type Arrangement,
+  type OutputFormat,
 } from "@/types";
+import { getSeasonByKey } from "@/lib/seasons/catalog";
 
 export const TASK_PROCESS_MENTION = "process-mention";
 export const TASK_PROCESS_EMAIL = "process-email";
@@ -46,6 +48,8 @@ export interface ProcessEmailPayload {
     color: Color;
     size: Size;
     arrangement: Arrangement;
+    /** シーズン（期間限定）キー。producer が受信時刻で解決済み。null=通常投稿 */
+    season: string | null;
     /** 公開範囲（件名コマンド > ユーザー設定 > public で解決済み） */
     visibility: PublishVisibility;
     /** カメラ機種を保存するか（件名コマンド > ユーザー設定で解決済み） */
@@ -133,6 +137,11 @@ const processEmailTask: Task = async (payload) => {
     }
   }
 
+  // シーズン（期間限定）: セット時はサムネのクロップ位置をプリセット位置に合わせ、
+  // 案B（完全隔離）でDBのスタイル列には中立デフォルトを保存する。
+  const seasonDef = p.options.season ? getSeasonByKey(p.options.season) : undefined;
+  const cropPosition: Position = seasonDef ? seasonDef.preset.position : p.options.position;
+
   // 文字入れは compute へ委譲（worker は sharp/skia を呼ばない）
   const result = await renderImage({
     imageBuffer: sourceBuffer,
@@ -143,6 +152,7 @@ const processEmailTask: Task = async (payload) => {
     font: p.options.font,
     output: outputFormat,
     arrangement: p.options.arrangement,
+    season: p.options.season,
   });
 
   await publishImage({
@@ -155,19 +165,32 @@ const processEmailTask: Task = async (payload) => {
       instance: { domain: user.instance.domain, type: user.instance.type },
     },
     text: p.text,
-    options: {
-      position: p.options.position,
-      font: p.options.font,
-      color: p.options.color,
-      size: p.options.size,
-      outputFormat,
-      arrangement: p.options.arrangement,
-    },
+    // 案B（実績は season:null で隔離）: season 指定時はスタイル列にプリセット実値を保存
+    // （タイル表示のフォーカス/拡大率を実描画に一致させる）。
+    options: seasonDef
+      ? {
+          position: seasonDef.preset.position,
+          font: seasonDef.preset.font,
+          color: seasonDef.preset.color,
+          size: seasonDef.preset.size,
+          outputFormat,
+          arrangement: DEFAULT_ARRANGEMENT,
+          season: seasonDef.key,
+        }
+      : {
+          position: p.options.position,
+          font: p.options.font,
+          color: p.options.color,
+          size: p.options.size,
+          outputFormat,
+          arrangement: p.options.arrangement,
+          season: null,
+        },
     source: "email",
     visibility: p.options.visibility,
     persistOnPostFailure: true,
     getThumbnailAndDimensions: async () => {
-      const f = await finalizeImage(result.buffer, p.options.position);
+      const f = await finalizeImage(result.buffer, cropPosition);
       return { thumbnail: f.thumbnail, width: f.width, height: f.height };
     },
     extras: { cameraMake, cameraModel, locationPrefecture, locationCity },

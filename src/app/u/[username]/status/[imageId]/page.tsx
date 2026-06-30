@@ -457,6 +457,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             size={image.size}
             font={image.font}
             arrangement={image.arrangement}
+            season={image.season}
           />
         </div>
 

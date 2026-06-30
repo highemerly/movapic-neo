@@ -17,6 +17,7 @@ import {
   calculateFontSize,
   ProcessImageResult,
 } from "@/lib/image";
+import { getSeasonByKey } from "@/lib/seasons/catalog";
 
 interface ProcessImageParams {
   imageBuffer: Buffer;
@@ -27,6 +28,8 @@ interface ProcessImageParams {
   font: FontFamily;
   output: OutputFormat;
   arrangement: Arrangement;
+  /** シーズン（期間限定）キー。セット時は position/color/size/font/arrangement を無視しプリセットで描画 */
+  season?: string | null;
   requestId?: string;
 }
 
@@ -45,14 +48,24 @@ export async function processImage({
   font,
   output,
   arrangement,
+  season,
   requestId,
 }: ProcessImageParams): Promise<ProcessImageResult> {
   const startTime = Date.now();
   const inputSizeKB = Math.round(imageBuffer.length / 1024);
   const rid = requestId || "unknown";
 
+  // シーズン指定時は通常オプションをプリセットへ上書きし、arrangement は無効化する。
+  // 描画分岐は createTextOverlay が season を受けて行う（短冊背景など）。
+  const seasonDef = season ? getSeasonByKey(season) : undefined;
+  const effPosition = seasonDef ? seasonDef.preset.position : position;
+  const effColor = seasonDef ? seasonDef.preset.color : color;
+  const effSize = seasonDef ? seasonDef.preset.size : size;
+  const effFont = seasonDef ? seasonDef.preset.font : font;
+  const effArrangement: Arrangement = seasonDef ? "none" : arrangement;
+
   console.log(
-    `[imageProcessor] rid=${rid} START: inputSize=${inputSizeKB}KB, output=${output}, position=${position}, font=${font}, arrangement=${arrangement}`
+    `[imageProcessor] rid=${rid} START: inputSize=${inputSizeKB}KB, output=${output}, position=${effPosition}, font=${effFont}, arrangement=${effArrangement}, season=${season ?? "none"}`
   );
 
   // EXIF Orientationに従って自動回転
@@ -112,9 +125,10 @@ export async function processImage({
     }
   }
 
-  const fontSize = calculateFontSize(width, height, position, size);
-  const textColor = COLORS[color];
-  const strokeColor = STROKE_COLORS[color];
+  const fontSize = calculateFontSize(width, height, effPosition, effSize);
+  // シーズンが描画専用の色（hex）を指定していればそれを使う（例: 七夕の黒文字・縁取りなし）。
+  const textColor = seasonDef?.preset.textColorHex ?? COLORS[effColor];
+  const strokeColor = seasonDef?.preset.strokeColorHex ?? STROKE_COLORS[effColor];
 
   // Canvasでテキストオーバーレイを生成
   const textOverlayStart = Date.now();
@@ -124,12 +138,13 @@ export async function processImage({
       width,
       height,
       text,
-      position,
+      effPosition,
       fontSize,
-      font,
+      effFont,
       textColor,
       strokeColor,
-      arrangement
+      effArrangement,
+      season
     );
   } catch (error) {
     console.error(`[imageProcessor] rid=${rid} TEXT_OVERLAY_FAILED:`, error);

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, X, ChevronDown } from "lucide-react";
+import { AlertCircle, X, ChevronDown, Sparkles } from "lucide-react";
 import { TextInput } from "@/components/TextInput";
 import { ImageUpload } from "@/components/ImageUpload";
 import { OptionsPanel } from "@/components/OptionsPanel";
@@ -101,6 +101,16 @@ export interface CreateClientProps {
     visibility: Visibility | null;
     cameraOption: "none" | "show" | null;
   };
+  /** 現在アクティブなシーズン（期間限定）。null=シーズン中でない（トグル非表示） */
+  activeSeason: {
+    key: string;
+    label: string;
+    description: string;
+    /** 期間の表示ラベル（例 "7/1〜7/10"） */
+    period: string;
+  } | null;
+  /** ?season=<key> が今アクティブなシーズンと一致したとき true＝最初から選択状態にする */
+  defaultSeasonOn?: boolean;
 }
 
 // インスタンス種別から出力形式を自動決定
@@ -142,11 +152,12 @@ const initialState: GenerateFormState = {
   size: DEFAULT_SIZE,
   output: DEFAULT_OUTPUT,
   arrangement: DEFAULT_ARRANGEMENT,
+  season: null,
   imageFile: null,
   imagePreview: null,
 };
 
-export function CreateClient({ user, preferences }: CreateClientProps) {
+export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn }: CreateClientProps) {
   const router = useRouter();
   // 出力形式は連携インスタンスの種別から自動決定
   const autoOutput = outputFromInstanceType(user.instance.type);
@@ -160,6 +171,8 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
     size: preferences.size ?? DEFAULT_SIZE,
     output: autoOutput,
     arrangement: preferences.arrangement ?? DEFAULT_ARRANGEMENT,
+    // ?season=<key> での告知リンク経由なら、最初から期間限定アレンジを選択状態にする。
+    season: defaultSeasonOn && activeSeason ? activeSeason.key : null,
   }));
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
@@ -391,6 +404,7 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
     formData.append("size", formState.size);
     formData.append("output", formState.output);
     formData.append("arrangement", formState.arrangement);
+    if (formState.season) formData.append("season", formState.season);
 
     const controller = new AbortController();
     // タイムアウトは外側ほど長く: compute(18s) < generate(22s) < client(25s)。
@@ -556,6 +570,7 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
       formData.append("size", stateToPost.size);
       formData.append("output", stateToPost.output);
       formData.append("arrangement", stateToPost.arrangement);
+      if (stateToPost.season) formData.append("season", stateToPost.season);
       formData.append("mimeType", mimeType);
       formData.append("visibility", visibility);
 
@@ -719,7 +734,8 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
         formState.color !== lastGeneratedState.color ||
         formState.size !== lastGeneratedState.size ||
         formState.output !== lastGeneratedState.output ||
-        formState.arrangement !== lastGeneratedState.arrangement
+        formState.arrangement !== lastGeneratedState.arrangement ||
+        formState.season !== lastGeneratedState.season
       : false;
 
   // アクションボタンが画面外に出たら下部固定表示
@@ -886,29 +902,105 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
                 {/* ③ コメント合成オプションを変更 */}
                 <div className="space-y-4">
                   <StepHeader num={3} label="コメント合成オプションを変更" />
-                  <OptionsPanel
-                    position={formState.position}
-                    font={formState.font}
-                    color={formState.color}
-                    size={formState.size}
-                    arrangement={formState.arrangement}
-                    onPositionChange={(position) =>
-                      setFormState((prev) => ({ ...prev, position }))
-                    }
-                    onFontChange={(font) =>
-                      setFormState((prev) => ({ ...prev, font }))
-                    }
-                    onColorChange={(color) =>
-                      setFormState((prev) => ({ ...prev, color }))
-                    }
-                    onSizeChange={(size) =>
-                      setFormState((prev) => ({ ...prev, size }))
-                    }
-                    onArrangementChange={(arrangement) =>
-                      setFormState((prev) => ({ ...prev, arrangement }))
-                    }
-                    disabled={isLoading || isPosting}
-                  />
+
+                  {/* シーズン（期間限定）: アクティブなシーズン中のみ最上位に表示。
+                      「使う」にすると他のオプションはすべて消え、プリセットで自動生成される。 */}
+                  {activeSeason && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-1.5 text-sm font-bold text-amber-500">
+                        <Sparkles className="h-4 w-4" />
+                        <span>【おすすめ】期間限定アレンジ</span>
+                      </div>
+                      {/* シーズンON時のみアンバーで強調。「なし」選択時は他のパネルと同じニュートラル色。 */}
+                      {(() => {
+                        const seasonOn = formState.season !== null;
+                        return (
+                          <div
+                            className={`flex rounded-lg border p-1 gap-1 ${
+                              seasonOn
+                                ? "border-amber-300 bg-amber-100/70 dark:border-amber-800/70 dark:bg-amber-950/40"
+                                : "bg-muted"
+                            }`}
+                          >
+                            {([
+                              { v: false, label: "なし" },
+                              {
+                                v: true,
+                                label: (
+                                  <>
+                                    {activeSeason.label}
+                                    <span className="text-xs">
+                                      （{activeSeason.period}限定）
+                                    </span>
+                                  </>
+                                ),
+                              },
+                            ] as const).map((opt) => {
+                              const selected = seasonOn === opt.v;
+                              return (
+                                <button
+                                  key={String(opt.v)}
+                                  type="button"
+                                  disabled={isLoading || isPosting}
+                                  onClick={() =>
+                                    setFormState((prev) => ({
+                                      ...prev,
+                                      season: opt.v ? activeSeason.key : null,
+                                    }))
+                                  }
+                                  className={`${
+                                    opt.v ? "flex-[2_1_0%]" : "flex-[1_1_0%]"
+                                  } rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
+                                    selected
+                                      ? seasonOn
+                                        ? "bg-amber-500 text-white shadow-sm"
+                                        : "bg-background text-foreground shadow-sm"
+                                      : seasonOn
+                                        ? "text-amber-700 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100"
+                                        : "text-muted-foreground hover:text-foreground"
+                                  } ${isLoading || isPosting ? "opacity-50 cursor-not-allowed" : ""}`}
+                                >
+                                  {opt.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
+                      {formState.season && (
+                        <p className="text-xs text-muted-foreground">
+                          位置・色・サイズ・フォント・アレンジは自動で設定されます。
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* シーズン使用中は通常のコメント合成オプションを非表示にする */}
+                  {!formState.season && (
+                    <OptionsPanel
+                      position={formState.position}
+                      font={formState.font}
+                      color={formState.color}
+                      size={formState.size}
+                      arrangement={formState.arrangement}
+                      onPositionChange={(position) =>
+                        setFormState((prev) => ({ ...prev, position }))
+                      }
+                      onFontChange={(font) =>
+                        setFormState((prev) => ({ ...prev, font }))
+                      }
+                      onColorChange={(color) =>
+                        setFormState((prev) => ({ ...prev, color }))
+                      }
+                      onSizeChange={(size) =>
+                        setFormState((prev) => ({ ...prev, size }))
+                      }
+                      onArrangementChange={(arrangement) =>
+                        setFormState((prev) => ({ ...prev, arrangement }))
+                      }
+                      disabled={isLoading || isPosting}
+                    />
+                  )}
                 </div>
 
                 {/* ④ 投稿する情報を追加（EXIF撮影情報）
@@ -1148,13 +1240,16 @@ export function CreateClient({ user, preferences }: CreateClientProps) {
                 {/* ⑥ 設定保存（投稿ボタンは段組の外・従来位置に配置） */}
                 <div className="space-y-3">
                   <StepHeader num={6} label="設定保存・投稿" />
-                  {/* 現在の設定を初期値として保存（プレビュー/投稿ボタンの上に配置） */}
-                  <SaveDefaultsSection
-                    onSave={handleSaveDefaults}
-                    isSaving={isSavingDefaults}
-                    saveSuccess={saveSuccess}
-                    disabled={isLoading || isPosting}
-                  />
+                  {/* 現在の設定を初期値として保存（プレビュー/投稿ボタンの上に配置）。
+                      期間限定アレンジ使用中はスタイルがプリセット固定のため保存対象がなく、非表示にする。 */}
+                  {!formState.season && (
+                    <SaveDefaultsSection
+                      onSave={handleSaveDefaults}
+                      isSaving={isSavingDefaults}
+                      saveSuccess={saveSuccess}
+                      disabled={isLoading || isPosting}
+                    />
+                  )}
                 </div>
               </div>
             </div>

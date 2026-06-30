@@ -14,6 +14,10 @@ import {
   VISIBILITY_MAP,
   decodeHtmlEntities,
 } from "@/lib/options/maps";
+import { getActiveSeason } from "@/lib/seasons/catalog";
+
+// シーズン（期間限定）を要求する件名キーワード。受信時刻でアクティブなシーズンに解決する。
+const SEASON_KEYWORD = "シーズン";
 
 /** 位置情報コマンドの解析結果（メール投稿のみ。none=保存しない） */
 export type EmailLocationOption = "none" | "pref" | "city";
@@ -27,6 +31,10 @@ export interface ParsedEmailOptions {
   color: Color;
   size: Size;
   arrangement: Arrangement;
+  /** シーズン（期間限定）キー。「シーズン」コマンドで受信時刻のアクティブなシーズンに解決。null=通常 */
+  season: string | null;
+  /** 「シーズン」コマンドが指定されたか（指定されたが期間外＝season=null のとき producer がエラーにする） */
+  seasonRequested: boolean;
   /** 公開範囲（件名コマンドは公開/非収載のみ。localはユーザー設定からのみ） */
   visibility: Visibility;
   /** カメラ機種を保存するか（件名コマンド「機種」「機種なし」で上書き可） */
@@ -80,6 +88,8 @@ const FALLBACK_OPTIONS: ParsedEmailOptions = {
   color: "white",
   size: "medium",
   arrangement: "none",
+  season: null,
+  seasonRequested: false,
   visibility: "public",
   cameraOption: "none",
   locationOption: "none",
@@ -97,6 +107,9 @@ function buildDefaultOptions(userDefaults?: EmailUserDefaults): ParsedEmailOptio
     color: (userDefaults?.color as Color) || FALLBACK_OPTIONS.color,
     size: (userDefaults?.size as Size) || FALLBACK_OPTIONS.size,
     arrangement: (userDefaults?.arrangement as Arrangement) || FALLBACK_OPTIONS.arrangement,
+    // シーズンはユーザー設定に持たせない（一過性オプション）。件名コマンドでのみ有効化。
+    season: null,
+    seasonRequested: false,
     visibility: (userDefaults?.visibility as Visibility) || FALLBACK_OPTIONS.visibility,
     cameraOption: (userDefaults?.cameraOption as EmailCameraOption) || FALLBACK_OPTIONS.cameraOption,
     locationOption: "none",
@@ -131,6 +144,11 @@ function parseSubjectOptions(
       options.cameraOption = CAMERA_MAP[token];
     } else if (LOCATION_MAP[token]) {
       options.locationOption = LOCATION_MAP[token];
+    } else if (token === SEASON_KEYWORD) {
+      // シーズン（期間限定）: 受信時刻でアクティブなシーズンに解決。
+      // 期間外なら season=null のまま（producer がエラーにする）。他オプションは無視される。
+      options.seasonRequested = true;
+      options.season = getActiveSeason(new Date())?.key ?? null;
     }
     // 不明なトークンは無視
   }

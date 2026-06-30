@@ -64,6 +64,8 @@ export interface RenderImageParams {
   font: FontFamily;
   output: OutputFormat;
   arrangement: Arrangement;
+  /** シーズン（期間限定）キー。セット時はスタイル系は送らず compute がプリセットで描画する */
+  season?: string | null;
   requestId?: string;
 }
 
@@ -74,12 +76,17 @@ export async function renderImage(
   const form = new FormData();
   form.append("image", bufferToBlob(p.imageBuffer), "image");
   form.append("text", p.text);
-  form.append("position", p.position);
-  form.append("color", p.color);
-  form.append("size", p.size);
-  form.append("font", p.font);
   form.append("output", p.output);
-  form.append("arrangement", p.arrangement);
+  if (p.season) {
+    // シーズン時はスタイル系をプリセットで上書きするため送らない（compute 側が許容）。
+    form.append("season", p.season);
+  } else {
+    form.append("position", p.position);
+    form.append("color", p.color);
+    form.append("size", p.size);
+    form.append("font", p.font);
+    form.append("arrangement", p.arrangement);
+  }
   if (p.requestId) form.append("requestId", p.requestId);
 
   const res = await computeFetch("/api/internal/render", form);

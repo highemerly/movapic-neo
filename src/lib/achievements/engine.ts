@@ -13,7 +13,9 @@ import { toJstDateString } from "@/lib/streak";
 import {
   CATALOG,
   evaluatePerfectMonth,
+  evaluateSeason,
   PERFECT_MONTH_CATEGORY,
+  SEASON_CATEGORY,
   type AchStats,
   type PostFacts,
 } from "./catalog";
@@ -67,6 +69,11 @@ export function selectNewlyGranted(
   const pm = evaluatePerfectMonth(stats, post, grace);
   if (pm && !ownedKeys.has(pm)) {
     out.push({ key: pm, category: PERFECT_MONTH_CATEGORY });
+  }
+  // シーズン（期間限定）: この投稿が season を持てば、そのシーズンのバッジを付与。
+  const season = evaluateSeason(post);
+  if (season && !ownedKeys.has(season)) {
+    out.push({ key: season, category: SEASON_CATEGORY });
   }
   return out;
 }

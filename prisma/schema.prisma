@@ -152,6 +152,11 @@ model Image {
   size          String   @db.VarChar(20)
   outputFormat  String   @map("output_format") @db.VarChar(20)
   arrangement   String   @default("none") @db.VarChar(20)
+  // シーズン（期間限定）。null=通常投稿 / "tanabata-2026" 等のシーズンキー。
+  // セット時はスタイル列（position/color/size/font）にシーズンのプリセット実値を保存する
+  // （タイル表示のフォーカス位置・拡大率を実際の描画に一致させるため）。実績側は
+  // season:null フィルタで別途隔離する。レジストリは src/lib/seasons/catalog.ts。
+  season        String?  @db.VarChar(40)
   source        String   @default("web") @db.VarChar(20) // "web" | "email"
   thumbnailKey  String?  @map("thumbnail_key") @db.VarChar(500)
   postUrl       String?  @map("post_url") @db.Text

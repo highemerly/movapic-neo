@@ -24,7 +24,9 @@ import { toJstDateString } from "@/lib/streak";
 import {
   CATALOG,
   evaluatePerfectMonth,
+  evaluateSeason,
   PERFECT_MONTH_CATEGORY,
+  SEASON_CATEGORY,
   type AchStats,
   type PostFacts,
 } from "@/lib/achievements/catalog";
@@ -65,6 +67,7 @@ interface ReplayImage {
   color: string;
   size: string;
   arrangement: string;
+  season: string | null;
   source: string;
   cameraModel: string | null;
   locationPrefecture: string | null;
@@ -113,13 +116,16 @@ function replayUser(userId: string, images: ReplayImage[], grace: number): Grant
     const mdc = monthDayCounts.get(ym)!;
     mdc.set(day, (mdc.get(day) ?? 0) + 1);
 
-    if (img.arrangement === "neon") featureCounts.neon += 1;
-    if (img.arrangement === "stamp") featureCounts.stamp += 1;
-    if (img.size === "extra-large") featureCounts.xlarge += 1;
-    if (img.position === "left" || img.position === "right") featureCounts.vertical += 1;
-
-    fonts.add(img.font);
-    colors.add(img.color);
+    // 案B（完全隔離）: season 投稿はスタイル列が中立デフォルトなので、スタイル系の集計から除外する
+    // （live=stats.ts の season:null フィルタと同期）。投稿数/連続/source/カメラ・位置情報は実値なので数える。
+    if (!img.season) {
+      if (img.arrangement === "neon") featureCounts.neon += 1;
+      if (img.arrangement === "stamp") featureCounts.stamp += 1;
+      if (img.size === "extra-large") featureCounts.xlarge += 1;
+      if (img.position === "left" || img.position === "right") featureCounts.vertical += 1;
+      fonts.add(img.font);
+      colors.add(img.color);
+    }
     if (img.cameraModel) cameras.add(img.cameraModel);
     if (img.locationPrefecture) prefectures.add(img.locationPrefecture);
     if (img.source === "email") hasEmailPost = true;
@@ -153,6 +159,7 @@ function replayUser(userId: string, images: ReplayImage[], grace: number): Grant
       color: img.color,
       size: img.size,
       arrangement: img.arrangement,
+      season: img.season,
       source: img.source,
       cameraModel: img.cameraModel,
       locationPrefecture: img.locationPrefecture,
@@ -183,6 +190,18 @@ function replayUser(userId: string, images: ReplayImage[], grace: number): Grant
         userId,
         key: pm,
         category: PERFECT_MONTH_CATEGORY,
+        imageId: img.id,
+        grantedAt: img.createdAt,
+      });
+    }
+    // シーズン（期間限定・動的）
+    const season = evaluateSeason(post);
+    if (season && !grantedKeys.has(season)) {
+      grantedKeys.add(season);
+      grants.push({
+        userId,
+        key: season,
+        category: SEASON_CATEGORY,
         imageId: img.id,
         grantedAt: img.createdAt,
       });
@@ -241,6 +260,7 @@ async function main() {
         color: true,
         size: true,
         arrangement: true,
+        season: true,
         source: true,
         cameraModel: true,
         locationPrefecture: true,

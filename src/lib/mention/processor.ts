@@ -11,7 +11,13 @@ import { deleteFediverseStatus } from "@/lib/fediverse/delete";
 import { decryptToken } from "@/lib/auth/tokens";
 import { MastodonNotification } from "./fetcher";
 import { parseMentionContent, formatOptionsSummary, ParsedMentionOptions } from "./parser";
-import { OutputFormat, MAX_TEXT_LENGTH } from "@/types";
+import {
+  OutputFormat,
+  MAX_TEXT_LENGTH,
+  DEFAULT_ARRANGEMENT,
+  type Position,
+} from "@/types";
+import { getSeasonByKey } from "@/lib/seasons/catalog";
 import { ErrorCodes } from "@/lib/errors";
 import { USER_AGENT } from "@/lib/userAgent";
 import { assertSafeRemoteUrl } from "@/lib/security/ssrf";
@@ -339,6 +345,18 @@ export async function processOneMention(
       `テキストは${MAX_TEXT_LENGTH}文字以内で入力してください。`
     );
   }
+  // シーズン（期間限定）コマンドが指定されたが、受信時刻にアクティブなシーズンが無い場合はエラー。
+  if (options.seasonRequested && !options.season) {
+    return handleError(
+      ErrorCodes.VALIDATION_INVALID,
+      "現在利用できるシーズンがありません。"
+    );
+  }
+
+  // シーズン時はサムネのクロップ位置をプリセット位置に合わせ、案B（完全隔離）で
+  // DBのスタイル列には中立デフォルトを保存する。
+  const seasonDef = options.season ? getSeasonByKey(options.season) : undefined;
+  const cropPosition: Position = seasonDef ? seasonDef.preset.position : options.position;
 
   // request ID生成（STEP6以降のエラーで使用）
   requestId = randomUUID().substring(0, 8) + "-" + randomUUID().substring(0, 4);
@@ -370,6 +388,7 @@ export async function processOneMention(
       font: options.font,
       output: outputFormat,
       arrangement: options.arrangement,
+      season: options.season,
       requestId,
     });
   } catch (error) {
@@ -395,20 +414,33 @@ export async function processOneMention(
         instance: { domain: user.instance.domain, type: user.instance.type },
       },
       text,
-      options: {
-        position: options.position,
-        font: options.font,
-        color: options.color,
-        size: options.size,
-        outputFormat,
-        arrangement: options.arrangement,
-      },
+      // 案B（実績は season:null で隔離）: season 指定時はスタイル列にプリセット実値を保存
+      // （タイル表示のフォーカス/拡大率を実描画に一致させる）。
+      options: seasonDef
+        ? {
+            position: seasonDef.preset.position,
+            font: seasonDef.preset.font,
+            color: seasonDef.preset.color,
+            size: seasonDef.preset.size,
+            outputFormat,
+            arrangement: DEFAULT_ARRANGEMENT,
+            season: seasonDef.key,
+          }
+        : {
+            position: options.position,
+            font: options.font,
+            color: options.color,
+            size: options.size,
+            outputFormat,
+            arrangement: options.arrangement,
+            season: null,
+          },
       source: "mention",
       visibility: effectiveVisibility as PublishVisibility,
       persistOnPostFailure: false,
       // 投稿成功時にだけ呼ばれる＝失敗時は compute(finalize)を呼ばない
       getThumbnailAndDimensions: async () => {
-        const f = await finalizeImage(processedImage.buffer, options.position);
+        const f = await finalizeImage(processedImage.buffer, cropPosition);
         return { thumbnail: f.thumbnail, width: f.width, height: f.height };
       },
     });

@@ -24,9 +24,13 @@ import {
   VISIBILITY_MAP,
   decodeHtmlEntities,
 } from "@/lib/options/maps";
+import { getActiveSeason, seasonLabel } from "@/lib/seasons/catalog";
 
 // コマンドで指定可能なvisibility（public/unlistedのみ）
 export type CommandVisibility = "public" | "unlisted";
+
+// シーズン（期間限定）を要求するコマンドキーワード。受信時刻でアクティブなシーズンに解決する。
+const SEASON_KEYWORD = "シーズン";
 
 export interface ParsedMentionOptions {
   position: Position;
@@ -34,6 +38,10 @@ export interface ParsedMentionOptions {
   color: Color;
   size: Size;
   arrangement: Arrangement;
+  /** シーズン（期間限定）キー。「シーズン」コマンドで受信時刻のアクティブなシーズンに解決。null=通常 */
+  season: string | null;
+  /** 「シーズン」コマンドが指定されたか（期間外＝season=null のとき processor がエラー通知する） */
+  seasonRequested: boolean;
   debug: boolean;
   keep: boolean;
   visibility?: CommandVisibility; // コマンドで指定された場合のみ設定
@@ -64,6 +72,8 @@ const FALLBACK_OPTIONS: ParsedMentionOptions = {
   color: "white",
   size: "medium",
   arrangement: "none",
+  season: null,
+  seasonRequested: false,
   debug: false,
   keep: false,
 };
@@ -78,6 +88,9 @@ function buildDefaultOptions(userDefaults?: UserDefaults): ParsedMentionOptions 
     color: (userDefaults?.color as Color) || FALLBACK_OPTIONS.color,
     size: (userDefaults?.size as Size) || FALLBACK_OPTIONS.size,
     arrangement: (userDefaults?.arrangement as Arrangement) || FALLBACK_OPTIONS.arrangement,
+    // シーズンはユーザー設定に持たせない（一過性オプション）。コマンドでのみ有効化。
+    season: null,
+    seasonRequested: false,
     debug: FALLBACK_OPTIONS.debug,
     keep: FALLBACK_OPTIONS.keep,
   };
@@ -134,6 +147,11 @@ function parseCommandTokens(commandString: string): Partial<ParsedMentionOptions
       options.font = FONT_MAP[token];
     } else if (ARRANGEMENT_MAP[token]) {
       options.arrangement = ARRANGEMENT_MAP[token];
+    } else if (token === SEASON_KEYWORD) {
+      // シーズン（期間限定）: 受信時刻でアクティブなシーズンに解決。
+      // 期間外なら season=null のまま（processor がエラー通知する）。他オプションは無視される。
+      options.seasonRequested = true;
+      options.season = getActiveSeason(new Date())?.key ?? null;
     }
     // 不明なトークンは無視
   }
@@ -183,14 +201,17 @@ const VISIBILITY_LABELS: Record<CommandVisibility, string> = {
  * オプションを日本語のサマリー文字列に変換
  */
 export function formatOptionsSummary(options: ParsedMentionOptions, defaultVisibility?: string): string {
-  const parts = [
-    `位置: ${POSITION_LABELS[options.position]}`,
-    `色: ${COLOR_LABELS[options.color]}`,
-    `サイズ: ${SIZE_LABELS[options.size]}`,
-    `フォント: ${FONT_LABELS[options.font]}`,
-  ];
+  // シーズン（期間限定）時はスタイル系を上書きするので、シーズン名だけ示す。
+  const parts: string[] = options.season
+    ? [`シーズン: ${seasonLabel(options.season)}`]
+    : [
+        `位置: ${POSITION_LABELS[options.position]}`,
+        `色: ${COLOR_LABELS[options.color]}`,
+        `サイズ: ${SIZE_LABELS[options.size]}`,
+        `フォント: ${FONT_LABELS[options.font]}`,
+      ];
 
-  if (options.arrangement !== "none") {
+  if (!options.season && options.arrangement !== "none") {
     parts.push(`アレンジ: ${ARRANGEMENT_LABELS[options.arrangement]}`);
   }
 

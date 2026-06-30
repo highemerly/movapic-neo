@@ -19,6 +19,7 @@ import {
   type FontFamily,
   type Arrangement,
 } from "@/types";
+import { seasonLabel } from "@/lib/seasons/catalog";
 
 interface ImageOptionsButtonProps {
   position: string;
@@ -26,6 +27,8 @@ interface ImageOptionsButtonProps {
   size: string;
   font: string;
   arrangement: string;
+  /** シーズン（期間限定）キー。セット時は個別オプションの代わりにシーズン名のみ表示 */
+  season?: string | null;
 }
 
 export function ImageOptionsButton({
@@ -34,6 +37,7 @@ export function ImageOptionsButton({
   size,
   font,
   arrangement,
+  season,
 }: ImageOptionsButtonProps) {
   const positionLabel = POSITION_LABELS[position as Position] || position;
   const colorLabel = COLOR_LABELS[color as Color] || color;
@@ -52,6 +56,14 @@ export function ImageOptionsButton({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[140px]">
+        {season ? (
+          // シーズン（期間限定）投稿: スタイル列は中立デフォルトなので、シーズン名だけ示す。
+          <DropdownMenuItem className="cursor-default focus:bg-transparent">
+            <span className="text-muted-foreground">シーズン:</span>
+            <span className="ml-auto">{seasonLabel(season)}</span>
+          </DropdownMenuItem>
+        ) : (
+          <>
         <DropdownMenuItem className="cursor-default focus:bg-transparent">
           <span className="text-muted-foreground">位置:</span>
           <span className="ml-auto">{positionLabel}</span>
@@ -73,6 +85,8 @@ export function ImageOptionsButton({
             <span className="text-muted-foreground">アレンジ:</span>
             <span className="ml-auto">{arrangementLabel}</span>
           </DropdownMenuItem>
+        )}
+          </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

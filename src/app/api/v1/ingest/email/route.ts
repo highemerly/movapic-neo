@@ -135,6 +135,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // シーズン（期間限定）コマンドが指定されたが、受信時刻にアクティブなシーズンが無い場合はエラー。
+    if (parsed.options.seasonRequested && !parsed.options.season) {
+      return errorResponse(
+        ErrorCodes.VALIDATION_INVALID,
+        "現在利用できるシーズンがありません",
+        400,
+        { requestId }
+      );
+    }
+
     if (parsed.image.buffer.length > MAX_FILE_SIZE) {
       return errorResponse(
         ErrorCodes.VALIDATION_FILE_TOO_LARGE,
@@ -175,6 +185,7 @@ export async function POST(request: NextRequest) {
         color: parsed.options.color,
         size: parsed.options.size,
         arrangement: parsed.options.arrangement,
+        season: parsed.options.season,
         visibility: parsed.options.visibility,
         cameraOption: parsed.options.cameraOption,
         locationOption: parsed.options.locationOption,

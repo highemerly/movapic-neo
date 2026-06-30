@@ -18,6 +18,8 @@ import {
   ACHIEVEMENT_LAYOUT,
   LADDER_META,
   PERFECT_MONTH_CATEGORY,
+  SEASON_CATEGORY,
+  resolveAchievement,
   type AchievementDef,
   type AchievementRank,
 } from "@/lib/achievements/catalog";
@@ -84,12 +86,14 @@ interface TileModel {
 type Entry =
   | { id: string; kind: "single"; def: AchievementDef }
   | { id: string; kind: "ladder"; ladderKey: string; defs: AchievementDef[] }
-  | { id: string; kind: "perfectMonth" };
+  | { id: string; kind: "perfectMonth" }
+  | { id: string; kind: "season" };
 
-/** 実績 key（単発キー・ラダーの段キー・皆勤賞キーのいずれか）が、このエントリのモーダルで表示されるか。 */
+/** 実績 key（単発キー・ラダーの段キー・皆勤賞キー・シーズンキーのいずれか）が、このエントリのモーダルで表示されるか。 */
 function entryMatchesKey(entry: Entry, key: string): boolean {
   if (entry.kind === "single") return entry.def.key === key;
   if (entry.kind === "ladder") return entry.defs.some((d) => d.key === key);
+  if (entry.kind === "season") return key.startsWith(`${SEASON_CATEGORY}:`);
   return key.startsWith(`${PERFECT_MONTH_CATEGORY}:`); // perfectMonth
 }
 
@@ -97,17 +101,20 @@ function entryMatchesKey(entry: Entry, key: string): boolean {
 function isEntryAchieved(
   entry: Entry,
   grantedMap: Map<string, string>,
-  perfectMonths: GrantedItem[]
+  perfectMonths: GrantedItem[],
+  seasons: GrantedItem[]
 ): boolean {
   if (entry.kind === "single") return grantedMap.has(entry.def.key);
   if (entry.kind === "ladder") return entry.defs.some((d) => grantedMap.has(d.key));
+  if (entry.kind === "season") return seasons.length > 0;
   return perfectMonths.length > 0;
 }
 
 function tileModel(
   entry: Entry,
   grantedMap: Map<string, string>,
-  perfectMonths: GrantedItem[]
+  perfectMonths: GrantedItem[],
+  seasons: GrantedItem[]
 ): TileModel {
   if (entry.kind === "single") {
     const { def } = entry;
@@ -132,6 +139,19 @@ function tileModel(
       rank: top?.rank ?? null,
       achieved: achievedTiers.length > 0,
       progress: tiers.map((d) => ({ rank: d.rank, done: grantedMap.has(d.key) })),
+    };
+  }
+  if (entry.kind === "season") {
+    // シーズン（段数は固定でなく参加シーズンごとに増える。獲得数ぶん金ドットを並べる）
+    const any = seasons.length > 0;
+    return {
+      icon: "Sparkles",
+      name: "シーズン",
+      rank: any ? "gold" : null,
+      achieved: any,
+      progress: any
+        ? seasons.map(() => ({ rank: "gold" as const, done: true }))
+        : [{ rank: "gold" as const, done: false }],
     };
   }
   // perfectMonth（段数は固定でなく毎月増えるので、獲得した月の数ぶん金ドットを並べる）
@@ -213,6 +233,7 @@ function DetailBody({
   grantedMap,
   ladderValues,
   perfectMonths,
+  seasons,
   perfectMonthGrace,
   celebrate = false,
 }: {
@@ -220,6 +241,7 @@ function DetailBody({
   grantedMap: Map<string, string>;
   ladderValues: Record<string, number>;
   perfectMonths: GrantedItem[];
+  seasons: GrantedItem[];
   /** このユーザーの皆勤賞の未投稿許容日数（所属インスタンスで決まる）。 */
   perfectMonthGrace: number;
   /** 獲得演出中はアイコンをポップさせる（ディープリンク到達時のみ true） */
@@ -311,6 +333,42 @@ function DetailBody({
             );
           })}
         </ul>
+      </DetailShell>
+    );
+  }
+
+  if (entry.kind === "season") {
+    const sorted = [...seasons].sort((a, b) => b.grantedAt.localeCompare(a.grantedAt)); // 新しい獲得順
+    const any = sorted.length > 0;
+    return (
+      <DetailShell
+        icon="Sparkles"
+        title="シーズン（期間限定）"
+        rank={any ? "gold" : null}
+        achieved={any}
+        celebrate={celebrate}
+        description="期間限定シーズンに投稿すると、そのシーズンの記念実績を獲得できます"
+      >
+        {any ? (
+          <ul className="space-y-1.5">
+            {sorted.map((g) => (
+              <li
+                key={g.key}
+                className="flex items-center justify-between gap-2 text-xs"
+              >
+                <span className="flex items-center gap-1.5 font-medium">
+                  <RankBadge rank="gold" className="h-3.5 w-3.5" />
+                  {resolveAchievement(g.key).title}
+                </span>
+                <span className="text-[11px] text-amber-700 dark:text-amber-400">
+                  {formatDate(g.grantedAt)} に獲得
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-muted-foreground">まだ獲得していません</p>
+        )}
       </DetailShell>
     );
   }
@@ -426,6 +484,12 @@ export function AchievementsView({
     [granted]
   );
 
+  // シーズン（動的・参加シーズンごとに+1）
+  const seasons = useMemo(
+    () => granted.filter((g) => g.category === SEASON_CATEGORY),
+    [granted]
+  );
+
   // レイアウトを「セクション → エントリ配列」に正規化（タイルとモーダルで共用）
   const sections = useMemo(
     () =>
@@ -435,6 +499,9 @@ export function AchievementsView({
           .map((block): Entry | null => {
             if (block.kind === "perfectMonth") {
               return { id: "perfect-month", kind: "perfectMonth" };
+            }
+            if (block.kind === "season") {
+              return { id: "season", kind: "season" };
             }
             if (block.kind === "ladder") {
               const defs = CATALOG.filter((d) => d.ladderKey === block.ladderKey);
@@ -473,7 +540,7 @@ export function AchievementsView({
     () =>
       celebrateParam &&
       initialEntry != null &&
-      isEntryAchieved(initialEntry, grantedMap, perfectMonths)
+      isEntryAchieved(initialEntry, grantedMap, perfectMonths, seasons)
   );
 
   const openTile = (entry: Entry) => {
@@ -497,7 +564,7 @@ export function AchievementsView({
             {section.entries.map((entry) => (
               <Tile
                 key={entry.id}
-                model={tileModel(entry, grantedMap, perfectMonths)}
+                model={tileModel(entry, grantedMap, perfectMonths, seasons)}
                 onClick={() => openTile(entry)}
               />
             ))}
@@ -540,6 +607,7 @@ export function AchievementsView({
               grantedMap={grantedMap}
               ladderValues={ladderValues}
               perfectMonths={perfectMonths}
+              seasons={seasons}
               perfectMonthGrace={perfectMonthGrace}
               celebrate={celebrate}
             />

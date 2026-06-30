@@ -63,6 +63,8 @@ export interface PublishImageInput {
     size: Size;
     outputFormat: OutputFormat;
     arrangement: Arrangement;
+    /** シーズン（期間限定）キー。null=通常投稿。セット時は他スタイルは中立デフォルト。 */
+    season?: string | null;
   };
   source: "web" | "email" | "mention";
   visibility: PublishVisibility;
@@ -117,6 +119,7 @@ function toPostFacts(input: PublishImageInput): PostFacts {
     color: input.options.color,
     size: input.options.size,
     arrangement: input.options.arrangement,
+    season: input.options.season ?? null,
     source: input.source,
     cameraModel: input.extras?.cameraModel ?? null,
     locationPrefecture: input.extras?.locationPrefecture ?? null,
@@ -268,6 +271,7 @@ async function storeAndRecord(
       size: input.options.size,
       outputFormat: input.options.outputFormat,
       arrangement: input.options.arrangement,
+      season: input.options.season ?? null,
       thumbnailKey,
       source: input.source,
       // 仕様: public / unlisted / local いずれも公開TLに表示する（CLAUDE.md）

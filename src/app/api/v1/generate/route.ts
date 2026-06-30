@@ -11,6 +11,10 @@ import {
   MAX_TEXT_LENGTH,
   MAX_FILE_SIZE,
   ALLOWED_FILE_TYPES,
+  DEFAULT_POSITION,
+  DEFAULT_COLOR,
+  DEFAULT_SIZE,
+  DEFAULT_FONT,
   isValidPosition,
   isValidFont,
   isValidColor,
@@ -18,6 +22,7 @@ import {
   isValidOutput,
   isValidArrangement,
 } from "@/types";
+import { isSeasonActiveNow } from "@/lib/seasons/catalog";
 import {
   ErrorCodes,
   ImageProcessError,
@@ -75,6 +80,7 @@ export async function POST(request: NextRequest) {
     const size = formData.get("size") as Size | null;
     const output = formData.get("output") as OutputFormat | null;
     const arrangement = (formData.get("arrangement") as Arrangement | null) || "none";
+    const season = (formData.get("season") as string | null) || null;
 
     // バリデーション
     if (!image) {
@@ -130,42 +136,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!isValidPosition(position)) {
-      return errorResponse(
-        ErrorCodes.VALIDATION_INVALID,
-        "無効な位置が指定されています",
-        400,
-        { requestId }
-      );
-    }
-
-    if (!isValidFont(font)) {
-      return errorResponse(
-        ErrorCodes.VALIDATION_INVALID,
-        "無効なフォントが指定されています",
-        400,
-        { requestId }
-      );
-    }
-
-    if (!isValidColor(color)) {
-      return errorResponse(
-        ErrorCodes.VALIDATION_INVALID,
-        "無効なカラーが指定されています",
-        400,
-        { requestId }
-      );
-    }
-
-    if (!isValidSize(size)) {
-      return errorResponse(
-        ErrorCodes.VALIDATION_INVALID,
-        "無効なサイズが指定されています",
-        400,
-        { requestId }
-      );
-    }
-
     if (!isValidOutput(output)) {
       return errorResponse(
         ErrorCodes.VALIDATION_INVALID,
@@ -175,13 +145,62 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!isValidArrangement(arrangement)) {
-      return errorResponse(
-        ErrorCodes.VALIDATION_INVALID,
-        "無効なアレンジが指定されています",
-        400,
-        { requestId }
-      );
+    // シーズン（期間限定）: 指定時はスタイル系オプションをプリセットで上書きするため
+    // それらの検証はスキップし、代わりに期間内かどうかを検証する（期間外は生成不可）。
+    if (season) {
+      if (!isSeasonActiveNow(season, new Date())) {
+        return errorResponse(
+          ErrorCodes.VALIDATION_INVALID,
+          "このシーズンは現在利用できません",
+          400,
+          { requestId }
+        );
+      }
+    } else {
+      if (!isValidPosition(position)) {
+        return errorResponse(
+          ErrorCodes.VALIDATION_INVALID,
+          "無効な位置が指定されています",
+          400,
+          { requestId }
+        );
+      }
+
+      if (!isValidFont(font)) {
+        return errorResponse(
+          ErrorCodes.VALIDATION_INVALID,
+          "無効なフォントが指定されています",
+          400,
+          { requestId }
+        );
+      }
+
+      if (!isValidColor(color)) {
+        return errorResponse(
+          ErrorCodes.VALIDATION_INVALID,
+          "無効なカラーが指定されています",
+          400,
+          { requestId }
+        );
+      }
+
+      if (!isValidSize(size)) {
+        return errorResponse(
+          ErrorCodes.VALIDATION_INVALID,
+          "無効なサイズが指定されています",
+          400,
+          { requestId }
+        );
+      }
+
+      if (!isValidArrangement(arrangement)) {
+        return errorResponse(
+          ErrorCodes.VALIDATION_INVALID,
+          "無効なアレンジが指定されています",
+          400,
+          { requestId }
+        );
+      }
     }
 
     // 画像処理（タイムアウト付き）
@@ -200,12 +219,14 @@ export async function POST(request: NextRequest) {
       renderImage({
         imageBuffer,
         text,
-        position,
-        color,
-        size,
-        font,
+        // season 指定時はこれらは compute に送られずプリセットで上書きされる（?? は型の都合）
+        position: position ?? DEFAULT_POSITION,
+        color: color ?? DEFAULT_COLOR,
+        size: size ?? DEFAULT_SIZE,
+        font: font ?? DEFAULT_FONT,
         output,
         arrangement,
+        season,
         requestId,
       }),
       PROCESS_TIMEOUT_MS,

@@ -15,6 +15,8 @@ import {
 } from "./text";
 import { drawStampText } from "./stamp";
 import { drawNeonText } from "./neon";
+import { drawSeasonBackground } from "./seasons";
+import { getSeasonByKey } from "@/lib/seasons/catalog";
 
 // フォントを登録
 const fontsDir = path.join(process.cwd(), "fonts");
@@ -44,7 +46,8 @@ export async function createTextOverlay(
   fontFamily: FontFamily,
   textColor: string,
   strokeColor: string,
-  arrangement: Arrangement
+  arrangement: Arrangement,
+  season?: string | null
 ): Promise<Buffer> {
   const canvas = new Canvas(width, height);
   const ctx = canvas.getContext("2d");
@@ -57,6 +60,36 @@ export async function createTextOverlay(
   const margin = Math.max(10, Math.min(width, height) * MARGIN_RATIO);
 
   const isVertical = position === "left" || position === "right";
+
+  // シーズン（期間限定）: 特殊モードとして背景＋テキストを専用に描いて return する。
+  // 七夕は「上部に穴のための余白（topInset）＋縦書き（右ほど大きく＝立体感）」。
+  const seasonDef = season ? getSeasonByKey(season) : undefined;
+  if (seasonDef) {
+    // 真正面の短冊。上部に穴のための余白(topInset)を空けて縦書き（右）で描く。
+    const topInset = fontSize * 1.7;
+    drawSeasonBackground(ctx, seasonDef.decoration, text, width, height, fontSize, margin, topInset);
+    // マジックで書いたような、ほんの少しのにじみ（同色・オフセット0の弱い影）。
+    ctx.shadowColor = "rgba(25, 25, 25, 0.5)";
+    ctx.shadowBlur = Math.max(1.5, fontSize * 0.05);
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    drawVerticalText(
+      ctx,
+      text,
+      "right",
+      width,
+      height,
+      fontSize,
+      margin,
+      textColor,
+      strokeColor,
+      strokeWidth,
+      "none",
+      fontFamily,
+      topInset
+    );
+    return Buffer.from(await canvas.toBuffer("png"));
+  }
 
   // アレンジに応じた描画方法を選択
   if (arrangement === "stamp") {
@@ -204,9 +237,11 @@ function drawVerticalText(
   strokeColor: string,
   strokeWidth: number,
   arrangement: Arrangement,
-  fontFamily: FontFamily
+  fontFamily: FontFamily,
+  // 上端に追加で空ける余白（シーズンの「穴」のぶんテキスト開始を下げる用）。既定 0。
+  topInset = 0
 ): void {
-  const maxHeight = height - margin * 2;
+  const maxHeight = height - margin * 2 - topInset;
   const lineHeight = fontSize * 1.2;
   const charsPerColumn = Math.max(1, Math.floor(maxHeight / lineHeight));
   const columnWidth = fontSize * 1.5;
@@ -242,8 +277,8 @@ function drawVerticalText(
     startX = margin + (columns.length - 1) * columnWidth;
   }
 
-  // Y開始位置（上揃え）
-  const startY = margin + fontSize / 2;
+  // Y開始位置（上揃え）。topInset があればそのぶん下げる。
+  const startY = margin + topInset + fontSize / 2;
 
   // 描画
   columns.forEach((column, colIndex) => {

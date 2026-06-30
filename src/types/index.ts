@@ -18,6 +18,11 @@ export type OutputFormat = "mastodon" | "misskey" | "none";
 
 export type Arrangement = "none" | "neon" | "stamp";
 
+// シーズン（期間限定）。値はシーズンキー（"tanabata-2026" 等）で、定義は
+// src/lib/seasons/catalog.ts のレジストリが持つ（型は文字列＝シーズンは随時追加されるため）。
+// null/未指定 = 通常投稿。セット時は他のスタイルオプションを完全に上書きする特殊モード。
+export type Season = string;
+
 export interface GenerateParams {
   text: string;
   position: Position;
@@ -26,6 +31,7 @@ export interface GenerateParams {
   size: Size;
   output: OutputFormat;
   arrangement: Arrangement;
+  season?: Season | null;
 }
 
 export interface GenerateFormState {
@@ -36,6 +42,7 @@ export interface GenerateFormState {
   size: Size;
   output: OutputFormat;
   arrangement: Arrangement;
+  season: Season | null;
   imageFile: File | null;
   imagePreview: string | null;
 }

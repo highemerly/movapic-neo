@@ -3,7 +3,9 @@
  * POST /api/internal/render
  *
  * worker-front から呼ばれる。skia/sharp による重い処理はここ（compute）でのみ実行する。
- * in: multipart（image + text/position/color/size/font/output/arrangement[+requestId]）
+ * in: multipart（image + text/position/color/size/font/output/arrangement[+season][+requestId]）
+ *   season を渡した場合は position/color/size/font/arrangement は不要（プリセットで上書きするため無視）。
+ *   期間チェックは worker-front 側の責務。compute は season キーの妥当性のみ確認する。
  * out: 生成画像 binary ＋ メタはヘッダ（Content-Type / X-Extension / X-Original-Width/Height）
  */
 
@@ -16,6 +18,10 @@ import {
   Size,
   OutputFormat,
   Arrangement,
+  DEFAULT_POSITION,
+  DEFAULT_COLOR,
+  DEFAULT_SIZE,
+  DEFAULT_FONT,
   isValidPosition,
   isValidFont,
   isValidColor,
@@ -23,6 +29,7 @@ import {
   isValidOutput,
   isValidArrangement,
 } from "@/types";
+import { getSeasonByKey } from "@/lib/seasons/catalog";
 
 export async function POST(request: NextRequest) {
   if (!verifyComputeApiKey(request)) {
@@ -32,25 +39,53 @@ export async function POST(request: NextRequest) {
   const form = await request.formData();
   const image = form.get("image") as File | null;
   const text = form.get("text") as string | null;
-  const position = form.get("position") as Position | null;
-  const color = form.get("color") as Color | null;
-  const size = form.get("size") as Size | null;
-  const font = form.get("font") as FontFamily | null;
   const output = form.get("output") as OutputFormat | null;
-  const arrangement = (form.get("arrangement") as Arrangement | null) || "none";
+  const season = (form.get("season") as string | null) || null;
   const requestId = (form.get("requestId") as string | null) || undefined;
 
-  if (
-    !image ||
-    !text ||
-    !isValidPosition(position) ||
-    !isValidColor(color) ||
-    !isValidSize(size) ||
-    !isValidFont(font) ||
-    !isValidOutput(output) ||
-    !isValidArrangement(arrangement)
-  ) {
+  // image / text / output は常に必須。
+  if (!image || !text || !isValidOutput(output)) {
     return NextResponse.json({ error: "invalid parameters" }, { status: 400 });
+  }
+
+  // スタイル系オプション。season 指定時はプリセットで上書きされるため検証不要
+  // （processImage がプリセットへ差し替える）。中立デフォルトを渡しておく。
+  let position: Position;
+  let color: Color;
+  let size: Size;
+  let font: FontFamily;
+  let arrangement: Arrangement;
+
+  if (season) {
+    // season キーの妥当性のみ確認（期間判定は worker-front 側で済んでいる）。
+    if (!getSeasonByKey(season)) {
+      return NextResponse.json({ error: "invalid season" }, { status: 400 });
+    }
+    position = DEFAULT_POSITION;
+    color = DEFAULT_COLOR;
+    size = DEFAULT_SIZE;
+    font = DEFAULT_FONT;
+    arrangement = "none";
+  } else {
+    const p = form.get("position") as Position | null;
+    const c = form.get("color") as Color | null;
+    const s = form.get("size") as Size | null;
+    const f = form.get("font") as FontFamily | null;
+    const a = (form.get("arrangement") as Arrangement | null) || "none";
+    if (
+      !isValidPosition(p) ||
+      !isValidColor(c) ||
+      !isValidSize(s) ||
+      !isValidFont(f) ||
+      !isValidArrangement(a)
+    ) {
+      return NextResponse.json({ error: "invalid parameters" }, { status: 400 });
+    }
+    position = p;
+    color = c;
+    size = s;
+    font = f;
+    arrangement = a;
   }
 
   const imageBuffer = Buffer.from(await image.arrayBuffer());
@@ -69,6 +104,7 @@ export async function POST(request: NextRequest) {
       font,
       output,
       arrangement,
+      season,
       requestId,
     });
 

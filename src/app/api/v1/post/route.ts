@@ -11,6 +11,7 @@ import { userHasPostedLocation } from "@/lib/locations";
 import { finalizeImage } from "@/lib/compute/client";
 import { publishImage } from "@/lib/publish/publishImage";
 import { normalizeVisibility } from "@/lib/visibility";
+import { isSeasonActiveNow, getSeasonByKey } from "@/lib/seasons/catalog";
 import {
   Position,
   FontFamily,
@@ -19,6 +20,11 @@ import {
   OutputFormat,
   Arrangement,
   MAX_FILE_SIZE,
+  DEFAULT_POSITION,
+  DEFAULT_COLOR,
+  DEFAULT_SIZE,
+  DEFAULT_FONT,
+  DEFAULT_ARRANGEMENT,
 } from "@/types";
 
 export async function POST(request: NextRequest) {
@@ -43,6 +49,7 @@ export async function POST(request: NextRequest) {
     const size = formData.get("size") as Size | null;
     const output = formData.get("output") as OutputFormat | null;
     const arrangement = (formData.get("arrangement") as Arrangement | null) || "none";
+    const season = (formData.get("season") as string | null) || null;
     const visibility = formData.get("visibility") as string | null;
 
     // EXIFメタデータ（クライアントが元画像から抽出したものを受け取る）
@@ -61,13 +68,27 @@ export async function POST(request: NextRequest) {
       cameraModel = (formData.get("cameraModel") as string | null)?.slice(0, 100) || null;
     }
 
-    // バリデーション
-    if (!imageBlob || !text || !position || !font || !color || !size || !output) {
+    // シーズン（期間限定）: 指定時はスタイル系オプションをプリセットで上書きするため
+    // それらの必須チェックを免除し、代わりに期間内かどうかをサーバー側で再検証する
+    // （クライアントを信用しない。期間外の投稿は不可）。
+    const seasonDef = season ? getSeasonByKey(season) : undefined;
+    if (season && !isSeasonActiveNow(season, new Date())) {
+      return NextResponse.json(
+        { error: "このシーズンは現在利用できません" },
+        { status: 400 }
+      );
+    }
+
+    // バリデーション（season 指定時は position/font/color/size を免除）
+    if (!imageBlob || !text || !output || (!season && (!position || !font || !color || !size))) {
       return NextResponse.json(
         { error: "必須パラメータが不足しています" },
         { status: 400 }
       );
     }
+
+    // サムネのクロップ位置は実際の描画レイアウトに合わせる（season はプリセット位置）。
+    const cropPosition: Position = seasonDef ? seasonDef.preset.position : position ?? DEFAULT_POSITION;
 
     // ファイルサイズ上限
     if (imageBlob.size > MAX_FILE_SIZE) {
@@ -85,7 +106,7 @@ export async function POST(request: NextRequest) {
     // /api/v1/generate の出力形式 (JPEG/AVIF) のみ許可する。
     let finalized;
     try {
-      finalized = await finalizeImage(imageBuffer, position);
+      finalized = await finalizeImage(imageBuffer, cropPosition);
     } catch {
       return NextResponse.json(
         { error: "画像の解析に失敗しました" },
@@ -155,7 +176,28 @@ export async function POST(request: NextRequest) {
         instance: { domain: user.instance.domain, type: user.instance.type },
       },
       text,
-      options: { position, font, color, size, outputFormat: output, arrangement },
+      // 案B（実績は season:null フィルタで隔離）: season 指定時はスタイル列に
+      // シーズンのプリセット実値を保存する。これでタイル表示のフォーカス（position）や
+      // 拡大率（size）が実際の描画と一致する。実績側は別途 season で除外する。
+      options: seasonDef
+        ? {
+            position: seasonDef.preset.position,
+            font: seasonDef.preset.font,
+            color: seasonDef.preset.color,
+            size: seasonDef.preset.size,
+            outputFormat: output,
+            arrangement: DEFAULT_ARRANGEMENT,
+            season: seasonDef.key,
+          }
+        : {
+            position: position ?? DEFAULT_POSITION,
+            font: font ?? DEFAULT_FONT,
+            color: color ?? DEFAULT_COLOR,
+            size: size ?? DEFAULT_SIZE,
+            outputFormat: output,
+            arrangement,
+            season: null,
+          },
       source: "web",
       visibility: publishVisibility,
       persistOnPostFailure: true,

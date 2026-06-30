@@ -9,12 +9,19 @@
  */
 
 import { toJstDateString } from "@/lib/streak";
+import { seasonLabel } from "@/lib/seasons/catalog";
 import {
   PERFECT_MONTH_CATEGORY,
   daysInMonthOf,
   isPerfectMonth,
   perfectMonthKey,
 } from "./perfectMonth";
+
+// シーズン（期間限定）実績の系列キーと安定キーの接頭辞。
+// 皆勤賞と同じ「動的キー」方式: シーズン投稿1回でそのシーズンのバッジを獲得し、
+// 実績名にはシーズン名（例: 七夕）を表示する。キーは season:<seasonKey>（永続）。
+export const SEASON_CATEGORY = "season";
+const SEASON_KEY_PREFIX = `${SEASON_CATEGORY}:`;
 import {
   DEFAULT_POSITION,
   DEFAULT_FONT,
@@ -64,6 +71,8 @@ export interface PostFacts {
   color: string;
   size: string;
   arrangement: string;
+  /** シーズン（期間限定）キー。null=通常投稿。セット時に season:<key> 実績を付与 */
+  season: string | null;
   source: string; // "web" | "email" | "mention"
   cameraModel: string | null;
   locationPrefecture: string | null;
@@ -305,12 +314,14 @@ const singletons: AchievementDef[] = [
     title: "こだわり派",
     description: "デフォルト以外の装飾オプションで投稿しました",
     icon: "Palette",
+    // シーズン投稿はスタイルをユーザーが選んでいない（プリセット）ので対象外（案Bの隔離）。
     evaluate: (_s, p) =>
-      p.position !== DEFAULT_POSITION ||
-      p.font !== DEFAULT_FONT ||
-      p.color !== DEFAULT_COLOR ||
-      p.size !== DEFAULT_SIZE ||
-      p.arrangement !== DEFAULT_ARRANGEMENT,
+      p.season == null &&
+      (p.position !== DEFAULT_POSITION ||
+        p.font !== DEFAULT_FONT ||
+        p.color !== DEFAULT_COLOR ||
+        p.size !== DEFAULT_SIZE ||
+        p.arrangement !== DEFAULT_ARRANGEMENT),
   },
   {
     key: "all-fonts",
@@ -461,7 +472,8 @@ export const CATALOG_BY_KEY: Map<string, AchievementDef> = new Map(
 export type AchievementBlock =
   | { kind: "ladder"; ladderKey: string }
   | { kind: "single"; key: string }
-  | { kind: "perfectMonth" };
+  | { kind: "perfectMonth" }
+  | { kind: "season" };
 
 export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[] = [
   {
@@ -500,6 +512,7 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
   {
     title: "期間限定",
     blocks: [
+      { kind: "season" },
       { kind: "single", key: "early-adopter" },
     ],
   },
@@ -531,6 +544,15 @@ export function evaluatePerfectMonth(s: AchStats, post: PostFacts, grace: number
     : null;
 }
 
+/**
+ * シーズン（期間限定）実績（動的キー）。シーズン投稿をした瞬間にそのシーズンのバッジを獲得。
+ * 集計（AchStats）は不要 — その投稿が season を持つかだけで決まる。2枚目以降は
+ * ownedKeys 重複で自動的に二重付与されない。返すキーは season:<seasonKey>。
+ */
+export function evaluateSeason(post: PostFacts): string | null {
+  return post.season ? `${SEASON_KEY_PREFIX}${post.season}` : null;
+}
+
 /** 表示用の解決済み実績情報。 */
 export interface ResolvedAchievement {
   key: string;
@@ -554,6 +576,20 @@ export function resolveAchievement(key: string, category?: string): ResolvedAchi
       title: def.title,
       description: def.description,
       icon: def.icon,
+    };
+  }
+  // 動的: シーズン（期間限定・金ランク固定）。実績名はシーズン名（例: 七夕）。
+  if (key.startsWith(SEASON_KEY_PREFIX)) {
+    const seasonKey = key.slice(SEASON_KEY_PREFIX.length);
+    const label = seasonLabel(seasonKey);
+    return {
+      key,
+      category: SEASON_CATEGORY,
+      rank: "gold",
+      section: "期間限定",
+      title: label,
+      description: `${label}シーズンに投稿しました`,
+      icon: "Sparkles",
     };
   }
   // 動的: 皆勤賞（金ランク固定）
