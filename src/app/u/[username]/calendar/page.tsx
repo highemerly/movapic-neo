@@ -7,7 +7,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
-import { calculateStreak } from "@/lib/streak";
+import { calculateStreak, toJstDateString } from "@/lib/streak";
 import { getRankCounts } from "@/lib/achievements/counts";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
@@ -64,7 +64,9 @@ export default async function CalendarPage({
   ).replace(/\/+$/, "");
 
   // クエリパラメータまたは現在の年月を使用
-  const now = new Date();
+  // 初期表示月は必ず JST 基準。サーバーローカルTZ（本番=UTC）だと JST 00:00〜09:00 に
+  // 先月が初期表示になり、APIの「今月」判定とも食い違うため toJstDateString に揃える。
+  const jstToday = toJstDateString(new Date()); // "YYYY-MM-DD"（JST）
   const queryYear = query.year ? parseInt(query.year, 10) : null;
   const queryMonth = query.month ? parseInt(query.month, 10) : null;
 
@@ -72,8 +74,8 @@ export default async function CalendarPage({
   const isValidYear = queryYear && queryYear >= 2000 && queryYear <= 2100;
   const isValidMonth = queryMonth && queryMonth >= 1 && queryMonth <= 12;
 
-  const initialYear = isValidYear ? queryYear : now.getFullYear();
-  const initialMonth = isValidMonth ? queryMonth : now.getMonth() + 1;
+  const initialYear = isValidYear ? queryYear : Number(jstToday.slice(0, 4));
+  const initialMonth = isValidMonth ? queryMonth : Number(jstToday.slice(5, 7));
 
   // 総画像数・連続投稿日数・実績ランク数の算出データを取得
   const [totalImageCount, postDates, rankCounts, perfectAttendance] =

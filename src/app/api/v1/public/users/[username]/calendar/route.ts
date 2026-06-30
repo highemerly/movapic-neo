@@ -187,9 +187,14 @@ export async function GET(
     });
 
     // 翌月に投稿があるかチェック（未来は常にfalse）
+    // 「今月」は必ず JST 基準で判定する。サーバーのローカルTZ（本番=UTC）で
+    // getFullYear/getMonth すると、JST が新しい月に入っても UTC がまだ前月の
+    // 時間帯（JST 00:00〜09:00）に「先月＝当月」と誤判定し、todayDayNum（JST基準）
+    // と食い違って穴埋め表示が壊れる。todayDayNum と同じ toJstDateString に揃える。
     const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
+    const jstToday = toJstDateString(now); // "YYYY-MM-DD"（JST）
+    const currentYear = Number(jstToday.slice(0, 4));
+    const currentMonth = Number(jstToday.slice(5, 7));
     let hasNextMonth = false;
 
     if (year < currentYear || (year === currentYear && month < currentMonth)) {
