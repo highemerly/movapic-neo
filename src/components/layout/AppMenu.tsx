@@ -251,7 +251,7 @@ function useMenuSections(nav: MenuNav): MenuSectionData[] {
           label: "地図",
           Icon: MapIcon,
           active: pathname.startsWith(`${userBase}/map`),
-          primary: false,
+          primary: true,
         },
         {
           key: "achievements",
