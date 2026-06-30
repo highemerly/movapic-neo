@@ -112,6 +112,8 @@ export async function GET(
 
     let count = image.favoriteCount;
     let favoriters = readCache(image);
+    // 最後に同期を試みた時刻（成功・失敗いずれも更新される）。未同期は null
+    let lastSyncedAt = image.favoritesSyncedAt;
     // 既存のpostStatusから理由を復元（前回のsync結果を引き継ぐ）
     let errorReason: FavoriteErrorReason | null = favoritable
       ? classifyPostStatus(image.postStatus)
@@ -126,6 +128,7 @@ export async function GET(
       count = result.count;
       favoriters = result.favoriters;
       errorReason = result.errorReason;
+      lastSyncedAt = new Date(); // この同期で更新された
     }
 
     return NextResponse.json({
@@ -134,6 +137,7 @@ export async function GET(
       favoriteCount: count,
       isFavorited: isFavoritedByViewer(favoriters, currentUser),
       favoriters: toClientFavoriters(favoriters),
+      lastSyncedAt: lastSyncedAt?.toISOString() ?? null,
       syncError: favoriteErrorMessage(errorReason),
     });
   } catch (error) {
