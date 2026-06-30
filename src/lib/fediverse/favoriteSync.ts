@@ -13,7 +13,6 @@
 
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/db";
-import { decryptToken } from "@/lib/auth/tokens";
 import {
   fetchFavoriteData,
   toFavoriteReason,
@@ -48,11 +47,10 @@ export async function syncFavoriteCache(
   opts: { logSuccess?: boolean } = {}
 ): Promise<SyncResult> {
   try {
-    const ownerToken = decryptToken(image.user.accessToken);
+    // 読み取りは未認証 GET（public/unlisted は誰でも読める）。オーナートークンは使わない
     const data = await fetchFavoriteData(
       image.user.instance.type,
       image.user.instance.domain,
-      ownerToken,
       image.postId!
     );
     // 更新前の状態（差分の基準）を退避してから上書きする

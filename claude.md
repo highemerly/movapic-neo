@@ -89,7 +89,7 @@ App Router の `<Link>` はビューポート進入で RSC ペイロードを自
 **TTL・定期同期（バックオフ／fire1・fire2）・停止条件など詳細仕様は [`docs/favorite.md`](docs/favorite.md) に集約。お気に入り周りを触るときは必ず読む。**
 
 お気に入りは独自DBレコードではなく**Mastodonの favourite そのもの**。正データはオーナー（投稿者）インスタンス側にあり、サービスは `favoriteCount`/`favoritersCache`（上位40件）をキャッシュ保持。対象はMastodonユーザー＋`postId`あり（`isFavoritable`）。実装は [favorite.ts](src/lib/fediverse/favorite.ts) と [route.ts](src/app/api/v1/images/[id]/favorite/route.ts)、判定ロジックは [favoritePolicy.ts](src/lib/fediverse/favoritePolicy.ts)（テスト済み）。要点と**設計上の割り切り**:
-- 読み取り（count/favourited_by）はオーナートークン、操作（POST/DELETE）はviewerトークン。別インスタンスは `postUrl` を `/api/v2/search?resolve=true` で毎回解決してから favourite（localStatusId は**キャッシュしない**割り切り。負荷化したら `(viewerInstanceDomain, postId)→localStatusId` キャッシュが有効だが現時点不要）。
+- 読み取り（count/favourited_by）は**未認証GET**（public/unlistedのみで誰でも読めるためトークン不使用＝オーナーのトークン失効に強い。限定連合モードのインスタンスは401/403で弾かれforbidden扱い）。操作（POST/DELETE）はviewerトークン。別インスタンスは `postUrl` を `/api/v2/search?resolve=true` で毎回解決してから favourite（localStatusId は**キャッシュしない**割り切り。負荷化したら `(viewerInstanceDomain, postId)→localStatusId` キャッシュが有効だが現時点不要）。
 - GETは**TTL切れ時のみ**オーナーsync。TTLは前回status（4xx=1日/5xx=1時間/成功=投稿経過時間ベースで可変）。POST/DELETE成功時は即時sync。
 - 楽観表示はDBに保存しないため、リロードするとオーナーsyncが連合反映を持ってくるまで一旦消える（federation遅延＋上位40件の壁による割り切り）。
 

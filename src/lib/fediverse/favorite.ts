@@ -5,7 +5,8 @@
  * 連合上は favourite ⇔ リアクション が相互に伝播するため、Mastodon⇔Misskey をまたいだ
  * お気に入りも成立する（MisskeyからMastodonへ送る Like は favourite として扱われる）。
  *
- * - 読み取り（count / 一覧 上位40件）: オーナーのトークンで取得（オーナーインスタンスが正データ）
+ * - 読み取り（count / 一覧 上位40件）: 未認証 GET（対象は public/unlisted のみで誰でも読める。
+ *   オーナーインスタンスが正データ。トークンを使わないのでオーナーのトークン失効に強い）
  *   - Mastodon: /statuses/:id（count）＋ /favourited_by（一覧）
  *   - Misskey:  notes/show（reactionCount）＋ notes/reactions（一覧）
  * - お気に入り操作: viewerのトークンで実行。別インスタンスは投稿を解決してから操作
@@ -143,17 +144,17 @@ function mapFavoriter(account: MastodonAccount, ownerDomain: string): CachedFavo
 
 /**
  * オーナーインスタンスから投稿のお気に入り情報（count + favourited_by 上位40件）を取得
- * 失敗時は例外を投げる
+ * 失敗時は例外を投げる。
+ *
+ * 対象は public/unlisted のみで status・favourited_by はどちらも未認証で読めるため、
+ * トークンは使わない（オーナーのトークン失効に強い）。限定連合モードのインスタンスでは
+ * 未認証アクセスが 401/403 で弾かれ得るが、その場合は forbidden として TTL を延ばす。
  */
 export async function fetchMastodonFavoriteData(
   ownerDomain: string,
-  ownerToken: string,
   postId: string
 ): Promise<FavoriteData> {
-  const headers = {
-    Authorization: `Bearer ${ownerToken}`,
-    "User-Agent": USER_AGENT,
-  };
+  const headers = { "User-Agent": USER_AGENT };
 
   const [statusRes, favBoyRes] = await Promise.all([
     fetch(`https://${ownerDomain}/api/v1/statuses/${postId}`, {
@@ -278,23 +279,25 @@ function classifyMisskeyError(
 /**
  * オーナー（Misskey）インスタンスから、投稿のリアクション情報
  * （合計数 + リアクションしたユーザー上位40件）を取得する。失敗時は例外を投げる。
+ *
+ * public/unlisted の note は notes/show・notes/reactions とも `i` 無し（未認証）で読めるため、
+ * トークンは使わない（Mastodon 側と同方針）。
  */
 export async function fetchMisskeyFavoriteData(
   ownerDomain: string,
-  ownerToken: string,
   postId: string
 ): Promise<FavoriteData> {
   const [noteRes, reactionsRes] = await Promise.all([
     fetch(`https://${ownerDomain}/api/notes/show`, {
       method: "POST",
       headers: MISSKEY_HEADERS,
-      body: JSON.stringify({ i: ownerToken, noteId: postId }),
+      body: JSON.stringify({ noteId: postId }),
       signal: AbortSignal.timeout(SHORT_TIMEOUT),
     }),
     fetch(`https://${ownerDomain}/api/notes/reactions`, {
       method: "POST",
       headers: MISSKEY_HEADERS,
-      body: JSON.stringify({ i: ownerToken, noteId: postId, limit: 40 }),
+      body: JSON.stringify({ noteId: postId, limit: 40 }),
       signal: AbortSignal.timeout(SHORT_TIMEOUT),
     }),
   ]);
@@ -320,17 +323,16 @@ export async function fetchMisskeyFavoriteData(
 }
 
 /**
- * オーナーのインスタンス種別に応じてお気に入り情報を取得する。
+ * オーナーのインスタンス種別に応じてお気に入り情報を取得する（未認証読み取り）。
  */
 export function fetchFavoriteData(
   ownerType: string,
   ownerDomain: string,
-  ownerToken: string,
   postId: string
 ): Promise<FavoriteData> {
   return ownerType === "misskey"
-    ? fetchMisskeyFavoriteData(ownerDomain, ownerToken, postId)
-    : fetchMastodonFavoriteData(ownerDomain, ownerToken, postId);
+    ? fetchMisskeyFavoriteData(ownerDomain, postId)
+    : fetchMastodonFavoriteData(ownerDomain, postId);
 }
 
 /**
