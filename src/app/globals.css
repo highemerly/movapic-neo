@@ -26,6 +26,18 @@
   padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
 }
 
+/* iOS Safari 対策: Radix の DropdownMenu/Popover 等は外側タップ検出を
+   document 上の pointerdown で行うが、iOS はクリック可能でない要素への
+   タップイベントを document へ伝播させないため「外側タップで閉じる」が効かない
+   （例: 画像詳細ページのミートボールメニューが背景タップで閉じない）。
+   タッチデバイスの body に cursor: pointer を付けると iOS がタップを配送するようになる。
+   タッチではカーソル表示自体がないため見た目への影響はない。 */
+@media (hover: none) and (pointer: coarse) {
+  body {
+    cursor: pointer;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
