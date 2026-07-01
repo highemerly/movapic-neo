@@ -3,6 +3,7 @@ import {
   computeCacheTtl,
   shouldSyncOnGet,
   isFavoriteSyncDue,
+  isFirstSuccessfulSync,
   MIN_MS,
   HOUR_MS,
   DAY_MS,
@@ -233,5 +234,31 @@ describe("isFavoriteSyncDue - fire1/fire2 の発火条件", () => {
     it("20日経過＋未sync → 発火", () => {
       expect(isFavoriteSyncDue({ createdAt: createdAgo(20 * DAY_MS), favoritesSyncedAt: null, postStatus: null }, NOW)).toBe(true);
     });
+  });
+});
+
+describe("isFirstSuccessfulSync - 通知ベースライン化の判定（初回“成功”sync か）", () => {
+  it("未sync（postStatus=null・キャッシュ空）→ 初回成功（ベースライン化）", () => {
+    expect(isFirstSuccessfulSync(null, 0)).toBe(true);
+  });
+
+  it("失敗のみ先行（postStatus=5xx・キャッシュ空）→ 初回成功として扱う（誤爆防止の要点）", () => {
+    // favoritesSyncedAt は失敗で埋まっているが、成功実績が無いのでベースライン化する
+    expect(isFirstSuccessfulSync(503, 0)).toBe(true);
+    expect(isFirstSuccessfulSync(429, 0)).toBe(true);
+    expect(isFirstSuccessfulSync(404, 0)).toBe(true);
+    expect(isFirstSuccessfulSync(0, 0)).toBe(true);
+  });
+
+  it("直近が成功（postStatus=200）→ 初回ではない（差分通知する）", () => {
+    // 成功が0件返しでキャッシュ空でも、成功実績があるので以後の新規は通知対象
+    expect(isFirstSuccessfulSync(200, 0)).toBe(false);
+  });
+
+  it("キャッシュが非空（過去の成功が populate 済み）→ 初回ではない", () => {
+    // 直近が失敗(5xx)でもキャッシュは失敗で消えないため、成功実績ありと判定
+    expect(isFirstSuccessfulSync(503, 3)).toBe(false);
+    expect(isFirstSuccessfulSync(200, 5)).toBe(false);
+    expect(isFirstSuccessfulSync(null, 2)).toBe(false);
   });
 });

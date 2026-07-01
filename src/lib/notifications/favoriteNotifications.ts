@@ -10,7 +10,7 @@
  *   主キー固定で upsert/findUnique するため、同時 sync でも重複行は生まれない。
  * - 「新規のみ通知」: 通知がまだ無い画像では、直前の favoritersCache に居なかった人が
  *   現れたときだけ通知を作る。これでリリース前から付いていた既存お気に入りは通知化しない。
- *   その投稿の初回 sync（favoritesSyncedAt が null）も同様にベースライン化のみ。
+ *   その投稿の初回の“成功” sync（wasFirstSync）も同様にベースライン化のみ。
  * - 通知ができた後の「新規」判定は data.seenAccts（通知済み acct の集合）を基準にする。
  *   Mastodon の favourited_by は remote ユーザー等で一時的に空/部分的に返ることがあり、
  *   画像キャッシュ基準だと取得のブレで再通知・名前消失が起きるため、安定した集合で持つ。
@@ -49,7 +49,11 @@ interface ReconcileParams {
   ownerUserId: string;
   /** 所有者自身の acct（username@domain）。自分のお気に入りは通知しない。 */
   ownerAcct: string;
-  /** この sync が「その投稿の初回 sync」か（直前の favoritesSyncedAt が null）。 */
+  /**
+   * この sync が「その投稿の初回の“成功” sync」か。true ならベースライン化のみで通知を作らない。
+   * 失敗 sync も favoritesSyncedAt を更新するため、favoritesSyncedAt の有無ではなく
+   * 「成功実績があるか」で判定する（呼び出し側 syncFavoriteCache 参照）。
+   */
   wasFirstSync: boolean;
   /** 更新前の favoritersCache（通知未作成時の差分の基準）。 */
   previousFavoriters: CachedFavoriter[];

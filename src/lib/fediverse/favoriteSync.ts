@@ -22,6 +22,7 @@ import {
   type FavoriteErrorReason,
 } from "@/lib/fediverse/favorite";
 import { reconcileFavoriteNotificationSafely } from "@/lib/notifications/favoriteNotifications";
+import { isFirstSuccessfulSync } from "@/lib/fediverse/favoritePolicy";
 
 export type ImageForFavorite = Prisma.ImageGetPayload<{
   include: { user: { include: { instance: true } } };
@@ -55,7 +56,9 @@ export async function syncFavoriteCache(
     );
     // 更新前の状態（差分の基準）を退避してから上書きする
     const previousFavoriters = readCache(image);
-    const wasFirstSync = !image.favoritesSyncedAt;
+    // 「初回の“成功”sync か」を判定（失敗込みの favoritesSyncedAt では誤爆する。理由は
+    // isFirstSuccessfulSync の doc / docs/favorite.md §2 参照）。
+    const wasFirstSync = isFirstSuccessfulSync(image.postStatus, previousFavoriters.length);
     await prisma.image.update({
       where: { id: image.id },
       data: {

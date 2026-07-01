@@ -85,6 +85,26 @@ export function shouldSyncOnGet(
   return now - favoritesSyncedAt.getTime() > ttl;
 }
 
+/**
+ * 今回の成功 sync が「その投稿で初めての成功 sync」か（＝通知はベースライン化のみで作らない）。
+ *
+ * favoritesSyncedAt は失敗時にも更新される（TTL/バックオフのため）ので、それだけを見ると
+ * 「失敗 → 初めての成功」のときに初回と判定されず、既存お気に入り全員へ通知が誤爆する。
+ * 成功実績は次のいずれかで判定する（失敗はキャッシュを触らないため両者は成功時のみ立つ）:
+ * - postStatus === 200（直近の sync が成功）
+ * - 既存キャッシュが非空（過去の成功が上位40件を populate 済み）
+ *
+ * @param postStatus         更新前の Image.postStatus
+ * @param cachedFavoriterCount 更新前の favoritersCache 件数
+ */
+export function isFirstSuccessfulSync(
+  postStatus: number | null,
+  cachedFavoriterCount: number
+): boolean {
+  const hadSuccessfulSync = postStatus === 200 || cachedFavoriterCount > 0;
+  return !hadSuccessfulSync;
+}
+
 export interface FavoriteSyncRow {
   createdAt: Date;
   favoritesSyncedAt: Date | null;
