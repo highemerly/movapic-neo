@@ -10,7 +10,10 @@ export const DEFAULT_PAGE_LIMIT = 20;
 export const MAX_PAGE_LIMIT = 100;
 
 /**
- * クエリの limit パラメータを 1〜maxLimit の範囲に正規化する
+ * クエリの limit パラメータを 1〜maxLimit の範囲に正規化する。
+ * 未指定・数値化できない値（例 "abc"）は defaultLimit にフォールバックする。
+ * ※ Number.isNaN ガードが無いと ?limit=abc で parseInt→NaN が Math.max/min を素通りし、
+ *   cursorPageArgs の take: NaN で Prisma クエリが壊れる。
  */
 export function parsePageLimit(
   limitParam: string | null,
@@ -19,10 +22,9 @@ export function parsePageLimit(
     maxLimit = MAX_PAGE_LIMIT,
   }: { defaultLimit?: number; maxLimit?: number } = {}
 ): number {
-  return Math.min(
-    Math.max(1, parseInt(limitParam || String(defaultLimit), 10)),
-    maxLimit
-  );
+  const parsed = parseInt(limitParam ?? "", 10);
+  const limit = Number.isNaN(parsed) ? defaultLimit : parsed;
+  return Math.min(Math.max(1, limit), maxLimit);
 }
 
 /**
