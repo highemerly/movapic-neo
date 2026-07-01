@@ -11,8 +11,14 @@ type Status = "loading" | "loaded" | "failed";
  *
  * iOS Safari は重い画像のダウンロード／デコード中に一過性で失敗（onError）し、
  * そのままブラウザ標準の壊れた画像「？」を表示してしまうことがある。発生そのものは
- * アプリ側で防げないため、失敗時にキャッシュバスターを付けて最大 MAX_RETRIES 回まで
- * 自動再取得し、それでも失敗したら「？」ではなくプレースホルダ（灰色）を維持する。
+ * アプリ側で防げないため、失敗時に同一URLのまま <img> を再マウント（key=attempt）して
+ * 最大 MAX_RETRIES 回まで自動再取得し、それでも失敗したら「？」ではなくプレースホルダ
+ * （灰色）を維持する。
+ *
+ * リトライにキャッシュバスター（?r=）は付けない。失敗の主因は URL の腐りではなく
+ * iOS 側の一過性の資源不足なので、同一URLで張り直せば十分再取得でき、かつ CDN/プロキシ
+ * のキャッシュを活かせる（バスターは毎回キャッシュミス＝オリジン往復で逆に遅く、
+ * クエリ検証つきプロキシでは 403/404 を招く）。
  *
  * 縮小表示で十分な箇所（サムネイル等）はそもそもデコードが軽く問題が出ないので、
  * このコンポーネントは原本をそのまま見せる箇所（タイムライン写真・画像詳細の本画像）専用。
@@ -54,10 +60,6 @@ export function RetryImage({
     };
   }, []);
 
-  // 1回目は原本URL、リトライ時はキャッシュバスターを付けて新規取得させる
-  const resolvedSrc =
-    attempt === 0 ? src : `${src}${src.includes("?") ? "&" : "?"}r=${attempt}`;
-
   const loaded = status === "loaded";
 
   return (
@@ -70,8 +72,9 @@ export function RetryImage({
       )}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
+        key={attempt}
         ref={ref}
-        src={resolvedSrc}
+        src={src}
         alt={alt}
         loading={loading}
         decoding="async"

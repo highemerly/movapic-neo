@@ -11,9 +11,15 @@ type Status = "loading" | "loaded" | "failed";
  *
  * iOS Safari はダウンロード／デコード中に一過性で失敗（onError）し、ブラウザ標準の
  * 壊れた画像「？」を出してしまうことがある。ヘッダー・下部ナビ・メニューに常駐する
- * アバターは全ページで露出するため症状が目立つ。失敗時にキャッシュバスターを付けて
- * 最大 MAX_RETRIES 回まで自動再取得し、それでも失敗したら「？」ではなく灰色の
- * プレースホルダ（呼び出し側の className の形＝rounded 等を踏襲）を残す。
+ * アバターは全ページで露出するため症状が目立つ。失敗時に同一URLのまま <img> を
+ * 再マウント（key=attempt）して最大 MAX_RETRIES 回まで自動再取得し、それでも失敗
+ * したら「？」ではなく灰色のプレースホルダ（呼び出し側の className の形＝rounded 等を
+ * 踏襲）を残す。
+ *
+ * リトライにキャッシュバスター（?r=）は付けない。アバターは
+ * `…/proxy/image.webp?url=…&avatar=1&fallback` のクエリ付きプロキシURLで、バスターを
+ * 足すと毎回プロキシ再変換のキャッシュミス（＝遅い）や、クエリ検証で 403/404 を招く。
+ * 失敗の主因は URL の腐りではなく iOS 側の一過性の資源不足なので同一URLで張り直せば足りる。
  *
  * 原本をそのまま見せる大きい画像は placeholder 付きの {@link RetryImage} を使う。
  * こちらはサイズ・rounded・配置を呼び出し側が className で与える前提の軽量版。
@@ -53,15 +59,12 @@ export function RetryImg({
     return <span className={`${className} bg-muted`} aria-hidden />;
   }
 
-  // 1回目は原本URL、リトライ時はキャッシュバスターを付けて新規取得させる
-  const resolvedSrc =
-    attempt === 0 ? src : `${src}${src.includes("?") ? "&" : "?"}r=${attempt}`;
-
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
+      key={attempt}
       ref={ref}
-      src={resolvedSrc}
+      src={src}
       alt={alt}
       loading={loading}
       decoding="async"
