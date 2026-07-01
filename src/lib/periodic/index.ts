@@ -178,24 +178,32 @@ const favoriteSyncJob: PeriodicJob = {
       total = t;
     }
 
+    // 本体は id ごとの findUnique（N+1）ではなく1クエリでまとめて取得する。
+    // 抽出時の並び（favorites_synced_at ASC NULLS FIRST）は findMany では保証されないため、
+    // 抽出順の id 配列で引き直して未同期・古い順を復元する。
+    const ids = rows.map((r) => r.id);
+    const found = await prisma.image.findMany({
+      where: { id: { in: ids } },
+      include: { user: { include: { instance: true } } },
+    });
+    const byId = new Map(found.map((img) => [img.id, img]));
+    // 抽出〜ここまでに削除された行は map に無く、自然にスキップされる
+    const images = ids
+      .map((id) => byId.get(id))
+      .filter((img): img is NonNullable<typeof img> => img !== undefined);
+
     // SQL 抽出時点と TS 判定時点で now がぶれないよう、1回だけ now を固定して使う
     const now = Date.now();
     let synced = 0;
     let failed = 0;
     // 連携先インスタンスへ一度に殺到させないよう、少数ずつ＋バッチ間ウェイトで回す
-    for (let i = 0; i < rows.length; i += FAVORITE_SYNC_CONCURRENCY) {
+    for (let i = 0; i < images.length; i += FAVORITE_SYNC_CONCURRENCY) {
       if (i > 0) await sleep(FAVORITE_SYNC_GAP_MS);
-      const chunk = rows.slice(i, i + FAVORITE_SYNC_CONCURRENCY);
+      const chunk = images.slice(i, i + FAVORITE_SYNC_CONCURRENCY);
       const results = await Promise.all(
-        chunk.map(async ({ id }) => {
-          const image = await prisma.image.findUnique({
-            where: { id },
-            include: { user: { include: { instance: true } } },
-          });
-          // 取得〜選別の間に削除/非公開化された場合はスキップ
-          if (!image || !image.isPublic || image.isDisabled || !image.postId) {
-            return null;
-          }
+        chunk.map(async (image) => {
+          // 抽出〜実行の間に非公開化/削除された場合はスキップ（SQL 抽出時点では満たしていた）
+          if (!image.isPublic || image.isDisabled || !image.postId) return null;
           // 発火条件の最終ゲート（isFavoriteSyncDue が正。SQL はあくまで前段の絞り込み）
           if (!isFavoriteSyncDue(image, now)) return null;
           // syncFavoriteCache は内部で例外を握り errorReason を返す（throw しない）。
@@ -224,9 +232,16 @@ const favoriteSyncJob: PeriodicJob = {
  */
 const periodicJobs: PeriodicJob[] = [mentionPoll, tmpCleanup, favoriteSyncJob];
 
-/** 全ての定期ジョブを順に実行する。各ジョブの失敗は隔離され、他のジョブには波及しない。 */
-export async function runPeriodicJobs(): Promise<void> {
-  for (const job of periodicJobs) {
+/** 登録済みの定期ジョブ名一覧（手動実行スクリプトのフィルタ指定用）。 */
+export const PERIODIC_JOB_NAMES = periodicJobs.map((j) => j.name);
+
+/**
+ * 定期ジョブを順に実行する。各ジョブの失敗は隔離され、他のジョブには波及しない。
+ * @param only 指定時はこのジョブ名だけ実行する（手動実行で mention-poll/tmp-cleanup を巻き込まない用途）。
+ */
+export async function runPeriodicJobs(only?: string[]): Promise<void> {
+  const jobs = only ? periodicJobs.filter((j) => only.includes(j.name)) : periodicJobs;
+  for (const job of jobs) {
     const start = Date.now();
     try {
       const summary = await job.run();
