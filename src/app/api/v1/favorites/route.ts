@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
     const images = await prisma.image.findMany({
       where: {
         isPublic: true,
+        isDisabled: false,
         favoritersCache: {
           array_contains: [{ acct: viewerAcct }] as Prisma.InputJsonValue,
         },

@@ -61,6 +61,7 @@ export async function GET(
       where: {
         userId: user.id,
         isPublic: true,
+        isDisabled: false,
         locationPrefecture: { not: null },
       },
       orderBy: { createdAt: "desc" },

@@ -210,6 +210,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
       where: {
         ...(isFromPublic ? {} : { userId: image.userId }),
         isPublic: true,
+        isDisabled: false,
         createdAt: { lt: image.createdAt },
       },
       orderBy: { createdAt: "desc" },
@@ -220,6 +221,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
       where: {
         ...(isFromPublic ? {} : { userId: image.userId }),
         isPublic: true,
+        isDisabled: false,
         createdAt: { gt: image.createdAt },
       },
       orderBy: { createdAt: "asc" },

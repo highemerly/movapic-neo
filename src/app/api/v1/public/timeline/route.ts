@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
     const images = await prisma.image.findMany({
       where: {
         isPublic: true,
+        isDisabled: false,
         ...(instanceDomains.length > 0 && {
           user: { instance: { domain: { in: instanceDomains } } },
         }),

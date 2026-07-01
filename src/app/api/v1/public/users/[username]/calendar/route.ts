@@ -114,6 +114,7 @@ export async function GET(
       where: {
         userId: user.id,
         isPublic: true,
+        isDisabled: false,
         createdAt: {
           gte: startDate,
           lt: endDate,
@@ -178,6 +179,7 @@ export async function GET(
       where: {
         userId: user.id,
         isPublic: true,
+        isDisabled: false,
         createdAt: {
           gte: prevMonthStart,
           lt: prevMonthEnd,
@@ -204,6 +206,7 @@ export async function GET(
         where: {
           userId: user.id,
           isPublic: true,
+          isDisabled: false,
           createdAt: {
             gte: nextMonthStart,
             lt: nextMonthEnd,

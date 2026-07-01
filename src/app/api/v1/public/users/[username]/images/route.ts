@@ -56,6 +56,7 @@ export async function GET(
       where: {
         userId: user.id,
         isPublic: true,
+        isDisabled: false,
         ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
