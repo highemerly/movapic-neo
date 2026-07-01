@@ -242,7 +242,9 @@ async function handleToggle(
   }
 
   // オーナー側のキャッシュを更新（avatar一覧・count）。federation遅延があるため
-  // 操作者への即時応答にはviewer側の結果を使う
+  // 操作者への即時応答にはviewer側の結果を使う。
+  // syncFavoriteCache は throw しない契約（DB 障害等も内部で握り errorReason を返す）。
+  // これにより「Fediverse 操作は成功したのに sync 失敗で 500 → 再操作で二重トグル」を防ぐ。
   const synced = await syncFavoriteCache(image);
 
   // federation遅延でオーナー側のfavourited_byにviewerがまだ載らないため、

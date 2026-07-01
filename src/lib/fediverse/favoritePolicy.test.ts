@@ -141,7 +141,7 @@ describe("isFavoriteSyncDue - fire1/fire2 の発火条件", () => {
 
   });
 
-  describe("バックオフ（成功=12時間 / 失敗=1時間）", () => {
+  describe("バックオフ（成功=12時間 / 一時障害=1日）", () => {
     // 成功(200)が fire1 対象であり続けるには「1日マーク未満の成功」である必要がある。
     // age=30時間 → 1日マークは now-6時間。よって synced が now-6h より前かつ
     // バックオフ境界(12h)をまたぐように 8h/13h 前を使うと、バックオフだけを切り分けられる。
@@ -159,21 +159,59 @@ describe("isFavoriteSyncDue - fire1/fire2 の発火条件", () => {
       expect(isFavoriteSyncDue(successBeforeMark(13 * HOUR_MS), NOW)).toBe(true);
     });
 
-    it("失敗(5xx): 1時間以内は発火しない", () => {
-      const createdAt = createdAgo(2 * DAY_MS);
-      expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: ago(30 * 60_000), postStatus: 503 }, NOW)).toBe(false);
+    // 一時障害（429/5xx/0）は1日バックオフ。createdAt を古めにして synced を [1日前,2日前] に置く。
+    it("一時障害(5xx): 1日以内は発火しない", () => {
+      const createdAt = createdAgo(3 * DAY_MS);
+      expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: ago(12 * HOUR_MS), postStatus: 503 }, NOW)).toBe(false);
     });
-    it("失敗(5xx): 1時間超で発火（成功より早く再試行）", () => {
-      const createdAt = createdAgo(2 * DAY_MS);
-      expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: ago(2 * HOUR_MS), postStatus: 503 }, NOW)).toBe(true);
+    it("一時障害(5xx): 1日超で発火（成功まで再試行）", () => {
+      const createdAt = createdAgo(3 * DAY_MS);
+      expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: ago(25 * HOUR_MS), postStatus: 503 }, NOW)).toBe(true);
     });
-    it("失敗(429): 1時間超で発火", () => {
-      const createdAt = createdAgo(2 * DAY_MS);
-      expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: ago(2 * HOUR_MS), postStatus: 429 }, NOW)).toBe(true);
+    it("一時障害(429): 1日以内は発火しない / 1日超で発火", () => {
+      const createdAt = createdAgo(3 * DAY_MS);
+      expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: ago(12 * HOUR_MS), postStatus: 429 }, NOW)).toBe(false);
+      expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: ago(25 * HOUR_MS), postStatus: 429 }, NOW)).toBe(true);
     });
-    it("接続失敗(0): 1時間超で発火", () => {
-      const createdAt = createdAgo(2 * DAY_MS);
-      expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: ago(2 * HOUR_MS), postStatus: 0 }, NOW)).toBe(true);
+    it("接続失敗(0): 1日超で発火", () => {
+      const createdAt = createdAgo(3 * DAY_MS);
+      expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: ago(25 * HOUR_MS), postStatus: 0 }, NOW)).toBe(true);
+    });
+  });
+
+  describe("429以外の4xx（deleted/forbidden）は定期リトライしない", () => {
+    // 他条件（1日超・バックオフ経過・成功sync無し）を満たしても、恒久4xxなら発火しない
+    const createdAt = createdAgo(3 * DAY_MS);
+    const syncedLongAgo = ago(2 * DAY_MS);
+
+    it("404(deleted) → 発火しない", () => {
+      expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: syncedLongAgo, postStatus: 404 }, NOW)).toBe(false);
+    });
+    it("403(forbidden) → 発火しない", () => {
+      expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: syncedLongAgo, postStatus: 403 }, NOW)).toBe(false);
+    });
+    it("400/451 など他の4xx → 発火しない", () => {
+      expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: syncedLongAgo, postStatus: 400 }, NOW)).toBe(false);
+      expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: syncedLongAgo, postStatus: 451 }, NOW)).toBe(false);
+    });
+    it("対比: 同条件でも 429/5xx（一時障害）は発火する", () => {
+      expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: syncedLongAgo, postStatus: 429 }, NOW)).toBe(true);
+      expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: syncedLongAgo, postStatus: 503 }, NOW)).toBe(true);
+    });
+  });
+
+  describe("16日で恒久停止（成功/失敗を問わずリトライしない）", () => {
+    it("ちょうど16日経過＋未sync → 発火しない（境界）", () => {
+      expect(isFavoriteSyncDue({ createdAt: createdAgo(16 * DAY_MS), favoritesSyncedAt: null, postStatus: null }, NOW)).toBe(false);
+    });
+    it("16日未満(15日)＋未sync → まだ発火", () => {
+      expect(isFavoriteSyncDue({ createdAt: createdAgo(15 * DAY_MS), favoritesSyncedAt: null, postStatus: null }, NOW)).toBe(true);
+    });
+    it("16日超(20日)＋失敗が続いていても → 停止", () => {
+      expect(isFavoriteSyncDue({ createdAt: createdAgo(20 * DAY_MS), favoritesSyncedAt: ago(2 * DAY_MS), postStatus: 503 }, NOW)).toBe(false);
+    });
+    it("16日超(20日)＋未sync → 停止（旧仕様では発火していたケース）", () => {
+      expect(isFavoriteSyncDue({ createdAt: createdAgo(20 * DAY_MS), favoritesSyncedAt: null, postStatus: null }, NOW)).toBe(false);
     });
   });
 
@@ -201,38 +239,34 @@ describe("isFavoriteSyncDue - fire1/fire2 の発火条件", () => {
     });
   });
 
-  describe("fire2（14日経過後の最終成功syncまで）", () => {
-    it("16日経過＋day1の成功syncだけ → 発火（成熟後の最終sync：day16に未閲覧でも拾う）", () => {
-      const createdAt = createdAgo(16 * DAY_MS);
+  describe("fire2（14日経過後の最終成功syncまで。窓は[14,16)日）", () => {
+    it("15日経過＋day1の成功syncだけ → 発火（成熟後の最終sync：未閲覧でも拾う）", () => {
+      const createdAt = createdAgo(15 * DAY_MS);
       const synced = syncedAtMark(createdAt, 1);
       expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: synced, postStatus: 200 }, NOW)).toBe(true);
     });
 
-    it("16日経過＋14日マーク以降に成功sync済み → 発火しない（恒久停止）", () => {
-      const createdAt = createdAgo(16 * DAY_MS);
-      const synced = syncedAtMark(createdAt, 15); // day15 の成功
+    it("15日経過＋14日マーク以降に成功sync済み → 発火しない（恒久停止）", () => {
+      const createdAt = createdAgo(15 * DAY_MS);
+      const synced = syncedAtMark(createdAt, 14); // day14 の成功
       expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: synced, postStatus: 200 }, NOW)).toBe(false);
     });
 
-    it("16日経過＋成熟sync済みでも 14日マーク丁度なら停止（境界）", () => {
-      const createdAt = createdAgo(16 * DAY_MS);
+    it("15日経過＋成熟sync済みでも 14日マーク丁度なら停止（境界）", () => {
+      const createdAt = createdAgo(15 * DAY_MS);
       const synced = syncedAtMark(createdAt, MATURE_DAYS);
       expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: synced, postStatus: 200 }, NOW)).toBe(false);
     });
 
-    it("16日経過＋14日以降の sync が失敗 → 発火し続ける（再試行）", () => {
-      const createdAt = createdAgo(16 * DAY_MS);
-      const synced = syncedAtMark(createdAt, 15);
+    it("15日経過＋14日以降の sync が失敗 → 発火し続ける（16日までは再試行）", () => {
+      const createdAt = createdAgo(15 * DAY_MS);
+      const synced = syncedAtMark(createdAt, 14);
       expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: synced, postStatus: 503 }, NOW)).toBe(true);
     });
 
-    it("14日以降の失敗syncでも1時間以内なら発火しない（バックオフ優先）", () => {
-      const createdAt = createdAgo(16 * DAY_MS);
+    it("14日以降の失敗syncでも1日以内なら発火しない（バックオフ優先）", () => {
+      const createdAt = createdAgo(15 * DAY_MS);
       expect(isFavoriteSyncDue({ createdAt, favoritesSyncedAt: ago(30 * 60_000), postStatus: 503 }, NOW)).toBe(false);
-    });
-
-    it("20日経過＋未sync → 発火", () => {
-      expect(isFavoriteSyncDue({ createdAt: createdAgo(20 * DAY_MS), favoritesSyncedAt: null, postStatus: null }, NOW)).toBe(true);
     });
   });
 });

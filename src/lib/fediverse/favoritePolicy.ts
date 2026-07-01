@@ -17,13 +17,19 @@ export const MATURE_DAYS = 14;
 
 /** フォールバックsyncの対象になる最小経過日数（投稿が落ち着く目安） */
 export const FALLBACK_MIN_AGE_MS = 1 * DAY_MS;
+/**
+ * フォールバックsyncを恒久停止する経過日数。これを超えたら成功・失敗を問わず
+ * 定期リトライしない（fav はほぼ動かず、失敗し続ける投稿を無限に叩かないための上限）。
+ */
+export const FALLBACK_MAX_AGE_MS = 16 * DAY_MS;
 /** フォールバックsyncの通常バックオフ（成功・未失敗時の再試行間隔） */
 export const FALLBACK_BACKOFF_MS = 12 * HOUR_MS;
 /**
- * 直近のsyncが失敗（4xx/5xx/接続失敗＝postStatus≠200）だったときの短いバックオフ。
- * 429やレート制限・一過性5xxは早めに回復するため、通常より短い間隔で再試行する。
+ * 一時障害（429 / 5xx / 接続失敗＝0）だったときのバックオフ。回復を待って再試行する。
+ * ※ 429以外の4xx（404 deleted / 403 forbidden 等）は回復見込みが薄いため、バックオフではなく
+ *   isFavoriteSyncDue 側で定期リトライ自体を停止する（このバックオフは適用しない）。
  */
-export const FALLBACK_BACKOFF_FAILED_MS = 1 * HOUR_MS;
+export const FALLBACK_BACKOFF_FAILED_MS = 1 * DAY_MS;
 
 /**
  * 「createdAt + markDays 日 以降に成功（200）syncが記録されているか」。
@@ -111,16 +117,25 @@ export interface FavoriteSyncRow {
   postStatus: number | null;
 }
 
+/** 429を除く4xx（404 deleted / 403 forbidden 等、回復見込みが薄い恒久エラー）か。 */
+function isPermanentClientError(postStatus: number | null): boolean {
+  return postStatus !== null && postStatus !== 429 && postStatus >= 400 && postStatus < 500;
+}
+
 /**
  * 定期フォールバックsyncの発火条件（worker SQL の WHERE と一致させること）。
  *
- * 共通足切り: 投稿から1日以上経過 かつ（未sync またはバックオフ経過）。
- * バックオフは直近syncの結果で変える: 成功/通常は12時間、失敗（postStatus≠200）は1時間。
+ * 足切り（この順に評価）:
+ *   1. 投稿から1日未満 → 対象外（まだ動きが激しい時期は GET 側に任せる）。
+ *   2. 投稿から16日超 → 恒久停止（fav はほぼ動かず、失敗し続ける投稿を無限に叩かない）。
+ *   3. 直近が「429以外の4xx」（deleted/forbidden 等）→ 定期リトライしない（回復見込みが薄い）。
+ *   4. バックオフ未経過 → 対象外。バックオフは直近syncの結果で変える:
+ *      成功(200)/未sync=12時間、一時障害(429/5xx/0)=1日。
  * その上で fire1 / fire2 のどちらかが立てば発火:
  *   - fire1: 1日経過後にまだ成功syncが無い（投稿が落ち着いた頃のfavを1回拾う）
  *   - fire2: 14日経過後にまだ「14日以降の成功sync」が無い（成熟後の最終syncを1回拾い停止）
  * 成功（200）syncがその段のマークを越えると、その段は二度と発火しない。
- * 失敗（4xx/5xx等）は postStatus≠200 のままなので成功するまで1時間間隔で再試行される。
+ * 一時障害（429/5xx/0）は postStatus≠200 のままなので、成功するか16日を超えるまで1日間隔で再試行される。
  */
 export function isFavoriteSyncDue(
   row: FavoriteSyncRow,
@@ -128,9 +143,13 @@ export function isFavoriteSyncDue(
 ): boolean {
   const age = now - row.createdAt.getTime();
   if (age < FALLBACK_MIN_AGE_MS) return false;
+  // 16日超は恒久停止（成功/失敗を問わずリトライしない）
+  if (age >= FALLBACK_MAX_AGE_MS) return false;
+  // 429以外の4xx（deleted/forbidden 等）は回復見込みが薄いので定期リトライしない
+  if (isPermanentClientError(row.postStatus)) return false;
 
   const syncedMs = row.favoritesSyncedAt?.getTime() ?? null;
-  // 直近syncが失敗（4xx/5xx/接続失敗）なら短いバックオフで早めに再試行する
+  // ここに来る失敗は一時障害（429/5xx/0）のみ（恒久4xxは上で除外済み）。1日バックオフで再試行。
   const lastFailed = row.postStatus !== null && row.postStatus !== 200;
   const backoffMs = lastFailed ? FALLBACK_BACKOFF_FAILED_MS : FALLBACK_BACKOFF_MS;
   const backoffOk = syncedMs === null || syncedMs <= now - backoffMs;
