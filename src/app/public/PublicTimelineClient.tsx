@@ -34,6 +34,14 @@ export function PublicTimelineClient({
       if (!response.ok) throw new Error("Failed to load more");
       return response.json();
     },
+    // 再前面化／bfcache 復元時に先頭ページを取り直す（iOS PWA の古い表示対策）。
+    fetchFirstPage: async () => {
+      const params = new URLSearchParams({ limit: "20" });
+      if (instancesParam) params.set("instances", instancesParam);
+      const response = await fetch(`/api/v1/public/timeline?${params.toString()}`);
+      if (!response.ok) throw new Error("Failed to refresh");
+      return response.json();
+    },
   });
 
   return (

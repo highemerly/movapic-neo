@@ -28,6 +28,12 @@ export function FavoritesClient({
       if (!response.ok) throw new Error("Failed to load more");
       return response.json();
     },
+    // 再前面化／bfcache 復元時に先頭ページを取り直す（iOS PWA の古い表示対策）。
+    fetchFirstPage: async () => {
+      const response = await fetch(`/api/v1/favorites?limit=20`);
+      if (!response.ok) throw new Error("Failed to refresh");
+      return response.json();
+    },
   });
 
   return (
