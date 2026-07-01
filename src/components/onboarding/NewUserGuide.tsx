@@ -49,7 +49,7 @@ export function NewUserGuide({ isLoggedIn, allowedServers }: NewUserGuideProps) 
       <div className="mb-6 text-center text-sm leading-relaxed text-muted-foreground">
         <p className="mb-1 font-semibold text-foreground">SHAMEZO（しゃめぞう）とは？</p>
         <p>
-          写真に「ひとこと」コメントを合成して、Mastodon に投稿できるサービスです。
+          写真にひとことコメントを合成し、Mastodon や Misskey に投稿するアプリです。
         </p>
       </div>
 
