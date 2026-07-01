@@ -20,12 +20,20 @@ import {
   OutputFormat,
   Arrangement,
   MAX_FILE_SIZE,
+  MAX_TEXT_LENGTH,
   DEFAULT_POSITION,
   DEFAULT_COLOR,
   DEFAULT_SIZE,
   DEFAULT_FONT,
   DEFAULT_ARRANGEMENT,
+  isValidPosition,
+  isValidFont,
+  isValidColor,
+  isValidSize,
+  isValidOutput,
+  isValidArrangement,
 } from "@/types";
+import { countGraphemes } from "@/lib/text/grapheme";
 
 export async function POST(request: NextRequest) {
   try {
@@ -85,6 +93,56 @@ export async function POST(request: NextRequest) {
         { error: "必須パラメータが不足しています" },
         { status: 400 }
       );
+    }
+
+    // 値の妥当性検証（/api/v1/generate と同一の制約。直叩きでの制限回避を防ぐ）。
+    // 存在チェックだけでは不正な enum や長大テキストがそのまま DB・Fediverse へ流れる。
+    if (countGraphemes(text) > MAX_TEXT_LENGTH) {
+      return NextResponse.json(
+        { error: `テキストは${MAX_TEXT_LENGTH}文字以下にしてください` },
+        { status: 400 }
+      );
+    }
+
+    if (!isValidOutput(output)) {
+      return NextResponse.json(
+        { error: "無効な出力形式が指定されています" },
+        { status: 400 }
+      );
+    }
+
+    // season 指定時はスタイル系をプリセットで上書きするため検証を免除（期間内チェックは上で実施済み）。
+    if (!season) {
+      if (!isValidPosition(position)) {
+        return NextResponse.json(
+          { error: "無効な位置が指定されています" },
+          { status: 400 }
+        );
+      }
+      if (!isValidFont(font)) {
+        return NextResponse.json(
+          { error: "無効なフォントが指定されています" },
+          { status: 400 }
+        );
+      }
+      if (!isValidColor(color)) {
+        return NextResponse.json(
+          { error: "無効なカラーが指定されています" },
+          { status: 400 }
+        );
+      }
+      if (!isValidSize(size)) {
+        return NextResponse.json(
+          { error: "無効なサイズが指定されています" },
+          { status: 400 }
+        );
+      }
+      if (!isValidArrangement(arrangement)) {
+        return NextResponse.json(
+          { error: "無効なアレンジが指定されています" },
+          { status: 400 }
+        );
+      }
     }
 
     // サムネのクロップ位置は実際の描画レイアウトに合わせる（season はプリセット位置）。
