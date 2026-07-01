@@ -6,6 +6,7 @@ import Link from "@/components/Link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { PermissionInfoDialog } from "@/components/auth/PermissionInfoDialog";
 
 interface LoginButtonProps {
   /**
@@ -187,6 +188,9 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
       <p className="text-center text-xs text-muted-foreground">
         Mastodon / Misskey サーバーのドメインを入力してください
       </p>
+      <div className="text-center">
+        <PermissionInfoDialog />
+      </div>
     </form>
   );
 }
