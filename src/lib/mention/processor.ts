@@ -32,7 +32,7 @@ const MAX_RETRY_COUNT = 2;
 const getBotInstanceUrl = () => process.env.MASTODON_BOT_INSTANCE_URL || "https://handon.club";
 const getBotInstanceDomain = () => process.env.MASTODON_BOT_INSTANCE_DOMAIN || "handon.club";
 const getBotAccessToken = () => process.env.MASTODON_BOT_ACCESS_TOKEN || "";
-const getBotAcct = () => process.env.MASTODON_BOT_ACCT || "movapic";
+const getBotAcct = () => process.env.MASTODON_BOT_ACCT || "pic";
 
 export interface ProcessResult {
   statusId: string;
