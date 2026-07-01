@@ -348,15 +348,6 @@ export async function getCurrentUserWithPreferences(): Promise<SessionUserWithPr
 }
 
 /**
- * ユーザーIDのみを取得（軽量版）
- * DB問い合わせなしでJWTからユーザーIDを取得
- */
-export async function getCurrentUserId(): Promise<string | null> {
-  const payload = await getSessionPayload();
-  return payload?.userId ?? null;
-}
-
-/**
  * 現在のセッションのjtiを取得（DB問い合わせなし）
  * /dashboard/sessions で「これは現在のセッション」を示すために使う
  */

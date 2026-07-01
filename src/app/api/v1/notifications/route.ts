@@ -11,8 +11,8 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getRecentNotifications } from "@/lib/achievements/notifications";
 
 export async function GET(request: NextRequest) {
-  // getCurrentUserId は JWT ペイロードのみで失効を見ないため、失効済みセッションでも
-  // 通知を読めてしまう。fail-closed な getCurrentUser（loginSessions.revokedAt を EXISTS 検証）を使う。
+  // fail-closed な getCurrentUser（loginSessions.revokedAt を EXISTS 検証）で認証する。
+  // JWT ペイロードのみの軽量取得だと失効済みセッションでも通知を読めてしまうため使わない。
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
