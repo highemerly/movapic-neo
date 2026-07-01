@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
         "画像サイズが大きすぎます",
         400,
         {
-          suggestion: "25MB以下の画像を使用してください",
+          suggestion: `${MAX_FILE_SIZE / 1024 / 1024}MB以下の画像を使用してください`,
           requestId,
         }
       );
