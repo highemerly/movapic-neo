@@ -7,14 +7,17 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { getCurrentUser } from "@/lib/auth/session";
 import { getRecentNotifications } from "@/lib/achievements/notifications";
 
 export async function GET(request: NextRequest) {
-  const userId = await getCurrentUserId();
-  if (!userId) {
+  // getCurrentUserId は JWT ペイロードのみで失効を見ないため、失効済みセッションでも
+  // 通知を読めてしまう。fail-closed な getCurrentUser（loginSessions.revokedAt を EXISTS 検証）を使う。
+  const user = await getCurrentUser();
+  if (!user) {
     return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
   }
+  const userId = user.id;
 
   const limitRaw = request.nextUrl.searchParams.get("limit");
   const limit = limitRaw ? Math.min(Math.max(parseInt(limitRaw, 10) || 0, 0), 50) : undefined;
