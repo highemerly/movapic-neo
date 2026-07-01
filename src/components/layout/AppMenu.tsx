@@ -12,6 +12,7 @@ import {
 } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import Link from "@/components/Link";
+import { RetryImg } from "@/components/RetryImg";
 import {
   ImagePlus,
   Globe,
@@ -385,12 +386,10 @@ function AppMenuSheet({
               className="flex items-center gap-3 rounded-md p-1 -m-1 hover:bg-accent transition-colors"
             >
               {avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                <RetryImg
                   src={avatarUrl}
                   alt=""
                   className="h-10 w-10 shrink-0 rounded-full object-cover"
-                  loading="lazy"
                 />
               ) : (
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
@@ -689,12 +688,10 @@ function AppRail({ nav }: { nav: MenuNav }) {
               expanded={expanded}
               icon={
                 avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
+                  <RetryImg
                     src={avatarUrl}
                     alt=""
                     className="h-6 w-6 rounded-full object-cover"
-                    loading="lazy"
                   />
                 ) : (
                   <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted">

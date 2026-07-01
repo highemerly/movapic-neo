@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import Link from "@/components/Link";
+import { RetryImg } from "@/components/RetryImg";
 import { Bell, ChevronRight, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,8 +61,7 @@ export function NotificationBell() {
                 <li key={n.id}>
                   <Link href={href} className="flex items-start gap-2.5 px-3 py-2 hover:bg-accent">
                     {!isReminder && n.image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <RetryImg
                         src={n.image.thumbnailUrl}
                         alt=""
                         className="mt-0.5 h-9 w-9 shrink-0 rounded-md object-cover"

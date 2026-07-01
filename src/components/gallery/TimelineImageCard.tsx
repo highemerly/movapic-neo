@@ -2,6 +2,7 @@
 
 import Link from "@/components/Link";
 import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
+import { RetryImg } from "@/components/RetryImg";
 import { FavoriteOverlay } from "@/components/favorite/FavoriteOverlay";
 import { userPathSegment } from "@/lib/userHandle";
 
@@ -67,12 +68,10 @@ export function TimelineImageCard({
             }`}
           >
             {image.user.avatarUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={image.user.avatarUrl ?? undefined}
+              <RetryImg
+                src={image.user.avatarUrl}
                 alt={image.user.displayName || image.user.username}
                 className="w-5 h-5 rounded-full"
-                loading="lazy"
               />
             )}
             <span className="text-xs text-white truncate min-w-0">
@@ -85,12 +84,10 @@ export function TimelineImageCard({
       ) : (
         // grid（正方形タイル）: アバターを右下隅に小さく（名前・お気に入り数なし）
         image.user.avatarUrl && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={image.user.avatarUrl ?? undefined}
+          <RetryImg
+            src={image.user.avatarUrl}
             alt={image.user.displayName || image.user.username}
             className="absolute bottom-0.5 right-0.5 w-[22px] h-[22px] rounded-full opacity-90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
-            loading="lazy"
           />
         )
       )}

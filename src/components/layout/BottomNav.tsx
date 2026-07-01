@@ -2,6 +2,7 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import Link from "@/components/Link";
+import { RetryImg } from "@/components/RetryImg";
 import { ImagePlus, User, Menu } from "lucide-react";
 import { useMenu } from "./AppMenu";
 import { getPrimaryNavItems } from "./primaryNav";
@@ -108,12 +109,10 @@ export function BottomNav({
           active={isMyPageSection}
           icon={
             avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
+              <RetryImg
                 src={avatarUrl}
                 alt=""
                 className="h-5 w-5 rounded-full object-cover"
-                loading="lazy"
               />
             ) : (
               <User className="h-5 w-5" />
