@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
       },
       sourceStorageKey,
       sourceContentType: parsed.image.contentType,
-    });
+    }, bodyHash);
 
     return NextResponse.json({ success: true, queued: true }, { status: 202 });
   } catch (error) {

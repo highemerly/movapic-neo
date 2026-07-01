@@ -67,10 +67,18 @@ export async function enqueueMention(
   });
 }
 
-/** mail ジョブを enqueue。 */
-export async function enqueueEmail(payload: ProcessEmailPayload): Promise<void> {
+/**
+ * mail ジョブを enqueue。dedupKey（raw email のハッシュ）で dedup。
+ * Cloudflare Email Worker がレスポンスタイムアウト等で同一メールを再転送しても、
+ * 未完了ジョブが残っていれば同一 jobKey で潰し二重投稿を防ぐ（他ジョブと同水準）。
+ */
+export async function enqueueEmail(
+  payload: ProcessEmailPayload,
+  dedupKey: string
+): Promise<void> {
   const utils = await getWorkerUtils();
   await utils.addJob(TASK_PROCESS_EMAIL, payload, {
+    jobKey: `email:${dedupKey}`,
     maxAttempts: MAX_ATTEMPTS,
   });
 }

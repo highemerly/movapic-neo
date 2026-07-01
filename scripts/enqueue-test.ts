@@ -147,7 +147,7 @@ async function runEmail(): Promise<void> {
     },
     sourceStorageKey,
     sourceContentType: contentType,
-  });
+  }, randomUUID());
   console.log(`✅ enqueued process-email  userId=${userId}  source=${sourceStorageKey}`);
 }
 
