@@ -566,7 +566,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           <div className="flex-1 min-w-0">
             <Link
               href={`/u/${username}`}
-              className="text-sm font-semibold hover:underline"
+              className="block truncate text-sm font-semibold hover:underline"
             >
               {image.user.displayName || image.user.username}
             </Link>
@@ -580,7 +580,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               <span className="truncate">@{image.user.username}@{image.user.instance.domain}</span>
             </a>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0">
             <Link
               href={`/u/${username}`}
               className="p-2.5 rounded-full hover:bg-background transition-colors"
