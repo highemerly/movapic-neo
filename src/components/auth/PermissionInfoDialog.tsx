@@ -148,10 +148,10 @@ export function PermissionInfoDialog() {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-muted/30 px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
         >
           <ShieldCheck className="size-3.5" />
-          どんな権限を要求しますか？
+          必要な権限は？
         </button>
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto">

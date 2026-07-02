@@ -74,7 +74,9 @@ export default async function HomePage() {
 
         {/* ログイン（保護ページからのリダイレクト時はバナー表示） */}
         <div className="container mx-auto max-w-2xl px-4">
-          <div className="max-w-sm mx-auto mt-6">
+          {/* ログインカードは画像詳細ページのガイドと同じ幅（max-w-2xl のコンテナ全幅）に広げる。
+              フォーム各コントロールは LoginButton 内部で max-w-sm に中央寄せするので広がりすぎない。 */}
+          <div className="mt-6">
             {!isLoggedIn && (
               <p className="mb-3 text-center text-sm font-semibold">
                 今すぐログインして投稿してみよう！

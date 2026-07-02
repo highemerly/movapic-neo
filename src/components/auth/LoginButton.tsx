@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, X } from "lucide-react";
+import { Lock, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
@@ -10,6 +10,7 @@ import { PermissionInfoDialog } from "@/components/auth/PermissionInfoDialog";
 import { LegalInfoDialog } from "@/components/legal/LegalInfoDialog";
 import { TermsContent } from "@/components/legal/TermsContent";
 import { PrivacyContent } from "@/components/legal/PrivacyContent";
+import { ServiceInfoContent } from "@/components/legal/ServiceInfoContent";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 
@@ -23,6 +24,7 @@ const PLACEHOLDER_SERVERS = [
   "misskey.io",
   "fedibird.com",
   "pawoo.net",
+  "handon.club"
 ];
 
 interface LoginButtonProps {
@@ -221,7 +223,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
 
     const needsAgreement = !isLoggedIn && !effectiveAgreed;
     return (
-      <div className="space-y-4">
+      <div className="mx-auto max-w-sm space-y-4">
         {error && (
           <p className="text-center text-sm text-destructive">
             {error.message}
@@ -250,7 +252,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
   // ログイン済みの場合
   if (isLoggedIn) {
     return (
-      <div className="space-y-4">
+      <div className="mx-auto max-w-sm space-y-4">
         <Button
           onClick={() => router.push(targetUrl)}
           className="w-full h-12 text-lg"
@@ -266,6 +268,9 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
   const needsInput = !server.trim() || !effectiveAgreed;
   return (
     <form onSubmit={handleLogin} className="space-y-4 text-center">
+      {/* 入力欄・同意トグル・ログインボタンは読みやすい幅（max-w-sm）に中央寄せで固定。
+          カード自体が広くても各コントロールは広がりすぎないようにする（下のpill列だけは全幅を使う）。 */}
+      <div className="mx-auto max-w-sm space-y-4">
       {/* サーバー入力 */}
       <div className="space-y-2.5">
         <label
@@ -345,16 +350,33 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
       >
         {isLoading ? "処理中..." : "ログイン"}
       </Button>
+      </div>
 
-      {/* 権限・プライバシーポリシー（同意は取らずモーダルで読める・同じ体裁のpill） */}
+      {/* サービス紹介・権限・プライバシーポリシー（同意は取らずモーダルで読める・同じ体裁のpill）。
+          PCなど横幅が確保できる環境（広いカード）では横並び、狭い端末ではpill単位で折り返す。
+          各pillは whitespace-nowrap で「1つのリンクの途中で改行」しないようにする。 */}
       <div className="flex flex-wrap items-center justify-center gap-2">
+        <LegalInfoDialog
+          title="何ができますか？"
+          trigger={
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-muted/30 px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            >
+              <Sparkles className="size-3.5" />
+              何ができますか？
+            </button>
+          }
+        >
+          <ServiceInfoContent />
+        </LegalInfoDialog>
         <PermissionInfoDialog />
         <LegalInfoDialog
           title="プライバシーポリシー"
           trigger={
             <button
               type="button"
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-muted/30 px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
             >
               <Lock className="size-3.5" />
               個人情報はどう扱われますか？
