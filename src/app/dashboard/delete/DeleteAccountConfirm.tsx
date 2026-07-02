@@ -59,6 +59,17 @@ export function DeleteAccountConfirm({
         throw new Error(data?.error || "アカウントの削除に失敗しました");
       }
 
+      // この時点で DB のユーザーは削除済み・セッションcookieも破棄済み。
+      // cookie(movapic_session)は httpOnly のためサーバー側で削除済みだが、
+      // クライアントにしか無い localStorage/sessionStorage はここで一掃する
+      // （テーマ・表示設定・直近ログインサーバー等をきれいさっぱり消す）。
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch {
+        // プライベートモード等でストレージ不可でも削除処理は続行
+      }
+
       // この時点で DB のユーザーは削除済み・ログアウト済み。トップへ戻す。
       toast.success(
         "アカウントを削除しました。またのご利用をお待ちしております。"
