@@ -17,8 +17,31 @@ export default async function LicensePage() {
             本サービスでは以下のフォントを使用しています。
           </p>
           <div className="space-y-4">
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-1">Noto Sans JP</p>
+            <div id="hui-font" className="bg-muted rounded-lg p-4 scroll-mt-20">
+              <p className="font-medium mb-2">ふい字</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/font-samples/hui-font.avif"
+                alt="ふい字の見本"
+                className="w-full h-auto rounded-md border border-border mb-3 dark:invert"
+              />
+              <p className="text-xs text-muted-foreground mb-2">Copyright © ふい字置き場</p>
+              <p className="text-sm text-muted-foreground mb-1">
+                本フォントは作者による独自ライセンスのもとで配布されており、商用・非商用を問わず無料で利用できます。
+              </p>
+              <p className="text-sm text-muted-foreground">
+                フォントファイルの販売および加工は禁止されています。
+              </p>
+            </div>
+
+            <div id="noto-sans-jp" className="bg-muted rounded-lg p-4 scroll-mt-20">
+              <p className="font-medium mb-2">Noto Sans JP</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/font-samples/noto-sans-jp.avif"
+                alt="Noto Sans JP の見本"
+                className="w-full h-auto rounded-md border border-border mb-3 dark:invert"
+              />
               <p className="text-xs text-muted-foreground mb-2">Copyright © Google LLC</p>
               <p className="text-sm text-muted-foreground mb-2">
                 本フォントは SIL Open Font License, Version 1.1 のもとで配布されています。
@@ -33,35 +56,14 @@ export default async function LicensePage() {
               </a>
             </div>
 
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-1">Noto Emoji</p>
-              <p className="text-xs text-muted-foreground mb-2">Copyright © Google LLC</p>
-              <p className="text-sm text-muted-foreground mb-2">
-                絵文字の表示に使用しています。本フォントは SIL Open Font License, Version 1.1 のもとで配布されています。
-              </p>
-              <a
-                href="https://scripts.sil.org/OFL"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline"
-              >
-                https://scripts.sil.org/OFL
-              </a>
-            </div>
-
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-1">ふい字</p>
-              <p className="text-xs text-muted-foreground mb-2">Copyright © ふい字置き場</p>
-              <p className="text-sm text-muted-foreground mb-1">
-                本フォントは作者による独自ライセンスのもとで配布されており、商用・非商用を問わず無料で利用できます。
-              </p>
-              <p className="text-sm text-muted-foreground">
-                フォントファイルの販売および加工は禁止されています。
-              </p>
-            </div>
-
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-1">ラノベPOP V2</p>
+            <div id="light-novel-pop" className="bg-muted rounded-lg p-4 scroll-mt-20">
+              <p className="font-medium mb-2">ラノベPOP V2</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/font-samples/light-novel-pop.avif"
+                alt="ラノベPOP V2 の見本"
+                className="w-full h-auto rounded-md border border-border mb-3 dark:invert"
+              />
               <p className="text-xs text-muted-foreground mb-1">Copyright © 2019 フロップデザイン</p>
               <p className="text-xs text-muted-foreground mb-2">Derived from M+ FONTS: Copyright © 2019 M+ FONTS PROJECT</p>
               <p className="text-sm text-muted-foreground mb-2">
@@ -76,7 +78,36 @@ export default async function LicensePage() {
                 https://booth.pm/ja/items/2328262
               </a>
             </div>
+
+            <div id="noto-emoji" className="bg-muted rounded-lg p-4 scroll-mt-20">
+              <p className="font-medium mb-2">Noto Emoji</p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/font-samples/noto-emoji.avif"
+                alt="Noto Emoji の見本"
+                className="w-full h-auto rounded-md border border-border mb-3 dark:invert"
+              />
+              <p className="text-xs text-muted-foreground mb-2">Copyright © Google LLC</p>
+              <p className="text-sm text-muted-foreground mb-2">
+                本フォントは SIL Open Font License, Version 1.1 のもとで配布されています。
+              </p>
+              <a
+                href="https://scripts.sil.org/OFL"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-primary hover:underline"
+              >
+                https://scripts.sil.org/OFL
+              </a>
+              <p className="text-xs text-muted-foreground mt-2">
+                本サービスでは、文字に絵文字を入れると全てこのフォントで表示されます。
+              </p>
+            </div>
           </div>
+
+          <p className="text-xs text-muted-foreground mt-6">
+            フォント見本の文章には、宮沢賢治『ポラーノの広場』からの引用を含みます。
+          </p>
         </section>
 
         <Footer />
