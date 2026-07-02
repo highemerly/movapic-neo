@@ -1,16 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { HelpCircle } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import Link from "@/components/Link";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 
@@ -146,9 +148,9 @@ export function PermissionInfoDialog() {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
         >
-          <HelpCircle className="size-3.5" />
+          <ShieldCheck className="size-3.5" />
           どんな権限を要求しますか？
         </button>
       </DialogTrigger>
@@ -204,6 +206,13 @@ export function PermissionInfoDialog() {
             に則り適切に取り扱います。
           </p>
         </div>
+
+        {/* 最後まで読んだあと上までスクロールせず閉じられるよう、末尾にも閉じるボタンを置く */}
+        <DialogClose asChild>
+          <Button variant="outline" className="w-full">
+            閉じる
+          </Button>
+        </DialogClose>
       </DialogContent>
     </Dialog>
   );

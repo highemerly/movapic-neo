@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
         },
       });
     } else {
-      // 新規ユーザーを作成
+      // 新規ユーザーを作成（ログイン前に規約同意トグルを通過している＝同意日時を記録）
       user = await prisma.user.create({
         data: {
           instanceId: instance.id,
@@ -154,6 +154,7 @@ export async function GET(request: NextRequest) {
           emailPrefix: nanoid(24),
           accessToken: encryptedToken,
           lastLoginAt: new Date(),
+          termsAgreedAt: new Date(),
         },
       });
     }

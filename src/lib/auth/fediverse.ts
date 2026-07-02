@@ -50,7 +50,7 @@ export async function detectInstanceType(server: string): Promise<InstanceInfo> 
       ErrorCodes.VALIDATION_INVALID,
       "サーバー名が不正です",
       400,
-      "正しいドメイン名（例: handon.club）を入力してください"
+      "例: handon.club の形式で入力してください"
     );
   }
   try {
@@ -63,7 +63,7 @@ export async function detectInstanceType(server: string): Promise<InstanceInfo> 
         ErrorCodes.NOT_FOUND,
         "サーバーが見つかりませんでした",
         404,
-        "ドメイン名が正しいか確認し、別のサーバー（例: handon.club）で試してください"
+        "ドメイン名を確認してください（例: handon.club）"
       );
     }
     throw e;
@@ -125,7 +125,7 @@ export async function detectInstanceType(server: string): Promise<InstanceInfo> 
     ErrorCodes.NOT_FOUND,
     "サーバーが見つかりませんでした",
     404,
-    "ドメイン名が正しいか確認し、別のサーバー（例: handon.club）で試してください"
+    "ドメイン名を確認してください（例: handon.club）"
   );
 }
 

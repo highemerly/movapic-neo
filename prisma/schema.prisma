@@ -53,6 +53,10 @@ model User {
   // ON → /u/[username] 配下を検索エンジンに noindex（generateMetadata）し、AI BotをrobotsでDisallow。
   blockCrawlers      Boolean   @default(false) @map("block_crawlers")
 
+  // 利用規約・プライバシーポリシーへの同意日時。null=未同意。
+  // 初回ログイン直後に /welcome で同意を取り記録する（以降は再提示しない）。
+  termsAgreedAt DateTime? @map("terms_agreed_at")
+
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   lastLoginAt  DateTime? @map("last_login_at")

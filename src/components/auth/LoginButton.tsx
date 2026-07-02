@@ -1,12 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "@/components/Link";
+import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
+import { ToggleSwitch } from "@/components/ui/toggle-switch";
 import { PermissionInfoDialog } from "@/components/auth/PermissionInfoDialog";
+import { LegalInfoDialog } from "@/components/legal/LegalInfoDialog";
+import { TermsContent } from "@/components/legal/TermsContent";
+import { PrivacyContent } from "@/components/legal/PrivacyContent";
+import { MastodonIcon } from "@/components/icons/MastodonIcon";
+import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
+
+// 直近に使ったサーバー名を記憶する localStorage キー（次回の初期値に使う）
+const LAST_SERVER_KEY = "shamezo.lastServer";
+
+// プレースホルダーに順に表示する例サーバー（Mastodon / Misskey 混在）
+const PLACEHOLDER_SERVERS = [
+  "mastodon.social",
+  "mstdn.jp",
+  "misskey.io",
+  "fedibird.com",
+  "pawoo.net",
+];
 
 interface LoginButtonProps {
   /**
@@ -35,14 +52,43 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
     allowedServers?.length === 1 ? allowedServers[0] : ""
   );
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // 利用規約への同意（ログイン前に必須）。プライバシーポリシーは同意不要のリンクのみ。
   const [agreed, setAgreed] = useState(false);
+  // 未同意でログインを押したときにトグル横へ出す吹き出し（トグル操作で消える）
+  const [showAgreementError, setShowAgreementError] = useState(false);
+  // エラーは見出し(message)＋補足(suggestion)に分けて吹き出しで2行表示する
+  const [error, setError] = useState<{ message: string; suggestion?: string } | null>(null);
+
+  // プレースホルダーは数秒ごとに例サーバーをローテーション（入力中は停止）
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  useEffect(() => {
+    if (server) return;
+    const id = setInterval(() => {
+      setPlaceholderIndex((i) => (i + 1) % PLACEHOLDER_SERVERS.length);
+    }, 3500);
+    return () => clearInterval(id);
+  }, [server]);
 
   // ログイン状態はサーバーから受け取った値で確定（クライアント fetch なし）
   const isLoggedIn = initialIsLoggedIn ?? false;
 
   // 単一サーバー限定モード
   const singleServerMode = allowedServers?.length === 1;
+
+  // 前回使ったサーバー名を初期値として復元し、過去に同意済みとみなしトグルを初期ONにする。
+  // （マウント後にクライアントで実行＝ハイドレーション不整合を避ける）
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LAST_SERVER_KEY);
+      if (!saved) return;
+      // 一度ログイン＝過去に規約へ同意済みとみなし、トグルを初期ON
+      setAgreed(true);
+      // 自由入力モードのみ入力欄にも復元（単一サーバーモードは固定値）
+      if (!singleServerMode) setServer(saved);
+    } catch {
+      // localStorage 不可（プライベートモード等）は無視
+    }
+  }, [singleServerMode]);
 
   const handleLogin = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -56,12 +102,13 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
     const targetServer = singleServerMode ? allowedServers[0] : server.trim();
 
     if (!targetServer) {
-      setError("サーバー名を入力してください");
+      setError({ message: "サーバー名を入力してください" });
       return;
     }
 
     if (!agreed) {
-      setError("利用規約・プライバシーポリシーへの同意が必要です");
+      // エラーはトグル横の吹き出しで表示（サーバー入力欄の吹き出しとは別）
+      setShowAgreementError(true);
       return;
     }
 
@@ -84,33 +131,72 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
 
       if (!response.ok) {
         // エラーレスポンスは { success: false, error: { code, message, suggestion? } } 形式
-        const message = data.error?.message || "認証の開始に失敗しました";
-        const suggestion = data.error?.suggestion;
-        throw new Error(suggestion ? `${message}（${suggestion}）` : message);
+        setError({
+          message: data.error?.message || "ログインを開始できませんでした",
+          suggestion: data.error?.suggestion,
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // 検証OKで認可へ進むので、次回の初期値として正規化済みサーバー名を記憶
+      try {
+        localStorage.setItem(LAST_SERVER_KEY, data.server || targetServer);
+      } catch {
+        // localStorage 不可は無視
       }
 
       window.location.href = data.url;
     } catch (err) {
       console.error("Login error:", err);
-      setError(err instanceof Error ? err.message : "エラーが発生しました");
+      setError({
+        message: "通信に失敗しました",
+        suggestion: "電波の良い場所でもう一度お試しください",
+      });
       setIsLoading(false);
     }
   };
 
-  const agreementCheckbox = (
-    <div className="flex items-center justify-center gap-2.5">
-      <Checkbox
-        id="agree"
-        checked={agreed}
-        onCheckedChange={(checked) => setAgreed(checked === true)}
-        className="size-5"
-      />
-      <label htmlFor="agree" className="text-sm text-muted-foreground leading-relaxed cursor-pointer">
-        <Link href="/terms" className="underline hover:text-foreground">利用規約</Link>
-        ・
-        <Link href="/privacy" className="underline hover:text-foreground">プライバシーポリシー</Link>
-        に同意
+  // 利用規約への同意トグル（ログイン前に必須）。
+  // トグルにだけ <label> を掛け、利用規約リンクは別要素（モーダルを開く）にして「クリックで誤トグル」を防ぐ。
+  const agreementToggle = (
+    <div className="relative flex items-center justify-center gap-2">
+      {/* 未同意でログインを押したときの吹き出し（トグル操作で消える・トグルを下向き矢印で指す） */}
+      {showAgreementError && (
+        <div
+          role="alert"
+          className="absolute bottom-full left-1/2 z-20 mb-2 w-max max-w-[16rem] -translate-x-1/2 rounded-lg bg-destructive px-3 py-1.5 text-xs font-medium leading-snug text-white shadow-md"
+        >
+          利用規約に同意してください
+          <span className="absolute left-1/2 top-full size-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-destructive" />
+        </div>
+      )}
+      {/* label の padding でタップ領域を拡大しつつ、-my-2 で縦の余白は相殺（見た目は詰める） */}
+      <label className="flex cursor-pointer items-center p-2 -my-2">
+        <span className="inline-flex scale-110">
+          <ToggleSwitch
+            checked={agreed}
+            onChange={() => {
+              setAgreed((v) => !v);
+              setShowAgreementError(false);
+            }}
+            disabled={isLoading}
+          />
+        </span>
       </label>
+      <p className="text-xs leading-relaxed text-muted-foreground">
+        <LegalInfoDialog
+          title="利用規約"
+          trigger={
+            <button type="button" className="underline hover:text-foreground">
+              利用規約
+            </button>
+          }
+        >
+          <TermsContent />
+        </LegalInfoDialog>
+        に同意します
+      </p>
     </div>
   );
 
@@ -126,13 +212,18 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
     const needsAgreement = !isLoggedIn && !agreed;
     return (
       <div className="space-y-4">
-        {!isLoggedIn && agreementCheckbox}
-        {error && <p className="text-center text-sm text-destructive">{error}</p>}
+        {error && (
+          <p className="text-center text-sm text-destructive">
+            {error.message}
+            {error.suggestion ? `（${error.suggestion}）` : ""}
+          </p>
+        )}
+        {!isLoggedIn && agreementToggle}
         <Button
           onClick={() => handleLogin()}
           disabled={isLoading}
           aria-disabled={needsAgreement || undefined}
-          className={`w-full py-6 text-lg ${needsAgreement ? "opacity-50" : ""}`}
+          className={`w-full h-12 text-lg ${needsAgreement ? "opacity-50" : ""}`}
           size="lg"
         >
           {buttonLabel}
@@ -152,7 +243,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
       <div className="space-y-4">
         <Button
           onClick={() => router.push(targetUrl)}
-          className="w-full py-6 text-lg"
+          className="w-full h-12 text-lg"
           size="lg"
         >
           {callbackUrl ? "戻る" : "ダッシュボードへ"}
@@ -162,34 +253,91 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
   }
 
   // 自由入力モード
+  const needsInput = !server.trim() || !agreed;
   return (
-    <form onSubmit={handleLogin} className="space-y-4">
-      {agreementCheckbox}
-      {error && <p className="text-center text-sm text-destructive">{error}</p>}
-      <div className="flex gap-2">
-        <Input
-          type="text"
-          value={server}
-          onChange={(e) => setServer(e.target.value)}
-          placeholder="mastodon.social"
-          disabled={isLoading}
-          className="flex-1 py-6 text-lg"
-        />
-        <Button
-          type="submit"
-          disabled={isLoading}
-          aria-disabled={(!server.trim() || !agreed) || undefined}
-          className={`shrink-0 py-6 px-4 text-sm ${(!server.trim() || !agreed) ? "opacity-50" : ""}`}
-          size="lg"
+    <form onSubmit={handleLogin} className="space-y-4 text-center">
+      {/* サーバー入力 */}
+      <div className="space-y-2.5">
+        <label
+          htmlFor="server"
+          className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm font-medium"
         >
-          {isLoading ? "処理中..." : "ログイン"}
-        </Button>
+          サーバー
+          <span className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <MastodonIcon className="size-3.5" /> Mastodon
+            </span>
+            <span className="flex items-center gap-1">
+              <MisskeyIcon className="size-3.5" /> Misskey
+            </span>
+          </span>
+        </label>
+        <div className="relative">
+          {/* エラーは入力欄の下に吹き出しで表示（上向き矢印で欄を指す・ログインボタンに重なる） */}
+          {error && (
+            <div
+              role="alert"
+              className="absolute inset-x-0 top-full z-20 mt-2 rounded-lg bg-destructive px-3 py-2 text-white shadow-lg"
+            >
+              <span className="absolute bottom-full left-1/2 size-2.5 -translate-x-1/2 translate-y-1/2 rotate-45 bg-destructive" />
+              <p className="text-sm font-semibold leading-snug">{error.message}</p>
+              {error.suggestion && (
+                <p className="mt-0.5 text-xs leading-snug text-white/90">{error.suggestion}</p>
+              )}
+            </div>
+          )}
+          <Input
+            id="server"
+            type="text"
+            value={server}
+            onChange={(e) => {
+              setServer(e.target.value);
+              if (error) setError(null);
+            }}
+            placeholder={PLACEHOLDER_SERVERS[placeholderIndex]}
+            disabled={isLoading}
+            aria-invalid={!!error}
+            inputMode="url"
+            autoCapitalize="none"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
+            className="h-12 text-lg md:text-lg text-center"
+          />
+        </div>
       </div>
-      <p className="text-center text-xs text-muted-foreground">
-        Mastodon / Misskey サーバーのドメインを入力してください
-      </p>
-      <div className="text-center">
+
+      {/* 同意トグル（ログインボタン直前） */}
+      {agreementToggle}
+
+      {/* ログイン */}
+      <Button
+        type="submit"
+        disabled={isLoading}
+        aria-disabled={needsInput || undefined}
+        className={`w-full h-12 text-lg ${needsInput ? "opacity-50" : ""}`}
+        size="lg"
+      >
+        {isLoading ? "処理中..." : "ログイン"}
+      </Button>
+
+      {/* 権限・プライバシーポリシー（同意は取らずモーダルで読める・同じ体裁のpill） */}
+      <div className="flex flex-wrap items-center justify-center gap-2">
         <PermissionInfoDialog />
+        <LegalInfoDialog
+          title="プライバシーポリシー"
+          trigger={
+            <button
+              type="button"
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            >
+              <Lock className="size-3.5" />
+              個人情報はどう扱われますか？
+            </button>
+          }
+        >
+          <PrivacyContent />
+        </LegalInfoDialog>
       </div>
     </form>
   );
