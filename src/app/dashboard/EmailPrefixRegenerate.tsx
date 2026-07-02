@@ -38,6 +38,7 @@ export function EmailPrefixRegenerate() {
         throw new Error(data.error || "再生成に失敗しました");
       }
 
+      toast.success("投稿用メールアドレスを再生成しました");
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "再生成に失敗しました");
