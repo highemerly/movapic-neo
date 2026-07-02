@@ -41,7 +41,7 @@ export function MentionSettingsForm({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        投稿用のBotアカウントにメンションで画像を送信するだけで、即座にコメントを合成した写真が投稿されます。
+        指定のアカウントにメンションで画像を送信するだけで、コメントを合成した写真が投稿されます。
       </p>
 
       <div className="text-sm space-y-3">
