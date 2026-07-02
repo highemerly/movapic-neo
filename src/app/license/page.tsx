@@ -42,7 +42,7 @@ export default async function LicensePage() {
                 alt="Noto Sans JP の見本"
                 className="w-full h-auto rounded-md border border-border mb-3 dark:invert"
               />
-              <p className="text-xs text-muted-foreground mb-2">Copyright © Google LLC</p>
+              <p className="text-xs text-muted-foreground mb-2">Copyright © 2014–2021 Adobe（「Noto」は Google Inc. の商標です）</p>
               <p className="text-sm text-muted-foreground mb-2">
                 本フォントは SIL Open Font License, Version 1.1 のもとで配布されています。
               </p>
@@ -106,6 +106,9 @@ export default async function LicensePage() {
           </div>
 
           <p className="text-xs text-muted-foreground mt-6">
+            本サービスではフォントを画像の生成にのみ使用しており、フォントファイル自体の配布は行っていません。
+          </p>
+          <p className="text-xs text-muted-foreground mt-2">
             フォント見本の文章には、宮沢賢治『ポラーノの広場』からの引用を含みます。
           </p>
         </section>
