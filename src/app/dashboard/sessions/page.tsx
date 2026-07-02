@@ -8,6 +8,7 @@ import { Footer } from "@/components/Footer";
 import { parseUserAgent } from "@/lib/auth/uaParser";
 import prisma from "@/lib/db";
 import { RevokeSessionButton } from "./RevokeSessionButton";
+import { RevokeAllSessionsButton } from "./RevokeAllSessionsButton";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,11 @@ export default async function SessionsPage() {
     orderBy: { createdAt: "desc" },
   });
 
+  // 「現在の端末」以外に有効なセッションがあるときだけ一括失効を出す
+  const otherSessionCount = sessions.filter(
+    (session) => session.jti !== currentJti
+  ).length;
+
   return (
     <>
       <SiteHeader user={{ username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) }} />
@@ -52,6 +58,12 @@ export default async function SessionsPage() {
         <p className="text-xs text-muted-foreground mb-6">
           直近90日間のログイン履歴を表示しています。これより古い履歴は自動的に削除されます。身に覚えのないログインは「失効させる」でそのセッションを無効化できます。なお「都市（推定）」はIPアドレスからのおおまかな推定で、実際の所在地とは大きくずれることがあります。
         </p>
+
+        {otherSessionCount > 0 && (
+          <div className="mb-6 flex justify-end">
+            <RevokeAllSessionsButton count={otherSessionCount} />
+          </div>
+        )}
 
         {sessions.length === 0 ? (
           <p className="text-sm text-muted-foreground">

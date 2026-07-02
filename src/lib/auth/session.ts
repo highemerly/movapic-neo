@@ -371,3 +371,20 @@ export async function revokeSession(
   });
   return result.count > 0;
 }
+
+/**
+ * 現在のセッション以外の全セッションを失効させる（本人のもののみ）
+ * currentJti を除外することで「この端末」だけログイン状態を維持する。
+ * userId で絞るため他人のセッションには影響しない（IDOR対策）。
+ * @returns 失効させた件数
+ */
+export async function revokeOtherSessions(
+  userId: string,
+  currentJti: string
+): Promise<number> {
+  const result = await prisma.loginSession.updateMany({
+    where: { userId, revokedAt: null, jti: { not: currentJti } },
+    data: { revokedAt: new Date() },
+  });
+  return result.count;
+}
