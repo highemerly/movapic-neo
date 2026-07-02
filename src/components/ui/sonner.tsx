@@ -11,6 +11,8 @@ export function Toaster(props: ToasterProps) {
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
       position="bottom-center"
+      richColors
+      duration={5000}
       style={
         {
           "--normal-bg": "var(--popover)",

@@ -12,7 +12,7 @@ import { getRankCounts } from "@/lib/achievements/counts";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
 import { userPageRobotsMetadata } from "@/lib/crawlers";
-import { SuccessToast } from "@/components/SuccessToast";
+import { ToastFlasher } from "@/components/ToastFlasher";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
@@ -127,10 +127,18 @@ export default async function UserGalleryPage({
 
   return (
     <>
-      {deleted === "remote" && (
-        <SuccessToast message="連携先の投稿も削除しました" />
+      {(deleted === "1" || deleted === "remote") && (
+        <ToastFlasher
+          flash={{
+            variant: "success",
+            message:
+              deleted === "remote"
+                ? "連携先の投稿も削除しました"
+                : "画像を削除しました",
+          }}
+          clearParams={["deleted"]}
+        />
       )}
-      {deleted === "1" && <SuccessToast message="画像を削除しました" />}
       <SiteHeader
         user={
           currentUser

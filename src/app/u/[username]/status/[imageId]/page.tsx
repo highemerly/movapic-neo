@@ -21,8 +21,8 @@ import { Footer } from "@/components/Footer";
 import { parseUserHandle } from "@/lib/userHandle";
 import { NewUserGuide } from "@/components/onboarding/NewUserGuide";
 import { getAllowedServers } from "@/lib/auth/allowedServers";
-import { PostSuccessToast } from "./PostSuccessToast";
-import { PostFediverseFailedToast } from "./PostFediverseFailedToast";
+import { ToastFlasher } from "@/components/ToastFlasher";
+import { buildPostFlash } from "./postFlash";
 import { AchievementCelebration } from "./AchievementCelebration";
 import { EarnedAchievementChips } from "./EarnedAchievementChips";
 import { NativeShareButton } from "./NativeShareButton";
@@ -317,15 +317,16 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain, avatarUrl: getAvatarUrl(currentUser.avatarUrl) } : null} />
-      {justPosted &&
-        (fediverseFailed ? (
-          <PostFediverseFailedToast
-            serverDomain={image.user.instance.domain}
-            statusCode={fediverseErrorStatus}
-          />
-        ) : (
-          <PostSuccessToast />
-        ))}
+      {justPosted && (
+        <ToastFlasher
+          flash={buildPostFlash({
+            fediverseFailed,
+            serverDomain: image.user.instance.domain,
+            statusCode: fediverseErrorStatus,
+          })}
+          clearParams={["posted", "federr", "fedstatus"]}
+        />
+      )}
       {justPosted && <AchievementCelebration username={username} />}
       <main className="container mx-auto max-w-2xl px-4 py-3">
         {/* ヘッダー */}
