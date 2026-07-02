@@ -37,13 +37,16 @@ function getCookie(name: string): string | null {
  * Cookie `not`（最後に確認した時刻）より新しい通知があれば未読＝赤ドット表示。
  * Cookie 未設定なら初回 now で初期化し、リリース時点の既存通知では光らせない。
  */
-export function useUnseenNotifications() {
+export function useUnseenNotifications(enabled: boolean = true) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [seenAt, setSeenAt] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   // setState は fetch のコールバック内でのみ行う（effect 本体での同期 setState を避ける）。
   useEffect(() => {
+    // 未ログイン時は通知APIを叩かない（401になるだけ）。
+    if (!enabled) return;
+
     let seen = getCookie(COOKIE_NAME);
     if (!seen) {
       seen = new Date().toISOString();
@@ -59,7 +62,7 @@ export function useUnseenNotifications() {
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
-  }, []);
+  }, [enabled]);
 
   const hasUnseen =
     loaded &&
