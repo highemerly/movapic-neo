@@ -2,6 +2,7 @@ import Link from "@/components/Link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { LoginButton } from "@/components/auth/LoginButton";
+import { LoginPrompt } from "@/components/auth/LoginPrompt";
 
 interface NewUserGuideProps {
   /** サーバー側で判定したログイン状態 */
@@ -46,40 +47,21 @@ export function NewUserGuide({ isLoggedIn, allowedServers }: NewUserGuideProps) 
       </div>
 
       {/* SHAMEZOとは？ */}
-      <div className="mb-6 text-center text-sm leading-relaxed text-muted-foreground">
+      <div className="mb-6 text-left text-sm leading-relaxed text-muted-foreground">
         <p className="mb-1 font-semibold text-foreground">SHAMEZO（しゃめぞう）とは？</p>
         <p>
           写真にひとことコメントを合成し、Mastodon や Misskey に投稿するアプリです。
         </p>
       </div>
 
-      {/* 今すぐ投稿する（TOPと共通のログインロジック） */}
-      <div>
-        <p className="mb-3 text-center text-sm font-semibold">今すぐログインして投稿してみよう！</p>
-        <div className="mx-auto max-w-sm">
-          <LoginButton
-            allowedServers={allowedServers}
-            callbackUrl={POST_LOGIN_REDIRECT}
-            initialIsLoggedIn={false}
-          />
-        </div>
-      </div>
-
-      {/* または */}
-      <div className="my-6 flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="h-px flex-1 bg-border" />
-        または
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
-      {/* 他のユーザーの投稿を見てみる */}
-      <div className="mx-auto max-w-sm">
-        <Link href="/public" className="block">
-          <Button variant="outline" className="w-full">
-            他のユーザーの投稿を見てみる
-          </Button>
-        </Link>
-      </div>
+      {/* 今すぐ投稿する〜他のユーザーの投稿を見てみる（TOPと共通ブロック） */}
+      <LoginPrompt>
+        <LoginButton
+          allowedServers={allowedServers}
+          callbackUrl={POST_LOGIN_REDIRECT}
+          initialIsLoggedIn={false}
+        />
+      </LoginPrompt>
     </section>
   );
 }

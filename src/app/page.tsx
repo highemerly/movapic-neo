@@ -1,12 +1,11 @@
 import { Suspense } from "react";
-import Link from "@/components/Link";
 import Image from "next/image";
 import { unstable_cache } from "next/cache";
 import prisma from "@/lib/db";
 import { getSessionClaims } from "@/lib/auth/session";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { LoginSection } from "@/components/auth/LoginSection";
-import { Button } from "@/components/ui/button";
+import { LoginPrompt } from "@/components/auth/LoginPrompt";
 import { FeaturedMarquee } from "@/components/gallery/FeaturedMarquee";
 import { Footer } from "@/components/Footer";
 import { getAllowedServers } from "@/lib/auth/allowedServers";
@@ -74,19 +73,18 @@ export default async function HomePage() {
 
         {/* ログイン（保護ページからのリダイレクト時はバナー表示） */}
         <div className="container mx-auto max-w-2xl px-4">
-          {/* ログインカードは画像詳細ページのガイドと同じ幅（max-w-2xl のコンテナ全幅）に広げる。
-              フォーム各コントロールは LoginButton 内部で max-w-sm に中央寄せするので広がりすぎない。 */}
+          {/* ログインカードは画像詳細ページのガイドと同じ幅（max-w-2xl のコンテナ全幅）。
+              見出し〜「他のユーザーの投稿を見てみる」まで一枚のカード内に収める（LoginSection が担当）。 */}
           <div className="mt-6">
-            {!isLoggedIn && (
-              <p className="mb-3 text-center text-sm font-semibold">
-                今すぐログインして投稿してみよう！
-              </p>
-            )}
+            {/* 保護ページ由来のバナー表示のため LoginSection を使う。バナー判定に useSearchParams を
+                使うので Suspense 必須。フォールバックはバナーなしの同型カード（LoginPrompt）で描く。 */}
             <Suspense
               fallback={
-                <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden text-center">
+                <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden text-left">
                   <div className="px-5 py-5">
-                    <LoginButton allowedServers={allowedServers} initialIsLoggedIn={isLoggedIn} />
+                    <LoginPrompt showPrompt={!isLoggedIn}>
+                      <LoginButton allowedServers={allowedServers} initialIsLoggedIn={isLoggedIn} />
+                    </LoginPrompt>
                   </div>
                 </div>
               }
@@ -94,15 +92,6 @@ export default async function HomePage() {
               <LoginSection allowedServers={allowedServers} initialIsLoggedIn={isLoggedIn} />
             </Suspense>
           </div>
-
-          {/* みんなの作品をもっと見る */}
-          {marqueeImages.length > 0 && (
-            <div className="text-center mt-8">
-              <Link href="/public">
-                <Button variant="outline">みんなの作品をもっと見る</Button>
-              </Link>
-            </div>
-          )}
 
           {/* フッター */}
           <Footer />

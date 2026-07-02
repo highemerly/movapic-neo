@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { Lock, AlertCircle } from "lucide-react";
 import { LoginButton } from "./LoginButton";
+import { LoginPrompt } from "./LoginPrompt";
 
 interface LoginSectionProps {
   allowedServers?: string[];
@@ -53,18 +54,20 @@ export function LoginSection({ allowedServers, initialIsLoggedIn }: LoginSection
   const errorCode = params.get("error");
   const returnTo = sanitizeReturnTo(params.get("returnTo"));
   const showLoginRequired = reason === "login_required" && !!returnTo;
+  // 上部に警告バナー（エラー／ログイン必須）が出るときは「今すぐログイン…」の見出しは冗長なので消す。
+  const hasBanner = !!errorCode || showLoginRequired;
 
   return (
-    <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden text-center">
+    <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden text-left">
       {errorCode ? (
-        <div className="bg-destructive/10 px-5 py-3 flex items-start justify-center gap-2.5 border-b border-border">
+        <div className="bg-destructive/10 px-5 py-3 flex items-start justify-start gap-2.5 border-b border-border">
           <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0 mt-0.5" />
           <p className="text-sm font-semibold leading-snug text-destructive">
             {getErrorMessage(errorCode)}
           </p>
         </div>
       ) : showLoginRequired ? (
-        <div className="bg-primary/5 px-5 py-3 flex items-start justify-center gap-2.5 border-b border-border">
+        <div className="bg-primary/5 px-5 py-3 flex items-start justify-start gap-2.5 border-b border-border">
           <Lock className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
           <p className="text-sm font-semibold leading-snug">
             {getLoginRequiredMessage(returnTo!)}
@@ -72,7 +75,10 @@ export function LoginSection({ allowedServers, initialIsLoggedIn }: LoginSection
         </div>
       ) : null}
       <div className="px-5 py-5">
-        <LoginButton allowedServers={allowedServers} callbackUrl={returnTo} initialIsLoggedIn={initialIsLoggedIn} />
+        {/* 見出し〜「他のユーザーの投稿を見てみる」まで、画像詳細ページのガイドと共通のブロックをカード内に収める。 */}
+        <LoginPrompt showPrompt={!initialIsLoggedIn && !hasBanner}>
+          <LoginButton allowedServers={allowedServers} callbackUrl={returnTo} initialIsLoggedIn={initialIsLoggedIn} />
+        </LoginPrompt>
       </div>
     </div>
   );

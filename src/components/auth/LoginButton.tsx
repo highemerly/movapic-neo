@@ -172,31 +172,37 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
   // 利用規約への同意トグル（ログイン前に必須）。
   // トグルにだけ <label> を掛け、利用規約リンクは別要素（モーダルを開く）にして「クリックで誤トグル」を防ぐ。
   const agreementToggle = (
-    <div className="relative flex items-center justify-center gap-2">
-      {/* 未同意でログインを押したときの吹き出し（トグル操作で消える・トグルを下向き矢印で指す） */}
-      {showAgreementError && (
-        <div
-          role="alert"
-          className="absolute bottom-full left-1/2 z-20 mb-2 w-max max-w-[16rem] -translate-x-1/2 rounded-lg bg-destructive px-3 py-1.5 text-xs font-medium leading-snug text-white shadow-md"
-        >
-          利用規約に同意してください
-          <span className="absolute left-1/2 top-full size-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-destructive" />
-        </div>
-      )}
-      {/* label の padding でタップ領域を拡大しつつ、-my-2 で縦の余白は相殺（見た目は詰める） */}
-      <label className="flex cursor-pointer items-center p-2 -my-2">
-        <span className="inline-flex scale-110">
-          <ToggleSwitch
-            checked={agreed}
-            onChange={() => {
-              setAgreed((v) => !v);
-              setShowAgreementError(false);
-            }}
-            disabled={isLoading}
-          />
-        </span>
-      </label>
-      <p className="text-xs leading-relaxed text-muted-foreground">
+    <div className="flex items-center justify-start gap-2">
+      {/* トグルを相対基準にして、吹き出しの左端をトグルに合わせ、矢印でトグル（チェックボックス）を指す */}
+      <div className="relative">
+        {/* label の padding でタップ領域を拡大しつつ、-my-2 で縦の余白は相殺（見た目は詰める） */}
+        <label className="flex cursor-pointer items-center p-2 -my-2">
+          <span className="inline-flex scale-110">
+            <ToggleSwitch
+              checked={agreed}
+              onChange={() => {
+                setAgreed((v) => !v);
+                setShowAgreementError(false);
+              }}
+              disabled={isLoading}
+            />
+          </span>
+        </label>
+        {/* 未同意でログインを押したときの吹き出し（トグル操作で消える）。
+            左端はトグルに揃え、矢印はトグル中心（左から約32px）を指す。 */}
+        {showAgreementError && (
+          <>
+            <div
+              role="alert"
+              className="absolute bottom-full left-0 z-20 mb-2 w-max max-w-[16rem] rounded-lg bg-destructive px-3 py-1.5 text-xs font-medium leading-snug text-white shadow-md"
+            >
+              利用規約に同意してください
+            </div>
+            <span className="absolute bottom-full left-8 z-20 mb-1 size-2.5 -translate-x-1/2 rotate-45 bg-destructive" />
+          </>
+        )}
+      </div>
+      <p className="text-sm leading-relaxed text-muted-foreground">
         <LegalInfoDialog
           title="利用規約"
           trigger={
@@ -223,9 +229,9 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
 
     const needsAgreement = !isLoggedIn && !effectiveAgreed;
     return (
-      <div className="mx-auto max-w-sm space-y-4">
+      <div className="space-y-4">
         {error && (
-          <p className="text-center text-sm text-destructive">
+          <p className="text-left text-sm text-destructive">
             {error.message}
             {error.suggestion ? `（${error.suggestion}）` : ""}
           </p>
@@ -241,7 +247,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
           {buttonLabel}
         </Button>
         {!isLoggedIn && (
-          <p className="text-center text-xs text-muted-foreground">
+          <p className="text-left text-xs text-muted-foreground">
             他のサーバーでは現在利用できません
           </p>
         )}
@@ -252,7 +258,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
   // ログイン済みの場合
   if (isLoggedIn) {
     return (
-      <div className="mx-auto max-w-sm space-y-4">
+      <div className="space-y-4">
         <Button
           onClick={() => router.push(targetUrl)}
           className="w-full h-12 text-lg"
@@ -267,18 +273,18 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
   // 自由入力モード
   const needsInput = !server.trim() || !effectiveAgreed;
   return (
-    <form onSubmit={handleLogin} className="space-y-4 text-center">
+    <form onSubmit={handleLogin} className="space-y-4 text-left">
       {/* 入力欄・同意トグル・ログインボタンは読みやすい幅（max-w-sm）に中央寄せで固定。
           カード自体が広くても各コントロールは広がりすぎないようにする（下のpill列だけは全幅を使う）。 */}
-      <div className="mx-auto max-w-sm space-y-4">
+      <div className="space-y-4">
       {/* サーバー入力 */}
       <div className="space-y-2.5">
         <label
           htmlFor="server"
-          className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm font-medium"
+          className="flex flex-wrap items-center justify-start gap-x-2 gap-y-1 text-sm font-medium"
         >
-          サーバー
-          <span className="flex items-center gap-2 text-xs font-normal text-muted-foreground">
+          サーバー：
+          <span className="ml-auto flex items-center gap-2 text-xs font-normal text-muted-foreground">
             <span className="flex items-center gap-1">
               <MastodonIcon className="size-3.5" /> Mastodon
             </span>
@@ -317,7 +323,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
             autoCorrect="off"
             autoComplete="off"
             spellCheck={false}
-            className={`h-12 text-lg md:text-lg text-center ${termsPreAgreed ? "px-11" : ""}`}
+            className={`h-12 text-lg md:text-lg ${termsPreAgreed ? "pr-11" : ""}`}
           />
           {/* localStorage から復元したサーバー名は × で消せる（消すと同意トグルが復活する） */}
           {termsPreAgreed && (
@@ -355,7 +361,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
       {/* サービス紹介・権限・プライバシーポリシー（同意は取らずモーダルで読める・同じ体裁のpill）。
           PCなど横幅が確保できる環境（広いカード）では横並び、狭い端末ではpill単位で折り返す。
           各pillは whitespace-nowrap で「1つのリンクの途中で改行」しないようにする。 */}
-      <div className="flex flex-wrap items-center justify-center gap-2">
+      <div className="flex flex-wrap items-center justify-start gap-2">
         <LegalInfoDialog
           title="何ができますか？"
           trigger={
