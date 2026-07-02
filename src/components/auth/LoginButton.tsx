@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock } from "lucide-react";
+import { Lock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
@@ -54,6 +54,9 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
   const [isLoading, setIsLoading] = useState(false);
   // 利用規約への同意（ログイン前に必須）。プライバシーポリシーは同意不要のリンクのみ。
   const [agreed, setAgreed] = useState(false);
+  // localStorage から復元した「前回ログインしたサーバー名」（無ければ null）。
+  // これがある＝過去にログイン成功済み＝規約同意済みとみなす。
+  const [savedServer, setSavedServer] = useState<string | null>(null);
   // 未同意でログインを押したときにトグル横へ出す吹き出し（トグル操作で消える）
   const [showAgreementError, setShowAgreementError] = useState(false);
   // エラーは見出し(message)＋補足(suggestion)に分けて吹き出しで2行表示する
@@ -75,14 +78,21 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
   // 単一サーバー限定モード
   const singleServerMode = allowedServers?.length === 1;
 
-  // 前回使ったサーバー名を初期値として復元し、過去に同意済みとみなしトグルを初期ONにする。
+  // 過去に規約同意済みか。保存済みサーバー名があり、かつ自由入力欄をまだ編集していない間は true。
+  // true の間は同意トグルを出さず「同意済み」表示にする。サーバー名を編集すると false になりトグルが復活する
+  // （単一サーバーモードは入力欄自体が無いので保存済みなら常に同意済み扱い）。
+  const termsPreAgreed = savedServer !== null && (singleServerMode || server === savedServer);
+  // ログイン可否判定に使う実効同意状態（過去同意済み or 今回トグルON）
+  const effectiveAgreed = termsPreAgreed || agreed;
+
+  // 前回使ったサーバー名を初期値として復元し、過去に同意済み（＝トグルを出さない）とみなす。
   // （マウント後にクライアントで実行＝ハイドレーション不整合を避ける）
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LAST_SERVER_KEY);
       if (!saved) return;
-      // 一度ログイン＝過去に規約へ同意済みとみなし、トグルを初期ON
-      setAgreed(true);
+      // 一度ログイン成功済み＝過去に規約へ同意済みとみなす（termsPreAgreed の根拠）
+      setSavedServer(saved);
       // 自由入力モードのみ入力欄にも復元（単一サーバーモードは固定値）
       if (!singleServerMode) setServer(saved);
     } catch {
@@ -106,7 +116,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
       return;
     }
 
-    if (!agreed) {
+    if (!effectiveAgreed) {
       // エラーはトグル横の吹き出しで表示（サーバー入力欄の吹き出しとは別）
       setShowAgreementError(true);
       return;
@@ -209,7 +219,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
         ? "処理中..."
         : `${allowedServers[0]} でログイン`;
 
-    const needsAgreement = !isLoggedIn && !agreed;
+    const needsAgreement = !isLoggedIn && !effectiveAgreed;
     return (
       <div className="space-y-4">
         {error && (
@@ -218,7 +228,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
             {error.suggestion ? `（${error.suggestion}）` : ""}
           </p>
         )}
-        {!isLoggedIn && agreementToggle}
+        {!isLoggedIn && !termsPreAgreed && agreementToggle}
         <Button
           onClick={() => handleLogin()}
           disabled={isLoading}
@@ -253,7 +263,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
   }
 
   // 自由入力モード
-  const needsInput = !server.trim() || !agreed;
+  const needsInput = !server.trim() || !effectiveAgreed;
   return (
     <form onSubmit={handleLogin} className="space-y-4 text-center">
       {/* サーバー入力 */}
@@ -302,13 +312,28 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
             autoCorrect="off"
             autoComplete="off"
             spellCheck={false}
-            className="h-12 text-lg md:text-lg text-center"
+            className={`h-12 text-lg md:text-lg text-center ${termsPreAgreed ? "px-11" : ""}`}
           />
+          {/* localStorage から復元したサーバー名は × で消せる（消すと同意トグルが復活する） */}
+          {termsPreAgreed && (
+            <button
+              type="button"
+              onClick={() => {
+                setServer("");
+                if (error) setError(null);
+              }}
+              disabled={isLoading}
+              aria-label="サーバー名を消す"
+              className="absolute right-2 top-1/2 z-10 flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X className="size-4" />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* 同意トグル（ログインボタン直前） */}
-      {agreementToggle}
+      {/* 同意トグル（ログインボタン直前）。過去ログイン済みで未編集なら非表示（サーバー名編集/×で復活） */}
+      {!termsPreAgreed && agreementToggle}
 
       {/* ログイン */}
       <Button
