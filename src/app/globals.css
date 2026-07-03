@@ -26,6 +26,45 @@
   padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
 }
 
+/* モバイル幅（<768px）では画面下部に固定バーが常に出る（通常は BottomNav、
+   /create の画像選択中は「プレビュー/投稿」アクションバー）。下寄せの sonner トーストが
+   これらと重ならないよう、モバイルのときだけトーストの下端を底上げする（PCは既定のまま）。 */
+@media (max-width: 767px) {
+  [data-sonner-toaster][data-y-position="bottom"] {
+    /* BottomNav(3.5rem) ＋ 余白。iOS のホームインジケータ分も safe-area で足す */
+    bottom: calc(env(safe-area-inset-bottom) + 4rem) !important;
+  }
+  /* create で画像選択中は BottomNav が隠れ、代わりに約4rem のアクションバーが出るぶん多く上げる */
+  [data-create-has-image] [data-sonner-toaster][data-y-position="bottom"] {
+    bottom: calc(env(safe-area-inset-bottom) + 4.75rem) !important;
+  }
+}
+
+/* エラートーストだけ、失敗に気づきやすいよう少し大きめ・目立つ表示にする（成功等は既定のまま）。
+   sonner がトースト要素に付ける data-type="error" を利用。
+   richColors の控えめな赤だと沈むため、ライト/ダーク共通で彩度の高い赤に上書きし、
+   白文字＋赤いグロー影で強く目立たせる。 */
+[data-sonner-toast][data-type="error"] {
+  padding: 1rem 1.15rem;
+  --error-bg: #ff1f3d;
+  --error-border: #ff8fa0;
+  --error-text: #ffffff;
+  box-shadow:
+    0 0 0 2px #ffe1e6,
+    0 8px 24px rgba(255, 31, 61, 0.6);
+}
+[data-sonner-toast][data-type="error"] [data-title] {
+  font-size: 0.9375rem; /* 15px（既定13px）*/
+  font-weight: 600;
+  line-height: 1.35;
+}
+[data-sonner-toast][data-type="error"] [data-description] {
+  font-size: 0.8125rem; /* 13px */
+}
+[data-sonner-toast][data-type="error"] [data-icon] {
+  transform: scale(1.15);
+}
+
 /* iOS Safari 対策: Radix の DropdownMenu/Popover 等は外側タップ検出を
    document 上の pointerdown で行うが、iOS はクリック可能でない要素への
    タップイベントを document へ伝播させないため「外側タップで閉じる」が効かない

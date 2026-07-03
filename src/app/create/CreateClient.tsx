@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { AlertCircle, X, ChevronDown, Sparkles } from "lucide-react";
+import { ChevronDown, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { TextInput } from "@/components/TextInput";
 import { ImageUpload } from "@/components/ImageUpload";
 import { OptionsPanel } from "@/components/OptionsPanel";
@@ -44,9 +45,6 @@ import {
 } from "@/lib/errors";
 import { extractExif, type ExtractedExif } from "@/lib/exif/parser";
 import { Label } from "@/components/ui/label";
-
-// エラートーストのフェードアウト時間（ms）。CSSの duration と揃える
-const ERROR_FADE_MS = 300;
 
 // 出力形式の表示名
 const OUTPUT_LABELS: Record<OutputFormat, string> = {
@@ -181,8 +179,6 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
   const [isLoading, setIsLoading] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [loadingTime, setLoadingTime] = useState(0);
-  const [error, setError] = useState<ParsedApiError | null>(null);
-  const [errorLeaving, setErrorLeaving] = useState(false);
   const [hasGenerated, setHasGenerated] = useState(false);
   const [lastGeneratedState, setLastGeneratedState] =
     useState<GenerateFormState | null>(null);
@@ -227,34 +223,20 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
     return () => clearInterval(interval);
   }, [isLoading]);
 
-  // エラートーストの自動消滅: 通常は8秒。429(レート制限)は再試行可能秒数+1秒（3〜10秒にクランプ）
-  // 消えるときは突然ではなくフェードアウトさせる（FADE_MS かけてから unmount）
-  useEffect(() => {
-    if (!error) return;
+  // エラーは sonner トーストで表示（成功トーストと統一）。
+  // 表示時間: 通常8秒。429(レート制限)は再試行可能秒数+1秒（3〜10秒にクランプ）。
+  // supportInfo（Error code: ...）は description として2行目に出す。
+  const showError = useCallback((e: ParsedApiError) => {
     let ms = 8000;
-    if (error.retryAfterSeconds) {
-      const seconds = Math.min(10, Math.max(3, error.retryAfterSeconds + 1));
+    if (e.retryAfterSeconds) {
+      const seconds = Math.min(10, Math.max(3, e.retryAfterSeconds + 1));
       ms = seconds * 1000;
     }
-    const startFade = setTimeout(() => setErrorLeaving(true), ms);
-    const remove = setTimeout(() => setError(null), ms + ERROR_FADE_MS);
-    return () => {
-      clearTimeout(startFade);
-      clearTimeout(remove);
-    };
-  }, [error]);
-
-  // エラー表示: 入場アニメーションから始めるため leaving を必ず false に戻す
-  const showError = useCallback((e: ParsedApiError) => {
-    setErrorLeaving(false);
-    setError(e);
+    toast.error(formatErrorMessage(e), {
+      description: e.supportInfo,
+      duration: ms,
+    });
   }, []);
-
-  // 閉じるボタン等から手動で消す: フェードアウトしてから unmount
-  const dismissError = () => {
-    setErrorLeaving(true);
-    setTimeout(() => setError(null), ERROR_FADE_MS);
-  };
 
   // BlobURLのクリーンアップ
   useEffect(() => {
@@ -290,7 +272,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
       // 新しい画像がアップロードされたら生成結果をクリア
       setHasGenerated(false);
       setResultUrl(null);
-      setError(null);
+      toast.dismiss();
       // 撮影情報の選択肢と位置情報の解析キャッシュは画像ごとに毎回リセット
       // 撮影場所は毎回ユーザーに選択してもらう（保存対象外）。
       // カメラ機種は EXIF が取れた後にユーザー初期値があれば "show" に復元する。
@@ -390,7 +372,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
       URL.revokeObjectURL(resultUrl);
       setResultUrl(null);
     }
-    setError(null);
+    toast.dismiss();
   }, [resultUrl, user.instance.type]);
 
   // 生成APIを呼び出してblob・MIMEタイプ・元画像情報を返す（UI状態は更新しない）
@@ -511,7 +493,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
 
     setLoadingTime(0);
     setIsLoading(true);
-    setError(null);
+    toast.dismiss();
 
     const result = await callGenerate();
     if (result) {
@@ -536,7 +518,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
     }
 
     setIsPosting(true);
-    setError(null);
+    toast.dismiss();
 
     try {
       let blob: Blob;
@@ -680,12 +662,12 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
         setTimeout(() => setSaveSuccess(false), 3000);
       } else {
         const data = await response.json();
-        setError({
+        showError({
           message: data.error?.message || "設定の保存に失敗しました",
         });
       }
     } catch {
-      setError({ message: "設定の保存に失敗しました" });
+      showError({ message: "設定の保存に失敗しました" });
     } finally {
       setIsSavingDefaults(false);
     }
@@ -785,36 +767,6 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
         user={{ username: user.username, instanceDomain: user.instance.domain, avatarUrl: user.avatarUrl }}
       />
 
-      {/* エラートースト（成功トーストと同じ画面上部・目立つよう大きめ＋スライドイン・5秒で自動消滅） */}
-      {error && (
-        <div className="pointer-events-none fixed inset-x-0 top-14 z-[60] flex justify-center px-4">
-          <div
-            className={`pointer-events-auto flex w-full max-w-md items-start gap-2.5 rounded-lg bg-destructive px-5 py-4 text-white shadow-xl ring-2 ring-white/40 duration-300 ${
-              errorLeaving
-                ? "animate-out fade-out slide-out-to-top-4"
-                : "animate-in fade-in slide-in-from-top-4"
-            }`}
-          >
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">{formatErrorMessage(error)}</p>
-              {error.supportInfo && (
-                <p className="mt-1 text-xs text-white/80">
-                  {error.supportInfo}
-                </p>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={dismissError}
-              className="shrink-0 text-white/70 transition-colors hover:text-white"
-              aria-label="エラーを閉じる"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
 
       <main
         className={`container mx-auto px-4 pt-4 pb-8 transition-[max-width] duration-500 ease-out ${
