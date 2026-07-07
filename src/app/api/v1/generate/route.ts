@@ -229,6 +229,8 @@ export async function POST(request: NextRequest) {
         arrangement,
         season,
         requestId,
+        // クライアントが諦めて切断したら compute の合成処理も中断する
+        signal: request.signal,
       }),
       PROCESS_TIMEOUT_MS,
       requestId

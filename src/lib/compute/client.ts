@@ -36,9 +36,20 @@ function computeApiKey(): string {
   return key;
 }
 
-async function computeFetch(path: string, form: FormData): Promise<Response> {
+async function computeFetch(
+  path: string,
+  form: FormData,
+  externalSignal?: AbortSignal,
+): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), COMPUTE_TIMEOUT_MS);
+  // クライアントが諦めて接続を切ると Next が request.signal を abort する。
+  // それを compute 呼び出しへ伝播させ、無駄な合成処理を続けない。
+  const onExternalAbort = () => controller.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort();
+    else externalSignal.addEventListener("abort", onExternalAbort);
+  }
   try {
     return await fetch(`${computeBase()}${path}`, {
       method: "POST",
@@ -48,6 +59,7 @@ async function computeFetch(path: string, form: FormData): Promise<Response> {
     });
   } finally {
     clearTimeout(timer);
+    if (externalSignal) externalSignal.removeEventListener("abort", onExternalAbort);
   }
 }
 
@@ -67,6 +79,8 @@ export interface RenderImageParams {
   /** シーズン（期間限定）キー。セット時はスタイル系は送らず compute がプリセットで描画する */
   season?: string | null;
   requestId?: string;
+  /** クライアント切断時に compute 呼び出しも中断するための signal（generate route の request.signal） */
+  signal?: AbortSignal;
 }
 
 /** 文字入れ画像を compute で生成する（processImage 相当）。 */
@@ -89,7 +103,7 @@ export async function renderImage(
   }
   if (p.requestId) form.append("requestId", p.requestId);
 
-  const res = await computeFetch("/api/internal/render", form);
+  const res = await computeFetch("/api/internal/render", form, p.signal);
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`compute render failed: ${res.status} ${body}`);

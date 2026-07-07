@@ -44,6 +44,11 @@ import {
   type ParsedApiError,
 } from "@/lib/errors";
 import { extractExif, type ExtractedExif } from "@/lib/exif/parser";
+import {
+  uploadWithProgress,
+  UploadError,
+  type UploadErrorPhase,
+} from "@/lib/uploadWithProgress";
 import { Label } from "@/components/ui/label";
 
 // 出力形式の表示名
@@ -155,6 +160,28 @@ const initialState: GenerateFormState = {
   imagePreview: null,
 };
 
+// アップロード/処理フェーズ別のエラー文言。「画像を小さく」等の的外れな案内を避ける。
+const UPLOAD_ERROR_MESSAGES: Record<
+  UploadErrorPhase,
+  { message: string; suggestion?: string }
+> = {
+  "upload-stall": {
+    message: "アップロードが完了できませんでした",
+    suggestion: "通信環境の良い場所で、もう一度お試しください",
+  },
+  "process-timeout": {
+    message: "画像の処理がタイムアウトしました",
+    suggestion: "しばらく待ってから、もう一度お試しください",
+  },
+  network: {
+    message: "通信エラーが発生しました",
+    suggestion: "電波状況をご確認のうえ、もう一度お試しください",
+  },
+  aborted: {
+    message: "キャンセルしました",
+  },
+};
+
 export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn }: CreateClientProps) {
   const router = useRouter();
   // 出力形式は連携インスタンスの種別から自動決定
@@ -179,6 +206,11 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
   const [isLoading, setIsLoading] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [loadingTime, setLoadingTime] = useState(0);
+  // 通信フェーズ: null=非通信 / "uploading"=送信中(進捗%あり) / "processing"=サーバー処理中(不定)
+  const [uploadPhase, setUploadPhase] = useState<
+    null | "uploading" | "processing"
+  >(null);
+  const [uploadPct, setUploadPct] = useState(0);
   const [hasGenerated, setHasGenerated] = useState(false);
   const [lastGeneratedState, setLastGeneratedState] =
     useState<GenerateFormState | null>(null);
@@ -214,14 +246,15 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
     city: string;
   } | null>(null);
 
-  // ローディング中の経過時間を更新（リセットは生成開始時に行う＝effect内での同期setStateを避ける）
+  // サーバー処理フェーズ中のみ経過秒数を更新（生成・投稿共通）。
+  // リセットはフェーズ遷移時のハンドラ側で行い、effect 内での同期 setState を避ける。
   useEffect(() => {
-    if (!isLoading) return;
+    if (uploadPhase !== "processing") return;
     const interval = setInterval(() => {
       setLoadingTime((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(interval);
-  }, [isLoading]);
+  }, [uploadPhase]);
 
   // エラーは sonner トーストで表示（成功トーストと統一）。
   // 表示時間: 通常8秒。429(レート制限)は再試行可能秒数+1秒（3〜10秒にクランプ）。
@@ -388,19 +421,21 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
     formData.append("arrangement", formState.arrangement);
     if (formState.season) formData.append("season", formState.season);
 
-    const controller = new AbortController();
-    // タイムアウトは外側ほど長く: compute(18s) < generate(22s) < client(25s)。
-    // サーバー(generate 22s)が処理タイムアウトを返す前にクライアントが切らないよう余裕を持たせる。
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
-
+    // アップロード中は stall(20s) でのみ中断＝遅い回線でも進捗が進む限り待つ。
+    // アップロード完了後の合成処理だけを processTimeout で計測（サーバー generate 22s + マージン）。
+    setUploadPhase("uploading");
+    setUploadPct(0);
     try {
-      const response = await fetch("/api/v1/generate", {
-        method: "POST",
-        body: formData,
-        signal: controller.signal,
+      const response = await uploadWithProgress("/api/v1/generate", formData, {
+        onProgress: (loaded, total) =>
+          setUploadPct(total > 0 ? Math.round((loaded / total) * 100) : 0),
+        onUploadComplete: () => {
+          setLoadingTime(0);
+          setUploadPhase("processing");
+        },
+        stallMs: 20000,
+        processTimeoutMs: 25000,
       });
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const parsedError = await parseApiError(response);
@@ -434,16 +469,14 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
         ),
       };
     } catch (err) {
-      clearTimeout(timeoutId);
-      if (err instanceof Error && err.name === "AbortError") {
-        showError({
-          message: "リクエストがタイムアウトしました",
-          suggestion: "画像サイズを小さくして再試行してください",
-        });
+      if (err instanceof UploadError) {
+        showError(UPLOAD_ERROR_MESSAGES[err.phase]);
       } else {
         showError({ message: "エラーが発生しました" });
       }
       return null;
+    } finally {
+      setUploadPhase(null);
     }
   };
 
@@ -584,9 +617,19 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
         }
       }
 
-      const response = await fetch("/api/v1/post", {
-        method: "POST",
-        body: formData,
+      // 投稿は生成済み画像を再アップロード＝通信負荷が大きい。generate 同様にフェーズ表示。
+      // 処理側は R2→DB→Fediverse を直列実行し正当に長時間かかり得る（かつ中断は部分保存の危険が
+      // あるため不可）ので processTimeout は設けず、stall(20s) のみで送信の詰まりを検知する。
+      setUploadPhase("uploading");
+      setUploadPct(0);
+      const response = await uploadWithProgress("/api/v1/post", formData, {
+        onProgress: (loaded, total) =>
+          setUploadPct(total > 0 ? Math.round((loaded / total) * 100) : 0),
+        onUploadComplete: () => {
+          setLoadingTime(0);
+          setUploadPhase("processing");
+        },
+        stallMs: 20000,
       });
 
       if (!response.ok) {
@@ -629,9 +672,14 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
       } else {
         router.push("/dashboard");
       }
-    } catch {
-      showError({ message: "投稿に失敗しました" });
+    } catch (err) {
+      if (err instanceof UploadError) {
+        showError(UPLOAD_ERROR_MESSAGES[err.phase]);
+      } else {
+        showError({ message: "投稿に失敗しました" });
+      }
     } finally {
+      setUploadPhase(null);
       setIsPosting(false);
     }
   };
@@ -752,17 +800,20 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
   }, [locationOption, geocoded, manualPref, manualCity]);
 
   const isProcessing = isLoading || isPosting;
-  const progressLabel = isPosting
-    ? "投稿中..."
-    : isLoading
-      ? loadingTime > 0
-        ? `生成中... ${loadingTime}秒`
-        : "生成中..."
-      : undefined;
+  // 文言は2種類だけに統一（生成/投稿でも区別しない）。処理中は0秒から常に秒数を出す。
+  const progressLabel = (() => {
+    if (uploadPhase === "uploading") return `アップロード中 ${uploadPct}%`;
+    if (isProcessing) return `処理中 ${loadingTime}秒...`;
+    return undefined;
+  })();
 
   return (
     <div className="min-h-screen bg-background">
-      <TopProgressBar active={isProcessing} label={progressLabel} />
+      <TopProgressBar
+        active={isProcessing}
+        label={progressLabel}
+        progress={uploadPhase === "uploading" ? uploadPct : undefined}
+      />
       <SiteHeader
         user={{ username: user.username, instanceDomain: user.instance.domain, avatarUrl: user.avatarUrl }}
       />
