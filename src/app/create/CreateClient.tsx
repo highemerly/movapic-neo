@@ -854,7 +854,6 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
                 resultInfo={resultInfo}
                 isLoading={isLoading}
                 isPosting={isPosting}
-                loadingTime={loadingTime}
                 onImageSelect={handleImageSelect}
                 onReset={handleReset}
                 disabled={isLoading || isPosting}

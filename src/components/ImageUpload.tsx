@@ -33,7 +33,6 @@ interface ImageUploadProps {
   resultInfo: ResultInfo | null;
   isLoading?: boolean;
   isPosting?: boolean;
-  loadingTime?: number;
   onImageSelect: (file: File, preview: string) => void;
   onReset: () => void;
   disabled?: boolean;
@@ -53,13 +52,11 @@ export function ImageUpload({
   resultInfo,
   isLoading,
   isPosting,
-  loadingTime,
   onImageSelect,
   onReset,
   disabled,
 }: ImageUploadProps) {
   const isBusy = isLoading || isPosting;
-  const busyLabel = isPosting ? "投稿中..." : "生成中...";
   const inputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -203,10 +200,6 @@ export function ImageUpload({
               {isBusy && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-sm">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="mt-2 text-sm font-medium text-foreground">{busyLabel}</p>
-                  {isLoading && loadingTime !== undefined && loadingTime > 0 && (
-                    <p className="mt-1 text-xs text-muted-foreground">{loadingTime}秒</p>
-                  )}
                 </div>
               )}
               {/* 右上の×ボタン */}
@@ -240,10 +233,6 @@ export function ImageUpload({
               {isBusy ? (
                 <div className="flex flex-col items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  <p className="mt-2 text-sm font-medium text-foreground">{busyLabel}</p>
-                  {isLoading && loadingTime !== undefined && loadingTime > 0 && (
-                    <p className="mt-1 text-xs text-muted-foreground">{loadingTime}秒</p>
-                  )}
                 </div>
               ) : (
                 <p className="text-center text-sm text-muted-foreground">
