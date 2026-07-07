@@ -7,6 +7,8 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { DeleteLocationButton } from "./DeleteLocationButton";
 import { ImageNavigation } from "./ImageNavigation";
 import { ImageOptionsButton } from "./ImageOptionsButton";
+import { FontLicenseBadge } from "./FontLicenseBadge";
+import { hasEmoji } from "@/lib/text/grapheme";
 import { ImageActionsMenu } from "./ImageActionsMenu";
 import { MisskeyOpenButton } from "./MisskeyOpenButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -282,7 +284,6 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-    second: "2-digit",
     timeZone: "Asia/Tokyo",
   });
 
@@ -395,7 +396,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
 
         {/* メタ情報（日時・ソース・設定） */}
         <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
+          <span className="inline-flex items-center gap-0.5">
             <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
             {image.postUrl ? (
               <a
@@ -410,41 +411,38 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               formattedCreatedAt
             )}
           </span>
-          <span className="inline-flex items-center gap-1">
-            {image.source === "email" ? (
-              <>
-                <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                メール
-              </>
-            ) : image.source === "mention" ? (
-              <>
-                <Bot className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                <a
-                  href={`https://${image.user.instance.domain}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:underline"
-                >
-                  {image.user.instance.domain}
-                </a>
-              </>
-            ) : (
-              <>
-                <Globe className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                <Link href="/create" className="hover:underline">
-                  Web
-                </Link>
-              </>
-            )}
-          </span>
+          <FontLicenseBadge font={image.font} hasEmoji={hasEmoji(image.overlayText)} />
           <ImageOptionsButton
             position={image.position}
             color={image.color}
             size={image.size}
-            font={image.font}
             arrangement={image.arrangement}
             season={image.season}
           />
+          {/* 投稿ソースはアイコンのみ（狭幅対策）。文脈は title で補う。 */}
+          {image.source === "email" ? (
+            <span className="inline-flex items-center" title="メール投稿">
+              <Mail className="h-3.5 w-3.5 shrink-0" aria-label="メール投稿" />
+            </span>
+          ) : image.source === "mention" ? (
+            <a
+              href={`https://${image.user.instance.domain}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center hover:text-foreground transition-colors"
+              title={`Bot投稿（${image.user.instance.domain}）`}
+            >
+              <Bot className="h-3.5 w-3.5 shrink-0" aria-label="Bot投稿" />
+            </a>
+          ) : (
+            <Link
+              href="/create"
+              className="inline-flex items-center hover:text-foreground transition-colors"
+              title="Web投稿"
+            >
+              <Globe className="h-3.5 w-3.5 shrink-0" aria-label="Web投稿" />
+            </Link>
+          )}
         </div>
 
         {/* お気に入り（Fediverse連携：Mastodon=favourite / Misskey=リアクション） */}

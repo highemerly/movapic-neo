@@ -71,3 +71,11 @@ export function isEmojiGrapheme(grapheme: string): boolean {
   if (!grapheme) return false;
   return EMOJI_COMPONENT.test(grapheme) || EXTENDED_PICTOGRAPHIC.test(grapheme);
 }
+
+/**
+ * 文字列に絵文字が1つでも含まれるか。書記素分割は不要（構成コードポイントを直接見る）。
+ * 絵文字は本文フォントに関わらず Noto Emoji で描画されるため、その表示判定に使う。
+ */
+export function hasEmoji(text: string): boolean {
+  return EMOJI_COMPONENT.test(text) || EXTENDED_PICTOGRAPHIC.test(text);
+}
