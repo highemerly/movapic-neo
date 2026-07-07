@@ -16,6 +16,7 @@ export const PUBLIC_IMAGE_LIST_SELECT = {
   overlayText: true,
   position: true,
   size: true,
+  blurDataUrl: true,
   favoriteCount: true,
   createdAt: true,
   user: {

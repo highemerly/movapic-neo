@@ -348,8 +348,10 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               src={imageUrl}
               alt={image.overlayText}
               loading="eager"
-              imgClassName="w-full object-contain"
-              showPlaceholder={false}
+              aspectRatio={image.width / image.height}
+              blurDataUrl={image.blurDataUrl}
+              containerClassName="w-full"
+              imgClassName="absolute inset-0 h-full w-full object-contain"
             />
           </div>
         </div>

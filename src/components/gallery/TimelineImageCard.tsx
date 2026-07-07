@@ -14,6 +14,7 @@ export interface TimelineCardImage {
   overlayText: string;
   position: string;
   size: string;
+  blurDataUrl?: string | null;
   favoriteCount: number;
   createdAt: string;
   user: {
@@ -57,6 +58,7 @@ export function TimelineImageCard({
         position={image.position}
         size={image.size}
         fill={fill}
+        blurDataUrl={image.blurDataUrl}
         className="group-hover:opacity-90 transition-opacity"
       />
       {fill ? (

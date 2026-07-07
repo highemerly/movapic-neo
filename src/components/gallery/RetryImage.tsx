@@ -30,6 +30,8 @@ export function RetryImage({
   containerClassName = "",
   loading = "lazy",
   showPlaceholder = true,
+  blurDataUrl,
+  aspectRatio,
 }: {
   src: string;
   alt: string;
@@ -40,6 +42,17 @@ export function RetryImage({
   loading?: "lazy" | "eager";
   /** 読み込み中・失敗時にパルス／灰色のプレースホルダを内部で出すか */
   showPlaceholder?: boolean;
+  /**
+   * Blurプレースホルダ用 LQIP（data:image/webp;base64,...）。あれば読み込み中に灰色ではなく
+   * 原本を縮小したぼかしプレビューを描く（追加の画像リクエストは発生しない）。無ければ従来の灰色。
+   */
+  blurDataUrl?: string | null;
+  /**
+   * width/height から算出したアスペクト比（= width / height）。指定するとコンテナが
+   * 読み込み前からその比率で高さを確保する（レイアウトシフト防止＋blur/img を絶対配置で敷ける）。
+   * 指定時は呼び出し側で img を `absolute inset-0 h-full w-full` 等にすること。
+   */
+  aspectRatio?: number;
 }) {
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<Status>("loading");
@@ -63,12 +76,25 @@ export function RetryImage({
   const loaded = status === "loaded";
 
   return (
-    <div className={`relative ${containerClassName}`}>
+    <div
+      className={`relative ${containerClassName}`}
+      style={aspectRatio ? { aspectRatio } : undefined}
+    >
       {showPlaceholder && !loaded && (
-        <div
-          className={`absolute inset-0 bg-muted ${status === "failed" ? "" : "animate-pulse"}`}
-          aria-hidden
-        />
+        blurDataUrl ? (
+          // LQIP（原本を32pxに縮小したWebP）のぼかしプレビュー。object-cover で枠を埋め、
+          // 拡大＋CSSぼかしで低解像度のドットを馴染ませる（scale はぼかしの透明な縁を隠す）。
+          <div
+            className="absolute inset-0 bg-cover bg-center scale-110"
+            style={{ backgroundImage: `url(${blurDataUrl})`, filter: "blur(12px)" }}
+            aria-hidden
+          />
+        ) : (
+          <div
+            className={`absolute inset-0 bg-muted ${status === "failed" ? "" : "animate-pulse"}`}
+            aria-hidden
+          />
+        )
       )}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

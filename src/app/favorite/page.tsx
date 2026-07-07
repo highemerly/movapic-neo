@@ -38,6 +38,7 @@ export default async function FavoritePage() {
       overlayText: true,
       position: true,
       size: true,
+      blurDataUrl: true,
       favoriteCount: true,
       createdAt: true,
       user: {
@@ -72,6 +73,7 @@ export default async function FavoritePage() {
             overlayText: image.overlayText,
             position: image.position,
             size: image.size,
+            blurDataUrl: image.blurDataUrl,
             favoriteCount: image.favoriteCount,
             createdAt: image.createdAt.toISOString(),
             user: {

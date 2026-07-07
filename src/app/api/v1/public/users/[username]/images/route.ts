@@ -70,6 +70,7 @@ export async function GET(
         overlayText: true,
         position: true,
         size: true,
+        blurDataUrl: true,
         favoriteCount: true,
         pinnedAt: true,
         createdAt: true,

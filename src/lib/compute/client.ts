@@ -125,6 +125,8 @@ export interface FinalizeResult {
   detectedMime?: string;
   width: number;
   height: number;
+  /** 一覧のBlurプレースホルダ用 LQIP（data:image/webp;base64,...）。生成失敗時は undefined */
+  blurDataUrl?: string;
 }
 
 /** 最終画像の mime 判定＋寸法＋サムネを compute で得る。 */
@@ -149,5 +151,6 @@ export async function finalizeImage(
     detectedMime: detected || undefined,
     width: parseInt(res.headers.get("X-Width") ?? "0", 10),
     height: parseInt(res.headers.get("X-Height") ?? "0", 10),
+    blurDataUrl: res.headers.get("X-Blur-Data") ?? undefined,
   };
 }

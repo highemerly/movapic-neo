@@ -92,6 +92,8 @@ export interface PublishImageInput {
     thumbnail: Buffer;
     width: number;
     height: number;
+    /** 一覧のBlurプレースホルダ用 LQIP（data URI）。生成失敗時は undefined/null */
+    blurDataUrl?: string | null;
   }>;
 }
 
@@ -251,7 +253,8 @@ async function storeAndRecord(
 
   // サムネ＋寸法は compute から取得（保存直前にだけ呼ぶ）→ R2へ
   const thumbnailKey = generateThumbnailKey(storageKey);
-  const { thumbnail, width, height } = await input.getThumbnailAndDimensions();
+  const { thumbnail, width, height, blurDataUrl } =
+    await input.getThumbnailAndDimensions();
   await uploadImage(thumbnail, thumbnailKey, "image/webp");
 
   await prisma.image.create({
@@ -273,6 +276,7 @@ async function storeAndRecord(
       arrangement: input.options.arrangement,
       season: input.options.season ?? null,
       thumbnailKey,
+      blurDataUrl: blurDataUrl ?? null,
       source: input.source,
       // 仕様: public / unlisted / local いずれも公開TLに表示する（CLAUDE.md）
       isPublic: true,

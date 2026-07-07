@@ -13,6 +13,8 @@ interface ThumbnailImageProps {
    * そのまま収める。aspect-square・拡大・位置クロップを行わない。
    */
   fill?: boolean;
+  /** Blurプレースホルダ用 LQIP（data URI）。読み込み中のぼかしプレビューに使う */
+  blurDataUrl?: string | null;
 }
 
 // grid 表示の拡大率を文字サイズで出し分ける。
@@ -55,6 +57,7 @@ export function ThumbnailImage({
   className = "",
   loading = "lazy",
   fill = false,
+  blurDataUrl,
 }: ThumbnailImageProps) {
   // fill: 親の枠（画像と同比率）にそのまま収める＝実質トリミングなし。
   // 既定: 正方形にクロップ（拡大＋文字位置基準）。
@@ -72,6 +75,7 @@ export function ThumbnailImage({
       src={src}
       alt={alt}
       loading={loading}
+      blurDataUrl={blurDataUrl}
       containerClassName={containerClass}
       imgClassName={`${imgClass} ${className}`}
     />

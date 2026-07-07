@@ -263,6 +263,7 @@ export async function POST(request: NextRequest) {
         thumbnail: finalized.thumbnail,
         width: finalized.width,
         height: finalized.height,
+        blurDataUrl: finalized.blurDataUrl,
       }),
       extras: { cameraMake, cameraModel, capturedAt, locationPrefecture, locationCity },
     });

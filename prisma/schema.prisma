@@ -163,6 +163,11 @@ model Image {
   season        String?  @db.VarChar(40)
   source        String   @default("web") @db.VarChar(20) // "web" | "email"
   thumbnailKey  String?  @map("thumbnail_key") @db.VarChar(500)
+  // 一覧のBlurプレースホルダ用 LQIP。原本を32pxに縮小したWebPの data URI
+  // （data:image/webp;base64,...）。原本AVIF読み込み中にこれを即描画してぼかし表示する
+  // ため、追加の画像リクエストは発生しない（JSONに相乗り・1画像~1KB以内）。
+  // null=未生成（旧画像。灰色プレースホルダにフォールバック）。生成は compute finalize。
+  blurDataUrl   String?  @map("blur_data_url") @db.Text
   postUrl       String?  @map("post_url") @db.Text
   postId        String?  @map("post_id") @db.VarChar(255)
   isPublic      Boolean  @default(true) @map("is_public")

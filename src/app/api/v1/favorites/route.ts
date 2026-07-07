@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
         overlayText: image.overlayText,
         position: image.position,
         size: image.size,
+        blurDataUrl: image.blurDataUrl,
         favoriteCount: image.favoriteCount,
         createdAt: image.createdAt.toISOString(),
         user: {

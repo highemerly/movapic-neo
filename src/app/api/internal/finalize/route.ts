@@ -67,6 +67,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const thumbnail = await generateThumbnail(imageBuffer, position);
+    // 一覧のBlurプレースホルダ用 LQIP。同じ最終画像を32pxのWebPに縮小した data URI を
+    // ヘッダで返す（~1KB以内・失敗しても本処理は止めない＝null相当）。
+    const { computeBlurDataUrl } = await import("@/lib/blurData");
+    const blurDataUrl = await computeBlurDataUrl(sharp, imageBuffer);
     return new NextResponse(new Uint8Array(thumbnail), {
       status: 200,
       headers: {
@@ -74,6 +78,7 @@ export async function POST(request: NextRequest) {
         "X-Detected-Mime": detectedMime,
         "X-Width": String(metadata.width || 0),
         "X-Height": String(metadata.height || 0),
+        ...(blurDataUrl ? { "X-Blur-Data": blurDataUrl } : {}),
         "Cache-Control": "no-store",
       },
     });

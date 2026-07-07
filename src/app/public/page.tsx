@@ -40,6 +40,7 @@ export default async function PublicTimelinePage({
       overlayText: true,
       position: true,
       size: true,
+      blurDataUrl: true,
       favoriteCount: true,
       createdAt: true,
       user: {
@@ -85,6 +86,7 @@ export default async function PublicTimelinePage({
             overlayText: img.overlayText,
             position: img.position,
             size: img.size,
+            blurDataUrl: img.blurDataUrl,
             favoriteCount: img.favoriteCount,
             createdAt: img.createdAt.toISOString(),
             user: {

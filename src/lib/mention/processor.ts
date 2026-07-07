@@ -442,7 +442,7 @@ export async function processOneMention(
       // 投稿成功時にだけ呼ばれる＝失敗時は compute(finalize)を呼ばない
       getThumbnailAndDimensions: async () => {
         const f = await finalizeImage(processedImage.buffer, cropPosition);
-        return { thumbnail: f.thumbnail, width: f.width, height: f.height };
+        return { thumbnail: f.thumbnail, width: f.width, height: f.height, blurDataUrl: f.blurDataUrl };
       },
     });
   } catch (error) {

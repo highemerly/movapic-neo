@@ -12,6 +12,7 @@ interface GalleryImage {
   overlayText: string;
   position: string;
   size: string;
+  blurDataUrl?: string | null;
   favoriteCount: number;
   pinnedAt: string | null;
   createdAt: string;

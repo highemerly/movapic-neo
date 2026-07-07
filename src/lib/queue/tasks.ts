@@ -191,7 +191,7 @@ const processEmailTask: Task = async (payload) => {
     persistOnPostFailure: true,
     getThumbnailAndDimensions: async () => {
       const f = await finalizeImage(result.buffer, cropPosition);
-      return { thumbnail: f.thumbnail, width: f.width, height: f.height };
+      return { thumbnail: f.thumbnail, width: f.width, height: f.height, blurDataUrl: f.blurDataUrl };
     },
     extras: { cameraMake, cameraModel, locationPrefecture, locationCity },
   });
