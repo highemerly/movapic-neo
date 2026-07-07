@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 // navigator.share 対応端末でのみ表示する（Web Share API はセキュアコンテキスト＝
 // HTTPS / localhost でのみ有効）。デザイン確認時のみ true にして非対応端末でも出せる。
@@ -40,13 +40,13 @@ export function useNativeShare({
   text,
   url,
 }: NativeShareParams) {
-  const [supported, setSupported] = useState(false);
-
-  useEffect(() => {
-    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
-      setSupported(true);
-    }
-  }, []);
+  // マウント後にのみ navigator.share を判定（SSR では false）。setState-in-effect を避け、
+  // サーバー/クライアントのスナップショットを分けて hydration 不整合も回避する。
+  const supported = useSyncExternalStore(
+    () => () => {},
+    () => typeof navigator !== "undefined" && typeof navigator.share === "function",
+    () => false,
+  );
 
   const share = useCallback(async () => {
     if (typeof navigator === "undefined" || typeof navigator.share !== "function") {

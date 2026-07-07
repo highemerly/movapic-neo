@@ -59,11 +59,14 @@ export function RetryImage({
   const ref = useRef<HTMLImageElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // src（原本URL）が変わったら状態をリセット（リスト再利用での取り違え防止）
-  useEffect(() => {
+  // src（原本URL）が変わったら状態をリセット（リスト再利用での取り違え防止）。
+  // レンダー中に前回 src と比較して同期する（effect 内 setState を避ける React 推奨パターン）。
+  const [prevSrc, setPrevSrc] = useState(src);
+  if (prevSrc !== src) {
+    setPrevSrc(src);
     setAttempt(0);
     setStatus("loading");
-  }, [src]);
+  }
 
   // キャッシュ済み等で onLoad が来ないケースを拾う＋アンマウント時のタイマー掃除
   useEffect(() => {

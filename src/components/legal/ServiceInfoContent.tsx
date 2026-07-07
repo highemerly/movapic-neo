@@ -8,7 +8,7 @@ export function ServiceInfoContent() {
   return (
     <div className="space-y-4 min-w-0 [overflow-wrap:anywhere]">
       <p className="text-sm text-muted-foreground">
-        写真にひとことコメントを合成して、Mastodon や Misskey に気軽に投稿できるソーシャルネットワーキングサービスです（"携帯百景"をリスペクトしています）。
+        写真にひとことコメントを合成して、Mastodon や Misskey に気軽に投稿できるソーシャルネットワーキングサービスです（&ldquo;携帯百景&rdquo;をリスペクトしています）。
       </p>
 
       <div className="overflow-hidden rounded-lg border border-border">

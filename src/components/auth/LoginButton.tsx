@@ -93,7 +93,10 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
     try {
       const saved = localStorage.getItem(LAST_SERVER_KEY);
       if (!saved) return;
-      // 一度ログイン成功済み＝過去に規約へ同意済みとみなす（termsPreAgreed の根拠）
+      // 一度ログイン成功済み＝過去に規約へ同意済みとみなす（termsPreAgreed の根拠）。
+      // localStorage は外部ストアで、SSR と一致させるためマウント後に読む必要がある
+      // （lazy init だと hydration 不整合になる）。ルールが認める外部システム同期のため許容。
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSavedServer(saved);
       // 自由入力モードのみ入力欄にも復元（単一サーバーモードは固定値）
       if (!singleServerMode) setServer(saved);
