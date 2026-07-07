@@ -91,10 +91,14 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* standalone判定（beforeInteractive で <head> に注入・ペイント前に実行）。上部コメント参照。 */}
-        <Script id="standalone-detect" strategy="beforeInteractive">
-          {STANDALONE_DETECT_SCRIPT}
-        </Script>
+        {/* standalone判定（beforeInteractive で <head> に注入・ペイント前に実行）。上部コメント参照。
+            インラインコードは children ではなく dangerouslySetInnerHTML で渡す（children だと
+            React が「クライアント描画時に実行されない script」と警告するため）。 */}
+        <Script
+          id="standalone-detect"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: STANDALONE_DETECT_SCRIPT }}
+        />
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
