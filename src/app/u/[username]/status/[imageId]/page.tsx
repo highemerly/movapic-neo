@@ -27,6 +27,7 @@ import { ToastFlasher } from "@/components/ToastFlasher";
 import { buildPostFlash } from "./postFlash";
 import { AchievementCelebration } from "./AchievementCelebration";
 import { EarnedAchievementChips } from "./EarnedAchievementChips";
+import { PrefectureScrollLink } from "@/components/ScrollIntoViewOnSelect";
 import { NativeShareButton } from "./NativeShareButton";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
@@ -377,12 +378,12 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               <span className="inline-flex items-center gap-1">
                 <span className="inline-flex items-center gap-1">
                   <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <Link
+                  <PrefectureScrollLink
                     href={`/u/${username}/map?prefecture=${encodeURIComponent(image.locationPrefecture)}`}
                     className="hover:underline"
                   >
                     {image.locationPrefecture}
-                  </Link>
+                  </PrefectureScrollLink>
                   {image.locationCity ?? ""}
                 </span>
                 {isOwner && (
