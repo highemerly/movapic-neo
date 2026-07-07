@@ -1,32 +1,33 @@
 /**
  * 管理ページ: 通報一覧（/admin/reports）
  *
- * 管理者（ADMIN_ACCTS）のみ閲覧可。非管理者には 404 を返す。
- * 未対応（status: "open"）の通報を画像ごとにまとめて表示し、各画像に対して
- * 「非表示にする」「削除する」「却下」を実行できる。
+ * 管理者ガードは admin/layout.tsx に集約。未対応（status: "open"）の通報を画像ごとに
+ * まとめて表示し、各画像に対して「非表示にする」「削除する」「却下」を実行できる。
+ * 「非表示中の投稿」一覧はオフセットページング（他の admin ページとデザイン共通化）。
  */
 
-import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "@/components/Link";
 
-import { getCurrentUser } from "@/lib/auth/session";
-import { isAdmin } from "@/lib/auth/admin";
 import prisma from "@/lib/db";
 import { getPublicUrl } from "@/lib/storage/storage";
 import { userPathSegment } from "@/lib/userHandle";
 import { ReportActions } from "./ReportActions";
+import { Pagination } from "../_components/Pagination";
+import { EmptyBox } from "../_components/ui";
+import { normalizeParams, parsePage, PAGE_SIZE } from "../_components/query";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminReportsPage() {
-  const currentUser = await getCurrentUser();
-  const acct = currentUser
-    ? `${currentUser.username}@${currentUser.instance.domain}`
-    : null;
-  if (!isAdmin(acct)) {
-    notFound();
-  }
+const BASE = "/admin/reports";
+
+export default async function AdminReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = normalizeParams(await searchParams);
+  const page = parsePage(params.page);
 
   // 未対応の通報を新しい順に取得（画像・通報者・投稿者を含む）
   const reports = await prisma.report.findMany({
@@ -73,11 +74,17 @@ export default async function AdminReportsPage() {
   }
   const grouped = [...groups.values()];
 
-  // 非表示中の投稿（通報対応で非表示にしたもの）。未対応通報の一覧に既出のものは除外。
-  const disabledImages = (
-    await prisma.image.findMany({
-      where: { isDisabled: true },
+  // 非表示中の投稿（通報対応で非表示にしたもの）。未対応通報の一覧に既出のものは除外し、
+  // 除外条件込みで件数を数えてページングする（ページ間で件数がぶれないように）。
+  const groupIds = [...groups.keys()];
+  const disabledWhere = { isDisabled: true, id: { notIn: groupIds } } as const;
+  const [disabledTotal, disabledImages] = await Promise.all([
+    prisma.image.count({ where: disabledWhere }),
+    prisma.image.findMany({
+      where: disabledWhere,
       orderBy: { createdAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
       select: {
         id: true,
         overlayText: true,
@@ -88,20 +95,19 @@ export default async function AdminReportsPage() {
           select: { username: true, instance: { select: { domain: true } } },
         },
       },
-    })
-  ).filter((img) => !groups.has(img.id));
+    }),
+  ]);
+  const disabledTotalPages = Math.max(1, Math.ceil(disabledTotal / PAGE_SIZE));
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-8">
+    <>
       <h1 className="mb-1 text-2xl font-bold">通報一覧</h1>
       <p className="mb-6 text-sm text-muted-foreground">
         未対応の通報: {reports.length} 件（{grouped.length} 画像）
       </p>
 
       {grouped.length === 0 ? (
-        <p className="rounded-md border border-border bg-muted/30 px-4 py-8 text-center text-muted-foreground">
-          未対応の通報はありません。
-        </p>
+        <EmptyBox>未対応の通報はありません。</EmptyBox>
       ) : (
         <ul className="flex flex-col gap-4">
           {grouped.map((g) => {
@@ -216,13 +222,11 @@ export default async function AdminReportsPage() {
       {/* 非表示中の投稿（通報対応で非表示にしたもの）。ここから削除・公開復帰ができる。 */}
       <section className="mt-10">
         <h2 className="mb-1 text-xl font-bold">非表示中の投稿</h2>
-        <p className="mb-4 text-sm text-muted-foreground">
-          現在非表示にしている投稿: {disabledImages.length} 件
+        <p className="mb-4 text-sm text-muted-foreground tabular-nums">
+          現在非表示にしている投稿: {disabledTotal.toLocaleString("ja-JP")} 件
         </p>
-        {disabledImages.length === 0 ? (
-          <p className="rounded-md border border-border bg-muted/30 px-4 py-8 text-center text-muted-foreground">
-            非表示中の投稿はありません。
-          </p>
+        {disabledTotal === 0 ? (
+          <EmptyBox>非表示中の投稿はありません。</EmptyBox>
         ) : (
           <ul className="flex flex-col gap-4">
             {disabledImages.map((img) => {
@@ -284,7 +288,14 @@ export default async function AdminReportsPage() {
             })}
           </ul>
         )}
+        <Pagination
+          basePath={BASE}
+          params={params}
+          page={page}
+          totalPages={disabledTotalPages}
+          totalCount={disabledTotal}
+        />
       </section>
-    </div>
+    </>
   );
 }
