@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Crown, Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 import { isJapaneseHoliday } from "@/lib/holidays";
 import { PERFECT_MONTH_GRACE_HOME, PERFECT_MONTH_GRACE_DEFAULT } from "@/lib/achievements/perfectMonth";
 import { DEFAULT_INSTANCE } from "@/lib/userHandle";
-import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { DayCell } from "./DayCell";
 
 interface DayData {
@@ -126,7 +125,6 @@ export function CalendarView({
   grace,
 }: CalendarViewProps) {
   const router = useRouter();
-  const confirm = useConfirm();
   const [year, setYear] = useState(initialYear);
   const [month, setMonth] = useState(initialMonth);
   const [data, setData] = useState<CalendarData | null>(null);
@@ -138,6 +136,31 @@ export function CalendarView({
   // 開いているピッカー（代表 or 穴埋め）。
   const [picker, setPicker] = useState<{ kind: "representative" | "donor"; day: number } | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // 離脱時（アンマウント / タブ離脱）に「今どの月を編集中か」をハンドラから読むための ref。
+  // クロージャに焼き付くと古い年月で reevaluate してしまうため常に最新へ同期する。
+  const editModeRef = useRef(editMode);
+  const ymRef = useRef({ year, month });
+  useEffect(() => {
+    editModeRef.current = editMode;
+  }, [editMode]);
+  useEffect(() => {
+    ymRef.current = { year, month };
+  }, [year, month]);
+
+  // 皆勤賞の再判定（付与のみ・冪等）を beacon で投げ切る。応答は待たない＝離脱・アンロード中でも届く。
+  // 編集は1操作ごとに PATCH 保存済みなので、離脱で失われるのはこの再判定だけ。どの経路で抜けても
+  // ここを必ず通すことで「手動穴埋めで皆勤成立→別画面へ→👑付かず」の取りこぼしを防ぐ。
+  const reevaluateBeacon = useCallback((y: number, m: number) => {
+    try {
+      navigator.sendBeacon?.(
+        "/api/v1/me/calendar/reevaluate",
+        new Blob([JSON.stringify({ year: y, month: m })], { type: "application/json" }),
+      );
+    } catch {
+      /* 付与のみなので失敗は無視 */
+    }
+  }, []);
 
   const thumbUrl = useCallback(
     (img: { thumbnailKey: string | null; storageKey: string }) =>
@@ -220,37 +243,31 @@ export function CalendarView({
     }
   }, [editMode, year, month, fetchCalendarData, router]);
 
-  // 編集中に別画面/別月へ移ろうとしたときの警告。OK なら編集を終了（再判定・付与のみ）して true。
-  const confirmLeaveEdit = useCallback(async (): Promise<boolean> => {
-    if (!editMode) return true;
-    const ok = await confirm({
-      title: "編集中です",
-      description: "「編集を終了」を押していません。編集を終了して移動しますか？",
-      confirmText: "終了して移動",
-      cancelText: "編集を続ける",
-    });
-    if (!ok) return false;
-    setPicker(null);
-    setEditMode(false);
-    // 再判定は付与のみ。移動前に現在の年月で投げる（失敗しても致命的でない）。
-    fetch("/api/v1/me/calendar/reevaluate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ year, month }),
-    }).catch(() => {});
-    return true;
-  }, [editMode, confirm, year, month]);
-
-  // 編集中はタブを閉じる/リロードで離脱警告を出す（ブラウザ標準ダイアログ）。
+  // 編集中のタブ離脱（閉じる/リロード/ハードナビ/バックグラウンド化）で再判定を投げ切る。
+  // モバイル Safari では beforeunload が不安定なため pagehide と visibilitychange:hidden の両方で拾う。
+  // 編集はすでに保存済みなのでブロッキング確認は出さない（beacon を撃つだけ）。
   useEffect(() => {
     if (!editMode) return;
-    const handler = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
+    const flush = () => reevaluateBeacon(ymRef.current.year, ymRef.current.month);
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
     };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [editMode]);
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [editMode, reevaluateBeacon]);
+
+  // アプリ内遷移（ヘッダー/下部ナビ/メニュー/戻る/任意の Link）は CalendarView のアンマウントで
+  // 捕まえる。編集中のまま抜けたら、離れる月の皆勤賞を beacon で再判定してから消える。
+  // 依存は空配列＝この cleanup はアンマウント時のみ発火し、編集ON/OFF のトグルでは発火しない。
+  useEffect(() => {
+    return () => {
+      if (editModeRef.current) reevaluateBeacon(ymRef.current.year, ymRef.current.month);
+    };
+  }, [reevaluateBeacon]);
 
   // PATCH 後に閉じて再取得。
   const applyAndRefresh = useCallback(
@@ -272,8 +289,9 @@ export function CalendarView({
     window.history.replaceState({}, "", url.toString());
   };
 
-  const goToPrevMonth = async () => {
-    if (!(await confirmLeaveEdit())) return;
+  const goToPrevMonth = () => {
+    // 編集は維持したまま月をまたぐ。離れる月の皆勤賞だけ確定させる（付与のみ・冪等）。
+    if (editMode) reevaluateBeacon(year, month);
     setDirection("prev");
     let newYear = year;
     let newMonth = month;
@@ -288,8 +306,9 @@ export function CalendarView({
     updateUrl(newYear, newMonth);
   };
 
-  const goToNextMonth = async () => {
-    if (!(await confirmLeaveEdit())) return;
+  const goToNextMonth = () => {
+    // 編集は維持したまま月をまたぐ。離れる月の皆勤賞だけ確定させる（付与のみ・冪等）。
+    if (editMode) reevaluateBeacon(year, month);
     setDirection("next");
     let newYear = year;
     let newMonth = month;
