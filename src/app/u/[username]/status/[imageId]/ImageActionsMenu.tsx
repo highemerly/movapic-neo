@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pin, Trash2, Flag, Share, Image as ImageIcon } from "lucide-react";
+import { MoreHorizontal, Pin, Trash2, Flag, Share, Image as ImageIcon, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -10,6 +10,26 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  POSITION_LABELS,
+  COLOR_LABELS,
+  SIZE_LABELS,
+  FONT_LABELS,
+  ARRANGEMENT_LABELS,
+  type Position,
+  type Color,
+  type Size,
+  type FontFamily,
+  type Arrangement,
+} from "@/types";
+import { seasonLabel } from "@/lib/seasons/catalog";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { ReportDialog } from "./ReportDialog";
 import { useNativeShare, type NativeShareParams } from "./useNativeShare";
@@ -25,6 +45,16 @@ interface ImageActionsMenuProps {
   triggerClassName?: string;
   /** 狭い画面でメニュー内に出すネイティブ共有（広い画面では行内のボタンが担当） */
   nativeShare?: NativeShareParams;
+  /** コメント合成オプション（メニュー→モーダルで確認）。 */
+  options: {
+    position: string;
+    color: string;
+    size: string;
+    font: string;
+    arrangement: string;
+    /** シーズン（期間限定）キー。セット時は個別オプションの代わりにシーズン名のみ表示 */
+    season?: string | null;
+  };
 }
 
 /**
@@ -40,6 +70,7 @@ export function ImageActionsMenu({
   canReport,
   triggerClassName,
   nativeShare,
+  options,
 }: ImageActionsMenuProps) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -52,6 +83,7 @@ export function ImageActionsMenu({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSettingThumb, setIsSettingThumb] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
 
   // ① その日のカレンダーサムネイルにこの写真を指定する。
   const handleSetThumbnail = useCallback(async () => {
@@ -204,6 +236,15 @@ export function ImageActionsMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[160px]">
+        <DropdownMenuItem
+          onSelect={() => {
+            // preventDefault しない＝選択でミートボールを閉じ、モーダルだけを開く。
+            setOptionsOpen(true);
+          }}
+        >
+          <Settings2 className="mr-2 h-4 w-4" />
+          コメント設定を表示
+        </DropdownMenuItem>
         {/* ネイティブ共有は狭い画面だけメニュー内に出す（広い画面は行内のボタンが担当） */}
         {nativeShare && native.visible && (
           <DropdownMenuItem
@@ -277,6 +318,55 @@ export function ImageActionsMenu({
           onOpenChange={setReportOpen}
         />
       )}
+      <Dialog open={optionsOpen} onOpenChange={setOptionsOpen}>
+        <DialogContent className="sm:max-w-xs">
+          <DialogHeader className="text-left">
+            <DialogTitle className="flex items-center gap-2">
+              <Settings2 className="h-5 w-5 shrink-0" />
+              コメント設定
+            </DialogTitle>
+          </DialogHeader>
+          <dl className="space-y-2 text-sm">
+            {options.season ? (
+              // シーズン（期間限定）投稿: スタイル列は中立デフォルトなので、シーズン名だけ示す。
+              <div className="flex items-center justify-between gap-2">
+                <dt className="text-muted-foreground">シーズン</dt>
+                <dd>{seasonLabel(options.season)}</dd>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-muted-foreground">位置</dt>
+                  <dd>
+                    {POSITION_LABELS[options.position as Position] || options.position}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-muted-foreground">色</dt>
+                  <dd>{COLOR_LABELS[options.color as Color] || options.color}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-muted-foreground">サイズ</dt>
+                  <dd>{SIZE_LABELS[options.size as Size] || options.size}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-muted-foreground">フォント</dt>
+                  <dd>{FONT_LABELS[options.font as FontFamily] || options.font}</dd>
+                </div>
+                {options.arrangement !== "none" && (
+                  <div className="flex items-center justify-between gap-2">
+                    <dt className="text-muted-foreground">アレンジ</dt>
+                    <dd>
+                      {ARRANGEMENT_LABELS[options.arrangement as Arrangement] ||
+                        options.arrangement}
+                    </dd>
+                  </div>
+                )}
+              </>
+            )}
+          </dl>
+        </DialogContent>
+      </Dialog>
     </DropdownMenu>
   );
 }

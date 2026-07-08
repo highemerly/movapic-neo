@@ -6,7 +6,6 @@ import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { DeleteLocationButton } from "./DeleteLocationButton";
 import { ImageNavigation } from "./ImageNavigation";
-import { ImageOptionsButton } from "./ImageOptionsButton";
 import { FontLicenseBadge } from "./FontLicenseBadge";
 import { hasEmoji } from "@/lib/text/grapheme";
 import { ImageActionsMenu } from "./ImageActionsMenu";
@@ -421,13 +420,6 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             )}
           </span>
           <FontLicenseBadge font={image.font} hasEmoji={hasEmoji(image.overlayText)} />
-          <ImageOptionsButton
-            position={image.position}
-            color={image.color}
-            size={image.size}
-            arrangement={image.arrangement}
-            season={image.season}
-          />
           {/* 投稿ソース（Bot/メール）。Web投稿は既定なので非表示。クリックで投稿方法モーダル。 */}
           {image.source === "email" ? (
             <PostSourceBadge source="email" />
@@ -532,6 +524,14 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               isOwner={isOwner}
               initialIsPinned={!!image.pinnedAt}
               canReport={!isOwner}
+              options={{
+                position: image.position,
+                color: image.color,
+                size: image.size,
+                font: image.font,
+                arrangement: image.arrangement,
+                season: image.season,
+              }}
               nativeShare={{
                 imageUrl,
                 mimeType: image.mimeType,
