@@ -284,10 +284,10 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
       <div className="space-y-1">
         <label
           htmlFor="server"
-          className="flex flex-wrap items-center justify-start gap-x-2 gap-y-1 text-sm font-medium"
+          className="flex flex-col items-start gap-y-1 text-sm font-medium"
         >
-          サーバー名：
-          <span className="ml-auto flex items-center gap-2 text-xs font-normal text-muted-foreground">
+          サーバー名
+          <span className="mb-0.5 flex items-center gap-2 text-xs font-normal text-muted-foreground">
             <span className="flex items-center gap-1">
               <MastodonIcon className="size-3.5" /> Mastodon
             </span>
