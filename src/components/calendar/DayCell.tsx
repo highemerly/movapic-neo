@@ -37,6 +37,8 @@ interface DayCellProps {
   /** 日本の祝日（振替休日・国民の休日含む）。日曜と同じ赤系で色付けする。 */
   isHoliday: boolean;
   loading: boolean;
+  /** カレンダー編集モード。空きセルも含め全日をクリック可能にし、編集用の枠線を出す。 */
+  editMode?: boolean;
   onClick: () => void;
 }
 
@@ -50,6 +52,7 @@ export function DayCell({
   isSaturday,
   isHoliday,
   loading,
+  editMode = false,
   onClick,
 }: DayCellProps) {
   // サムネ読み込み完了までシマー（パルス）で隠し、完了後にフェードイン
@@ -84,7 +87,8 @@ export function DayCell({
       ? `${publicUrl}/${filledMakeup.image.thumbnailKey}`
       : `${publicUrl}/${filledMakeup.image.storageKey}`
     : null;
-  const clickable = hasImage || isFilledHole;
+  // 編集モードでは空きセルも含め全日をクリック可能（代表選択／穴埋め割当のため）。
+  const clickable = editMode ? true : hasImage || isFilledHole;
 
   return (
     <button
@@ -102,6 +106,7 @@ export function DayCell({
         transition-all duration-200
         ${clickable ? "cursor-pointer hover:ring-2 hover:ring-primary" : "cursor-default"}
         ${isToday ? "ring-2 ring-primary ring-offset-2" : ""}
+        ${editMode ? "ring-1 ring-dashed ring-primary/50" : ""}
         ${loading ? "animate-pulse" : ""}
       `}
     >

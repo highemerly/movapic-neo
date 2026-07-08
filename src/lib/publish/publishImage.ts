@@ -36,6 +36,7 @@ import {
   Arrangement,
 } from "@/types";
 import { evaluateAndGrant, GrantedAchievement } from "@/lib/achievements/engine";
+import { assignMakeupForNewPost } from "@/lib/achievements/makeupAssign";
 import { userPathSegment } from "@/lib/userHandle";
 import type { PostFacts } from "@/lib/achievements/catalog";
 
@@ -48,6 +49,8 @@ export interface PublishUser {
   /** 復号済みアクセストークン（呼び出し側で decryptToken 済み） */
   accessToken: string;
   instance: { domain: string; type: string };
+  /** カレンダーの自動穴埋め設定。true=投稿の瞬間にダブル投稿を過去の穴へ自動割当（既定）。 */
+  autoMakeup: boolean;
 }
 
 export interface PublishImageInput {
@@ -138,6 +141,15 @@ async function evaluateAchievementsSafely(
   imageId: string
 ): Promise<GrantedAchievement[]> {
   try {
+    // 自動穴埋め: 実績評価の「前」に割当を書き、書いた割当を含めて皆勤賞を判定させる。
+    // autoMakeup=false のユーザーは投稿時に自動割当しない（カレンダー編集で明示指定した穴だけ埋まる）。
+    if (input.user.autoMakeup) {
+      await assignMakeupForNewPost({
+        userId: input.user.id,
+        imageId,
+        createdAt: new Date(),
+      });
+    }
     return await evaluateAndGrant({
       userId: input.user.id,
       post: toPostFacts(input),

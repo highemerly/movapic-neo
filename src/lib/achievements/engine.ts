@@ -163,6 +163,7 @@ async function maybeNotifyMakeup(
     daysInMonth: daysInMonthOf(year, month),
     todayDayNum,
     dayCounts: stats.postMonthDayCounts,
+    filledHoleDays: stats.filledHoleDays,
     grace,
   });
   if (!shouldRemindMakeup(status.skippedSoFar, status.unfilled)) return;

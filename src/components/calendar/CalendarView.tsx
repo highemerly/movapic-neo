@@ -2,13 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Crown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Crown, Pencil, Check, X } from "lucide-react";
+import { toast } from "sonner";
 import { StackedSquaresIcon } from "./StackedSquaresIcon";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isJapaneseHoliday } from "@/lib/holidays";
 import { PERFECT_MONTH_GRACE_HOME, PERFECT_MONTH_GRACE_DEFAULT } from "@/lib/achievements/perfectMonth";
 import { DEFAULT_INSTANCE } from "@/lib/userHandle";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { DayCell } from "./DayCell";
 
 interface DayData {
@@ -34,6 +36,15 @@ interface PerfectMonthInfo {
   filledDays: FilledDay[];
 }
 
+/** owner編集モード用: 各日の全画像（chronological asc）。 */
+interface OwnerDayImage {
+  id: string;
+  thumbnailKey: string | null;
+  storageKey: string;
+  isPicked: boolean;
+  makeupTargetDay: number | null;
+}
+
 interface CalendarData {
   year: number;
   month: number;
@@ -42,6 +53,7 @@ interface CalendarData {
   hasNextMonth: boolean;
   isPerfectAttendance: boolean;
   perfectMonth: PerfectMonthInfo | null;
+  ownerEdit?: { dayImages: Record<number, OwnerDayImage[]> };
 }
 
 interface CalendarViewProps {
@@ -114,12 +126,50 @@ export function CalendarView({
   grace,
 }: CalendarViewProps) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [year, setYear] = useState(initialYear);
   const [month, setMonth] = useState(initialMonth);
   const [data, setData] = useState<CalendarData | null>(null);
   const [loading, setLoading] = useState(true);
   // 月送りの方向（スライドイン演出用）。prev=左から / next=右から。
   const [direction, setDirection] = useState<"prev" | "next" | null>(null);
+  // カレンダー編集モード（owner のみ）。ON中は日タップで代表選択／穴埋め割当のピッカーを開く。
+  const [editMode, setEditMode] = useState(false);
+  // 開いているピッカー（代表 or 穴埋め）。
+  const [picker, setPicker] = useState<{ kind: "representative" | "donor"; day: number } | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const thumbUrl = useCallback(
+    (img: { thumbnailKey: string | null; storageKey: string }) =>
+      img.thumbnailKey ? `${publicUrl}/${img.thumbnailKey}` : `${publicUrl}/${img.storageKey}`,
+    [publicUrl],
+  );
+
+  // 画像を1件 PATCH（①代表 or ②穴埋め）。成功で再取得。失敗はトースト。
+  const patchImage = useCallback(
+    async (imageId: string, body: Record<string, unknown>): Promise<boolean> => {
+      setSaving(true);
+      try {
+        const res = await fetch(`/api/v1/images/${imageId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          toast.error(d.error ?? "更新に失敗しました");
+          return false;
+        }
+        return true;
+      } catch {
+        toast.error("更新に失敗しました");
+        return false;
+      } finally {
+        setSaving(false);
+      }
+    },
+    [],
+  );
 
   const fetchCalendarData = useCallback(async () => {
     setLoading(true);
@@ -145,6 +195,75 @@ export function CalendarView({
     fetchCalendarData();
   }, [fetchCalendarData]);
 
+  // 編集モードの ON/OFF。OFF に切り替える瞬間にその月の皆勤賞を再判定（付与のみ）。
+  const toggleEditMode = useCallback(async () => {
+    if (editMode) {
+      setPicker(null);
+      try {
+        await fetch("/api/v1/me/calendar/reevaluate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ year, month }),
+        });
+      } catch {
+        /* 再判定は付与のみなので失敗しても致命的でない */
+      }
+      setEditMode(false);
+      await fetchCalendarData();
+      router.refresh();
+    } else {
+      setEditMode(true);
+      // レイアウトを動かさないよう、操作説明はトーストで案内する。
+      toast("日付をタップすると、サムネイル選択や穴埋め割り当ての変更ができます。", {
+        duration: 10000,
+      });
+    }
+  }, [editMode, year, month, fetchCalendarData, router]);
+
+  // 編集中に別画面/別月へ移ろうとしたときの警告。OK なら編集を終了（再判定・付与のみ）して true。
+  const confirmLeaveEdit = useCallback(async (): Promise<boolean> => {
+    if (!editMode) return true;
+    const ok = await confirm({
+      title: "編集中です",
+      description: "「編集を終了」を押していません。編集を終了して移動しますか？",
+      confirmText: "終了して移動",
+      cancelText: "編集を続ける",
+    });
+    if (!ok) return false;
+    setPicker(null);
+    setEditMode(false);
+    // 再判定は付与のみ。移動前に現在の年月で投げる（失敗しても致命的でない）。
+    fetch("/api/v1/me/calendar/reevaluate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ year, month }),
+    }).catch(() => {});
+    return true;
+  }, [editMode, confirm, year, month]);
+
+  // 編集中はタブを閉じる/リロードで離脱警告を出す（ブラウザ標準ダイアログ）。
+  useEffect(() => {
+    if (!editMode) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [editMode]);
+
+  // PATCH 後に閉じて再取得。
+  const applyAndRefresh = useCallback(
+    async (imageId: string, body: Record<string, unknown>) => {
+      const ok = await patchImage(imageId, body);
+      if (ok) {
+        setPicker(null);
+        await fetchCalendarData();
+      }
+    },
+    [patchImage, fetchCalendarData],
+  );
+
   // URLを更新する（履歴に追加せずに置き換え）
   const updateUrl = (newYear: number, newMonth: number) => {
     const url = new URL(window.location.href);
@@ -153,7 +272,8 @@ export function CalendarView({
     window.history.replaceState({}, "", url.toString());
   };
 
-  const goToPrevMonth = () => {
+  const goToPrevMonth = async () => {
+    if (!(await confirmLeaveEdit())) return;
     setDirection("prev");
     let newYear = year;
     let newMonth = month;
@@ -168,7 +288,8 @@ export function CalendarView({
     updateUrl(newYear, newMonth);
   };
 
-  const goToNextMonth = () => {
+  const goToNextMonth = async () => {
+    if (!(await confirmLeaveEdit())) return;
     setDirection("next");
     let newYear = year;
     let newMonth = month;
@@ -273,10 +394,38 @@ export function CalendarView({
           <PerfectMonthCallout pm={data.perfectMonth} />
         )}
 
+        {/* カレンダー編集（owner・過去/当月のみ）。穴埋めアナウンスとカレンダーの間・全幅で配置。 */}
+        {isOwner && !isFutureMonth && (
+          <div className="mb-3">
+            <Button
+              variant={editMode ? "default" : "outline"}
+              size="sm"
+              className="h-9 w-full gap-1.5 text-sm"
+              onClick={toggleEditMode}
+              disabled={loading || saving}
+            >
+              {editMode ? (
+                <>
+                  <Check className="h-4 w-4" />
+                  編集を終了
+                </>
+              ) : (
+                <>
+                  <Pencil className="h-4 w-4" />
+                  カレンダーを編集
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
         {/* カレンダーグリッド */}
         <div className="grid grid-cols-7 gap-1">
           {grid.map((day, index) => {
             const filled = day != null ? filledByDay.get(day) : undefined;
+            // 明日以降（未来日）は編集不可。過去月は未来日なし・当月は今日より後が未来。
+            const isFutureDay =
+              isCurrentMonth && day != null && day > today.getDate();
             return (
               <DayCell
                 key={index}
@@ -293,7 +442,18 @@ export function CalendarView({
                 isSaturday={index % 7 === 6}
                 isHoliday={day != null && isJapaneseHoliday(year, month, day)}
                 loading={loading}
+                editMode={editMode && !isFutureDay}
                 onClick={() => {
+                  // 編集モード: 日タップでピッカーを開く（代表選択 or 穴埋め割当）。
+                  // 明日以降（未来日）は編集対象外。
+                  if (editMode) {
+                    if (day == null || isFutureDay) return;
+                    setPicker({
+                      kind: data?.days[day] ? "representative" : "donor",
+                      day,
+                    });
+                    return;
+                  }
                   // 戻る導線で同じ月のカレンダーへ復元できるよう from に年月を載せる。
                   const fromQ = `user-calendar:${year}-${month}`;
                   if (day && data?.days[day]) {
@@ -359,6 +519,221 @@ export function CalendarView({
             <span>穴埋めされた日</span>
           </div>
         </div>
+      </div>
+
+      {/* 編集モードのピッカー（代表選択 / 穴埋め割当） */}
+      {picker && data?.ownerEdit && (
+        <EditPicker
+          picker={picker}
+          year={year}
+          month={month}
+          dayImages={data.ownerEdit.dayImages}
+          filledByDay={filledByDay}
+          thumbUrl={thumbUrl}
+          saving={saving}
+          onClose={() => setPicker(null)}
+          onApply={applyAndRefresh}
+        />
+      )}
+    </div>
+  );
+}
+
+/** 編集モードのボトムシート型ピッカー。代表サムネ選択と穴埋め割当を1つで扱う。 */
+function EditPicker({
+  picker,
+  year,
+  month,
+  dayImages,
+  filledByDay,
+  thumbUrl,
+  saving,
+  onClose,
+  onApply,
+}: {
+  picker: { kind: "representative" | "donor"; day: number };
+  year: number;
+  month: number;
+  dayImages: Record<number, OwnerDayImage[]>;
+  filledByDay: Map<number, FilledDay>;
+  thumbUrl: (img: { thumbnailKey: string | null; storageKey: string }) => string;
+  saving: boolean;
+  onClose: () => void;
+  onApply: (imageId: string, body: Record<string, unknown>) => void;
+}) {
+  const { kind, day } = picker;
+
+  // カレンダーと同じ曜日色（日/祝=赤・土=青）でその日の番号を表示するためのヘルパー。
+  const dayNumberClass = (d: number): string => {
+    const dow = new Date(year, month - 1, d).getDay();
+    const isRed = dow === 0 || isJapaneseHoliday(year, month, d);
+    const isBlue = dow === 6 && !isRed;
+    return isRed ? "text-red-400" : isBlue ? "text-blue-400" : "text-white";
+  };
+
+  // 穴埋め割当の候補: その穴より後の「2枚以上投稿した日」の画像を全て表示し、
+  // 選べないもの（＝その日のサムネイル／別の穴で使用中）はグレーアウトして見せる。
+  const donorCandidates: {
+    day: number;
+    img: OwnerDayImage;
+    disabled: boolean;
+    isCurrent: boolean;
+    reason: string | null;
+  }[] = [];
+  if (kind === "donor") {
+    for (const [dStr, imgs] of Object.entries(dayImages)) {
+      const d = Number(dStr);
+      if (d > day && imgs.length >= 2) {
+        for (const img of imgs) {
+          const isCurrent = img.makeupTargetDay === day;
+          const usedElsewhere = img.makeupTargetDay != null && !isCurrent;
+          const disabled = img.isPicked || usedElsewhere;
+          // 選べない理由（タップ時のトーストで案内する）
+          const reason = img.isPicked
+            ? "この写真はその日のサムネイルに使用中のため、穴埋めには使えません"
+            : usedElsewhere
+              ? `この写真は${img.makeupTargetDay}日の穴埋めに使用中のため、この日には使えません`
+              : null;
+          donorCandidates.push({ day: d, img, disabled, isCurrent, reason });
+        }
+      }
+    }
+    donorCandidates.sort((a, b) => a.day - b.day);
+  }
+  const currentFill = kind === "donor" ? filledByDay.get(day) : undefined;
+  const repImages = kind === "representative" ? (dayImages[day] ?? []) : [];
+  const pickedRep = repImages.find((i) => i.isPicked);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-t-2xl bg-background p-4 shadow-xl sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-bold">
+            {kind === "representative"
+              ? `${month}月${day}日のサムネイルを選ぶ`
+              : `${month}月${day}日を穴埋めする写真を選ぶ`}
+          </h3>
+          <button onClick={onClose} className="rounded p-1 text-muted-foreground hover:bg-muted">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {kind === "representative" && (
+          <div className="grid grid-cols-4 gap-2">
+            {repImages.map((img) => {
+              // 穴埋めに使っている写真はサムネイルにできない → 表示するが選べない（グレーアウト）。
+              const isDonor = img.makeupTargetDay != null;
+              return (
+                <button
+                  key={img.id}
+                  disabled={saving}
+                  onClick={() => {
+                    // 穴埋めに使用中の写真はサムネイルにできない → タップでトースト案内。
+                    if (isDonor) {
+                      toast.error(
+                        `この写真は${img.makeupTargetDay}日の穴埋めに使用中のため、サムネイルにできません`,
+                      );
+                      return;
+                    }
+                    onApply(img.id, { calendarPicked: true });
+                  }}
+                  className={cn(
+                    "relative aspect-square overflow-hidden rounded ring-offset-2",
+                    isDonor
+                      ? "opacity-40"
+                      : img.isPicked
+                        ? "ring-2 ring-amber-500"
+                        : "hover:ring-2 hover:ring-primary",
+                  )}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={thumbUrl(img)} alt="" className="h-full w-full object-cover" />
+                  {img.isPicked && !isDonor && (
+                    <span className="absolute right-0.5 top-0.5 rounded-full bg-amber-500 p-0.5 text-white">
+                      <Check className="h-3 w-3" />
+                    </span>
+                  )}
+                  {isDonor && (
+                    <span className="absolute inset-x-0 bottom-0 bg-black/60 text-center text-[10px] font-semibold text-white/90">
+                      使用中
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {kind === "representative" && pickedRep && (
+          <button
+            disabled={saving}
+            onClick={() => onApply(pickedRep.id, { calendarPicked: false })}
+            className="mt-3 w-full rounded-md border py-2 text-xs text-muted-foreground hover:bg-muted"
+          >
+            自動（その日の最初の投稿）に戻す
+          </button>
+        )}
+
+        {kind === "donor" && (
+          <>
+            {donorCandidates.length === 0 ? (
+              <p className="py-4 text-center text-xs text-muted-foreground">
+                この日を埋められる候補（後日の2枚以上投稿）がありません
+              </p>
+            ) : (
+              <div className="grid grid-cols-4 gap-2">
+                {donorCandidates.map(({ day: d, img, disabled, isCurrent, reason }) => (
+                  <button
+                    key={img.id}
+                    disabled={saving}
+                    onClick={() => {
+                      // 使用中で選べないものはタップでトースト案内（適用しない）。
+                      if (disabled) {
+                        toast.error(reason ?? "この写真は使用中のため選べません");
+                        return;
+                      }
+                      onApply(img.id, { makeupTargetDay: day });
+                    }}
+                    className={cn(
+                      "relative aspect-square overflow-hidden rounded",
+                      disabled
+                        ? "opacity-40"
+                        : isCurrent
+                          ? "ring-2 ring-emerald-500"
+                          : "hover:ring-2 hover:ring-primary",
+                    )}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={thumbUrl(img)} alt="" className="h-full w-full object-cover" />
+                    {/* ラベルはカレンダーと同じ「日付のみ（曜日色）」に統一。使用中は「使用中」に簡略化。 */}
+                    <span
+                      className={cn(
+                        "absolute bottom-0 left-0 right-0 bg-black/60 text-center text-[10px] font-semibold",
+                        disabled ? "text-white/90" : dayNumberClass(d),
+                      )}
+                    >
+                      {disabled ? "使用中" : d}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {currentFill && (
+              <button
+                disabled={saving}
+                onClick={() => onApply(currentFill.image.id, { makeupTargetDay: null })}
+                className="mt-3 w-full rounded-md border py-2 text-xs text-red-600 hover:bg-muted"
+              >
+                穴埋めを解除する
+              </button>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

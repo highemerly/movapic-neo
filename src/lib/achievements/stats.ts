@@ -14,7 +14,11 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
 
   const [dateRows, featureCounts, fontGroups, colorGroups, distinctGroups] = await Promise.all([
     // 全投稿日（streak / today / monthly-distinct-days / 当日のsource種類 用）
-    prisma.image.findMany({ where: { userId }, select: { createdAt: true, source: true } }),
+    // makeupTargetDay も相乗せ（投稿月の永続穴埋め割当＝皆勤賞判定の filledHoleDays に使う）。
+    prisma.image.findMany({
+      where: { userId },
+      select: { createdAt: true, source: true, makeupTargetDay: true },
+    }),
     // 機能別の利用回数（season 投稿はスタイル列が中立デフォルト＝案Bの隔離のため除外）
     prisma.$transaction([
       prisma.image.count({ where: { userId, season: null, arrangement: "neon" } }),
@@ -59,6 +63,14 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
     postMonthDayCounts[Number(dayStr.slice(8, 10))] = c;
   }
 
+  // 投稿月の永続穴埋め割当（Image.makeupTargetDay）が指す空き日。皆勤賞判定の単一ソース。
+  const filledHoleDays: number[] = [];
+  for (const r of dateRows) {
+    if (r.makeupTargetDay != null && toJstDateString(r.createdAt).startsWith(postYm)) {
+      filledHoleDays.push(r.makeupTargetDay);
+    }
+  }
+
   // 投稿日（JST）に使った source の種類数（ハットトリック判定）
   const sourcesToday = new Set(
     dateRows.filter((r) => toJstDateString(r.createdAt) === postDay).map((r) => r.source)
@@ -70,6 +82,7 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
     todayPosts: jstDays.filter((d) => d === postDay).length,
     distinctDaysInPostMonth: monthSummary.distinctDays,
     postMonthDayCounts,
+    filledHoleDays,
     featureCounts: { neon, stamp, xlarge, vertical },
     distinctFonts: fontGroups.length,
     distinctColors: colorGroups.length,

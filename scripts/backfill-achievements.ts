@@ -73,6 +73,7 @@ interface ReplayImage {
   locationPrefecture: string | null;
   postUrl: string | null;
   postId: string | null;
+  makeupTargetDay: number | null;
 }
 
 interface GrantRow {
@@ -93,8 +94,11 @@ function replayUser(userId: string, images: ReplayImage[], grace: number): Grant
   const dayCounts = new Map<string, number>();
   // JST日 -> その日に使った source の集合（ハットトリック判定）
   const daySources = new Map<string, Set<string>>();
-  // ym -> (JST日 -> その日の投稿数)。distinct日数 / 穴埋めの日付順マッチングをここから出す。
+  // ym -> (JST日 -> その日の投稿数)。distinct日数 / 皆勤賞判定をここから出す。
   const monthDayCounts = new Map<string, Map<string, number>>();
+  // ym -> その月で永続化された穴埋め割当（makeupTargetDay）が指す空き日。皆勤賞判定の単一ソース。
+  // live=collectStats（DBから当月分を読む）と同形式。backfill は時系列リプレイで running に積む。
+  const monthFilledHoles = new Map<string, number[]>();
   const featureCounts = { neon: 0, stamp: 0, xlarge: 0, vertical: 0 };
   const fonts = new Set<string>();
   const colors = new Set<string>();
@@ -115,6 +119,14 @@ function replayUser(userId: string, images: ReplayImage[], grace: number): Grant
     if (!monthDayCounts.has(ym)) monthDayCounts.set(ym, new Map());
     const mdc = monthDayCounts.get(ym)!;
     mdc.set(day, (mdc.get(day) ?? 0) + 1);
+
+    // この投稿(donor)が永続的な穴埋め割当を持つなら、その月の filledHoleDays に積む。
+    // donor は穴より後の日に投稿されるためリプレイ順で正しいタイミングに加算される
+    //（＝穴が埋まり切った donor 投稿の瞬間に皆勤賞が確定する）。
+    if (img.makeupTargetDay != null) {
+      if (!monthFilledHoles.has(ym)) monthFilledHoles.set(ym, []);
+      monthFilledHoles.get(ym)!.push(img.makeupTargetDay);
+    }
 
     // 案B（完全隔離）: season 投稿はスタイル列が中立デフォルトなので、スタイル系の集計から除外する
     // （live=stats.ts の season:null フィルタと同期）。投稿数/連続/source/カメラ・位置情報は実値なので数える。
@@ -143,6 +155,7 @@ function replayUser(userId: string, images: ReplayImage[], grace: number): Grant
       todayPosts: dayCounts.get(day) ?? 0,
       distinctDaysInPostMonth: monthSummary.distinctDays,
       postMonthDayCounts,
+      filledHoleDays: monthFilledHoles.get(ym) ?? [],
       featureCounts: { ...featureCounts },
       distinctFonts: fonts.size,
       distinctColors: colors.size,
@@ -266,6 +279,7 @@ async function main() {
         locationPrefecture: true,
         postUrl: true,
         postId: true,
+        makeupTargetDay: true,
       },
     });
 

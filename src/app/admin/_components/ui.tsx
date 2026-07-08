@@ -12,6 +12,19 @@ export function fmtDate(d: Date | null | undefined): string {
   return d ? d.toLocaleDateString("ja-JP", JST) : "—";
 }
 
+/** バイト数を人間可読な単位（B〜TB・1024進）で整形 */
+export function fmtBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1
+  );
+  const val = bytes / 1024 ** i;
+  const digits = i === 0 || val >= 100 ? 0 : 1;
+  return `${val.toFixed(digits)} ${units[i]}`;
+}
+
 /** データが無いときのプレースホルダ枠 */
 export function EmptyBox({ children }: { children: React.ReactNode }) {
   return (

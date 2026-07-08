@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pin, Trash2, Flag, Share } from "lucide-react";
+import { MoreHorizontal, Pin, Trash2, Flag, Share, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -50,7 +50,32 @@ export function ImageActionsMenu({
   const [isPinned, setIsPinned] = useState(initialIsPinned);
   const [isPinning, setIsPinning] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSettingThumb, setIsSettingThumb] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+
+  // ① その日のカレンダーサムネイルにこの写真を指定する。
+  const handleSetThumbnail = useCallback(async () => {
+    if (isSettingThumb) return;
+    setIsSettingThumb(true);
+    try {
+      const response = await fetch(`/api/v1/images/${imageId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ calendarPicked: true }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        toast.error(data.error ?? "サムネイルの設定に失敗しました");
+        return;
+      }
+      toast.success("この日のカレンダーサムネイルにしました");
+    } catch (error) {
+      console.error("Set thumbnail error:", error);
+      toast.error("サムネイルの設定に失敗しました");
+    } finally {
+      setIsSettingThumb(false);
+    }
+  }, [imageId, isSettingThumb]);
 
   const handlePin = useCallback(async () => {
     if (isPinning) return;
@@ -194,6 +219,16 @@ export function ImageActionsMenu({
         )}
         {isOwner && (
           <>
+            <DropdownMenuItem
+              disabled={isSettingThumb}
+              onSelect={(e) => {
+                e.preventDefault();
+                handleSetThumbnail();
+              }}
+            >
+              <ImageIcon className="mr-2 h-4 w-4" />
+              この日のサムネイルにする
+            </DropdownMenuItem>
             <DropdownMenuItem
               disabled={isPinning}
               onSelect={(e) => {

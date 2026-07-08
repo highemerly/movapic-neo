@@ -232,6 +232,7 @@ export async function POST(request: NextRequest) {
         username: user.username,
         accessToken: decryptToken(user.accessToken),
         instance: { domain: user.instance.domain, type: user.instance.type },
+        autoMakeup: user.autoMakeup,
       },
       text,
       // 案B（実績は season:null フィルタで隔離）: season 指定時はスタイル列に

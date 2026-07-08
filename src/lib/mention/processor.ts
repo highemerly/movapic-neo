@@ -48,6 +48,7 @@ interface UserWithInstance {
   accessToken: string;
   defaultVisibility: string;
   mentionKeep: boolean;
+  autoMakeup: boolean;
   instance: {
     domain: string;
     type: string;
@@ -180,6 +181,7 @@ async function findUserByAcct(acct: string, botInstanceDomain: string): Promise<
     accessToken: decryptedToken,
     defaultVisibility: user.defaultVisibility ?? "public",
     mentionKeep: user.mentionKeep ?? false,
+    autoMakeup: user.autoMakeup,
     instance: {
       domain: user.instance.domain,
       type: user.instance.type,
@@ -413,6 +415,7 @@ export async function processOneMention(
         username: user.username,
         accessToken: user.accessToken, // findUserByAcct で復号済み
         instance: { domain: user.instance.domain, type: user.instance.type },
+        autoMakeup: user.autoMakeup,
       },
       text,
       // 案B（実績は season:null で隔離）: season 指定時はスタイル列にプリセット実値を保存

@@ -16,6 +16,7 @@ import { BioEditForm } from "./BioEditForm";
 import { DefaultsEditor } from "./DefaultsEditor";
 import { LocationMapToggle } from "./LocationMapToggle";
 import { BlockCrawlersToggle } from "./BlockCrawlersToggle";
+import { AutoMakeupToggle } from "./AutoMakeupToggle";
 import { DisplayModeSelector } from "./DisplayModeSelector";
 import prisma from "@/lib/db";
 import { getUserProfileStats } from "@/lib/userStats";
@@ -64,6 +65,7 @@ export default async function DashboardPage() {
         defaultCameraOption: true,
         showLocationMap: true,
         blockCrawlers: true,
+        autoMakeup: true,
       },
     }),
     getUserProfileStats(user.id),
@@ -400,6 +402,9 @@ export default async function DashboardPage() {
             </p>
             <div className="space-y-4">
               <BioEditForm initialBio={userWithPreferences?.bio ?? null} />
+              <AutoMakeupToggle
+                initialDisabled={!(userWithPreferences?.autoMakeup ?? true)}
+              />
               <DisplayModeSelector />
               {/* 控えめなインストール導線（Android/iOS Safari・未インストール時のみ表示） */}
               <InstallEntry />

@@ -44,8 +44,14 @@ export interface AchStats {
   todayPosts: number;
   /** この投稿の月（JST）の、投稿があった distinct 日数 */
   distinctDaysInPostMonth: number;
-  /** この投稿の月（JST）の日(1-31)→投稿数。皆勤賞の穴埋め（日付順マッチング）判定に使う。 */
+  /** この投稿の月（JST）の日(1-31)→投稿数。皆勤賞の distinct 日数・穴埋め判定に使う。 */
   postMonthDayCounts: Record<number, number>;
+  /**
+   * この投稿の月（JST）で、永続化された穴埋め割当（Image.makeupTargetDay）が指す空き日の一覧。
+   * 皆勤賞判定は「貪欲の再計算」ではなくこの永続割当を数える（表示と👑の単一ソース）。
+   * ③ON既存ユーザーは貪欲割当と一致するため判定は従来と不変。
+   */
+  filledHoleDays: number[];
   /** 機能別の累計利用回数 */
   featureCounts: { neon: number; stamp: number; xlarge: number; vertical: number };
   /** 使ったフォントの種類数 */
@@ -542,7 +548,12 @@ export function evaluatePerfectMonth(s: AchStats, post: PostFacts, grace: number
   const year = Number(ym.slice(0, 4));
   const month = Number(ym.slice(5, 7));
   const daysInMonth = daysInMonthOf(year, month);
-  return isPerfectMonth({ daysInMonth, dayCounts: s.postMonthDayCounts, grace })
+  return isPerfectMonth({
+    daysInMonth,
+    dayCounts: s.postMonthDayCounts,
+    filledHoleDays: s.filledHoleDays,
+    grace,
+  })
     ? perfectMonthKey(ym)
     : null;
 }

@@ -52,6 +52,10 @@ model User {
   // 検索エンジン/AI Botのクロール拒否オプトイン。デフォルトoff（=従来どおり許可）。
   // ON → /u/[username] 配下を検索エンジンに noindex（generateMetadata）し、AI BotをrobotsでDisallow。
   blockCrawlers      Boolean   @default(false) @map("block_crawlers")
+  // カレンダーの自動穴埋め。true(既定)=投稿の瞬間にダブル投稿を過去の穴へ自動割当（従来挙動）。
+  // false=自動割当せず、カレンダー編集モードで明示指定した穴だけ埋める。過去の割当・皆勤賞には影響しない
+  // （未来の投稿の自動判定のみを切り替える）。詳細は docs/穴埋め設計は achievements/README.md 参照。
+  autoMakeup         Boolean   @default(true) @map("auto_makeup")
 
   // 利用規約・プライバシーポリシーへの同意日時。null=未同意。
   // 初回ログイン直後に /welcome で同意を取り記録する（以降は再提示しない）。
@@ -177,6 +181,13 @@ model Image {
   favoritesSyncedAt DateTime? @map("favorites_synced_at")
   postStatus        Int?      @map("post_status") // 最後のMastodon sync HTTP status（0=接続失敗、200=OK、4xx=失敗、5xx=サーバ不調）
   pinnedAt      DateTime? @map("pinned_at")
+  // カレンダーで「その日のサムネイル」にユーザーが手動指定した印。null=自動（その日の最古の投稿）。
+  // pinnedAt と同じ timestamp idiom（同日に複数指定されたら最新のpickを優先してtie-break）。
+  calendarPickedAt DateTime? @map("calendar_picked_at")
+  // 皆勤賞の穴埋め割当（永続化）。この投稿(donor)が埋める「同月の空き日(1-31)」。null=穴埋めに使っていない。
+  // カレンダー表示・皆勤賞判定の両方がこの永続値を読む（表示と👑のズレを防ぐ単一ソース）。
+  // 書き込み: 投稿時の自動割当(autoMakeup=true)／カレンダー編集モードの手動指定／既存分はbackfill。
+  makeupTargetDay  Int?      @map("makeup_target_day")
   // 管理者によるモデレーション取り下げフラグ。true で全公開面から隠す（投稿者含め非表示・復元可能）
   isDisabled    Boolean   @default(false) @map("is_disabled")
   // EXIFメタデータ（出力画像からは常に除去、ここはDB保存のみ／位置情報は投稿時オプトイン）
