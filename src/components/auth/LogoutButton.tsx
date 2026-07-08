@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
 
 interface LogoutButtonProps {
   className?: string;
@@ -9,9 +10,21 @@ interface LogoutButtonProps {
 }
 
 export function LogoutButton({ className, variant = "destructive" }: LogoutButtonProps) {
+  const confirm = useConfirm();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogout = async () => {
+    // 誤タップでの意図しないログアウトを防ぐため、必ず確認モーダルを挟む（サイドメニューと同挙動）。
+    if (
+      !(await confirm({
+        title: "ログアウト",
+        description: "ログアウトします。よろしいですか？",
+        confirmText: "ログアウト",
+        destructive: true,
+      }))
+    ) {
+      return;
+    }
     setIsLoading(true);
     try {
       await fetch("/api/auth/logout", {
