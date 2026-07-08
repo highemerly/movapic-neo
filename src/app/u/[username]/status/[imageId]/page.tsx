@@ -374,14 +374,14 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         {(image.cameraModel || image.locationPrefecture) && (
           <p className="mb-[5px] flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
             {image.cameraModel && (
-              <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center gap-[3px]">
                 <Camera className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 {image.cameraModel}{image.cameraMake && !image.cameraModel.startsWith(image.cameraMake) ? `（${image.cameraMake}）` : ""}
               </span>
             )}
             {image.locationPrefecture && (
               <span className="inline-flex items-center gap-1">
-                <span className="inline-flex items-center gap-1">
+                <span className="inline-flex items-center gap-0.5">
                   <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
                   <PrefectureScrollLink
                     href={`/u/${username}/map?prefecture=${encodeURIComponent(image.locationPrefecture)}`}

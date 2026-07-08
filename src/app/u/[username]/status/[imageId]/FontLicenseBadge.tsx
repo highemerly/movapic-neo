@@ -26,7 +26,7 @@ function LicenseBadge({
   );
 
   if (!license) {
-    return <span className="inline-flex items-center gap-0.5">{content}</span>;
+    return <span className="inline-flex items-center gap-0">{content}</span>;
   }
 
   return (
@@ -35,7 +35,7 @@ function LicenseBadge({
       trigger={
         <button
           type="button"
-          className="inline-flex items-center gap-0.5 hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-0 hover:text-foreground transition-colors"
           title={title}
         >
           {content}
