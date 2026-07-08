@@ -15,40 +15,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "@/lib/db";
 import { FAVORITE_SYNC_WHERE } from "@/lib/fediverse/favoriteSyncQuery";
 import { PAGE_SIZE } from "@/app/admin/_components/query";
-
-export type FavWindow = "all" | "31d" | "7d" | "1d" | "1h";
-
-export function normalizeFavWindow(v: string | undefined): FavWindow {
-  return v === "all" || v === "31d" || v === "7d" || v === "1h" ? v : "1d";
-}
-
-const WINDOW_LABEL: Record<FavWindow, string> = {
-  all: "全期間",
-  "31d": "31日",
-  "7d": "7日",
-  "1d": "1日",
-  "1h": "1時間",
-};
-
-export function favWindowLabel(w: FavWindow): string {
-  return WINDOW_LABEL[w];
-}
-
-/** window → interval SQL（all は絞らない） */
-function windowInterval(w: FavWindow): Prisma.Sql | null {
-  switch (w) {
-    case "all":
-      return null;
-    case "31d":
-      return Prisma.raw("interval '31 days'");
-    case "7d":
-      return Prisma.raw("interval '7 days'");
-    case "1d":
-      return Prisma.raw("interval '1 day'");
-    case "1h":
-      return Prisma.raw("interval '1 hour'");
-  }
-}
+import { periodRange, type Period } from "./periods";
 
 /** post_status のステータス別内訳（同期済み行のみ） */
 export interface StatusBreakdown {
@@ -148,7 +115,7 @@ export interface FavErrorSample {
 }
 
 export interface FavoritesData {
-  window: FavWindow;
+  period: Period;
   /** 円グラフを絞り込んでいる投稿者インスタンス（null=全体） */
   server: string | null;
   summary: FavSummary;
@@ -165,46 +132,35 @@ export interface FavoritesData {
   errorSamples: FavErrorSample[];
 }
 
-/** window → 起点 Date（all は null）。エラーサンプルの favorites_synced_at 絞り込み用 */
-function windowCutoff(w: FavWindow): Date | null {
-  const MS: Record<Exclude<FavWindow, "all">, number> = {
-    "31d": 31 * 24 * 3600e3,
-    "7d": 7 * 24 * 3600e3,
-    "1d": 24 * 3600e3,
-    "1h": 3600e3,
-  };
-  return w === "all" ? null : new Date(Date.now() - MS[w]);
-}
-
 const FAVORITABLE = Prisma.sql`post_id IS NOT NULL AND is_disabled = false`;
 const SYNCED = Prisma.sql`favorites_synced_at IS NOT NULL`;
 
 export async function getFavoritesData(
-  window: FavWindow,
+  period: Period,
   server: string | null = null,
   serverPage: number = 1
 ): Promise<FavoritesData> {
-  const iv = windowInterval(window);
+  // 期間は絶対レンジ [from, to)（all は null＝絞らない）。timestamp(UTC保持) は
+  // (col AT TIME ZONE 'UTC') で instant 化してから比較（セッションTZ非依存）。
+  const range = periodRange(period, new Date());
   // 円グラフ（posted/synced）とエラーサンプルだけ server で絞る。summary は期間のみ（server非依存）、
   // byServer は全サーバーの一覧なので期間のみで絞る。
   const serverClause = server
     ? Prisma.sql`AND user_id IN (SELECT u.id FROM users u JOIN instances inst ON inst.id = u.instance_id WHERE inst.domain = ${server})`
     : Prisma.empty;
   // 期間のみ（server 非依存）の投稿基準 WHERE。サマリはこれを使う。
-  const postedWhereBase = iv
-    ? Prisma.sql`${FAVORITABLE} AND created_at >= now() - ${iv}`
+  const postedWhereBase = range
+    ? Prisma.sql`${FAVORITABLE} AND (created_at AT TIME ZONE 'UTC') >= ${range.from} AND (created_at AT TIME ZONE 'UTC') < ${range.to}`
     : Prisma.sql`${FAVORITABLE}`;
   const postedWhere = Prisma.sql`${postedWhereBase} ${serverClause}`;
-  const syncedWhereBase = iv
-    ? Prisma.sql`${FAVORITABLE} AND favorites_synced_at >= now() - ${iv}`
+  const syncedWhereBase = range
+    ? Prisma.sql`${FAVORITABLE} AND (favorites_synced_at AT TIME ZONE 'UTC') >= ${range.from} AND (favorites_synced_at AT TIME ZONE 'UTC') < ${range.to}`
     : Prisma.sql`${FAVORITABLE} AND ${SYNCED}`;
   const syncedWhere = Prisma.sql`${syncedWhereBase} ${serverClause}`;
   // サーバー別: all は全 favoritable（未同期列を出す）、期間指定は「その期間に最後の同期」のみ
-  const serverWindowClause = iv
-    ? Prisma.sql`AND i.favorites_synced_at >= now() - ${iv}`
+  const serverWindowClause = range
+    ? Prisma.sql`AND (i.favorites_synced_at AT TIME ZONE 'UTC') >= ${range.from} AND (i.favorites_synced_at AT TIME ZONE 'UTC') < ${range.to}`
     : Prisma.empty;
-
-  const cutoff = windowCutoff(window);
   const [summaryRows, postedRows, syncedRows, backlogRows, servers, serverCountRows, totalsRows, samples] =
     await Promise.all([
     prisma.$queryRaw<
@@ -289,13 +245,13 @@ export async function getFavoritesData(
       JOIN instances inst ON inst.id = u.instance_id
       WHERE i.post_id IS NOT NULL AND i.is_disabled = false ${serverWindowClause}
     `),
-    // エラー投稿サンプル（同期済みで post_status ≠ 200）。window / server で絞り、投稿詳細へ飛ぶ導線用。
+    // エラー投稿サンプル（同期済みで post_status ≠ 200）。期間 / server で絞り、投稿詳細へ飛ぶ導線用。
     prisma.image.findMany({
       where: {
         postId: { not: null },
         isDisabled: false,
         postStatus: { not: 200 },
-        favoritesSyncedAt: cutoff ? { gte: cutoff } : { not: null },
+        favoritesSyncedAt: range ? { gte: range.from, lt: range.to } : { not: null },
         ...(server ? { user: { instance: { domain: server } } } : {}),
       },
       orderBy: { favoritesSyncedAt: "desc" },
@@ -327,7 +283,7 @@ export async function getFavoritesData(
   const serverCount = serverCountRows[0]?.c ?? 0;
 
   return {
-    window,
+    period,
     server,
     summary,
     posted: { favoritable: p.favoritable, unsynced: p.unsynced, ...toBreakdown(p) },

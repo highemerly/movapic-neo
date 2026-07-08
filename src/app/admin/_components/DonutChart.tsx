@@ -86,10 +86,8 @@ export function DonutChart({
                 acc += frac;
                 return (
                   <path key={s.key} d={arcPath(a0, Math.max(a1, a0 + 0.001))} className={s.fill}>
-                    <title>
-                      {s.label} {s.value.toLocaleString("ja-JP")} 件（
-                      {Math.round(frac * 100)}%）
-                    </title>
+                    {/* SVG <title> の children は単一文字列にする（配列だと React 19 が警告＋hydration不一致） */}
+                    <title>{`${s.label} ${s.value.toLocaleString("ja-JP")} 件（${Math.round(frac * 100)}%）`}</title>
                   </path>
                 );
               });

@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
 import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
@@ -64,9 +63,11 @@ export const metadata: Metadata = {
 // 全画面ゆえ standalone を誤マッチして下部ナビ等が出てしまう。iOS では WebView で立たない
 // `navigator.standalone === true`（ホーム画面PWAのみ true）で判定し、誤検知を防ぐ。
 // 非iOSは display-mode で判定（Androidのアプリ内WebViewは browser を返すため誤検知しにくい）。
-// next/script の beforeInteractive は配置場所に関わらず <head> へ注入され、ハイドレーション前
-// （＝ペイント前）に同期実行される。React ツリーに生 <script> を置く（クライアント再描画で実行
-// されず警告が出る）代わりにこれを使い、DOMをペイント前に書き換えて不整合・フラッシュを防ぐ。
+// <body> 先頭のネイティブ <script> は HTML パース時（＝下部コンテンツのペイント前）に同期実行
+// されるので、DOMをペイント前に書き換えて不整合・フラッシュを防げる。インラインコードは children
+// ではなく dangerouslySetInnerHTML で渡す（children 直書きの <script> は React 19 が
+// 「クライアント描画時に実行されない」と警告するため。next/script の beforeInteractive も同経路で
+// 警告が出たのでネイティブ <script> に変更）。
 const STANDALONE_DETECT_SCRIPT = `(function(){try{var n=navigator,ua=n.userAgent||"",isIos=/iphone|ipad|ipod/i.test(ua)||(n.platform==="MacIntel"&&n.maxTouchPoints>1),s=isIos?n.standalone===true:(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches);if(s)document.documentElement.setAttribute("data-standalone","");}catch(e){}})();`;
 
 export const viewport: Viewport = {
@@ -91,12 +92,9 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {/* standalone判定（beforeInteractive で <head> に注入・ペイント前に実行）。上部コメント参照。
-            インラインコードは children ではなく dangerouslySetInnerHTML で渡す（children だと
-            React が「クライアント描画時に実行されない script」と警告するため）。 */}
-        <Script
+        {/* standalone判定（<body>先頭のネイティブ script でペイント前に同期実行）。上部コメント参照。 */}
+        <script
           id="standalone-detect"
-          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: STANDALONE_DETECT_SCRIPT }}
         />
         <ThemeProvider

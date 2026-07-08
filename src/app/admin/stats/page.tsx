@@ -7,9 +7,10 @@
  */
 
 import { getMainMetrics } from "@/lib/admin/metrics";
-import { getPostTimeSeries, isTimeRange, type TimeRange } from "@/lib/admin/timeseries";
+import { getPostTimeSeries } from "@/lib/admin/timeseries";
+import { normalizePeriod, periodRangeText, PERIOD_OPTIONS, type Period } from "@/lib/admin/periods";
 import { StatCard } from "../_components/StatCard";
-import { PeriodToggle } from "../_components/PeriodToggle";
+import { PeriodSelect } from "../_components/PeriodSelect";
 import { normalizeParams } from "../_components/query";
 import { PostTimeSeriesChart } from "./_components/PostTimeSeriesChart";
 
@@ -21,11 +22,12 @@ const SOURCE_LABEL: Record<string, string> = {
   email: "📧メール",
 };
 
-const RANGE_OPTIONS = [
-  { value: "31d", label: "31日" },
-  { value: "7d", label: "7日" },
-  { value: "1d", label: "1日" },
-];
+/** 期間ごとのバケット粒度（getPostTimeSeries と一致）を説明文に使う。 */
+function granularityLabel(p: Period): string {
+  if (p === "all") return "月次";
+  if (p === "1h" || p === "24h" || p === "72h" || p === "yesterday") return "時次";
+  return "日次";
+}
 
 export default async function AdminStatsPage({
   searchParams,
@@ -33,11 +35,11 @@ export default async function AdminStatsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = normalizeParams(await searchParams);
-  const range: TimeRange = isTimeRange(params.range) ? params.range : "7d";
+  const period = normalizePeriod(params.range, "7d");
 
   const [metrics, series] = await Promise.all([
     getMainMetrics(),
-    getPostTimeSeries(range),
+    getPostTimeSeries(period),
   ]);
 
   const sourceHint = metrics.bySource
@@ -84,18 +86,15 @@ export default async function AdminStatsPage({
       <section className="mt-10">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-xl font-bold">投稿数の推移</h2>
-          <PeriodToggle
+          <PeriodSelect
             basePath="/admin/stats"
             params={params}
             param="range"
-            current={range}
-            options={RANGE_OPTIONS}
+            current={period}
+            options={PERIOD_OPTIONS}
+            rangeText={`${periodRangeText(period, new Date())}・${granularityLabel(period)}`}
           />
         </div>
-        <p className="mb-3 text-xs text-muted-foreground">
-          折れ線＝総投稿数、積み上げ棒＝お気に入り同期状態（favoritable な投稿のみ・JST 基準）。
-          {range === "1d" ? "直近24時間を時次で表示。" : `直近${range === "31d" ? "31" : "7"}日を日次で表示。`}
-        </p>
         <PostTimeSeriesChart data={series} />
       </section>
     </>

@@ -10,14 +10,11 @@
 import Link from "@/components/Link";
 
 import { userPathSegment } from "@/lib/userHandle";
-import {
-  getFavoritesData,
-  normalizeFavWindow,
-  favWindowLabel,
-} from "@/lib/admin/favorites";
+import { getFavoritesData } from "@/lib/admin/favorites";
+import { normalizePeriod, periodRangeText, PERIOD_OPTIONS } from "@/lib/admin/periods";
 import { StatCard } from "../_components/StatCard";
 import { InstanceLogo } from "../_components/InstanceLogo";
-import { PeriodToggle } from "../_components/PeriodToggle";
+import { PeriodSelect } from "../_components/PeriodSelect";
 import { Pagination } from "../_components/Pagination";
 import { DonutChart, type DonutSegment } from "../_components/DonutChart";
 import { TableWrap, theadRowCls, fmt, EmptyBox } from "../_components/ui";
@@ -26,14 +23,6 @@ import { normalizeParams, parsePage, withParams } from "../_components/query";
 export const dynamic = "force-dynamic";
 
 const BASE = "/admin/favorites";
-
-const WINDOW_OPTIONS = [
-  { value: "all", label: "全期間" },
-  { value: "31d", label: "31日" },
-  { value: "7d", label: "7日" },
-  { value: "1d", label: "1日" },
-  { value: "1h", label: "1時間" },
-];
 
 // ステータスの表示メタ（円グラフの塗り・凡例で共有）。fill/bg は Tailwind が拾えるリテラル。
 // ラベルは表示上 "Other 4xx"→"4xx"、"接続失敗"→"0"。
@@ -74,12 +63,11 @@ export default async function AdminFavoritesPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = normalizeParams(await searchParams);
-  const window = normalizeFavWindow(params.window);
+  const period = normalizePeriod(params.window, "24h");
   const server = params.server?.trim() || null;
   const serverPage = parsePage(params.page);
   const { summary, posted, synced, byServer, serverTotals, serverCount, serverTotalPages, errorSamples } =
-    await getFavoritesData(window, server, serverPage);
-  const wl = favWindowLabel(window);
+    await getFavoritesData(period, server, serverPage);
 
   const postedSegs = segments(STATUS_META, posted as unknown as Record<string, number>);
   const syncedSegs = segments(STATUS_ONLY, synced as unknown as Record<string, number>);
@@ -96,46 +84,44 @@ export default async function AdminFavoritesPage({
   const numCls = (n: number, cls: string) =>
     `py-1.5 pr-3 ${n ? cls : "text-muted-foreground/50"}`;
 
+  // 選択行の見た目（太い左罫線＋前景色の淡い背景）。「すべて」行・サーバー行で共用。
+  const rowCls = (active: boolean) =>
+    `border-b border-border/50 ${active ? "bg-foreground/10" : "hover:bg-muted/40"}`;
+  const firstCellCls = (active: boolean) =>
+    `py-1.5 pr-3 text-left border-l-4 ${active ? "border-foreground" : "border-transparent"}`;
+
+  // 円グラフ・エラーサンプルはサーバーで絞り込まれる。絞り込み中はその旨を右揃えで明記。
+  const serverNote = server ? (
+    <span className="text-[11px] text-muted-foreground">絞り込み: {server}</span>
+  ) : null;
+
   return (
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">お気に入り同期</h1>
-        <PeriodToggle
+        <PeriodSelect
           basePath={BASE}
           params={params}
           param="window"
-          current={window}
-          options={WINDOW_OPTIONS}
+          current={period}
+          options={PERIOD_OPTIONS}
+          rangeText={periodRangeText(period, new Date())}
         />
       </div>
-      <p className="mb-6 text-sm text-muted-foreground">
-        お気に入りは Mastodon の favourite そのもの（local 投稿は対象外）。数値は期間
-        <span className="font-semibold">「{wl}」</span>での集計。
-      </p>
 
       {/* サマリー（期間フィルタ） */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <StatCard label="対象投稿数" value={summary.favoritable} hint={`期間: ${wl}`} />
-        <StatCard
-          label="未同期"
-          value={summary.neverSynced}
-          tone="warn"
-          hint="一度も同期なし"
-        />
+        <StatCard label="対象投稿数" value={summary.favoritable} />
+        <StatCard label="未同期" value={summary.neverSynced} tone="warn" />
         <StatCard label="総お気に入り数" value={summary.totalFavorites} />
-        <StatCard
-          label="⏳ backlog"
-          value={summary.backlog}
-          tone="warn"
-          hint="定期syncの対象(全体)"
-        />
-        <StatCard label="成功率" value={`${summary.successRate}%`} hint="期間内・直近200割合" />
+        <StatCard label="⏳ backlog" value={summary.backlog} tone="warn" />
+        <StatCard label="成功率" value={`${summary.successRate}%`} />
       </div>
 
       {/* サーバー別（先頭に「すべて」行・行クリックで円グラフを絞り込み・ページネーション） */}
       <section className="mt-8">
         <h2 className="mb-1 text-lg font-bold">
-          サーバー（投稿者インスタンス）
+          同期サーバー
         </h2>
         <TableWrap minWidth="34rem">
           <thead>
@@ -143,19 +129,15 @@ export default async function AdminFavoritesPage({
               <th className="py-1.5 pr-3 text-left font-semibold">サーバー名</th>
               <th className="py-1.5 pr-3 font-semibold">対象</th>
               <th className="py-1.5 pr-3 font-semibold">成功</th>
-              <th className="py-1.5 pr-3 font-semibold">一時エラー</th>
-              <th className="py-1.5 pr-3 font-semibold">4xx</th>
+              <th className="py-1.5 pr-3 font-semibold">エラー(一時)</th>
+              <th className="py-1.5 pr-3 font-semibold">エラー(4xx)</th>
               <th className="py-1.5 font-semibold">最終同期</th>
             </tr>
           </thead>
           <tbody className="text-right tabular-nums">
             {/* すべて行 */}
-            <tr className={`border-b border-border/50 ${!server ? "bg-muted" : "hover:bg-muted/40"}`}>
-              <td
-                className={`py-1.5 pr-3 text-left border-l-2 ${
-                  !server ? "border-foreground" : "border-transparent"
-                }`}
-              >
+            <tr className={rowCls(!server)}>
+              <td className={firstCellCls(!server)}>
                 <Link
                   href={withParams(BASE, params, { server: undefined })}
                   scroll={false}
@@ -193,15 +175,8 @@ export default async function AdminFavoritesPage({
                 const clientErr = s.forbidden + s.notFound + s.otherClient;
                 const active = s.domain === server;
                 return (
-                  <tr
-                    key={s.domain}
-                    className={`border-b border-border/50 ${active ? "bg-muted" : "hover:bg-muted/40"}`}
-                  >
-                    <td
-                      className={`py-1.5 pr-3 text-left border-l-2 ${
-                        active ? "border-foreground" : "border-transparent"
-                      }`}
-                    >
+                  <tr key={s.domain} className={rowCls(active)}>
+                    <td className={firstCellCls(active)}>
                       <Link
                         href={withParams(BASE, params, { server: s.domain })}
                         scroll={false}
@@ -243,8 +218,9 @@ export default async function AdminFavoritesPage({
 
       {/* 円グラフ2枚（期間＋選択サーバーで絞り込み） */}
       <section className="mt-8">
-        <div className="mb-3 flex flex-wrap items-baseline gap-2">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-lg font-bold">同期ステータス</h2>
+          {serverNote}
         </div>
         <div className="grid gap-8 sm:grid-cols-2">
           <div>
@@ -260,7 +236,10 @@ export default async function AdminFavoritesPage({
 
       {/* エラー投稿サンプル（投稿詳細へ飛べる） */}
       <section className="mt-8">
-        <h2 className="mb-1 text-lg font-bold">エラー投稿（サンプル）</h2>
+        <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-bold">エラー投稿（サンプル）</h2>
+          {serverNote}
+        </div>
         <p className="mb-2 text-xs text-muted-foreground">
           最新順・最大12件。
         </p>

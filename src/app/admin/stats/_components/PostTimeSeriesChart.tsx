@@ -115,9 +115,7 @@ export function PostTimeSeriesChart({ data }: { data: TimeBucket[] }) {
                     rx={1.5}
                     className={s.cls}
                   >
-                    <title>
-                      {d.fullLabel} ・ {s.label} {s.v.toLocaleString("ja-JP")} 件
-                    </title>
+                    <title>{`${d.fullLabel} ・ ${s.label} ${s.v.toLocaleString("ja-JP")} 件`}</title>
                   </rect>
                 );
               })}
@@ -143,9 +141,7 @@ export function PostTimeSeriesChart({ data }: { data: TimeBucket[] }) {
             r={n <= 14 ? 3 : 2.5}
             className="fill-foreground"
           >
-            <title>
-              {d.fullLabel} ・ 総投稿 {d.posts.toLocaleString("ja-JP")} 件
-            </title>
+            <title>{`${d.fullLabel} ・ 総投稿 ${d.posts.toLocaleString("ja-JP")} 件`}</title>
           </circle>
         ))}
 
