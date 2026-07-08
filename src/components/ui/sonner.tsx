@@ -17,6 +17,8 @@ export function Toaster(props: ToasterProps) {
       offset={{ top: "calc(env(safe-area-inset-top, 0px) + 80px)" }}
       mobileOffset={{ top: "calc(env(safe-area-inset-top, 0px) + 80px)" }}
       richColors
+      // 全トーストに×ボタンを表示し、ユーザー操作で即時に閉じられるようにする。
+      closeButton
       duration={5000}
       style={
         {
