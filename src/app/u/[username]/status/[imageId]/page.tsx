@@ -34,7 +34,8 @@ import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect"
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
-import { User, CalendarDays, Camera, MapPin, Reply, Repeat2, Bookmark, Share2, Globe, Mail, Bot, ChevronLeft } from "lucide-react";
+import { PostSourceBadge } from "./PostSourceBadge";
+import { User, CalendarDays, Camera, MapPin, Reply, Repeat2, Bookmark, Share2, ChevronLeft } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -166,6 +167,11 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
 
   // 投稿者が直近（先月/今月）の皆勤賞を取っていればアバターに王冠を表示
   const posterPerfectAttendance = await hasRecentPerfectAttendance(image.user.id);
+
+  // Bot投稿の表示・説明に使う Bot アカウント（例: dev01@handon.club）
+  const botAcct = `${process.env.MASTODON_BOT_ACCT || "pic"}@${
+    process.env.MASTODON_BOT_INSTANCE_DOMAIN || "handon.club"
+  }`;
 
   // お気に入りキャッシュから初期表示データを算出
   // お気に入り可能 = Fediverseに投稿済み（postIdがある）投稿のみ（local投稿は対象外）
@@ -422,30 +428,22 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             arrangement={image.arrangement}
             season={image.season}
           />
-          {/* 投稿ソースはアイコンのみ（狭幅対策）。文脈は title で補う。 */}
+          {/* 投稿ソース（Bot/メール）。Web投稿は既定なので非表示。クリックで投稿方法モーダル。 */}
           {image.source === "email" ? (
-            <span className="inline-flex items-center" title="メール投稿">
-              <Mail className="h-3.5 w-3.5 shrink-0" aria-label="メール投稿" />
-            </span>
+            <PostSourceBadge source="email" />
           ) : image.source === "mention" ? (
-            <a
-              href={`https://${image.user.instance.domain}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center hover:text-foreground transition-colors"
-              title={`Bot投稿（${image.user.instance.domain}）`}
-            >
-              <Bot className="h-3.5 w-3.5 shrink-0" aria-label="Bot投稿" />
-            </a>
-          ) : (
-            <Link
-              href="/create"
-              className="inline-flex items-center hover:text-foreground transition-colors"
-              title="Web投稿"
-            >
-              <Globe className="h-3.5 w-3.5 shrink-0" aria-label="Web投稿" />
-            </Link>
-          )}
+            <PostSourceBadge
+              source="mention"
+              instanceType={image.user.instance.type}
+              botAcct={botAcct}
+              position={image.position}
+              color={image.color}
+              size={image.size}
+              font={image.font}
+              arrangement={image.arrangement}
+              text={image.overlayText}
+            />
+          ) : null}
         </div>
 
         {/* お気に入り（Fediverse連携：Mastodon=favourite / Misskey=リアクション） */}
