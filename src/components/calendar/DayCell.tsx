@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Plus } from "lucide-react";
 import { StackedSquaresIcon } from "./StackedSquaresIcon";
 
 /** 暗いサムネ上で文字を読めるようにする控えめな灰色の縁取り（細めの多方向シャドウ）。 */
@@ -39,6 +40,8 @@ interface DayCellProps {
   loading: boolean;
   /** カレンダー編集モード。空きセルも含め全日をクリック可能にし、編集用の枠線を出す。 */
   editMode?: boolean;
+  /** 本人の当月「今日」で未投稿のとき、投稿導線の「＋」を表示しクリック可能にする。 */
+  showAddPost?: boolean;
   onClick: () => void;
 }
 
@@ -53,6 +56,7 @@ export function DayCell({
   isHoliday,
   loading,
   editMode = false,
+  showAddPost = false,
   onClick,
 }: DayCellProps) {
   // サムネ読み込み完了までシマー（パルス）で隠し、完了後にフェードイン
@@ -88,18 +92,21 @@ export function DayCell({
       : `${publicUrl}/${filledMakeup.image.storageKey}`
     : null;
   // 編集モードでは空きセルも含め全日をクリック可能（代表選択／穴埋め割当のため）。
-  const clickable = editMode ? true : hasImage || isFilledHole;
+  // 本人の当日未投稿セルは「＋」投稿導線としてクリック可能にする。
+  const clickable = editMode ? true : hasImage || isFilledHole || showAddPost;
 
   return (
     <button
       onClick={onClick}
       disabled={!clickable || loading}
       title={
-        isFilledHole
-          ? `${filledMakeup!.filledBy}日のダブル投稿で穴埋めされました`
-          : makeupCount > 0
-            ? `${dayData!.count}枚投稿`
-            : undefined
+        showAddPost
+          ? "今日の画像を投稿する"
+          : isFilledHole
+            ? `${filledMakeup!.filledBy}日のダブル投稿で穴埋めされました`
+            : makeupCount > 0
+              ? `${dayData!.count}枚投稿`
+              : undefined
       }
       className={`
         relative aspect-square rounded overflow-hidden
@@ -159,6 +166,14 @@ export function DayCell({
           {/* 日付の視認性確保のための下方グラデーション */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
         </>
+      ) : showAddPost ? (
+        // 本人の当日未投稿セル: 投稿導線（薄い primary 背景＋プラス＋「投稿」文言）
+        <div className="absolute inset-0 flex flex-col items-center justify-start gap-0.5 bg-primary/10 pt-1 sm:pt-1.5">
+          <Plus className="h-4 w-4 sm:h-6 sm:w-6 text-primary" strokeWidth={2.5} />
+          <span className="text-[9px] font-bold leading-none text-primary sm:text-xs">
+            投稿する
+          </span>
+        </div>
       ) : (
         <div className="absolute inset-0 bg-muted/50" />
       )}

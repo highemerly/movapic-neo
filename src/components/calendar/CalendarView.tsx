@@ -445,6 +445,16 @@ export function CalendarView({
             // 明日以降（未来日）は編集不可。過去月は未来日なし・当月は今日より後が未来。
             const isFutureDay =
               isCurrentMonth && day != null && day > today.getDate();
+            const isTodayCell = isCurrentMonth && day === today.getDate();
+            // 本人の当月「今日」がまだ未投稿なら、そのセルに「＋」投稿導線を出す
+            // （編集モード中は穴埋めピッカーを優先するため出さない）。
+            const showAddPost =
+              isOwner &&
+              isTodayCell &&
+              day != null &&
+              !data?.days[day] &&
+              !editMode &&
+              !loading;
             return (
               <DayCell
                 key={index}
@@ -456,12 +466,13 @@ export function CalendarView({
                     : undefined
                 }
                 publicUrl={publicUrl}
-                isToday={isCurrentMonth && day === today.getDate()}
+                isToday={isTodayCell}
                 isSunday={index % 7 === 0}
                 isSaturday={index % 7 === 6}
                 isHoliday={day != null && isJapaneseHoliday(year, month, day)}
                 loading={loading}
                 editMode={editMode && !isFutureDay}
+                showAddPost={showAddPost}
                 onClick={() => {
                   // 編集モード: 日タップでピッカーを開く（代表選択 or 穴埋め割当）。
                   // 明日以降（未来日）は編集対象外。
@@ -471,6 +482,11 @@ export function CalendarView({
                       kind: data?.days[day] ? "representative" : "donor",
                       day,
                     });
+                    return;
+                  }
+                  // 本人の当日未投稿セル: 投稿ページへ遷移。
+                  if (showAddPost) {
+                    router.push("/create");
                     return;
                   }
                   // 戻る導線で同じ月のカレンダーへ復元できるよう from に年月を載せる。
