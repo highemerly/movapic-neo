@@ -7,14 +7,12 @@ import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { randomUUID } from "crypto";
 import prisma from "@/lib/db";
 import type { Prisma } from "@prisma/client";
+import { SESSION_COOKIE_NAME, SESSION_DURATION_SECONDS } from "./sessionConstants";
 
 const LOGIN_SESSION_RETENTION_DAYS = 90;
 
 // Prismaから生成されたInstance型を取得
 type Instance = Prisma.InstanceGetPayload<object>;
-
-const SESSION_COOKIE_NAME = "movapic_session";
-const SESSION_DURATION_SECONDS = 7 * 24 * 60 * 60; // 7日
 
 // JWT署名用の秘密鍵
 function getJWTSecret(): Uint8Array {
@@ -40,6 +38,8 @@ interface SessionPayload extends JWTPayload {
   avatarUrl: string | null;
   instanceDomain: string;
   instanceType: string;
+  // セッション開始の絶対時刻(秒)。スライディング更新でも不変（90日上限の判定用）。
+  sat?: number;
 }
 
 // createSession に渡す識別フィールド（ログイン時に手元の user/instance から渡す）
@@ -112,6 +112,10 @@ export async function createSession(
     avatarUrl: identity.avatarUrl,
     instanceDomain: identity.instanceDomain,
     instanceType: identity.instanceType,
+    // sat: セッション開始の絶対時刻(秒)。スライディング更新で exp/iat は
+    // 上書きされるが sat は引き継がれ、「発行から90日で強制再ログイン」
+    // という絶対上限の判定に使う（slidingSession.ts）。
+    sat: Math.floor(Date.now() / 1000),
   };
 
   const token = await new SignJWT(payload)

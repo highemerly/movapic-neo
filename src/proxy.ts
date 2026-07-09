@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { maybeSlideSession } from "@/lib/auth/slidingSession";
 
 // 状態変更を伴うHTTPメソッド（CSRF検証の対象）
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -73,7 +74,7 @@ function forbidden(): NextResponse {
  * - web / worker-front: /api/internal/* を 404（内部APIは compute だけが提供）
  * - 未設定(dev all-in-one): 制限なし
  */
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const role = process.env.COMPONENT_ROLE;
   const path = request.nextUrl.pathname;
   const isInternal = path.startsWith("/api/internal");
@@ -129,6 +130,10 @@ export function proxy(request: NextRequest) {
   ].join("; ");
 
   response.headers.set("Content-Security-Policy", csp);
+
+  // スライディングセッション: 有効なJWTがアクティブに使われている限り
+  // 有効期限を7日窓で自動延長する（詳細は slidingSession.ts）。
+  await maybeSlideSession(request, response);
 
   return response;
 }

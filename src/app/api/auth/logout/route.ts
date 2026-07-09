@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { deleteSessionCookie } from "@/lib/auth/session";
+import { SESSION_COOKIE_NAME } from "@/lib/auth/sessionConstants";
 
 export async function POST() {
   try {
@@ -20,7 +21,7 @@ export async function POST() {
 
     // エラーでもCookieは削除
     const cookieStore = await cookies();
-    cookieStore.delete("movapic_session");
+    cookieStore.delete(SESSION_COOKIE_NAME);
 
     return NextResponse.json({ success: true });
   }
