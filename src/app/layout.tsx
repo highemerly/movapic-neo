@@ -27,6 +27,14 @@ const geistMono = Geist_Mono({
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 const SITE_NAME = "SHAMEZO";
 const SITE_DESCRIPTION = "写真 × ひとこと = SNSに投稿しよう。";
+// OGカード用の共有画像（1200×630 PNG）。X はカード画像に AVIF を非対応のため PNG で用意する。
+// 各ページで openGraph.images を上書きしなければこの既定が使われる（トップページ等）。
+const OG_IMAGE = {
+  url: "/og-image.png",
+  width: 1200,
+  height: 630,
+  alt: SITE_NAME,
+} as const;
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
@@ -41,11 +49,13 @@ export const metadata: Metadata = {
     title: SITE_NAME,
     description: SITE_DESCRIPTION,
     locale: "ja_JP",
+    images: [OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
     title: SITE_NAME,
     description: SITE_DESCRIPTION,
+    images: [OG_IMAGE.url],
   },
   // PWA: ホーム画面に追加 / インストール可能化
   manifest: "/manifest.json",

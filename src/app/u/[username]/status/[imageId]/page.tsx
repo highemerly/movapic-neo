@@ -77,10 +77,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const title = image.overlayText;
   const authorName = image.user.displayName || image.user.username;
   const description = `${authorName} さんの投稿`;
+  // OG/Twitterカードのタイトルは HTMLの <title>（＝「本文 - 投稿者名 | SHAMEZO」）に揃える。
+  // X は og:site_name を表示しないため、カード上にサービス名を出すにはタイトルへ含める必要がある。
+  const cardTitle = `${title} - ${authorName} | SHAMEZO`;
 
   return {
-    // HTMLの <title>（テンプレート %s | SHAMEZO）には投稿者名を含める。
-    // OG/Twitterカードのタイトルは本文のみ（下記 title）のまま。
+    // HTMLの <title> はテンプレート（%s | SHAMEZO）でサービス名が付くので本文＋投稿者名まで。
     title: `${title} - ${authorName}`,
     description,
     // 投稿者がクロール拒否中なら公開画像でも検索エンジンに noindex（AI Bot は robots.txt 側）
@@ -89,7 +91,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       type: "article",
       siteName: "SHAMEZO",
       locale: "ja_JP",
-      title,
+      title: cardTitle,
       description,
       url: pageUrl,
       images: [
@@ -104,7 +106,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     },
     twitter: {
       card: "summary_large_image",
-      title,
+      title: cardTitle,
       description,
       images: [imageUrl],
     },
