@@ -14,6 +14,8 @@ interface ImageCardProps {
     width: number;
     height: number;
     overlayText: string;
+    /** 画像の代替テキスト（ALT）。未設定時は overlayText を alt にフォールバック。 */
+    altText?: string | null;
     position: string;
     size: string;
     blurDataUrl?: string | null;
@@ -64,7 +66,7 @@ export function ImageCard({ image, publicUrl, username, showDelete, onDelete, is
       <Link href={detailUrl} target={username ? undefined : "_blank"} rel={username ? undefined : "noopener noreferrer"} className={fill ? "block h-full w-full" : "block"}>
         <ThumbnailImage
           src={imageUrl}
-          alt={image.overlayText}
+          alt={image.altText || image.overlayText}
           position={image.position}
           size={image.size}
           fill={fill}

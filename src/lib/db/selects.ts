@@ -14,6 +14,7 @@ export const PUBLIC_IMAGE_LIST_SELECT = {
   width: true,
   height: true,
   overlayText: true,
+  altText: true,
   position: true,
   size: true,
   blurDataUrl: true,

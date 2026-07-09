@@ -8,6 +8,7 @@ export interface FeaturedMarqueeItem {
   id: string;
   storageKey: string;
   overlayText: string;
+  altText?: string | null;
   position: string;
   username: string;
 }
@@ -128,7 +129,7 @@ export function FeaturedMarquee({ images, publicUrl }: FeaturedMarqueeProps) {
           >
             <ThumbnailImage
               src={`${publicUrl}/${image.storageKey}`}
-              alt={image.overlayText}
+              alt={image.altText || image.overlayText}
               position={image.position}
               loading="eager"
               className="hover:opacity-90 transition-opacity"

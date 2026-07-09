@@ -418,6 +418,8 @@ export async function processOneMention(
         autoMakeup: user.autoMakeup,
       },
       text,
+      // ALTは元投稿の添付画像に設定されていた代替テキストをそのまま引き継ぐ（未設定なら null）。
+      altText: mediaAttachments[0].description?.trim() || null,
       // 案B（実績は season:null で隔離）: season 指定時はスタイル列にプリセット実値を保存
       // （タイル表示のフォーカス/拡大率を実描画に一致させる）。
       options: seasonDef

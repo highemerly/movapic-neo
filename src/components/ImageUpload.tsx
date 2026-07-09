@@ -5,37 +5,20 @@ import { X, Loader2, ImagePlus, Eye, Camera } from "lucide-react";
 import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from "@/types";
 import { useIsHydrated } from "@/hooks/useIsHydrated";
 
-interface ResultInfo {
-  fileSize: number;
-  format: string;
-  width: number;
-  height: number;
-  processingTime: number;
-  originalFileSize: number;
-  originalFormat: string;
-  originalWidth: number;
-  originalHeight: number;
-  requestId: string;
-}
-
-// ファイルサイズをフォーマットする関数
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}
-
 interface ImageUploadProps {
   imageFile: File | null;
   imagePreview: string | null;
   resultUrl: string | null;
   hasGenerated: boolean;
-  resultInfo: ResultInfo | null;
   isLoading?: boolean;
   isPosting?: boolean;
   onImageSelect: (file: File, preview: string) => void;
   onReset: () => void;
   disabled?: boolean;
+  /** 現在の代替テキスト（ALT）。バッジの「設定済み/未設定」表示に使う。 */
+  altText?: string;
+  /** ALTバッジ押下時（親がダイアログを開く）。未指定ならバッジ自体を出さない。 */
+  onEditAlt?: () => void;
 }
 
 // HEICファイルの拡張子チェック（ブラウザがMIMEタイプを認識しない場合がある）
@@ -49,12 +32,13 @@ export function ImageUpload({
   imagePreview,
   resultUrl,
   hasGenerated,
-  resultInfo,
   isLoading,
   isPosting,
   onImageSelect,
   onReset,
   disabled,
+  altText,
+  onEditAlt,
 }: ImageUploadProps) {
   const isBusy = isLoading || isPosting;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -202,6 +186,27 @@ export function ImageUpload({
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               )}
+              {/* 右下のALTバッジ（Mastodon風・画像詳細ページと位置を統一）。押すと親がALT編集
+                  ダイアログを開く。設定済みは強調表示（primary＋チェック）、未設定は半透明。 */}
+              {onEditAlt && !isBusy && (
+                <button
+                  type="button"
+                  onClick={onEditAlt}
+                  disabled={disabled}
+                  className={`absolute bottom-2 right-2 flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold leading-none transition-colors disabled:opacity-50 ${
+                    altText && altText.trim()
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "bg-black/50 text-white hover:bg-black/70"
+                  }`}
+                  aria-label={
+                    altText && altText.trim()
+                      ? "代替テキスト（ALT）を編集（設定済み）"
+                      : "代替テキスト（ALT）を設定"
+                  }
+                >
+                  ALT
+                </button>
+              )}
               {/* 右上の×ボタン */}
               {!isBusy && (
                 <button
@@ -214,17 +219,13 @@ export function ImageUpload({
                   <X className="h-4 w-4" />
                 </button>
               )}
-              {/* 下部オーバーレイ: プレビュー + 生成情報（極小） */}
-              {hasGenerated && resultInfo && !isBusy && (
-                <div className="absolute inset-x-0 bottom-0 flex items-center gap-1.5 bg-black/55 px-2 py-1 leading-none text-white">
-                  <Eye className="h-2.5 w-2.5 shrink-0" />
-                  <span className="text-[10px] font-medium">プレビュー</span>
-                  <span className="truncate text-[9px] text-white/75">
-                    {(resultInfo.processingTime / 1000).toFixed(2)}sec・
-                    {resultInfo.format}・{formatFileSize(resultInfo.fileSize)}
-                    {resultInfo.originalFileSize > 0 &&
-                      `（${Math.round((1 - resultInfo.fileSize / resultInfo.originalFileSize) * 100)}%減）`}
-                  </span>
+              {/* 画像中央のプレビューマーク（半透明ピル・クリックは透過して下のボタンを操作可能）。 */}
+              {hasGenerated && !isBusy && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-white">
+                    <Eye className="h-4 w-4 shrink-0" />
+                    <span className="text-sm font-medium">プレビュー</span>
+                  </div>
                 </div>
               )}
             </div>

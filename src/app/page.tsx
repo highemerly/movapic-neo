@@ -24,6 +24,7 @@ const getFeaturedImages = unstable_cache(
         id: true,
         storageKey: true,
         overlayText: true,
+        altText: true,
         position: true,
         user: {
           select: {
@@ -50,6 +51,7 @@ export default async function HomePage() {
     id: image.id,
     storageKey: image.storageKey,
     overlayText: image.overlayText,
+    altText: image.altText,
     position: image.position,
     username: userPathSegment(image.user.username, image.user.instance.domain),
   }));

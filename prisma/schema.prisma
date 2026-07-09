@@ -154,6 +154,10 @@ model Image {
   width         Int
   height        Int
   overlayText   String   @map("overlay_text") @db.Text
+  // 画像の代替テキスト（ALT）。null=未設定。web=ユーザー入力・mention=元投稿のALT引き継ぎ。
+  // Fediverse へは Mastodon=description / Misskey=comment(512字上限) として送信。
+  // サービス側の <img alt> は altText を優先し、未設定時は overlayText にフォールバック。
+  altText       String?  @map("alt_text") @db.VarChar(1500)
   position      String   @db.VarChar(20)
   font          String   @db.VarChar(50)
   color         String   @db.VarChar(20)

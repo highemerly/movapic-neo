@@ -81,6 +81,7 @@ export default async function DashboardPage() {
         thumbnailKey: true,
         storageKey: true,
         overlayText: true,
+        altText: true,
         favoriteCount: true,
       },
     }),
@@ -94,6 +95,7 @@ export default async function DashboardPage() {
         thumbnailKey: true,
         storageKey: true,
         overlayText: true,
+        altText: true,
         user: { select: { username: true, instance: { select: { domain: true } } } },
       },
     }),
@@ -301,7 +303,7 @@ export default async function DashboardPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`${publicUrl}/${topFavoriteImage.thumbnailKey || topFavoriteImage.storageKey}`}
-                  alt={topFavoriteImage.overlayText}
+                  alt={topFavoriteImage.altText || topFavoriteImage.overlayText}
                   className="w-12 h-12 object-cover flex-shrink-0"
                 />
                 <div className="flex-1 min-w-0">
@@ -378,7 +380,7 @@ export default async function DashboardPage() {
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={`${publicUrl}/${img.thumbnailKey || img.storageKey}`}
-                          alt={img.overlayText}
+                          alt={img.altText || img.overlayText}
                           className="aspect-square w-full object-cover"
                         />
                       </Link>

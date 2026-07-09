@@ -10,6 +10,7 @@ interface GalleryImage {
   width: number;
   height: number;
   overlayText: string;
+  altText?: string | null;
   position: string;
   size: string;
   blurDataUrl?: string | null;

@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
         width: image.width,
         height: image.height,
         overlayText: image.overlayText,
+        altText: image.altText,
         position: image.position,
         size: image.size,
         blurDataUrl: image.blurDataUrl,

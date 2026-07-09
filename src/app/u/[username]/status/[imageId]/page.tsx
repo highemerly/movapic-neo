@@ -13,6 +13,7 @@ import { MisskeyOpenButton } from "./MisskeyOpenButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
 import { RetryImage } from "@/components/gallery/RetryImage";
+import { AltTextReveal } from "@/components/AltTextReveal";
 import {
   classifyPostStatus,
   favoriteErrorMessage,
@@ -46,6 +47,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     select: {
       storageKey: true,
       overlayText: true,
+      altText: true,
       mimeType: true,
       width: true,
       height: true,
@@ -95,7 +97,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
           url: imageUrl,
           width: image.width,
           height: image.height,
-          alt: image.overlayText,
+          alt: image.altText || image.overlayText,
           type: image.mimeType,
         },
       ],
@@ -347,19 +349,21 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           </Link>
         </div>
 
-        {/* 画像 */}
+        {/* 画像。ALTがある場合は右下に「ALT」バッジを重ね、押すと画像下にALTテキストを展開。 */}
         <div className="mb-2">
-          <div className="rounded-lg overflow-hidden bg-muted">
-            <RetryImage
-              src={imageUrl}
-              alt={image.overlayText}
-              loading="eager"
-              aspectRatio={image.width / image.height}
-              blurDataUrl={image.blurDataUrl}
-              containerClassName="w-full"
-              imgClassName="absolute inset-0 h-full w-full object-contain"
-            />
-          </div>
+          <AltTextReveal altText={image.altText}>
+            <div className="rounded-lg overflow-hidden bg-muted">
+              <RetryImage
+                src={imageUrl}
+                alt={image.altText || image.overlayText}
+                loading="eager"
+                aspectRatio={image.width / image.height}
+                blurDataUrl={image.blurDataUrl}
+                containerClassName="w-full"
+                imgClassName="absolute inset-0 h-full w-full object-contain"
+              />
+            </div>
+          </AltTextReveal>
         </div>
 
         {/* テキスト */}

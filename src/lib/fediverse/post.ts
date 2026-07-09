@@ -62,11 +62,14 @@ async function uploadMastodonMedia(
   accessToken: string,
   imageBuffer: Buffer,
   mimeType: string,
-  filename: string
+  filename: string,
+  altText?: string
 ): Promise<string> {
   const formData = new FormData();
   const blob = new Blob([new Uint8Array(imageBuffer)], { type: mimeType });
   formData.append("file", blob, filename);
+  // 代替テキスト（ALT）。未設定なら送らない。Mastodon の description 上限は約1500字。
+  if (altText) formData.append("description", altText);
 
   const response = await fetch(`https://${server}/api/v2/media`, {
     method: "POST",
@@ -145,7 +148,8 @@ export async function postToMastodon(
   filename: string,
   statusText: string,
   imageUrl: string,
-  visibility: MastodonVisibility = "public"
+  visibility: MastodonVisibility = "public",
+  altText?: string
 ): Promise<PostResult> {
   try {
     // メディアをアップロード
@@ -154,7 +158,8 @@ export async function postToMastodon(
       accessToken,
       imageBuffer,
       mimeType,
-      filename
+      filename,
+      altText
     );
 
     // ステータスを投稿
@@ -203,12 +208,15 @@ async function uploadMisskeyFile(
   accessToken: string,
   imageBuffer: Buffer,
   mimeType: string,
-  filename: string
+  filename: string,
+  altText?: string
 ): Promise<string> {
   const formData = new FormData();
   const blob = new Blob([new Uint8Array(imageBuffer)], { type: mimeType });
   formData.append("file", blob, filename);
   formData.append("i", accessToken);
+  // 代替テキスト（ALT）。Misskey の comment 上限は512字なので切り詰める。未設定なら送らない。
+  if (altText) formData.append("comment", altText.slice(0, 512));
 
   const response = await fetch(`https://${server}/api/drive/files/create`, {
     method: "POST",
@@ -244,7 +252,8 @@ export async function postToMisskey(
   filename: string,
   statusText: string,
   imageUrl: string,
-  visibility: MisskeyVisibility = "public"
+  visibility: MisskeyVisibility = "public",
+  altText?: string
 ): Promise<PostResult> {
   try {
     // ファイルをアップロード
@@ -253,7 +262,8 @@ export async function postToMisskey(
       accessToken,
       imageBuffer,
       mimeType,
-      filename
+      filename,
+      altText
     );
 
     // ノートを投稿

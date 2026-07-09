@@ -59,6 +59,13 @@ export interface PublishImageInput {
   contentType: string;
   user: PublishUser;
   text: string;
+  /**
+   * 画像の代替テキスト（ALT）。null/undefined/空=未設定。
+   * web=ユーザー入力 / mention=元投稿のメディア description を引き継ぎ / email=未対応。
+   * Fediverse へは Mastodon=description・Misskey=comment(512字上限) として送り、
+   * DB にも保存してサービス側 <img alt> のフォールバック元にする。
+   */
+  altText?: string | null;
   options: {
     position: Position;
     font: FontFamily;
@@ -170,6 +177,8 @@ interface PostImageInput {
   text: string;
   imagePageUrl: string;
   visibility: PublishVisibility;
+  /** 画像の代替テキスト（ALT）。未設定なら送らない。 */
+  altText?: string | null;
 }
 
 /** 5xx 再試行前の軽いバックオフ */
@@ -184,8 +193,19 @@ async function postImageOnce(input: PostImageInput): Promise<PostResult | null> 
     return null;
   }
 
-  const { user, buffer, contentType, filename, text, imagePageUrl, visibility } =
-    input;
+  const {
+    user,
+    buffer,
+    contentType,
+    filename,
+    text,
+    imagePageUrl,
+    visibility,
+    altText,
+  } = input;
+
+  // 空文字/空白のみは未設定として扱う（description/comment を送らない）
+  const alt = altText?.trim() || undefined;
 
   if (user.instance.type === "mastodon") {
     const v = toMastodonVisibility(visibility);
@@ -197,7 +217,8 @@ async function postImageOnce(input: PostImageInput): Promise<PostResult | null> 
       filename,
       text,
       imagePageUrl,
-      v
+      v,
+      alt
     );
   }
 
@@ -212,7 +233,8 @@ async function postImageOnce(input: PostImageInput): Promise<PostResult | null> 
       filename,
       text,
       imagePageUrl,
-      v
+      v,
+      alt
     );
   }
 
@@ -280,6 +302,7 @@ async function storeAndRecord(
       width,
       height,
       overlayText: input.text,
+      altText: input.altText?.trim() || null,
       position: input.options.position,
       font: input.options.font,
       color: input.options.color,
@@ -339,6 +362,7 @@ export async function publishImage(
       text: input.text,
       imagePageUrl,
       visibility: input.visibility,
+      altText: input.altText,
     });
 
     if (postResult?.success && postResult.postUrl) {
@@ -373,6 +397,7 @@ export async function publishImage(
     text: input.text,
     imagePageUrl,
     visibility: input.visibility,
+    altText: input.altText,
   });
 
   if (!postResult || !postResult.success) {

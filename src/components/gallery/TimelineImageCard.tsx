@@ -12,6 +12,8 @@ export interface TimelineCardImage {
   width: number;
   height: number;
   overlayText: string;
+  /** 画像の代替テキスト（ALT）。未設定時は overlayText を alt にフォールバック。 */
+  altText?: string | null;
   position: string;
   size: string;
   blurDataUrl?: string | null;
@@ -54,7 +56,7 @@ export function TimelineImageCard({
     >
       <ThumbnailImage
         src={imageUrl}
-        alt={image.overlayText}
+        alt={image.altText || image.overlayText}
         position={image.position}
         size={image.size}
         fill={fill}

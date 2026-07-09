@@ -54,6 +54,13 @@ Readme参照
 ### EXIF/メタデータ
 - Orientationに従い自動回転（スマホ画像対応）。GPS・カメラ情報等は出力時に削除（プライバシー保護）。
 
+### 代替テキスト（ALT）
+画像の代替テキスト。`text` と同じ経路に `altText` を1本通す配管（`PublishImageInput.altText` → `PostImageInput` → [post.ts](src/lib/fediverse/post.ts)）。DBは `Image.altText`（VarChar1500・null=未設定）。
+- **投稿先**: Mastodon=メディアの `description`／Misskey=ドライブの `comment`（**512字上限で切り詰め**）。未設定なら送らない。
+- **Web**: [ImageUpload.tsx](src/components/ImageUpload.tsx) の画像左上「ALT」バッジ（Mastodon風）→ [AltTextDialog.tsx](src/components/AltTextDialog.tsx) で入力。生成には不要なので `/api/v1/generate` には送らず `/api/v1/post` の FormData にのみ相乗り。画像を変えたら破棄。上限1500字。
+- **Bot（mention）**: 元投稿の添付メディアの `description` をそのまま引き継ぐ（[processor.ts](src/lib/mention/processor.ts)）。**メール投稿は非対応**。
+- **サービス側 `<img>`**: 主画像の alt は `altText || overlayText`（ALT未設定なら合成テキストにフォールバック）。装飾サムネ（`alt=""`）は対象外。
+
 ### APIの制限
 - レート制限8秒/1req（IP単位）・処理タイムアウト30秒（超過で504）・レスポンスにContent-Lengthを含む。
 
@@ -72,7 +79,7 @@ App Router の `<Link>` はビューポート進入で RSC ペイロードを自
 
 ### POST /api/v1/post
 - multipart/form-data・**認証必須**（JWT）。
-- パラメータ: image(生成済Blob), text, position/font/color/size/output（生成オプション）, mimeType, visibility(`public`/`unlisted`/`local`)。
+- パラメータ: image(生成済Blob), text, position/font/color/size/output（生成オプション）, mimeType, visibility(`public`/`unlisted`/`local`), altText(任意・画像の代替テキスト)。
 - **処理**: R2アップロード → DB保存 → Fediverse投稿（local時はスキップ）。
 - **レスポンス**: `{ success, imageId, imagePageUrl, postUrl? }`
 

@@ -8,6 +8,7 @@ import { TextInput } from "@/components/TextInput";
 import { ImageUpload } from "@/components/ImageUpload";
 import { OptionsPanel } from "@/components/OptionsPanel";
 import { VisibilityPicker } from "@/components/VisibilityPicker";
+import { AltTextDialog } from "@/components/AltTextDialog";
 import { SaveDefaultsSection } from "@/components/SaveDefaultsSection";
 import { OtherPostMethods } from "@/components/OtherPostMethods";
 import { ActionButtons } from "@/components/ActionButtons";
@@ -217,6 +218,10 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
   const [visibility, setVisibility] = useState<Visibility>(
     preferences.visibility ?? "public",
   );
+  // 画像の代替テキスト（ALT）。生成には不要なので formState には載せず独立に持つ。
+  // 投稿時（handlePost）の FormData にだけ相乗りさせる。画像を変えたら破棄する。
+  const [altText, setAltText] = useState("");
+  const [altDialogOpen, setAltDialogOpen] = useState(false);
   const [isSavingDefaults, setIsSavingDefaults] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [exif, setExif] = useState<ExtractedExif | null>(null);
@@ -305,6 +310,8 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
       // 新しい画像がアップロードされたら生成結果をクリア
       setHasGenerated(false);
       setResultUrl(null);
+      // ALTは「その写真」の説明なので、別の写真になったら破棄する
+      setAltText("");
       toast.dismiss();
       // 撮影情報の選択肢と位置情報の解析キャッシュは画像ごとに毎回リセット
       // 撮影場所は毎回ユーザーに選択してもらう（保存対象外）。
@@ -401,6 +408,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
     setLocationOption("none");
     setGeocoded(null);
     setGeocodeError(null);
+    setAltText("");
     if (resultUrl) {
       URL.revokeObjectURL(resultUrl);
       setResultUrl(null);
@@ -588,6 +596,8 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
       if (stateToPost.season) formData.append("season", stateToPost.season);
       formData.append("mimeType", mimeType);
       formData.append("visibility", visibility);
+      // 代替テキスト（ALT）: 設定されている場合のみ送る（generate には送らない）
+      if (altText.trim()) formData.append("altText", altText.trim());
 
       // EXIFメタデータ: 表示オプションに従って送る内容を決める
       // - none:         何も送らない
@@ -851,12 +861,13 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
                 imagePreview={formState.imagePreview}
                 resultUrl={resultUrl}
                 hasGenerated={hasGenerated}
-                resultInfo={resultInfo}
                 isLoading={isLoading}
                 isPosting={isPosting}
                 onImageSelect={handleImageSelect}
                 onReset={handleReset}
                 disabled={isLoading || isPosting}
+                altText={altText}
+                onEditAlt={() => setAltDialogOpen(true)}
               />
             </div>
 
@@ -1294,6 +1305,18 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
           </div>
         </div>
       )}
+
+      {/* 代替テキスト（ALT）編集ダイアログ。ImageUpload のALTバッジから開く。
+          参考画像は生成結果があればそれ、なければアップロードプレビューを出す。 */}
+      <AltTextDialog
+        open={altDialogOpen}
+        value={altText}
+        previewUrl={
+          hasGenerated && resultUrl ? resultUrl : formState.imagePreview
+        }
+        onSave={setAltText}
+        onClose={() => setAltDialogOpen(false)}
+      />
     </div>
   );
 }

@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
     const color = formData.get("color") as Color | null;
     const size = formData.get("size") as Size | null;
     const output = formData.get("output") as OutputFormat | null;
+    const altText = (formData.get("altText") as string | null)?.trim() || null;
     const arrangement = (formData.get("arrangement") as Arrangement | null) || "none";
     const season = (formData.get("season") as string | null) || null;
     const visibility = formData.get("visibility") as string | null;
@@ -100,6 +101,15 @@ export async function POST(request: NextRequest) {
     if (countGraphemes(text) > MAX_TEXT_LENGTH) {
       return NextResponse.json(
         { error: `テキストは${MAX_TEXT_LENGTH}文字以下にしてください` },
+        { status: 400 }
+      );
+    }
+
+    // 代替テキスト（ALT）は Mastodon の description 上限に合わせて1500字まで。
+    // （Misskey へ送るときは post.ts が512字に切り詰める）
+    if (altText && countGraphemes(altText) > 1500) {
+      return NextResponse.json(
+        { error: "代替テキストは1500文字以下にしてください" },
         { status: 400 }
       );
     }
@@ -235,6 +245,7 @@ export async function POST(request: NextRequest) {
         autoMakeup: user.autoMakeup,
       },
       text,
+      altText,
       // 案B（実績は season:null フィルタで隔離）: season 指定時はスタイル列に
       // シーズンのプリセット実値を保存する。これでタイル表示のフォーカス（position）や
       // 拡大率（size）が実際の描画と一致する。実績側は別途 season で除外する。
