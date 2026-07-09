@@ -35,7 +35,7 @@ export function EmailAddressDisplay({ emailPrefix, emailDomain }: EmailAddressDi
           <button
             type="button"
             onClick={handleCopy}
-            className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
             title="コピー"
           >
             {isCopied ? (
@@ -47,7 +47,7 @@ export function EmailAddressDisplay({ emailPrefix, emailDomain }: EmailAddressDi
           <button
             type="button"
             onClick={() => setIsVisible(!isVisible)}
-            className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+            className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
             title={isVisible ? "隠す" : "表示"}
             aria-label={isVisible ? "隠す" : "表示"}
           >

@@ -24,7 +24,7 @@ export function CopyableText({ text }: CopyableTextProps) {
       <button
         type="button"
         onClick={handleCopy}
-        className="shrink-0 p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+        className="shrink-0 p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
         title="コピー"
       >
         {isCopied ? (

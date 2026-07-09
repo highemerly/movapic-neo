@@ -61,7 +61,7 @@ export function MentionSettingsForm({
               <button
                 type="button"
                 onClick={handleCopy}
-                className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                className="p-2 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
                 title="コピー"
               >
                 {isCopied ? (
