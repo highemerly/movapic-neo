@@ -136,6 +136,9 @@ export function CalendarView({
   // 開いているピッカー（代表 or 穴埋め）。
   const [picker, setPicker] = useState<{ kind: "representative" | "donor"; day: number } | null>(null);
   const [saving, setSaving] = useState(false);
+  // 年月ジャンプ用ピッカー（見出しタップで開く）。pickerYear はパネル内で選択中の年。
+  const [monthPickerOpen, setMonthPickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(initialYear);
 
   // 離脱時（アンマウント / タブ離脱）に「今どの月を編集中か」をハンドラから読むための ref。
   // クロージャに焼き付くと古い年月で reevaluate してしまうため常に最新へ同期する。
@@ -323,6 +326,26 @@ export function CalendarView({
     updateUrl(newYear, newMonth);
   };
 
+  // 見出しタップの年月ピッカーから任意の年月へジャンプ。月送りと同じく
+  // 方向スライド・編集中の皆勤再判定（付与のみ・冪等）・URL更新を通す。
+  const jumpToYearMonth = (newYear: number, newMonth: number) => {
+    setMonthPickerOpen(false);
+    if (newYear === year && newMonth === month) return;
+    if (editMode) reevaluateBeacon(year, month);
+    const isForward =
+      newYear > year || (newYear === year && newMonth > month);
+    setDirection(isForward ? "next" : "prev");
+    setYear(newYear);
+    setMonth(newMonth);
+    updateUrl(newYear, newMonth);
+  };
+
+  // ピッカーを開くとき、パネルの表示年を現在の年に合わせる。
+  const openMonthPicker = () => {
+    setPickerYear(year);
+    setMonthPickerOpen(true);
+  };
+
   // カレンダーのグリッドを生成
   const generateCalendarGrid = () => {
     const firstDay = new Date(year, month - 1, 1);
@@ -381,9 +404,15 @@ export function CalendarView({
         >
           <ChevronLeft className="w-4 h-4" />
         </Button>
-        <h2 className="text-base font-bold min-w-[120px] text-center">
+        <button
+          type="button"
+          onClick={openMonthPicker}
+          disabled={loading}
+          className="min-w-[120px] rounded-md px-2 py-1 text-base font-bold transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+          aria-label="年月を選択"
+        >
           {year}年{month}月
-        </h2>
+        </button>
         <Button
           variant="ghost"
           size="sm"
@@ -570,6 +599,107 @@ export function CalendarView({
           onApply={applyAndRefresh}
         />
       )}
+
+      {/* 年月ジャンプのピッカー（見出しタップで開く） */}
+      {monthPickerOpen && (
+        <MonthYearPicker
+          selectedYear={year}
+          selectedMonth={month}
+          pickerYear={pickerYear}
+          setPickerYear={setPickerYear}
+          today={today}
+          onClose={() => setMonthPickerOpen(false)}
+          onPick={jumpToYearMonth}
+        />
+      )}
+    </div>
+  );
+}
+
+/** 見出しタップで開く年月ジャンプ用ボトムシート。年を送りながら12ヶ月から選ぶ。 */
+function MonthYearPicker({
+  selectedYear,
+  selectedMonth,
+  pickerYear,
+  setPickerYear,
+  today,
+  onClose,
+  onPick,
+}: {
+  selectedYear: number;
+  selectedMonth: number;
+  pickerYear: number;
+  setPickerYear: (y: number) => void;
+  today: Date;
+  onClose: () => void;
+  onPick: (year: number, month: number) => void;
+}) {
+  const todayYear = today.getFullYear();
+  const todayMonth = today.getMonth() + 1;
+  // 未来年へは進めない（当年まで）。
+  const canGoNextYear = pickerYear < todayYear;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-t-2xl bg-background p-4 shadow-xl sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 年セレクタ */}
+        <div className="mb-3 flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => setPickerYear(pickerYear - 1)}
+            aria-label="前の年"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="text-base font-bold">{pickerYear}年</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => setPickerYear(pickerYear + 1)}
+            disabled={!canGoNextYear}
+            aria-label="次の年"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* 12ヶ月グリッド（未来月は選択不可） */}
+        <div className="grid grid-cols-4 gap-2">
+          {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => {
+            const isFuture =
+              pickerYear > todayYear ||
+              (pickerYear === todayYear && m > todayMonth);
+            const isSelected = pickerYear === selectedYear && m === selectedMonth;
+            return (
+              <button
+                key={m}
+                type="button"
+                disabled={isFuture}
+                onClick={() => onPick(pickerYear, m)}
+                className={cn(
+                  "rounded-md py-2 text-sm font-semibold transition-colors",
+                  isFuture
+                    ? "cursor-not-allowed text-muted-foreground/40"
+                    : isSelected
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted",
+                )}
+              >
+                {m}月
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
