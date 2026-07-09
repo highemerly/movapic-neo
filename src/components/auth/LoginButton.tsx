@@ -311,7 +311,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
                 新規登録は不要です。お持ちの分散型SNS（MastodonまたはMisskey）のサーバー名を入力すればログインできます。
               </p>
               <p>
-                まだ分散型SNSのアカウントを持っていない方はあ、SHAMEZO管理者の運営する{" "}
+                まだ分散型SNSのアカウントを持っていない方は、SHAMEZO管理者の運営する{" "}
                 <a
                   href="https://handon.club"
                   target="_blank"
