@@ -127,6 +127,10 @@ export async function POST(request: NextRequest) {
       if (isJapaneseHoliday(year, month, day)) holidays.push(day);
     }
 
+    console.log(
+      `[collage-generate] user=${user.username} ${year}-${month} cells=${cells.length} perfect=${resolved.isPerfectAttendance}`
+    );
+
     const result = await renderCalendarCollage(
       {
         year,

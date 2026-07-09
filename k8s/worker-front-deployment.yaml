@@ -7,11 +7,12 @@
 # 設計（3-tier: web / worker-front / compute）:
 #   - 全 pod「同一イメージ」。役割は COMPONENT_ROLE で起動時に確定する。
 #   - worker-front は COMPONENT_ROLE=worker-front:
-#       * /api/v1/generate・/api/v1/post・/api/v1/ingest/* を HTTP 配信
+#       * /api/v1/generate・/api/v1/post・/api/v1/ingest/*・/api/v1/calendar/collage/* を HTTP 配信
+#         （collage は compute 描画＋S3読み＋Fediverse投稿を伴うため web ではなく worker-front）
 #       * instrumentation.ts が Graphile Worker ランナー（キュー consumer）を起動
 #       * 重い画像処理は compute サービス（/api/internal/*）へ委譲（自身は sharp/skia を呼ばない）
 #   - レート制限（generate の IP単位8s/1req インメモリ）のため当面 replicas: 1。
-#   - Traefik で generate/post/ingest を worker-front へ、それ以外を web へ振り分ける（末尾の例参照）。
+#   - Traefik で generate/post/ingest/calendar/collage を worker-front へ、それ以外を web へ振り分ける（末尾の例参照）。
 # =============================================================================
 apiVersion: apps/v1
 kind: Deployment
@@ -96,8 +97,8 @@ spec:
 # spec:
 #   entryPoints: [websecure]
 #   routes:
-#     # 画像生成・投稿・取り込み → worker-front
-#     - match: Host(`pic.handon.club`) && (PathPrefix(`/api/v1/generate`) || PathPrefix(`/api/v1/post`) || PathPrefix(`/api/v1/ingest`))
+#     # 画像生成・投稿・取り込み・カレンダー画像 → worker-front
+#     - match: Host(`pic.handon.club`) && (PathPrefix(`/api/v1/generate`) || PathPrefix(`/api/v1/post`) || PathPrefix(`/api/v1/ingest`) || PathPrefix(`/api/v1/calendar/collage`))
 #       kind: Rule
 #       services:
 #         - name: movapic-neo-worker-front

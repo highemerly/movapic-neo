@@ -138,6 +138,10 @@ export async function POST(request: NextRequest) {
       });
     };
 
+    console.log(
+      `[collage-post] user=${user.username}@${domain} type=${user.instance.type} vis=${visibility} bytes=${buffer.length}`
+    );
+
     let result = await postOnce();
     if (result && !result.success && result.statusCode && result.statusCode >= 500) {
       await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS));
@@ -145,6 +149,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (!result || !result.success) {
+      console.error(
+        `[collage-post] fediverse failed: status=${result?.statusCode} error=${result?.error}`
+      );
       return NextResponse.json(
         { success: false, error: result?.error ?? "投稿に失敗しました" },
         { status: 502 }
