@@ -217,7 +217,7 @@ export function CollageShareDialog({
           </h3>
           <button
             onClick={onClose}
-            className="rounded p-1 text-muted-foreground hover:bg-muted"
+            className="-m-1.5 rounded p-2.5 text-muted-foreground hover:bg-muted"
             aria-label="閉じる"
           >
             <X className="h-4 w-4" />

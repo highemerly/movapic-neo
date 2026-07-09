@@ -826,7 +826,7 @@ function EditPicker({
               ? `${month}月${day}日のサムネイルを選ぶ`
               : `${month}月${day}日を穴埋めする写真を選ぶ`}
           </h3>
-          <button onClick={onClose} className="rounded p-1 text-muted-foreground hover:bg-muted">
+          <button onClick={onClose} className="-m-1.5 rounded p-2.5 text-muted-foreground hover:bg-muted" aria-label="閉じる">
             <X className="h-4 w-4" />
           </button>
         </div>
