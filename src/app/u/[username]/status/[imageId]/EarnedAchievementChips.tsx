@@ -25,7 +25,7 @@ export function EarnedAchievementChips({
 
   return (
     <>
-      <p className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-amber-700 dark:text-amber-400">
+      <p className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-amber-700 dark:text-amber-400">
         <Trophy
           className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-600"
           aria-label="この投稿で獲得した実績"

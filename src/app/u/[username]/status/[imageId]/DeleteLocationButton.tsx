@@ -49,11 +49,11 @@ export function DeleteLocationButton({ imageId, locationLabel }: DeleteLocationB
     <button
       onClick={handleDelete}
       disabled={isDeleting}
-      className="inline-flex items-center rounded p-0.5 text-muted-foreground transition-colors hover:text-red-600 disabled:opacity-50"
+      className="relative inline-flex items-center rounded p-1 text-muted-foreground transition-colors hover:text-red-600 disabled:opacity-50 before:absolute before:-inset-y-[11px] before:-left-1 before:-right-3 before:content-['']"
       title="撮影場所を削除"
       aria-label="撮影場所を削除"
     >
-      <X className="h-3 w-3" />
+      <X className="h-3.5 w-3.5" />
     </button>
   );
 }

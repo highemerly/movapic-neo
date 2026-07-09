@@ -378,7 +378,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
 
         {/* EXIF情報（カメラ機種・撮影場所）。投稿者本人のみ撮影場所だけ削除可能。 */}
         {(image.cameraModel || image.locationPrefecture) && (
-          <p className="mb-[5px] flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+          <p className="mb-[5px] flex flex-wrap items-center gap-x-2 text-[13px] text-muted-foreground">
             {image.cameraModel && (
               <span className="inline-flex items-center gap-[3px]">
                 <Camera className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -409,7 +409,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         )}
 
         {/* メタ情報（日時・ソース・設定） */}
-        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
           <span className="inline-flex items-center gap-0.5">
             <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
             {image.postUrl ? (
