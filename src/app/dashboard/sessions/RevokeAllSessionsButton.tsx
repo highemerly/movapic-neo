@@ -45,7 +45,7 @@ export function RevokeAllSessionsButton({ count }: { count: number }) {
       type="button"
       onClick={handleRevokeAll}
       disabled={loading}
-      className="inline-flex items-center gap-1.5 text-xs text-destructive hover:underline disabled:opacity-50"
+      className="inline-flex items-center gap-1.5 -my-1 -mr-2 rounded-md px-2 py-2 text-xs text-destructive hover:underline disabled:opacity-50"
     >
       {loading ? (
         <Loader2 className="h-3.5 w-3.5 animate-spin" />

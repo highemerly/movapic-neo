@@ -47,7 +47,7 @@ export function RevokeSessionButton({ sessionId }: { sessionId: string }) {
         type="button"
         onClick={handleRevoke}
         disabled={loading}
-        className="inline-flex items-center gap-1 text-xs text-destructive hover:underline disabled:opacity-50"
+        className="inline-flex items-center gap-1 -my-1 -mr-2 rounded-md px-2 py-2 text-xs text-destructive hover:underline disabled:opacity-50"
       >
         {loading ? (
           <Loader2 className="h-3 w-3 animate-spin" />
