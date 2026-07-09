@@ -28,7 +28,7 @@ export function FooterThemeToggle() {
       <span
         role="radiogroup"
         aria-label="表示モード"
-        className="inline-flex items-center gap-0.5"
+        className="inline-flex items-center gap-1"
       >
         {OPTIONS.map(({ value, label, Icon }) => {
           const selected = mounted && theme === value;
