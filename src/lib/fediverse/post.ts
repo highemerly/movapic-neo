@@ -147,6 +147,8 @@ export async function postToMastodon(
   mimeType: string,
   filename: string,
   statusText: string,
+  // 本文末尾に付ける画像ページURL。空文字なら付けない（カレンダー画像などサービス側にページを
+  // 持たない投稿はメディア＋本文のみで投稿する）。
   imageUrl: string,
   visibility: MastodonVisibility = "public",
   altText?: string
@@ -171,7 +173,7 @@ export async function postToMastodon(
         "User-Agent": USER_AGENT,
       },
       body: JSON.stringify({
-        status: `${statusText}\n${imageUrl}`,
+        status: imageUrl ? `${statusText}\n${imageUrl}` : statusText,
         media_ids: [mediaId],
         visibility,
       }),
@@ -275,7 +277,7 @@ export async function postToMisskey(
       },
       body: JSON.stringify({
         i: accessToken,
-        text: `${statusText}\n${imageUrl}`,
+        text: imageUrl ? `${statusText}\n${imageUrl}` : statusText,
         fileIds: [fileId],
         visibility,
       }),

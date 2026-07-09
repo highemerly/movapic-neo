@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Crown, Pencil, Check, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Crown, Pencil, Check, X, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { StackedSquaresIcon } from "./StackedSquaresIcon";
+import { CollageShareDialog } from "./CollageShareDialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isJapaneseHoliday } from "@/lib/holidays";
@@ -64,6 +65,8 @@ interface CalendarViewProps {
   isOwner: boolean;
   /** このカレンダーの持ち主の未投稿許容日数（穴埋め枠。所属インスタンスで決まる注意書きの数字）。 */
   grace: number;
+  /** 投稿先サーバー名（カレンダー画像投稿ボタンの文言に使う）。 */
+  serverName: string;
 }
 
 /**
@@ -123,6 +126,7 @@ export function CalendarView({
   initialMonth,
   isOwner,
   grace,
+  serverName,
 }: CalendarViewProps) {
   const router = useRouter();
   const [year, setYear] = useState(initialYear);
@@ -139,6 +143,8 @@ export function CalendarView({
   // 年月ジャンプ用ピッカー（見出しタップで開く）。pickerYear はパネル内で選択中の年。
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState(initialYear);
+  // カレンダー画像（コラージュ）の共有ダイアログの開閉。
+  const [shareOpen, setShareOpen] = useState(false);
 
   // 離脱時（アンマウント / タブ離脱）に「今どの月を編集中か」をハンドラから読むための ref。
   // クロージャに焼き付くと古い年月で reevaluate してしまうため常に最新へ同期する。
@@ -388,6 +394,12 @@ export function CalendarView({
     year > today.getFullYear() ||
     (year === today.getFullYear() && month > today.getMonth() + 1);
 
+  // この月に投稿（または穴埋め）があるか（カレンダー画像投稿ボタンの表示判定）。
+  const hasPosts =
+    !!data &&
+    (Object.keys(data.days).length > 0 ||
+      (data.perfectMonth?.filledDays.length ?? 0) > 0);
+
   return (
     <div className="w-full overflow-x-clip">
       {/* カレンダー本体（ナビ＋グリッド）は従来幅に制限。コンテナが広いと
@@ -442,28 +454,48 @@ export function CalendarView({
           <PerfectMonthCallout pm={data.perfectMonth} />
         )}
 
-        {/* カレンダー編集（owner・過去/当月のみ）。穴埋めアナウンスとカレンダーの間・全幅で配置。 */}
+        {/* カレンダー編集＋画像投稿（owner・過去/当月のみ）。画像詳細ページのボタンUIに合わせた
+            枠線ボタンを横並びで配置。編集中はカレンダー画像投稿を隠して編集ボタンのみ全幅にする。 */}
         {isOwner && !isFutureMonth && (
-          <div className="mb-3">
-            <Button
-              variant={editMode ? "default" : "outline"}
-              size="sm"
-              className="h-9 w-full gap-1.5 text-sm"
+          <div className="mb-3 flex gap-2">
+            <button
+              type="button"
               onClick={toggleEditMode}
               disabled={loading || saving}
+              className={cn(
+                "flex flex-auto items-center justify-center gap-1.5 h-[40px] px-1.5 border rounded-md transition-colors disabled:opacity-60",
+                editMode
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground border-border",
+              )}
             >
               {editMode ? (
                 <>
-                  <Check className="h-4 w-4" />
-                  編集を終了
+                  <Check className="h-4 w-4 shrink-0" />
+                  <span className="text-sm font-medium">編集を終了</span>
                 </>
               ) : (
                 <>
-                  <Pencil className="h-4 w-4" />
-                  カレンダーを編集
+                  <Pencil className="h-4 w-4 shrink-0" />
+                  <span className="text-sm font-medium">編集</span>
                 </>
               )}
-            </Button>
+            </button>
+
+            {!editMode && hasPosts && (
+              <button
+                type="button"
+                onClick={() => setShareOpen(true)}
+                disabled={loading || saving}
+                className="flex flex-auto items-center justify-center gap-1.5 h-[40px] px-1.5 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border disabled:opacity-60"
+              >
+                <Share2 className="h-4 w-4 shrink-0" />
+                <span className="text-sm font-medium">月次画像を作成</span>
+                <span className="rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-bold leading-none text-amber-600 dark:text-amber-400">
+                  ベータ
+                </span>
+              </button>
+            )}
           </div>
         )}
 
@@ -597,6 +629,16 @@ export function CalendarView({
           saving={saving}
           onClose={() => setPicker(null)}
           onApply={applyAndRefresh}
+        />
+      )}
+
+      {/* カレンダー画像（コラージュ）の共有ダイアログ */}
+      {shareOpen && (
+        <CollageShareDialog
+          year={year}
+          month={month}
+          serverName={serverName}
+          onClose={() => setShareOpen(false)}
         />
       )}
 

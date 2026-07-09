@@ -138,6 +138,7 @@ export default async function CalendarPage({
             initialMonth={initialMonth}
             isOwner={isOwner}
             grace={perfectMonthGrace(user.instance.domain)}
+            serverName={user.instance.domain}
           />
         </TabTransition>
 

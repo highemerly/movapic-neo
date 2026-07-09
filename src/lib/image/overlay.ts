@@ -1,6 +1,6 @@
-import path from "path";
-import { Canvas, FontLibrary, CanvasRenderingContext2D } from "skia-canvas";
+import { Canvas, CanvasRenderingContext2D } from "skia-canvas";
 import { Position, FontFamily, Arrangement } from "@/types";
+import { ensureFontsLoaded } from "./fonts";
 import {
   PROPORTIONAL_FONTS,
   MONOSPACE_FONTS,
@@ -20,16 +20,8 @@ import { drawNeonText } from "./neon";
 import { drawSeasonBackground } from "./seasons";
 import { getSeasonByKey } from "@/lib/seasons/catalog";
 
-// フォントを登録
-const fontsDir = path.join(process.cwd(), "fonts");
-// eslint-disable-next-line react-hooks/rules-of-hooks
-FontLibrary.use([
-  path.join(fontsDir, "HuiFont29.ttf"),
-  path.join(fontsDir, "NotoSansJP-Regular.ttf"),
-  path.join(fontsDir, "LightNovelPOPv2.otf"),
-  // 絵文字（モノクロ）。本文フォントが持たない絵文字グリフをフォールバックで描画する。
-  path.join(fontsDir, "NotoEmoji-VariableFont_wght.ttf"),
-]);
+// フォントを登録（overlay/collage 共通のローダーで1回だけ実行）
+ensureFontsLoaded();
 
 // フォント名のマッピング（skia-canvasはフォントファイル内のフォント名を使用）
 export const CANVAS_FONT_NAMES: Record<FontFamily, string> = {

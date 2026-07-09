@@ -7,6 +7,7 @@
  */
 
 import type { ProcessImageResult } from "@/lib/image";
+import type { CalendarCollageSpec } from "@/lib/calendar/collageTypes";
 import type {
   Position,
   FontFamily,
@@ -127,6 +128,43 @@ export interface FinalizeResult {
   height: number;
   /** 一覧のBlurプレースホルダ用 LQIP（data:image/webp;base64,...）。生成失敗時は undefined */
   blurDataUrl?: string;
+}
+
+export interface CalendarCollageResult {
+  buffer: Buffer;
+  contentType: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * カレンダー画像（コラージュ）を compute で生成する。
+ * thumbnails は spec.cells[].imageIndex が指す順で渡す（thumb_0..）。
+ */
+export async function renderCalendarCollage(
+  spec: CalendarCollageSpec,
+  thumbnails: Buffer[],
+  signal?: AbortSignal
+): Promise<CalendarCollageResult> {
+  const form = new FormData();
+  form.append("spec", JSON.stringify(spec));
+  thumbnails.forEach((buf, i) => {
+    form.append(`thumb_${i}`, bufferToBlob(buf), `thumb_${i}`);
+  });
+
+  const res = await computeFetch("/api/internal/render-calendar", form, signal);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`compute render-calendar failed: ${res.status} ${body}`);
+  }
+
+  const buffer = Buffer.from(await res.arrayBuffer());
+  return {
+    buffer,
+    contentType: res.headers.get("Content-Type") ?? "image/jpeg",
+    width: parseInt(res.headers.get("X-Width") ?? "0", 10),
+    height: parseInt(res.headers.get("X-Height") ?? "0", 10),
+  };
 }
 
 /** 最終画像の mime 判定＋寸法＋サムネを compute で得る。 */
