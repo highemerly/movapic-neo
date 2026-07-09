@@ -405,9 +405,9 @@ export default async function DashboardPage() {
               <AutoMakeupToggle
                 initialDisabled={!(userWithPreferences?.autoMakeup ?? true)}
               />
-              <DisplayModeSelector />
               {/* 控えめなインストール導線（Android/iOS Safari・未インストール時のみ表示） */}
               <InstallEntry />
+              <DisplayModeSelector />
             </div>
           </div>
 
