@@ -60,23 +60,27 @@ export const PREFECTURES: Prefecture[] = [
 ];
 
 /**
- * 地図ヒートマップのタイルカルトグラム配置。13列 × 11行。各セルは prefecture code か null。
- * 厳密な地理ではなく、おおまかに日本列島の形を再現したレイアウト（やや反時計回りに回し、
- * 九州が縦一直線にならないよう row 8-9 に横展開している）。
+ * 地図ヒートマップのタイルカルトグラム配置。12列 × 12行。各セルは prefecture code か null。
+ * 厳密な地理ではなく、九州(左下)→北海道(右上)の対角線で日本列島の形をおおまかに再現する。
+ * 精度より上下左右の位置関係を優先し、各行・各列を経度/緯度順で単調になるよう配置している。
+ * 四国は高知を1段下げて田の字（愛媛/香川/徳島の南に高知）、九州は南北3段
+ * （佐賀福岡／長崎大分熊本／鹿児島宮崎）に展開して南北関係を出している。
+ * 近畿は三重を大阪の行に落とし、奈良の真下に和歌山を置いて並びを出している。
  * 東北はファーストビュー高さを抑えるため、青森を秋田-岩手の間に押し込んで1行に集約している。
  */
 export const JAPAN_TILE_GRID: (string | null)[][] = [
-  [null, null, null, null, null, null, null, null, null, null, null, "01", null],
-  [null, null, null, null, null, null, null, null, null, null, "05", "02", "03"],
-  [null, null, null, null, null, null, null, null, null, null, "06", "04", null],
-  [null, null, null, null, null, null, null, null, null, "15", "07", null, null],
-  [null, null, null, null, null, null, null, null, "17", "16", "10", "09", "08"],
-  [null, null, null, null, null, null, "18", "21", "20", "19", "11", "13", "12"],
-  [null, null, null, "32", "31", "26", "25", "23", "24", "22", "14", null, null],
-  [null, null, "35", "34", "33", "28", "27", "29", "30", null, null, null, null],
-  ["40", "44", "38", "37", "36", "39", null, null, null, null, null, null, null],
-  ["42", "41", "43", "45", "46", null, null, null, null, null, null, null, null],
-  [null, "47", null, null, null, null, null, null, null, null, null, null, null],
+  [null, null, null, null, null, null, null, null, null, null, "01", null],
+  [null, null, null, null, null, null, null, null, null, "05", "02", "03"],
+  [null, null, null, null, null, null, null, null, null, "06", "04", null],
+  [null, null, null, null, null, null, null, null, null, "15", "07", null],
+  [null, null, null, null, null, null, null, "17", "16", "10", "09", "08"],
+  [null, null, null, null, null, "18", "21", "20", "19", "11", "13", "12"],
+  [null, null, null, "32", "31", "26", "25", "23", "22", "14", null, null],
+  [null, null, "35", "34", "33", "28", "27", "24", null, null, null, null],
+  ["41", "40", null, "38", "37", "36", null, "29", null, null, null, null],
+  ["42", "43", "44", null, "39", null, null, "30", null, null, null, null],
+  [null, "46", "45", null, null, null, null, null, null, null, null, null],
+  [null, "47", null, null, null, null, null, null, null, null, null, null],
 ];
 
 export const PREFECTURE_BY_CODE: Record<string, Prefecture> = Object.fromEntries(

@@ -194,7 +194,10 @@ function TileGrid({
   const cols = JAPAN_TILE_GRID[0].length;
   return (
     <div
-      className="grid w-full gap-1"
+      // 地図は左側に空セルが多く左余白が広い一方、右端列(岩手/茨城/千葉)は詰まって見える。
+      // そこでスマホでは左のページ余白(px-4=16px)の半分だけ負マージンで相殺して地図を左へ
+      // 寄せ、右に余白を残す。タイルの潰れは隙間の圧縮(gap-0.5)で緩和し、sm 以上は従来どおり。
+      className="grid -ml-2 w-[calc(100%+0.5rem)] gap-0.5 sm:ml-0 sm:w-full sm:gap-1"
       style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
       role="grid"
       aria-label="都道府県別投稿のサムネイル地図"
