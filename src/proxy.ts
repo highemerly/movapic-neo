@@ -133,7 +133,13 @@ export async function proxy(request: NextRequest) {
 
   // スライディングセッション: 有効なJWTがアクティブに使われている限り
   // 有効期限を7日窓で自動延長する（詳細は slidingSession.ts）。
-  await maybeSlideSession(request, response);
+  //
+  // 認証系ルート（/api/auth/*）は除外する。これらは自前でセッションCookieを
+  // 操作する（logout=削除 / callback=createSessionで発行）ため、ここで旧Cookieを
+  // 再署名して Set-Cookie すると同一レスポンスでCookie操作が競合してしまう。
+  if (!path.startsWith("/api/auth")) {
+    await maybeSlideSession(request, response);
+  }
 
   return response;
 }

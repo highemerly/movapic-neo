@@ -1,8 +1,11 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import Image from "next/image";
 import { unstable_cache } from "next/cache";
 import prisma from "@/lib/db";
-import { getSessionClaims } from "@/lib/auth/session";
+import { getCurrentUser } from "@/lib/auth/session";
+import { SESSION_COOKIE_NAME } from "@/lib/auth/sessionConstants";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { LoginSection } from "@/components/auth/LoginSection";
 import { LoginPrompt } from "@/components/auth/LoginPrompt";
@@ -82,8 +85,20 @@ export default async function HomePage() {
   const allowedServers = getAllowedServers();
   const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
-  // ログイン状態は JWT（署名+exp検証のみ）で判定＝DBアクセスなし
-  const isLoggedIn = (await getSessionClaims()) !== null;
+  // ログイン状態は DB照合（getCurrentUser）で判定する。
+  // トップページはログイン導線の着地点なので、ここだけは JWT を信用せず
+  // 「DB上でセッションが生きているか」を権威として使う。これを JWT(claims) だけで
+  // 判定すると、スライディングで延命された「JWTは有効だがDBセッションは失効」な
+  // Cookie を持つ端末に対してログインフォームを出せず、ゲートページ↔/ の無限ループに陥る。
+  const currentUser = await getCurrentUser();
+  if (!currentUser) {
+    // Cookieは存在するのに未認証＝食い違い状態。Cookieを掃除して整合させる。
+    const hasSessionCookie = (await cookies()).has(SESSION_COOKIE_NAME);
+    if (hasSessionCookie) {
+      redirect("/api/auth/reconcile");
+    }
+  }
+  const isLoggedIn = currentUser !== null;
 
   // フィーチャー画像を取得（最新16件・5分キャッシュ）
   const featuredImages = await getFeaturedImages();
