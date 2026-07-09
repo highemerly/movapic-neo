@@ -380,7 +380,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             {image.cameraModel && (
               <span className="inline-flex items-center gap-[3px]">
                 <Camera className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                {image.cameraModel}{image.cameraMake && !image.cameraModel.startsWith(image.cameraMake) ? `（${image.cameraMake}）` : ""}
+                {image.cameraModel}
               </span>
             )}
             {image.locationPrefecture && (
