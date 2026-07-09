@@ -299,7 +299,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
               <button
                 type="button"
                 aria-label="ログイン方法"
-                className="flex size-4 items-center justify-center rounded-full border border-border text-[10px] leading-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="relative flex size-5 items-center justify-center rounded-full border border-border text-xs leading-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground before:absolute before:-inset-3 before:content-['']"
               >
                 ？
               </button>
