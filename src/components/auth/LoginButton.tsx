@@ -281,22 +281,60 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
           カード自体が広くても各コントロールは広がりすぎないようにする（下のpill列だけは全幅を使う）。 */}
       <div className="space-y-4">
       {/* サーバー入力 */}
-      <div className="space-y-1">
-        <label
-          htmlFor="server"
-          className="flex flex-col items-start gap-y-1 text-sm font-medium"
-        >
-          サーバー名
-          <span className="mb-0.5 flex items-center gap-2 text-xs font-normal text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <MastodonIcon className="size-3.5" /> Mastodon
-            </span>
-            <span className="flex items-center gap-1">
-              <MisskeyIcon className="size-3.5" /> Misskey
-            </span>
-          </span>
+      {/* space-y ではロゴ行の margin-bottom が入力欄の margin-top と相殺され余白が潰れるため、明示マージンで間隔を作る */}
+      <div>
+        <label htmlFor="server" className="block text-sm font-medium">
+          サーバー名：
         </label>
-        <div className="relative">
+        {/* 対応SNSの案内と、アカウント未所持者向けの説明モーダルを開く「？」ボタン */}
+        <div className="mt-1 flex items-center gap-2 text-xs font-normal text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <MastodonIcon className="size-3.5" /> Mastodon
+          </span>
+          <span className="flex items-center gap-1">
+            <MisskeyIcon className="size-3.5" /> Misskey
+          </span>
+          <LegalInfoDialog
+            title="ログイン方法"
+            trigger={
+              <button
+                type="button"
+                aria-label="ログイン方法"
+                className="flex size-4 items-center justify-center rounded-full border border-border text-[10px] leading-none text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                ？
+              </button>
+            }
+          >
+            <div className="space-y-3 text-sm leading-relaxed text-muted-foreground">
+              <p>
+                新規登録は不要です。お持ちの分散型SNS（MastodonまたはMisskey）のサーバー名を入力すればログインできます。
+              </p>
+              <p>
+                まだ分散型SNSのアカウントを持っていない方はあ、SHAMEZO管理者の運営する{" "}
+                <a
+                  href="https://handon.club"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 align-middle font-medium text-foreground underline hover:text-primary"
+                >
+                  <MastodonIcon className="size-3.5" />handon.club
+                </a>{" "}
+                または{" "}
+                <a
+                  href="https://mi.hiyoko.club"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 align-middle font-medium text-foreground underline hover:text-primary"
+                >
+                  <MisskeyIcon className="size-3.5" />mi.hiyoko.club
+                </a>{" "}
+                などがおすすめです。一度新規登録してから、改めてSHAMEZOにログインしてください。
+              </p>
+            </div>
+          </LegalInfoDialog>
+        </div>
+        <div className="relative mt-2">
           {/* エラーは入力欄の下に吹き出しで表示（上向き矢印で欄を指す・ログインボタンに重なる） */}
           {error && (
             <div
