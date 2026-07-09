@@ -26,6 +26,7 @@ import {
   Map as MapIcon,
   Trophy,
   Megaphone,
+  ChartColumn,
   ScrollText,
   ShieldCheck,
   Code,
@@ -292,6 +293,14 @@ function useMenuSections(nav: MenuNav): MenuSectionData[] {
         label: "プライバシーポリシー",
         Icon: ShieldCheck,
         active: pathname === "/privacy",
+        primary: false,
+      },
+      {
+        key: "stats",
+        href: "/stats",
+        label: "統計",
+        Icon: ChartColumn,
+        active: pathname === "/stats",
         primary: false,
       },
       {

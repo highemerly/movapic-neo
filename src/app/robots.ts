@@ -9,10 +9,20 @@ export const dynamic = "force-dynamic";
 export default async function robots(): Promise<MetadataRoute.Robots> {
   const blocked = await getCrawlerBlockedPaths();
 
-  // 既定は全許可。クロール拒否ユーザーがいる場合のみ、AI Bot 群にだけ Disallow を追加する。
-  const rules: MetadataRoute.Robots["rules"] = [{ userAgent: "*", allow: "/" }];
+  // 統計ページは重い集計を伴うのでクロール対象外にする（ページ側 noindex と揃える）。
+  const STATS_PATH = "/stats";
+
+  // 既定は全許可（統計だけ Disallow）。クロール拒否ユーザーがいる場合のみ、AI Bot 群に
+  // 追加の Disallow を足す。AI Bot は専用UAグループがあると `*` ルールを見ないため、
+  // /stats はそちらのグループにも明示的に含める。
+  const rules: MetadataRoute.Robots["rules"] = [
+    { userAgent: "*", allow: "/", disallow: STATS_PATH },
+  ];
   if (blocked.length > 0) {
-    rules.push({ userAgent: AI_CRAWLER_USER_AGENTS, disallow: blocked });
+    rules.push({
+      userAgent: AI_CRAWLER_USER_AGENTS,
+      disallow: [STATS_PATH, ...blocked],
+    });
   }
 
   return { rules };

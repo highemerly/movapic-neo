@@ -33,6 +33,12 @@ export function Footer() {
           プライバシーポリシー
         </Link>
         <Link
+          href="/stats"
+          className="text-sm text-muted-foreground hover:text-foreground hover:underline"
+        >
+          統計
+        </Link>
+        <Link
           href="/spec"
           className="text-sm text-muted-foreground hover:text-foreground hover:underline"
         >
