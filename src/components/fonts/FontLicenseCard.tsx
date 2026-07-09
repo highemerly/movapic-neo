@@ -13,6 +13,8 @@ export function FontLicenseCard({ license }: { license: FontLicense }) {
       <img
         src={license.sampleSrc}
         alt={license.sampleAlt}
+        width={license.sampleWidth}
+        height={license.sampleHeight}
         className="w-full h-auto rounded-md border border-border mb-3 dark:invert"
       />
       {license.copyright.map((line, i) => (

@@ -18,6 +18,10 @@ export interface FontLicense {
   sampleSrc: string;
   /** 見本画像の alt */
   sampleAlt: string;
+  /** 見本画像の実寸（px）。img の width/height 属性に渡し、読み込み前の高さを予約してCLSを防ぐ */
+  sampleWidth: number;
+  /** 見本画像の実寸（px）。同上 */
+  sampleHeight: number;
   /** 著作権表記（小さめ・muted） */
   copyright: string[];
   /** ライセンス本文（説明段落） */
@@ -35,6 +39,8 @@ export const FONT_LICENSE_LIST: FontLicense[] = [
     label: "ふい字",
     sampleSrc: "/font-samples/hui-font.avif",
     sampleAlt: "ふい字の見本",
+    sampleWidth: 1200,
+    sampleHeight: 628,
     copyright: ["Copyright © ふい字置き場"],
     body: [
       "本フォントは作者による独自ライセンスのもとで配布されており、商用・非商用を問わず無料で利用できます。",
@@ -46,6 +52,8 @@ export const FONT_LICENSE_LIST: FontLicense[] = [
     label: "Noto Sans JP",
     sampleSrc: "/font-samples/noto-sans-jp.avif",
     sampleAlt: "Noto Sans JP の見本",
+    sampleWidth: 1200,
+    sampleHeight: 628,
     copyright: ["Copyright © 2014–2021 Adobe（「Noto」は Google Inc. の商標です）"],
     body: ["本フォントは SIL Open Font License, Version 1.1 のもとで配布されています。"],
     link: { href: "https://scripts.sil.org/OFL", label: "https://scripts.sil.org/OFL" },
@@ -55,6 +63,8 @@ export const FONT_LICENSE_LIST: FontLicense[] = [
     label: "ラノベPOP V2",
     sampleSrc: "/font-samples/light-novel-pop.avif",
     sampleAlt: "ラノベPOP V2 の見本",
+    sampleWidth: 1200,
+    sampleHeight: 628,
     copyright: [
       "Copyright © 2019 フロップデザイン",
       "Derived from M+ FONTS: Copyright © 2019 M+ FONTS PROJECT",
@@ -67,6 +77,8 @@ export const FONT_LICENSE_LIST: FontLicense[] = [
     label: "Noto Emoji",
     sampleSrc: "/font-samples/noto-emoji.avif",
     sampleAlt: "Noto Emoji の見本",
+    sampleWidth: 1200,
+    sampleHeight: 172,
     copyright: ["Copyright © Google LLC"],
     body: ["本フォントは SIL Open Font License, Version 1.1 のもとで配布されています。"],
     link: { href: "https://scripts.sil.org/OFL", label: "https://scripts.sil.org/OFL" },
