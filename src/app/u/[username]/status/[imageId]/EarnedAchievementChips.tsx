@@ -35,7 +35,7 @@ export function EarnedAchievementChips({
             key={a.key}
             type="button"
             onClick={() => setSelected(a)}
-            className="inline-flex items-center gap-1 hover:underline"
+            className="inline-flex items-center gap-1 -my-1 py-1 hover:underline"
           >
             <AchievementIcon name={a.icon} className="h-3.5 w-3.5" />
             {a.title}

@@ -35,7 +35,7 @@ function LicenseBadge({
       trigger={
         <button
           type="button"
-          className="inline-flex items-center gap-0 hover:text-foreground transition-colors"
+          className="inline-flex items-center gap-0 -my-1 py-1 hover:text-foreground transition-colors"
           title={title}
         >
           {content}

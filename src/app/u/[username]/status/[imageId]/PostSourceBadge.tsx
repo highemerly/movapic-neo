@@ -124,7 +124,7 @@ export function PostSourceBadge({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+        className="inline-flex items-center gap-1 -my-1 py-1 hover:text-foreground transition-colors"
         title={isMention ? "Bot投稿について" : "メール投稿について"}
       >
         <Icon className="h-3.5 w-3.5 shrink-0" />
