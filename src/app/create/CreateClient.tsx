@@ -1056,7 +1056,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                   OptionsPanel の SegmentControl と揃える。位置情報のセグメントは
                   pref/city を選んだ初回タップ時のみ /geocode を呼んで結果をキャッシュ。 */}
                 <div className="space-y-4">
-                  <StepHeader num={4} label="投稿する情報を追加" />
+                  <StepHeader num={4} label="付与する情報を追加" />
                   {(() => {
                     const cameraText = exif?.cameraModel
                       ? exif.cameraMake &&
@@ -1182,7 +1182,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                               </p>
                             ) : (
                               <p className="text-[11px] text-muted-foreground">
-                                この画像には位置情報がありません。特定のブラウザからアップロードした写真はブラウザの仕様により位置情報が削除されることがあります。位置情報付きで投稿した実績がないため、手動での設定はできません。
+                                この画像には位置情報がありません。
                               </p>
                             ))}
 
@@ -1218,7 +1218,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                                 <select
                                   value={
                                     manualCity
-                                      ? `${manualCity.prefecture} ${manualCity.city}`
+                                      ? `${manualCity.prefecture}\u0000${manualCity.city}`
                                       : ""
                                   }
                                   onChange={(e) => {
@@ -1227,7 +1227,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                                       setManualCity(null);
                                       return;
                                     }
-                                    const [prefecture, city] = v.split(" ");
+                                    const [prefecture, city] = v.split("\u0000");
                                     setManualCity({ prefecture, city });
                                   }}
                                   disabled={disabled}
@@ -1236,8 +1236,8 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                                   <option value="">市町村を選択…</option>
                                   {pastLocations.cities.map((c) => (
                                     <option
-                                      key={`${c.prefecture} ${c.city}`}
-                                      value={`${c.prefecture} ${c.city}`}
+                                      key={`${c.prefecture}\u0000${c.city}`}
+                                      value={`${c.prefecture}\u0000${c.city}`}
                                     >
                                       {c.prefecture}
                                       {c.city}
@@ -1261,12 +1261,6 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                               </p>
                             ) : null)}
                         </div>
-
-                        {hasGps && (
-                          <p className="text-[11px] text-muted-foreground">
-                            いかなる場合もサーバーには詳細な位置情報（座標）は保存されず、都道府県名または市区町村名のみが保存されます。
-                          </p>
-                        )}
                       </div>
                     );
                   })()}
