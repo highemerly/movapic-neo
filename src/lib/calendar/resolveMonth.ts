@@ -71,15 +71,15 @@ export interface ResolvedCalendarMonth {
 }
 
 /**
- * カレンダー画像の投稿本文（キャプション）。年月のみ・皆勤月は👑を添える。
- * （画像内は「皆勤」の文字を出さず王冠のみ／本文も同じ方針で年月＋👑）
+ * カレンダー画像の投稿本文（キャプション）。「○年○月 #shamezo」＋皆勤月は👑。
+ * カレンダーページURLは投稿関数の imageUrl（本文末尾）に別途付与する。
  */
 export function buildCollageCaption(
   year: number,
   month: number,
   isPerfect: boolean
 ): string {
-  return `${year}年${month}月${isPerfect ? " 👑" : ""}`;
+  return `${year}年${month}月${isPerfect ? " 👑" : ""} #shamezo`;
 }
 
 /**
