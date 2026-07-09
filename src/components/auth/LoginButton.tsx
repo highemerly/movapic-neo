@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Lock, Sparkles, X } from "lucide-react";
+import { Lock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
@@ -10,7 +10,6 @@ import { PermissionInfoDialog } from "@/components/auth/PermissionInfoDialog";
 import { LegalInfoDialog } from "@/components/legal/LegalInfoDialog";
 import { TermsContent } from "@/components/legal/TermsContent";
 import { PrivacyContent } from "@/components/legal/PrivacyContent";
-import { ServiceInfoContent } from "@/components/legal/ServiceInfoContent";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 
@@ -399,24 +398,11 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
       </Button>
       </div>
 
-      {/* サービス紹介・権限・プライバシーポリシー（同意は取らずモーダルで読める・同じ体裁のpill）。
+      {/* 権限・プライバシーポリシー（同意は取らずモーダルで読める・同じ体裁のpill）。
+          「何ができますか？」は SHAMEZOとは？ の説明（AboutShamezo）内へ移動した。
           PCなど横幅が確保できる環境（広いカード）では横並び、狭い端末ではpill単位で折り返す。
           各pillは whitespace-nowrap で「1つのリンクの途中で改行」しないようにする。 */}
       <div className="flex flex-wrap items-center justify-start gap-2">
-        <LegalInfoDialog
-          title="何ができますか？"
-          trigger={
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-muted/30 px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-            >
-              <Sparkles className="size-3.5" />
-              何ができますか？
-            </button>
-          }
-        >
-          <ServiceInfoContent />
-        </LegalInfoDialog>
         <PermissionInfoDialog />
         <LegalInfoDialog
           title="プライバシーポリシー"

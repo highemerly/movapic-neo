@@ -3,6 +3,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { LoginPrompt } from "@/components/auth/LoginPrompt";
+import { AboutShamezo } from "@/components/onboarding/AboutShamezo";
 
 interface NewUserGuideProps {
   /** サーバー側で判定したログイン状態 */
@@ -46,13 +47,8 @@ export function NewUserGuide({ isLoggedIn, allowedServers }: NewUserGuideProps) 
         />
       </div>
 
-      {/* SHAMEZOとは？ */}
-      <div className="mb-6 text-left text-sm leading-relaxed text-muted-foreground">
-        <p className="mb-1 font-semibold text-foreground">SHAMEZO（しゃめぞう）とは？</p>
-        <p>
-          写真にひとことコメントを合成し、Mastodon や Misskey に投稿するアプリです。
-        </p>
-      </div>
+      {/* SHAMEZOとは？（TOPページと共通・「もっと詳しく」モーダルを内包。下マージンは自身が持つ） */}
+      <AboutShamezo />
 
       {/* 今すぐ投稿する〜他のユーザーの投稿を見てみる（TOPと共通ブロック） */}
       <LoginPrompt>

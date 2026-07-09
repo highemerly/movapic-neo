@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Lock, AlertCircle } from "lucide-react";
 import { LoginButton } from "./LoginButton";
 import { LoginPrompt } from "./LoginPrompt";
+import { AboutShamezo } from "@/components/onboarding/AboutShamezo";
 
 interface LoginSectionProps {
   allowedServers?: string[];
@@ -75,6 +76,9 @@ export function LoginSection({ allowedServers, initialIsLoggedIn }: LoginSection
         </div>
       ) : null}
       <div className="px-5 py-5">
+        {/* 未ログイン時はカード上部に「SHAMEZO（しゃめぞう）とは？」の説明を出す（画像詳細ページのガイドと共通）。
+            リピーター（localStorage にサーバー名あり）には AboutShamezo 自身が非表示になる。下マージンも自身が持つ。 */}
+        {!initialIsLoggedIn && <AboutShamezo />}
         {/* 見出し〜「他のユーザーの投稿を見てみる」まで、画像詳細ページのガイドと共通のブロックをカード内に収める。 */}
         <LoginPrompt showPrompt={!initialIsLoggedIn && !hasBanner}>
           <LoginButton allowedServers={allowedServers} callbackUrl={returnTo} initialIsLoggedIn={initialIsLoggedIn} />

@@ -7,6 +7,7 @@ import { LoginButton } from "@/components/auth/LoginButton";
 import { LoginSection } from "@/components/auth/LoginSection";
 import { LoginPrompt } from "@/components/auth/LoginPrompt";
 import { FeaturedMarquee } from "@/components/gallery/FeaturedMarquee";
+import { AboutShamezo } from "@/components/onboarding/AboutShamezo";
 import { Footer } from "@/components/Footer";
 import { getAllowedServers } from "@/lib/auth/allowedServers";
 import { userPathSegment } from "@/lib/userHandle";
@@ -84,6 +85,7 @@ export default async function HomePage() {
               fallback={
                 <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden text-left">
                   <div className="px-5 py-5">
+                    {!isLoggedIn && <AboutShamezo />}
                     <LoginPrompt showPrompt={!isLoggedIn}>
                       <LoginButton allowedServers={allowedServers} initialIsLoggedIn={isLoggedIn} />
                     </LoginPrompt>
