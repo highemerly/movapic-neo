@@ -93,14 +93,16 @@ function countDistinct(count: (day: number) => number, daysInMonth: number): num
  * - ダブル投稿日 D（>=2枚）は「D より前の未割当の最古の穴(0枚の日)」を1つ埋める。1日1穴。
  * - 投稿は createdAt 単調増加で過去日には投稿できないため、投稿時の逐次割当（pickMakeupHole）は
  *   一括再計算（assignMonthMakeups）と必ず一致する。
- * NOTE: grace 上限は割当時には掛けない。判定は isPerfectMonth の `missing <= grace`、
- *       表示件数の上限はカレンダーAPI側で適用する（従来 makeupsForCalendar の slice 相当）。
+ * - **grace 上限を割当時にも掛ける**: 既に grace 個埋まっていればそれ以上は割り当てない。
+ *   （表示は元々 grace 件までなので、DBに grace 超の割当を残すと「表示上は空き日なのに
+ *   その写真は穴埋めに使用中」と食い違うため。判定は missing<=grace が前提なので
+ *   上限を掛けても皆勤賞の結果は不変＝超過割当は非達成月にしか発生しない。）
  */
 
 /**
  * 新しい投稿（postDay に投稿）が埋めるべき「過去の空き日」を1つ返す（逐次貪欲・純粋）。
  * - postDay がダブル投稿日（count>=2）で、まだその日に donor 割当が無く（postDayHasDonor=false）、
- *   postDay より前に未割当の穴（count==0 かつ filledHoleDays 未収載）があれば、その最古の穴を返す。
+ *   既に埋めた穴が grace 未満で、postDay より前に未割当の穴があれば、その最古の穴を返す。
  * - 条件を満たさなければ null（＝この投稿は穴埋めに使わない）。
  * live（投稿時）と assignMonthMakeups（一括）が共用する唯一の割当規則。
  */
@@ -109,11 +111,15 @@ export function pickMakeupHole(args: {
   filledHoleDays: Iterable<number>;
   postDay: number;
   postDayHasDonor: boolean;
+  grace: number;
 }): number | null {
-  const { postDay, postDayHasDonor } = args;
+  const { postDay, postDayHasDonor, grace } = args;
   const count = toCountFn(args.dayCounts);
   if (count(postDay) < 2 || postDayHasDonor) return null;
-  const filled = new Set(args.filledHoleDays);
+  // 既に埋めた「実際の空き日」の distinct 件数。grace に達していたら打ち止め。
+  const filled = new Set<number>();
+  for (const d of args.filledHoleDays) if (count(d) === 0) filled.add(d);
+  if (filled.size >= grace) return null;
   for (let d = 1; d < postDay; d++) {
     if (count(d) === 0 && !filled.has(d)) return d;
   }
@@ -121,13 +127,14 @@ export function pickMakeupHole(args: {
 }
 
 /**
- * 月内の投稿列（createdAt 昇順）から穴埋め割当を一括算出（逐次貪欲・純粋）。
+ * 月内の投稿列（createdAt 昇順）から穴埋め割当を一括算出（逐次貪欲・純粋・grace 上限つき）。
  * 返り値: donor になった投稿の id → 埋める穴の日(1-31)。live の pickMakeupHole と同一規則なので
  * 一括再計算しても投稿時の逐次割当と一致する。backfill の一括 populate と削除後の自己修復で使う。
  * donor は「その日の2枚目に投稿した写真」（＝ダブルにした投稿）になる。
  */
 export function assignMonthMakeups(
-  posts: ReadonlyArray<{ id: string; day: number }>
+  posts: ReadonlyArray<{ id: string; day: number }>,
+  grace: number
 ): Map<string, number> {
   const dayCounts: Record<number, number> = {};
   const donorDays = new Set<number>();
@@ -140,6 +147,7 @@ export function assignMonthMakeups(
       filledHoleDays: filled,
       postDay: p.day,
       postDayHasDonor: donorDays.has(p.day),
+      grace,
     });
     if (hole != null) {
       donorDays.add(p.day);

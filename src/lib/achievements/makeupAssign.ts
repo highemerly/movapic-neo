@@ -38,8 +38,10 @@ export async function assignMakeupForNewPost(args: {
   userId: string;
   imageId: string;
   createdAt: Date;
+  /** 穴埋め枠の上限（投稿者の所属インスタンスで決まる。perfectMonthGrace(domain)）。 */
+  grace: number;
 }): Promise<void> {
-  const { userId, imageId, createdAt } = args;
+  const { userId, imageId, createdAt, grace } = args;
   const jst = toJstDateString(createdAt);
   const year = Number(jst.slice(0, 4));
   const month = Number(jst.slice(5, 7));
@@ -64,7 +66,7 @@ export async function assignMakeupForNewPost(args: {
     }
   }
 
-  const hole = pickMakeupHole({ dayCounts, filledHoleDays, postDay, postDayHasDonor });
+  const hole = pickMakeupHole({ dayCounts, filledHoleDays, postDay, postDayHasDonor, grace });
   if (hole != null) {
     await prisma.image.update({ where: { id: imageId }, data: { makeupTargetDay: hole } });
   }
@@ -79,8 +81,10 @@ export async function recomputeMonthMakeups(args: {
   userId: string;
   year: number;
   month: number;
+  /** 穴埋め枠の上限（投稿者の所属インスタンスで決まる。perfectMonthGrace(domain)）。 */
+  grace: number;
 }): Promise<void> {
-  const { userId, year, month } = args;
+  const { userId, year, month, grace } = args;
   const { start, end } = jstMonthRange(year, month);
   const rows = await prisma.image.findMany({
     where: { userId, createdAt: { gte: start, lt: end } },
@@ -88,7 +92,8 @@ export async function recomputeMonthMakeups(args: {
     select: { id: true, createdAt: true, makeupTargetDay: true },
   });
   const assigned = assignMonthMakeups(
-    rows.map((r) => ({ id: r.id, day: jstDay(r.createdAt) }))
+    rows.map((r) => ({ id: r.id, day: jstDay(r.createdAt) })),
+    grace
   );
   const updates = rows
     .filter((r) => (assigned.get(r.id) ?? null) !== r.makeupTargetDay)

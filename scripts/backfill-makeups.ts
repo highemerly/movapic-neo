@@ -21,7 +21,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { toJstDateString } from "@/lib/streak";
-import { assignMonthMakeups } from "@/lib/achievements/perfectMonth";
+import { assignMonthMakeups, perfectMonthGrace } from "@/lib/achievements/perfectMonth";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -32,7 +32,9 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 async function main() {
-  const users = await prisma.user.findMany({ select: { id: true, username: true } });
+  const users = await prisma.user.findMany({
+    select: { id: true, username: true, instance: { select: { domain: true } } },
+  });
   console.log(`対象ユーザー: ${users.length}人`);
 
   let totalUpdated = 0;
@@ -66,10 +68,11 @@ async function main() {
       byMonth.get(ym)!.push({ id: img.id, day });
     }
 
-    // donorImageId -> holeDay を集めて一括 update。
+    // donorImageId -> holeDay を集めて一括 update。grace は所属インスタンスで決まる。
+    const grace = perfectMonthGrace(user.instance.domain);
     const updates: { id: string; holeDay: number }[] = [];
     for (const posts of byMonth.values()) {
-      const assigned = assignMonthMakeups(posts); // Map<imageId, holeDay>
+      const assigned = assignMonthMakeups(posts, grace); // Map<imageId, holeDay>
       for (const [id, holeDay] of assigned) updates.push({ id, holeDay });
     }
 

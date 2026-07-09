@@ -149,28 +149,42 @@ export async function PATCH(
       }
     }
 
-    // ---- no-divergence ガード: 達成済み(👑)月を非達成に落とす変更を拒否 ----
+    // ---- 穴埋めまわりのガード（grace 上限 / no-divergence）----
     if (makeupUpdates.size > 0) {
+      const grace = perfectMonthGrace(user.instance.domain);
+      // 変更後の filledHoleDays（実在する空き日のみ・distinct）を算出。
+      const effective = new Map<string, number | null>(
+        monthImages.map((m) => [m.id, m.makeupTargetDay])
+      );
+      for (const [k, v] of makeupUpdates) effective.set(k, v);
+      const filledHoleSet = new Set<number>();
+      for (const v of effective.values()) {
+        if (v != null && (dayCounts[v] ?? 0) === 0) filledHoleSet.add(v);
+      }
+
+      // grace 上限: 新規割当（target != null）で穴埋め数が grace を超えるなら拒否。
+      // （表示・DBともに grace 件までに揃え、「表示上は空きなのに使用中」の食い違いを防ぐ）
+      const isAssign = wantsMakeup && body.makeupTargetDay !== null;
+      if (isAssign && filledHoleSet.size > grace) {
+        return NextResponse.json(
+          { error: `穴埋めは1か月に${grace}日までです` },
+          { status: 409 }
+        );
+      }
+
+      // no-divergence: 達成済み(👑)月を非達成に落とす変更（穴埋めの解除など）は拒否。
       const grantedPerfect = await prisma.achievement.findFirst({
         where: { userId: user.id, key: perfectMonthKey(`${year}-${String(month).padStart(2, "0")}`) },
         select: { id: true },
       });
-      if (grantedPerfect) {
-        const grace = perfectMonthGrace(user.instance.domain);
-        // 変更後の filledHoleDays を算出
-        const effective = new Map<string, number | null>(
-          monthImages.map((m) => [m.id, m.makeupTargetDay])
+      if (
+        grantedPerfect &&
+        !isPerfectMonth({ daysInMonth, dayCounts, filledHoleDays: [...filledHoleSet], grace })
+      ) {
+        return NextResponse.json(
+          { error: "この月は皆勤賞を達成済みのため、穴埋めを解除できません（別の写真への付け替えは可能です）" },
+          { status: 409 }
         );
-        for (const [k, v] of makeupUpdates) effective.set(k, v);
-        const filledHoleDays = [...effective.values()].filter(
-          (v): v is number => v != null && (dayCounts[v] ?? 0) === 0
-        );
-        if (!isPerfectMonth({ daysInMonth, dayCounts, filledHoleDays, grace })) {
-          return NextResponse.json(
-            { error: "この月は皆勤賞を達成済みのため、穴埋めを解除できません（別の写真への付け替えは可能です）" },
-            { status: 409 }
-          );
-        }
       }
     }
 
@@ -243,6 +257,7 @@ export async function DELETE(
         userId: user.id,
         year: Number(jst.slice(0, 4)),
         month: Number(jst.slice(5, 7)),
+        grace: perfectMonthGrace(user.instance.domain),
       }).catch((e) => console.error("Makeup self-heal failed:", e));
     }
 

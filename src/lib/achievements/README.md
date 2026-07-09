@@ -100,7 +100,7 @@ npm run build             # 本番ビルド（新ルート・静的解析）
 
 **穴埋め割当は永続化する（表示と👑の単一ソース）**: 割当（どの投稿がどの空き日を埋めるか）は `Image.makeupTargetDay` に書き、カレンダー表示も皆勤賞判定も同じ永続値を読む。書き込み経路は ①投稿時の自動割当（`assignMakeupForNewPost`・autoMakeup=true のみ）②カレンダー編集モードの手動指定（`PATCH /api/v1/images/[id]`）③既存分の一括 populate（`scripts/backfill-makeups.ts`）。判定 `isPerfectMonth` は永続割当（`filledHoleDays`）を数え、`件数 >= missing(= 月の日数 - distinctDays)` かつ `missing <= grace` なら達成。`missing=0`（完全皆勤）は常に成立し後方互換。
 
-**投稿は createdAt 単調増加で過去日には投稿できない**ため、投稿時の逐次割当（`pickMakeupHole`）は一括再計算（`assignMonthMakeups`）と必ず一致する＝③ON既存ユーザーの割当・👑は従来（オンザフライ貪欲）と不変。**grace 上限のルールは `perfectMonth.ts` の中だけが持つ**（`isPerfectMonth` の `missing <= grace`／表示件数の上限はカレンダーAPI側で `slice(0, grace)`）。
+**投稿は createdAt 単調増加で過去日には投稿できない**ため、投稿時の逐次割当（`pickMakeupHole`）は一括再計算（`assignMonthMakeups`）と必ず一致する。**grace 上限のルールは `perfectMonth.ts` の中だけが持つ**。ポイントは**割当時にも grace 上限を掛ける**こと（`pickMakeupHole` は既に grace 個埋まっていれば割り当てない）。表示は元々 grace 件まで（カレンダーAPIの `slice(0, grace)`）なので、DBに grace 超の割当を残すと「表示上は空き日なのにその写真は穴埋めに使用中」と食い違う。割当時に上限を掛けても、`isPerfectMonth` は `missing <= grace` が前提＝超過割当は非達成月にしか発生しないため、皆勤賞の判定結果は不変。
 
 **③自動穴埋め設定（User.autoMakeup）**: true(既定)=投稿時に自動割当。false=自動割当せず編集モードで指定した穴だけ埋める。切替は**過去の割当・👑に影響しない**（未来の投稿の自動判定のみ切替）ので、切替時の再判定は不要。**no-divergence 不変条件**: 達成済み(👑)月では穴埋めの解除（un-assign）で非達成に落ちる変更を PATCH が 409 で拒否（別donorへの付替は可）。画像削除は常に許可（プライバシー優先）で、削除後は `recomputeMonthMakeups` が別donorで埋め直す（埋まらなければ穴のまま・👑維持）。
 

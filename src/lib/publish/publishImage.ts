@@ -37,6 +37,7 @@ import {
 } from "@/types";
 import { evaluateAndGrant, GrantedAchievement } from "@/lib/achievements/engine";
 import { assignMakeupForNewPost } from "@/lib/achievements/makeupAssign";
+import { perfectMonthGrace } from "@/lib/achievements/perfectMonth";
 import { userPathSegment } from "@/lib/userHandle";
 import type { PostFacts } from "@/lib/achievements/catalog";
 
@@ -155,6 +156,7 @@ async function evaluateAchievementsSafely(
         userId: input.user.id,
         imageId,
         createdAt: new Date(),
+        grace: perfectMonthGrace(input.user.instance.domain),
       });
     }
     return await evaluateAndGrant({
