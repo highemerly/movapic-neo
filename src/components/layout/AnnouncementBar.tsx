@@ -56,7 +56,7 @@ export function AnnouncementBar() {
   if (unreadAnnouncements.length === 0) return null;
 
   return (
-    <div className="border-b flex items-start">
+    <div className="border-b flex items-stretch">
       <div className="flex-1">
         {unreadAnnouncements.map((announcement, index) => (
           <div
@@ -96,10 +96,10 @@ export function AnnouncementBar() {
       </div>
       <button
         onClick={handleDismissAll}
-        className="p-1.5 hover:opacity-70 flex-shrink-0 text-muted-foreground"
+        className="flex items-center justify-center self-stretch px-4 hover:opacity-70 flex-shrink-0 text-muted-foreground"
         aria-label="お知らせを閉じる"
       >
-        <X className="h-3 w-3" />
+        <X className="h-4 w-4" />
       </button>
     </div>
   );
