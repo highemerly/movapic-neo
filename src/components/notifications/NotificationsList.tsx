@@ -89,22 +89,22 @@ export function NotificationsList({
               <li key={n.id}>
                 <Link
                   href={href}
-                  className="flex items-start gap-3 px-3 py-3 transition-colors hover:bg-accent"
+                  className="flex items-start gap-3 px-3 py-2 transition-colors hover:bg-accent"
                 >
                   {!isReminder && n.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={n.image.thumbnailUrl}
                       alt=""
-                      className="mt-0.5 h-10 w-10 shrink-0 rounded-md object-cover"
+                      className="h-12 w-12 shrink-0 rounded-md object-cover"
                     />
                   ) : isFavorite ? (
-                    <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-300">
-                      <Heart className="h-5 w-5 fill-current" />
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-300">
+                      <Heart className="h-7 w-7 fill-current" />
                     </span>
                   ) : (
-                    <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                      <AchievementIcon name={isReminder ? "Crown" : a?.icon ?? "Trophy"} className="h-5 w-5" />
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                      <AchievementIcon name={isReminder ? "Crown" : a?.icon ?? "Trophy"} className="h-7 w-7" />
                     </span>
                   )}
                   <div className="min-w-0 flex-1">
