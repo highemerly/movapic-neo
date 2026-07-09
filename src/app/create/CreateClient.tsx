@@ -115,6 +115,10 @@ export interface CreateClientProps {
   } | null;
   /** ?season=<key> が今アクティブなシーズンと一致したとき true＝最初から選択状態にする */
   defaultSeasonOn?: boolean;
+  /** まだ1枚も投稿していないユーザー＝初回投稿者向けにUIを簡素化する（③以降を折りたたむ等） */
+  firstTime?: boolean;
+  /** 初回ログイン直後（?welcome=1）＝歓迎バナーを表示する */
+  showWelcome?: boolean;
 }
 
 // インスタンス種別から出力形式を自動決定
@@ -183,8 +187,12 @@ const UPLOAD_ERROR_MESSAGES: Record<
   },
 };
 
-export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn }: CreateClientProps) {
+export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn, firstTime = false, showWelcome = false }: CreateClientProps) {
   const router = useRouter();
+  // 初回投稿者は③以降（色・位置などの詳細オプション）を折りたたんで最初は隠す。
+  // 既定はデフォルト値で投稿できるので、写真→コメント→投稿の最短動線を邪魔しない。
+  // 2回目以降のユーザーは従来どおり最初から開いておく。
+  const [optionsOpen, setOptionsOpen] = useState(!firstTime);
   // 出力形式は連携インスタンスの種別から自動決定
   const autoOutput = outputFromInstanceType(user.instance.type);
   // フォーム初期値はユーザー設定（preferences）で seed（output は instance.type を優先）。
@@ -835,6 +843,19 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
         } ${showSticky ? "pb-28" : ""}`}
       >
         <h1 className="mb-3 text-xl font-bold">新しい写真を投稿する</h1>
+
+        {/* 初回ログイン直後の歓迎バナー（?welcome=1）。写真＋コメントだけで投稿できることを伝える。 */}
+        {showWelcome && (
+          <div className="mb-4 flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4 animate-in fade-in slide-in-from-top-1 duration-500">
+            <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <div className="space-y-1">
+              <p className="text-sm font-bold">ようこそ SHAMEZO へ！</p>
+              <p className="text-xs text-muted-foreground">
+                写真を選んで、入れたいひとことを書くだけ。あとはそのまま「投稿」でOKです。色や位置にこだわりたいときは、投稿する前に自由に選べます。
+              </p>
+            </div>
+          </div>
+        )}
         {/* 写真アップロード後（横幅の広い端末）は2段組:
             左列 = ① 写真 + 注意事項（lg で sticky・常に表示） / 右列 = ②〜⑤ + ⑥設定保存。
             スマホ幅と未アップロード時は従来どおり1列。投稿ボタンは段組の外（従来位置）に置く。 */}
@@ -902,15 +923,29 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
                 />
               </div>
 
-              {/* ③〜⑥: コメント未入力のうちは「非アクティブ風」（淡色＋操作不可）で見せ、
-                  コメントが入力されたら通常状態に戻す（表示自体は常に出しておく） */}
+              {/* 初回投稿者向け: ③以降は最初は隠し、このボタンを押すと展開する。
+                  一度開いたら閉じ操作は不要（＝再度折りたためない）ので、開いたらボタン自体を消す。 */}
+              {firstTime && !optionsOpen && (
+                <button
+                  type="button"
+                  onClick={() => setOptionsOpen(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg border bg-muted/50 px-4 py-3 text-center transition-colors hover:bg-muted"
+                >
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">文字の色や位置を変える</span>
+                </button>
+              )}
+
+              {/* ③〜⑥: 初回投稿者は上のボタンを押して展開したときだけ表示。2回目以降は常に表示し、
+                  コメント未入力のうちは「非アクティブ風」（淡色＋操作不可）で見せる。 */}
+              {(!firstTime || optionsOpen) && (
               <div
                 className={`space-y-6 transition-opacity duration-300 ${
-                  formState.text.trim().length === 0
+                  !firstTime && formState.text.trim().length === 0
                     ? "pointer-events-none select-none opacity-40"
                     : ""
                 }`}
-                aria-disabled={formState.text.trim().length === 0}
+                aria-disabled={!firstTime && formState.text.trim().length === 0}
               >
                 {/* ③ コメント合成オプションを変更 */}
                 <div className="space-y-4">
@@ -1265,6 +1300,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
                   )}
                 </div>
               </div>
+              )}
             </div>
           )}
         </div>
@@ -1283,10 +1319,13 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn 
           </div>
         )}
 
-        {/* 他の投稿方法（PC では2列合計の幅いっぱいに配置） */}
-        <div className="mt-6">
-          <OtherPostMethods />
-        </div>
+        {/* 他の投稿方法（PC では2列合計の幅いっぱいに配置）。
+            初回投稿者にはまず1枚目に集中してもらうため非表示にする。 */}
+        {!firstTime && (
+          <div className="mt-6">
+            <OtherPostMethods />
+          </div>
+        )}
 
         {/* フッター */}
         <Footer />

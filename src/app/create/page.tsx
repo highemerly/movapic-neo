@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUserWithPreferences } from "@/lib/auth/session";
 import { getAvatarUrl } from "@/lib/avatar";
 import { getActiveSeason, seasonPeriodLabel } from "@/lib/seasons/catalog";
+import prisma from "@/lib/db";
 import { CreateClient } from "./CreateClient";
 import type {
   Position,
@@ -40,8 +41,17 @@ export default async function CreatePage({
   const requestedSeason = typeof sp.season === "string" ? sp.season : undefined;
   const defaultSeasonOn = active != null && requestedSeason === active.key;
 
+  // 初回投稿者向けのやさしいUI用フラグ。
+  // - firstTime: これまで1枚も投稿していない（公開/非公開/local問わず全件で判定）
+  // - showWelcome: 初回ログイン直後のリダイレクト（/create?welcome=1）で歓迎バナーを出す
+  const imageCount = await prisma.image.count({ where: { userId: user.id } });
+  const firstTime = imageCount === 0;
+  const showWelcome = sp.welcome === "1";
+
   return (
     <CreateClient
+      firstTime={firstTime}
+      showWelcome={showWelcome}
       defaultSeasonOn={defaultSeasonOn}
       activeSeason={
         active

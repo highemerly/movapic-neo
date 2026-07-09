@@ -130,6 +130,10 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // 初回ログイン（新規ユーザー作成）かどうか。初回はダッシュボードではなく
+    // 投稿ページへ誘導して、最初の一枚までの導線を短くする。
+    const isNewUser = !user;
+
     if (user) {
       // 既存ユーザーを更新
       user = await prisma.user.update({
@@ -173,8 +177,12 @@ export async function GET(request: NextRequest) {
       extractLoginRequestInfo(request)
     );
 
-    // コールバックURLにリダイレクト（安全なパスのみ許可）
-    const redirectTo = sanitizeRedirectUrl(stateData.callbackUrl);
+    // コールバックURLにリダイレクト（安全なパスのみ許可）。
+    // 初回ログインで、かつ遷移先が既定（/dashboard＝特定ページへ戻る指定ではない）のときだけ、
+    // 初めての投稿を促すため /create?welcome=1 に差し替える。
+    const sanitized = sanitizeRedirectUrl(stateData.callbackUrl);
+    const redirectTo =
+      isNewUser && sanitized === "/dashboard" ? "/create?welcome=1" : sanitized;
     return NextResponse.redirect(new URL(redirectTo, baseUrl));
   } catch (error) {
     console.error("OAuth callback error:", error);

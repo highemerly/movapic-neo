@@ -93,6 +93,9 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // 初回ログイン（新規ユーザー作成）かどうか。初回は投稿ページへ誘導する。
+    const isNewUser = !user;
+
     if (user) {
       // 既存ユーザーを更新
       user = await prisma.user.update({
@@ -136,8 +139,10 @@ export async function GET(request: NextRequest) {
       extractLoginRequestInfo(request)
     );
 
-    // リダイレクト
-    return NextResponse.redirect(new URL(redirectTo, baseUrl));
+    // リダイレクト。初回ログインで遷移先が既定（/dashboard）のときだけ /create?welcome=1 へ。
+    const finalRedirect =
+      isNewUser && redirectTo === "/dashboard" ? "/create?welcome=1" : redirectTo;
+    return NextResponse.redirect(new URL(finalRedirect, baseUrl));
   } catch (error) {
     console.error("MiAuth callback error:", error);
     return NextResponse.redirect(new URL("/?error=auth_failed", baseUrl));

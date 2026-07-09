@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "@/components/Link";
 import { getAvatarUrl } from "@/lib/avatar";
-import { Globe, Server, Heart, ChevronRight, Settings2, ShieldCheck, SlidersHorizontal, Trophy, Images, Calendar, Map as MapIcon, Trash2 } from "lucide-react";
+import { Globe, Server, Heart, ChevronRight, Settings2, ShieldCheck, SlidersHorizontal, Trophy, Images, Calendar, Map as MapIcon, Trash2, Sparkles, ImagePlus } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/auth/LogoutButton";
@@ -49,7 +49,7 @@ export default async function DashboardPage() {
 
   // ユーザーのデフォルト設定、bio、統計情報を取得
   // 投稿数・連続投稿・都道府県数・実績数はユーザーページの各タブと共通の集計（getUserProfileStats）
-  const [userWithPreferences, profileStats, favoritesAgg, topFavoriteImage, recentPublicImages, perfectAttendance] = await Promise.all([
+  const [userWithPreferences, profileStats, favoritesAgg, topFavoriteImage, recentPublicImages, perfectAttendance, totalImageCount] = await Promise.all([
     prisma.user.findUnique({
       where: { id: user.id },
       select: {
@@ -100,6 +100,8 @@ export default async function DashboardPage() {
       },
     }),
     hasRecentPerfectAttendance(user.id),
+    // 初回投稿者向けCTAの出し分け用（公開/非公開/local問わず全件で判定）
+    prisma.image.count({ where: { userId: user.id } }),
   ]);
 
   // 自分の /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）
@@ -207,6 +209,27 @@ export default async function DashboardPage() {
     <>
       <SiteHeader user={user ? { username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) } : null} />
       <div className="container mx-auto px-4 pt-2 pb-8 max-w-2xl">
+
+        {/* 初回投稿者向けCTA: まだ1枚も投稿していないときだけ、最上部に大きめの導線を出す。 */}
+        {totalImageCount === 0 && (
+          <section className="mb-4">
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-5 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                <Sparkles className="h-6 w-6 text-primary" />
+              </div>
+              <p className="text-base font-bold">はじめての一枚を投稿してみましょう</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                写真を選んで、入れたいひとことを書くだけ。色や位置にこだわりたいときは、投稿する前に自由に選べます。
+              </p>
+              <Link href="/create" prefetch className="mt-4 inline-block">
+                <Button size="lg" className="h-12 px-8">
+                  <ImagePlus className="mr-2 h-5 w-5" />
+                  写真を投稿する
+                </Button>
+              </Link>
+            </div>
+          </section>
+        )}
 
         {/* セクション1: あなたの情報 */}
         <section className="mb-4">
