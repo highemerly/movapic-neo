@@ -629,8 +629,8 @@ function AppRail({ nav }: { nav: MenuNav }) {
   const userBase = selfSegment ? `/u/${selfSegment}` : null;
 
   // 通知の未読ドット（PCはヘッダーのベルを廃し、このレールの「通知」だけで既読管理する）。
-  // 未ログイン時は通知APIを叩かない。
-  const { hasUnseen, markSeen } = useUnseenNotifications(isLoggedIn);
+  // 取得は NotificationsProvider が1回だけ行い、ここは共有状態を読むだけ（未ログインは未取得）。
+  const { hasUnseen, markSeen } = useUnseenNotifications();
 
   const [expanded, setExpanded] = useState(false);
   const collapse = useCallback(() => setExpanded(false), []);

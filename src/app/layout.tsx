@@ -6,6 +6,7 @@ import { ConfirmProvider } from "@/components/providers/ConfirmProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { MenuProvider } from "@/components/layout/AppMenu";
+import { NotificationsProvider } from "@/components/layout/useUnseenNotifications";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { getSessionClaims } from "@/lib/auth/session";
@@ -110,6 +111,10 @@ export default async function RootLayout({
               ログアウトの確認モーダル（useConfirm）が Sheet からも使えるよう、ConfirmProvider で
               MenuProvider ごと包む。 */}
           <ConfirmProvider>
+            {/* 通知の未読状態はページごとに1回だけ取得して共有する（ベル＝NotificationBell と
+                PCレール＝AppRail が同時マウントで二重取得していたのを集約）。両者を子に含むよう
+                MenuProvider ごと包む。 */}
+            <NotificationsProvider enabled={claims != null}>
             <MenuProvider
               isLoggedIn={claims != null}
               selfSegment={selfSegment}
@@ -131,6 +136,7 @@ export default async function RootLayout({
                 />
               </Suspense>
             </MenuProvider>
+            </NotificationsProvider>
           </ConfirmProvider>
           <Toaster />
           {/* iOS PWA（standalone）専用の引っ張って更新。Androidはネイティブ任せ */}
