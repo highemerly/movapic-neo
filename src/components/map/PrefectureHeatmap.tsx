@@ -120,25 +120,6 @@ export function PrefectureHeatmap({
 
   return (
     <div className="w-full space-y-3">
-      {/* 表示モード切替 */}
-      <div className="flex items-center justify-end gap-1">
-        <span className="mr-2 text-[11px] text-muted-foreground">表示</span>
-        {(["thumbnail", "heatmap"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setMode(m)}
-            className={`rounded-md border px-2 py-1 text-[11px] transition-colors ${
-              mode === m
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-background text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {m === "thumbnail" ? "サムネイル" : "ヒートマップ"}
-          </button>
-        ))}
-      </div>
-
       {mode === "thumbnail" ? (
         <TileGrid
           data={data}
@@ -173,6 +154,25 @@ export function PrefectureHeatmap({
           <span>多（最大 {max} 件）</span>
         </div>
       )}
+
+      {/* 表示モード切替（ファーストビューを地図優先にするため地図の下に配置） */}
+      <div className="flex items-center justify-end gap-1">
+        <span className="mr-2 text-[11px] text-muted-foreground">表示</span>
+        {(["thumbnail", "heatmap"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => setMode(m)}
+            className={`rounded-md border px-2 py-1 text-[11px] transition-colors ${
+              mode === m
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-background text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            {m === "thumbnail" ? "サムネイル" : "ヒートマップ"}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

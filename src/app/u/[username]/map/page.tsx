@@ -211,12 +211,6 @@ export default async function UserMapPage({
 
         {/* 地図タブの本文（タブ切替時に横スライドで表示） */}
         <TabTransition tab="map">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              位置情報付き投稿 {total} 件 ／ {Object.keys(data).length} 都道府県
-            </p>
-          </div>
-
           {/* オプトイン未済の本人 → 案内 */}
           {!isOptedIn && isOwner && (
             <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
@@ -239,6 +233,13 @@ export default async function UserMapPage({
               username={seg}
               selectedPrefecture={selectedPrefecture}
             />
+          )}
+
+          {/* 件数（地図・表示切替の更に下） */}
+          {total > 0 && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              位置情報付き投稿 {total} 件 ／ {Object.keys(data).length} 都道府県
+            </p>
           )}
 
           {/* 都道府県クリックで画像一覧（下部）へスムーズスクロール */}
