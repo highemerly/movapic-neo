@@ -12,17 +12,39 @@ import { Footer } from "@/components/Footer";
 import { getAllowedServers } from "@/lib/auth/allowedServers";
 import { userPathSegment } from "@/lib/userHandle";
 
+// マーキーに流す枚数と、スコアリング元になる候補プールの上限。
+// プールから「お気に入り×新しさ」でスコアし、投稿者1人1枚に間引いて上位 MARQUEE_COUNT 枚を選ぶ。
+const MARQUEE_COUNT = 16;
+const CANDIDATE_POOL = 240;
+// 時間減衰の強さ。大きいほど新しさ重視（古い人気作が居座りにくい）。
+const RECENCY_GRAVITY = 1.2;
+
+// お気に入り数と投稿からの経過日数を合成したスコア。
+// favoriteCount / (経過日数 + 2)^gravity。分母の +2 で投稿直後の過度な優遇を抑える。
+// 候補は favoriteCount>=1 に絞ってあるので分子は常に1以上（お気に入り0＝未評価は除外済み）。
+// 古い写真は多くのお気に入りがないと上位に来ない。
+function featuredScore(favoriteCount: number, createdAt: Date, now: number): number {
+  const ageDays = Math.max(0, (now - createdAt.getTime()) / 86_400_000);
+  return favoriteCount / Math.pow(ageDays + 2, RECENCY_GRAVITY);
+}
+
 // ログイン判定（getSessionClaims）で cookie を読むためページは動的になる。
 // 公開ギャラリーのクエリは unstable_cache で 5 分キャッシュし、全訪問者で共有する。
 // （cacheComponents 未有効のため 'use cache' は使えず unstable_cache が正解）
 const getFeaturedImages = unstable_cache(
-  async () =>
-    prisma.image.findMany({
-      where: { isPublic: true, isDisabled: false },
+  async () => {
+    // 候補プール（最新順に多めに取得）。この母集団の中でスコアリング＆投稿者間引きを行う。
+    // favoriteCount>=1 でお気に入り0を除外＝お気に入りは Mastodon 投稿にしか付かないため、
+    // Fediverse に投稿され最低1つお気に入りが付いた写真だけが対象になる（local投稿は必ず除外）。
+    const candidates = await prisma.image.findMany({
+      where: { isPublic: true, isDisabled: false, favoriteCount: { gte: 1 } },
       orderBy: { createdAt: "desc" },
-      take: 16,
+      take: CANDIDATE_POOL,
       select: {
         id: true,
+        userId: true,
+        favoriteCount: true,
+        createdAt: true,
         storageKey: true,
         overlayText: true,
         altText: true,
@@ -34,7 +56,24 @@ const getFeaturedImages = unstable_cache(
           },
         },
       },
-    }),
+    });
+
+    const now = Date.now();
+    // 投稿者ごとに最高スコアの1枚だけを残す（同じ人の写真が並ばないように）。
+    const bestByUser = new Map<string, { image: (typeof candidates)[number]; score: number }>();
+    for (const image of candidates) {
+      const score = featuredScore(image.favoriteCount, image.createdAt, now);
+      const current = bestByUser.get(image.userId);
+      if (!current || score > current.score) {
+        bestByUser.set(image.userId, { image, score });
+      }
+    }
+
+    return Array.from(bestByUser.values())
+      .sort((a, b) => b.score - a.score)
+      .slice(0, MARQUEE_COUNT)
+      .map(({ image }) => image);
+  },
   ["home-featured-images"],
   { revalidate: 300, tags: ["featured-images"] }
 );
