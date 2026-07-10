@@ -19,6 +19,11 @@ env:
   K8S_MANIFEST_PATHS: "manifests/movapic-neo/prd/web.yaml manifests/movapic-neo/prd/worker.yaml manifests/movapic-neo/prd/compute.yaml"
 
 jobs:
+  # CI（vitest / eslint / tsc）。build-and-push と並走し、両方緑になって初めて
+  # create-k8s-pr が走る（下の needs 参照）。定義は checks.yml に集約。
+  checks:
+    uses: ./.github/workflows/checks.yml
+
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
@@ -113,7 +118,8 @@ jobs:
           platforms: linux/amd64
 
   create-k8s-pr:
-    needs: build-and-push
+    # ビルドと CI の両方が成功したときだけ k8s マニフェストへ PR する。
+    needs: [build-and-push, checks]
     runs-on: ubuntu-latest
     permissions:
       contents: read

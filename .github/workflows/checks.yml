@@ -1,0 +1,41 @@
+name: Checks
+
+# vitest / eslint / tsc を回す再利用可能ワークフロー。
+# ci.yml（PR・main push）と docker-build.yml（タグ push でビルドと並走）の両方から呼ぶ。
+# CI ステップの単一の定義元。
+on:
+  workflow_call:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # ネイティブビルド（sharp の system libvips ソースビルド・skia-canvas のバイナリ取得）は
+      # テスト/型検査/lint には不要なので --ignore-scripts でスキップし、CI を高速・確定にする。
+      # 型は package から来るので tsc は通り、既存の unit テストは純粋ロジックで sharp/skia を呼ばない。
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Test (vitest)
+        run: npm test
+
+      # 先行ステップが落ちても lint / typecheck まで走らせ、1 回の実行で全問題を出す。
+      - name: Lint (eslint)
+        if: ${{ !cancelled() }}
+        run: npm run lint
+
+      # typecheck は next typegen（生成型を作る。gitignore 対象で新規 checkout には無い）→ tsc --noEmit。
+      - name: Typecheck (tsc)
+        if: ${{ !cancelled() }}
+        run: npm run typecheck
