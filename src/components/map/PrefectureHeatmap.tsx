@@ -44,6 +44,8 @@ interface PrefectureHeatmapProps {
 }
 
 type ViewMode = "thumbnail" | "heatmap";
+/** サムネイル地図のエリアズーム。西/東に絞ると列数が減りタイルが約2倍になり押しやすい。 */
+type RegionView = "all" | "west" | "east";
 
 const HEATMAP_COLORS = [
   "#dbeafe", // blue-100
@@ -113,6 +115,7 @@ export function PrefectureHeatmap({
 }: PrefectureHeatmapProps) {
   const router = useRouter();
   const [mode, setMode] = useState<ViewMode>("thumbnail");
+  const [region, setRegion] = useState<RegionView>("all");
   const max = Math.max(0, ...Object.values(data).map((e) => e.count));
 
   const hrefFor = (prefName: string) =>
@@ -127,6 +130,7 @@ export function PrefectureHeatmap({
           max={max}
           hrefFor={hrefFor}
           selectedPrefecture={selectedPrefecture}
+          region={region}
         />
       ) : (
         <JapanSvg
@@ -155,23 +159,62 @@ export function PrefectureHeatmap({
         </div>
       )}
 
-      {/* 表示モード切替（ファーストビューを地図優先にするため地図の下に配置） */}
-      <div className="flex items-center justify-end gap-1">
-        <span className="mr-2 text-[11px] text-muted-foreground">表示</span>
-        {(["thumbnail", "heatmap"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setMode(m)}
-            className={`rounded-md border px-2 py-1 text-[11px] transition-colors ${
-              mode === m
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-background text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            {m === "thumbnail" ? "サムネイル" : "ヒートマップ"}
-          </button>
-        ))}
+      {/* コントロール（ファーストビューを地図優先にするため地図の下に配置）。
+          エリアズーム（全国/西拡大/東拡大・サムネイル時のみ）と表示モード切替を、
+          押しやすいよう横いっぱいのセグメント（各ボタン min-h 44px）で縦に並べる。 */}
+      <div className="space-y-2">
+        {mode === "thumbnail" && (
+          <div className="flex items-center gap-2">
+            <span className="w-10 shrink-0 text-xs text-muted-foreground">
+              エリア
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["all", "全国"],
+                  ["west", "西拡大"],
+                  ["east", "東拡大"],
+                ] as const
+              ).map(([r, label]) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRegion(r)}
+                  aria-pressed={region === r}
+                  className={`rounded-md border px-4 py-2.5 text-xs font-medium transition-colors ${
+                    region === r
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <span className="w-10 shrink-0 text-xs text-muted-foreground">
+            表示
+          </span>
+          <div className="flex flex-wrap gap-2">
+            {(["thumbnail", "heatmap"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                aria-pressed={mode === m}
+                className={`rounded-md border px-4 py-2.5 text-xs font-medium transition-colors ${
+                  mode === m
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {m === "thumbnail" ? "サムネイル" : "ヒートマップ"}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -184,25 +227,43 @@ function TileGrid({
   max,
   hrefFor,
   selectedPrefecture,
+  region,
 }: {
   data: PrefectureMapData;
   publicUrl: string;
   max: number;
   hrefFor: (name: string) => string;
   selectedPrefecture?: string | null;
+  region: RegionView;
 }) {
   const cols = JAPAN_TILE_GRID[0].length;
+  // エリアズーム: 西=九州〜近畿(0..7列) / 東=近畿〜北海道(6..末列)。近畿(6,7列)を両方に含めて
+  // 継ぎ目で文脈が切れないようにする。列を半分にするとタイルが約2倍になり押しやすくなる。
+  const [startCol, endCol] =
+    region === "west"
+      ? [0, 7]
+      : region === "east"
+        ? [6, cols - 1]
+        : [0, cols - 1];
+  const viewCols = endCol - startCol + 1;
+  // 列スライスで全セルが null になる行（西表示での北海道/東北の行など）は畳んで縦を詰める。
+  const grid = JAPAN_TILE_GRID.map((row) =>
+    row.slice(startCol, endCol + 1),
+  ).filter((row) => region === "all" || row.some(Boolean));
   return (
     <div
-      // 地図は左側に空セルが多く左余白が広い一方、右端列(岩手/茨城/千葉)は詰まって見える。
-      // そこでスマホでは左のページ余白(px-4=16px)の半分だけ負マージンで相殺して地図を左へ
-      // 寄せ、右に余白を残す。タイルの潰れは隙間の圧縮(gap-0.5)で緩和し、sm 以上は従来どおり。
-      className="grid -ml-2 w-[calc(100%+0.5rem)] gap-0.5 sm:ml-0 sm:w-full sm:gap-1"
-      style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+      // 全国表示のみ、左に多い空セルぶんをスマホで負マージン相殺して左へ寄せる（sm以上は従来どおり）。
+      // 西/東ズーム時は左端まで使うので等倍。タイルの潰れは隙間の圧縮(gap-0.5)で緩和。
+      className={`grid gap-0.5 sm:w-full sm:gap-1 ${
+        region === "all"
+          ? "-ml-2 w-[calc(100%+0.5rem)] sm:ml-0"
+          : "w-full"
+      }`}
+      style={{ gridTemplateColumns: `repeat(${viewCols}, minmax(0, 1fr))` }}
       role="grid"
       aria-label="都道府県別投稿のサムネイル地図"
     >
-      {JAPAN_TILE_GRID.map((row, rIdx) =>
+      {grid.map((row, rIdx) =>
         row.map((code, cIdx) => {
           if (!code) return <div key={`${rIdx}-${cIdx}`} aria-hidden />;
           const pref = PREFECTURE_BY_CODE[code];
