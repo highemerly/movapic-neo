@@ -1,4 +1,6 @@
-import { CanvasRenderingContext2D } from "skia-canvas";
+// 型としてのみ使用（ランタイムで skia-canvas をロードさせない）。
+// これにより本ファイルの純粋関数は skia ネイティブ無しでテスト/実行できる。
+import type { CanvasRenderingContext2D } from "skia-canvas";
 import { FontFamily, Size, Position } from "@/types";
 import { SIZE_MULTIPLIERS } from "@/types";
 import { isEmojiGrapheme, splitGraphemes } from "@/lib/text/grapheme";
@@ -201,5 +203,47 @@ export function drawTextWithStroke(
   // 本体（フィル）
   ctx.fillStyle = textColor;
   ctx.fillText(char, x, y);
+}
+
+// 縦書きの1文字ぶんの分類情報（回転・句読点・半角）。
+export type VerticalCharInfo = {
+  char: string;
+  isPunctuation: boolean;
+  shouldRotate: boolean;
+  isHalf: boolean;
+};
+
+/**
+ * 縦書きの列分割（純粋関数・ctx 非依存）。
+ * テキストを段落（\n 区切り）ごとに charsPerColumn 文字ずつ列へ割る（右→左は描画側の責務）。
+ * 空段落は空列を1つ生む。各文字に回転/句読点/半角の分類を付与する。
+ * useHalfWidth は等幅フォント時のみ半角判定を有効化する（絵文字は対象外）。
+ */
+export function splitTextIntoColumns(
+  text: string,
+  charsPerColumn: number,
+  useHalfWidth: boolean
+): VerticalCharInfo[][] {
+  const columns: VerticalCharInfo[][] = [];
+  const paragraphs = text.split("\n");
+
+  for (const paragraph of paragraphs) {
+    const chars: VerticalCharInfo[] = splitGraphemes(paragraph).map((char) => ({
+      char,
+      isPunctuation: PUNCTUATION_CHARS.has(char),
+      shouldRotate: ROTATE_CHARS.has(char),
+      isHalf: useHalfWidth && !isEmojiGrapheme(char) && isHalfWidthChar(char),
+    }));
+
+    if (chars.length === 0) {
+      columns.push([]);
+    } else {
+      for (let i = 0; i < chars.length; i += charsPerColumn) {
+        columns.push(chars.slice(i, i + charsPerColumn));
+      }
+    }
+  }
+
+  return columns;
 }
 

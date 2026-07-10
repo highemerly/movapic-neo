@@ -4,14 +4,12 @@ import { ensureFontsLoaded } from "./fonts";
 import {
   PROPORTIONAL_FONTS,
   MONOSPACE_FONTS,
-  ROTATE_CHARS,
-  PUNCTUATION_CHARS,
   MARGIN_RATIO,
   STROKE_WIDTH_RATIO,
   splitTextIntoLines,
+  splitTextIntoColumns,
   drawTextWithStroke,
   getMonospaceCharWidth,
-  isHalfWidthChar,
   fontStack,
 } from "./text";
 import { splitGraphemes, isEmojiGrapheme } from "@/lib/text/grapheme";
@@ -260,25 +258,8 @@ function drawVerticalText(
   const columnWidth = fontSize * 1.5;
   const useHalfWidth = MONOSPACE_FONTS.has(fontFamily);
 
-  // 改行で分割し、各段落を高さに応じてさらに列に分割
-  type CharInfo = { char: string; isPunctuation: boolean; shouldRotate: boolean; isHalf: boolean };
-  const columns: CharInfo[][] = [];
-  const paragraphs = text.split("\n");
-  for (const paragraph of paragraphs) {
-    const chars = splitGraphemes(paragraph).map((char) => ({
-      char,
-      isPunctuation: PUNCTUATION_CHARS.has(char),
-      shouldRotate: ROTATE_CHARS.has(char),
-      isHalf: useHalfWidth && !isEmojiGrapheme(char) && isHalfWidthChar(char),
-    }));
-    if (chars.length === 0) {
-      columns.push([]);
-    } else {
-      for (let i = 0; i < chars.length; i += charsPerColumn) {
-        columns.push(chars.slice(i, i + charsPerColumn));
-      }
-    }
-  }
+  // 改行で分割し、各段落を高さに応じてさらに列に分割（純粋関数へ切り出し済み）
+  const columns = splitTextIntoColumns(text, charsPerColumn, useHalfWidth);
 
   // X開始位置（縦書きは右から左へ）
   let startX: number;
