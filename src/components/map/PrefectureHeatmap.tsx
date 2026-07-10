@@ -210,7 +210,7 @@ export function PrefectureHeatmap({
                     : "border-border bg-background text-muted-foreground hover:bg-muted"
                 }`}
               >
-                {m === "thumbnail" ? "サムネイル" : "ヒートマップ"}
+                {m === "thumbnail" ? "タイル" : "地図"}
               </button>
             ))}
           </div>
