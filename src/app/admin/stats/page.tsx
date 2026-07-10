@@ -8,11 +8,13 @@
 
 import { getMainMetrics } from "@/lib/admin/metrics";
 import { getPostTimeSeries } from "@/lib/admin/timeseries";
+import { getComponentHealth } from "@/lib/admin/health";
 import { normalizePeriod, periodRangeText, PERIOD_OPTIONS, type Period } from "@/lib/admin/periods";
 import { StatCard } from "../_components/StatCard";
 import { PeriodSelect } from "../_components/PeriodSelect";
 import { normalizeParams } from "../_components/query";
 import { PostTimeSeriesChart } from "./_components/PostTimeSeriesChart";
+import { HealthPanel } from "./_components/HealthPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -37,9 +39,10 @@ export default async function AdminStatsPage({
   const params = normalizeParams(await searchParams);
   const period = normalizePeriod(params.range, "7d");
 
-  const [metrics, series] = await Promise.all([
+  const [metrics, series, health] = await Promise.all([
     getMainMetrics(),
     getPostTimeSeries(period),
+    getComponentHealth(),
   ]);
 
   const sourceHint = metrics.bySource
@@ -49,11 +52,8 @@ export default async function AdminStatsPage({
   return (
     <>
       <h1 className="mb-1 text-2xl font-bold">統計情報</h1>
-      <p className="mb-6 text-sm text-muted-foreground">
-        管理者向けのサービス状況。各カードから詳細ページへ移動できます。
-      </p>
-
       {/* 主要メトリクス */}
+      <h2 className="text-xl font-bold mt-6 mb-3">主要メトリクス</h2>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatCard label="総ユーザー数" value={metrics.userCount} href="/admin/accounts" />
         <StatCard
@@ -82,10 +82,15 @@ export default async function AdminStatsPage({
         />
       </div>
 
+      {/* コンポーネント稼働状況（ヘルスチェック） */}
+      <div className="mt-10">
+        <HealthPanel items={health} />
+      </div>
+
       {/* 時系列グラフ */}
       <section className="mt-10">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-xl font-bold">投稿数の推移</h2>
+          <h2 className="text-xl font-bold">投稿数</h2>
           <PeriodSelect
             basePath="/admin/stats"
             params={params}

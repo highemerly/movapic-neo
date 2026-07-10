@@ -89,6 +89,43 @@ export function getMentionStreamStatus(): MentionStreamStatus {
   return { ...status() };
 }
 
+/** ヘルスチェック表示向けに、経過時間（age）を算出した整形済みスナップショット。 */
+export interface MentionStreamHealth {
+  connected: boolean;
+  started: boolean;
+  streamingHost: string | null;
+  mentionCount: number;
+  reconnectAttempts: number;
+  lastCloseCode: number | null;
+  connectedSince: number | null;
+  /** 直近 OPEN からの経過（未接続なら null） */
+  uptimeMs: number | null;
+  /** 最後にフレーム受信してからの経過 */
+  lastEventAgeMs: number | null;
+  /** 最後にメンション受信してからの経過 */
+  lastMentionAgeMs: number | null;
+}
+
+/**
+ * streaming 状態を age 付きに整形して返す。`/api/health/stream`（HTTP）と
+ * 管理ヘルスチェック（all-in-one の同一プロセス参照）の両方から使う単一の真実源。
+ */
+export function summarizeMentionStream(now = Date.now()): MentionStreamHealth {
+  const s = status();
+  return {
+    connected: s.connected,
+    started: s.started,
+    streamingHost: s.streamingHost,
+    mentionCount: s.mentionCount,
+    reconnectAttempts: s.reconnectAttempts,
+    lastCloseCode: s.lastCloseCode,
+    connectedSince: s.connectedSince,
+    uptimeMs: s.connectedSince ? now - s.connectedSince : null,
+    lastEventAgeMs: s.lastEventAt ? now - s.lastEventAt : null,
+    lastMentionAgeMs: s.lastMentionAt ? now - s.lastMentionAt : null,
+  };
+}
+
 /**
  * streaming 接続を開始する。多重起動はガードされ、トークン未設定なら no-op。
  * instrumentation.ts から呼ばれる（await 不要・内部で非同期に接続を張る）。

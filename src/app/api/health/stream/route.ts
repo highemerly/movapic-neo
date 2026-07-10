@@ -10,7 +10,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { getMentionStreamStatus } from "@/lib/mention/streamer";
+import { summarizeMentionStream } from "@/lib/mention/streamer";
 
 export const dynamic = "force-dynamic";
 
@@ -18,29 +18,17 @@ export function GET() {
   const role = process.env.COMPONENT_ROLE || "all-in-one";
   const streamingExpected = role === "worker-front" || role === "all-in-one";
 
-  const s = getMentionStreamStatus();
-  const now = Date.now();
+  const h = summarizeMentionStream();
 
   const body = {
-    ok: streamingExpected ? s.connected : true,
+    ok: streamingExpected ? h.connected : true,
     role,
     streamingExpected,
-    connected: s.connected,
-    started: s.started,
-    streamingHost: s.streamingHost,
-    mentionCount: s.mentionCount,
-    reconnectAttempts: s.reconnectAttempts,
-    lastCloseCode: s.lastCloseCode,
-    connectedSince: s.connectedSince,
-    uptimeMs: s.connectedSince ? now - s.connectedSince : null,
-    lastEventAt: s.lastEventAt,
-    lastEventAgeMs: s.lastEventAt ? now - s.lastEventAt : null,
-    lastMentionAt: s.lastMentionAt,
-    lastMentionAgeMs: s.lastMentionAt ? now - s.lastMentionAt : null,
+    ...h,
   };
 
   // 接続が期待される役割で未接続なら 503（監視アラート用）。それ以外は 200。
-  const httpStatus = streamingExpected && !s.connected ? 503 : 200;
+  const httpStatus = streamingExpected && !h.connected ? 503 : 200;
 
   return NextResponse.json(body, {
     status: httpStatus,
