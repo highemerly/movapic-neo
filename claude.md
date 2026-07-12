@@ -121,14 +121,14 @@ App Router の `<Link>` はビューポート進入で RSC ペイロードを自
 Mastodon上でBotにメンションして画像生成・投稿する機能。
 
 ### 仕組み
-- **Botアカウント**: `@movapic@handon.club`（環境変数で設定可能）。
+- **Botアカウント**: `@pic@handon.club`（環境変数で設定可能）。
 - **フロー**: ①画像付きメンション受信 → ②通知取得（主: Streaming API WebSocket `src/lib/mention/streamer.ts`／フォールバック: 定期ジョブによる since_id ポーリング `fetcher.ts`・`ingest.ts` で取りこぼし補完。「定期ジョブ」参照）→ ③パース `parser.ts` → ④画像処理・投稿 `processor.ts` → ⑤元投稿削除しユーザーアカウントで再投稿 → ⑥DB保存（source: "mention"）。
 
 ### コマンド形式
-`@movapic [オプション] テキスト`（`[...]` 内にスペース区切り）
+`@pic [オプション] テキスト`（`[...]` 内にスペース区切り）
 - オプション値はメール投稿と同じ（位置/色/サイズ/フォント/アレンジ）。公開範囲 public/unlisted（未指定はユーザー設定）。
 - 特殊: `debug`（開始・完了をBotがリプライ通知）/ `keep`（元投稿を削除せず保持）。
-- 例: `@movapic [上 赤 大] こんにちは` / `@movapic [下 ネオン debug] テスト` / `@movapic [keep unlisted] 元投稿を残す`
+- 例: `@pic [上 赤 大] こんにちは` / `@pic [下 ネオン debug] テスト` / `@pic [keep unlisted] 元投稿を残す`
 
 ### 制約・出力
 - 画像1枚のみ（動画・GIF不可）・テキスト1〜140文字・ユーザーは事前ログイン必須・リトライ最大2回（失敗時Botがリプライ通知）。

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parseMentionContent, formatOptionsSummary } from "./parser";
 
-const BOT_ACCT = "movapic";
+const BOT_ACCT = "pic";
 
 describe("parseMentionContent - テキスト抽出", () => {
   it("シンプルなテキストを返す", () => {

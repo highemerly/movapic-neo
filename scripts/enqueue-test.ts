@@ -45,7 +45,7 @@ for (let i = 0; i < rest.length; i += 2) {
   if (key) args[key] = rest[i + 1] ?? "";
 }
 
-const botAcct = process.env.MASTODON_BOT_ACCT || "movapic";
+const botAcct = process.env.MASTODON_BOT_ACCT || "pic";
 
 function buildContent(text: string, options?: string): string {
   const opt = options ? `[${options}] ` : "";

@@ -117,7 +117,7 @@ function stripHtmlTags(html: string): string {
  * @param botAcct Botのアカウント名（@なし）
  */
 function removeBotMention(text: string, botAcct: string): string {
-  // @movapic や @movapic@handon.club などを除去
+  // @pic や @pic@handon.club などを除去
   const mentionPattern = new RegExp(`@${botAcct}(@[\\w.-]+)?\\s*`, "gi");
   return text.replace(mentionPattern, "").trim();
 }
