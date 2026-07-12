@@ -1,12 +1,12 @@
 name: CI
 
-# テストゲート。PR と main への push で checks.yml（vitest / eslint / tsc）を回す。
-# リリース（タグ push での Docker ビルド）は docker-build.yml が同じ checks.yml を並走させる。
+# テストゲート。全ブランチへの push で checks.yml（vitest / eslint / tsc）を回す。
+# タグ push（リリース）は branches フィルタに一致しないためここでは発動せず、
+# docker-build.yml 側が同じ checks.yml をビルドと並走させる（＝二重実行しない）。
 on:
-  pull_request:
   push:
     branches:
-      - main
+      - '**'
 
 # 同一ブランチ/PR の古い実行はキャンセルして CI 分を節約する。
 concurrency:

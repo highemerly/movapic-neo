@@ -27,6 +27,12 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
+      # --ignore-scripts で postinstall をスキップしたため Prisma クライアントが未生成。
+      # @prisma/client の型（PrismaClient / Prisma / モデル型）は generate で作られるので、
+      # tsc を通すには必須。DB 接続は不要（スキーマから型を生成するだけ）。
+      - name: Generate Prisma client
+        run: npx prisma generate
+
       - name: Test (vitest)
         run: npm test
 
