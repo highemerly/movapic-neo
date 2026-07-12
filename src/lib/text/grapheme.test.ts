@@ -4,6 +4,8 @@ import {
   countGraphemes,
   truncateGraphemes,
   isEmojiGrapheme,
+  hasEmoji,
+  hasNonEmojiText,
 } from "./grapheme";
 
 describe("splitGraphemes", () => {
@@ -67,5 +69,41 @@ describe("isEmojiGrapheme", () => {
     expect(isEmojiGrapheme("A")).toBe(false);
     expect(isEmojiGrapheme("1")).toBe(false);
     expect(isEmojiGrapheme("、")).toBe(false);
+  });
+
+  it("空文字は false", () => {
+    expect(isEmojiGrapheme("")).toBe(false);
+  });
+});
+
+describe("hasEmoji", () => {
+  it("絵文字を1つでも含めば true", () => {
+    expect(hasEmoji("やった👍")).toBe(true);
+    expect(hasEmoji("🇯🇵")).toBe(true); // 国旗（地域指示子）
+    expect(hasEmoji("1️⃣")).toBe(true); // キーキャップ
+    expect(hasEmoji("👨‍👩‍👧")).toBe(true); // ZWJ結合
+  });
+
+  it("絵文字が無ければ false", () => {
+    expect(hasEmoji("こんにちは")).toBe(false);
+    expect(hasEmoji("abc123!?")).toBe(false);
+    expect(hasEmoji("")).toBe(false);
+  });
+});
+
+describe("hasNonEmojiText", () => {
+  it("絵文字・空白以外の文字があれば true", () => {
+    expect(hasNonEmojiText("あ")).toBe(true);
+    expect(hasNonEmojiText("hello")).toBe(true);
+    expect(hasNonEmojiText("猫🐱")).toBe(true);
+    expect(hasNonEmojiText("a👍")).toBe(true);
+  });
+
+  it("絵文字（＋空白）だけなら false", () => {
+    expect(hasNonEmojiText("👍")).toBe(false);
+    expect(hasNonEmojiText("😀🎉")).toBe(false);
+    expect(hasNonEmojiText("👍 😀")).toBe(false); // 絵文字＋空白
+    expect(hasNonEmojiText("   ")).toBe(false); // 空白のみ
+    expect(hasNonEmojiText("")).toBe(false);
   });
 });
