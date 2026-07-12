@@ -347,9 +347,9 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* セクション2: 投稿する */}
+        {/* セクション2: 写真を投稿する */}
         <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-2">投稿する</h2>
+          <h2 className="text-lg font-semibold mb-2">写真を投稿する</h2>
           <div className="bg-muted rounded-lg p-4">
             <PostMethodTabs
               instanceType={user.instance.type}
@@ -359,9 +359,9 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* セクション3: みんなの投稿をみる */}
+        {/* セクション3: 写真をみる */}
         <section className="mb-4">
-          <h2 className="text-lg font-semibold mb-2">みんなの投稿をみる</h2>
+          <h2 className="text-lg font-semibold mb-2">写真をみる</h2>
           <div className="bg-muted rounded-lg p-4">
             <div className="grid grid-cols-3 gap-3">
             <Link href="/public">
