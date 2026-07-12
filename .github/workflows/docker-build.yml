@@ -24,6 +24,52 @@ jobs:
   checks:
     uses: ./.github/workflows/checks.yml
 
+  # ゴールデン画像テスト（skia 実描画の見た目回帰）。本番同一ランタイムの golden-test ステージを
+  # build して docker run で比較する。build-and-push と並走し、退行があれば create-k8s-pr を止める。
+  golden:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout fonts (private repository)
+        uses: actions/checkout@v4
+        with:
+          repository: highemerly/movapic-fonts
+          token: ${{ secrets.FONT_REPO_TOKEN }}
+          path: fonts
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 本番イメージと同じ deps/prisma レイヤを共有するので、build-and-push が積む
+      # buildcache を再利用してソースビルド（sharp 等）をスキップできる。
+      - name: Build golden-test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: golden-test
+          load: true
+          tags: movapic-golden:ci
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+          platforms: linux/amd64
+
+      - name: Run golden image tests
+        run: |
+          mkdir -p golden-out
+          docker run --rm -e GOLDEN_DIFF_DIR=/out -v "$PWD/golden-out:/out" movapic-golden:ci
+
+      # 失敗時のみ actual/expected/diff PNG をアーティファクト化（目視用）。
+      - name: Upload golden diffs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-diffs
+          path: golden-out
+          if-no-files-found: ignore
+
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
@@ -118,8 +164,8 @@ jobs:
           platforms: linux/amd64
 
   create-k8s-pr:
-    # ビルドと CI の両方が成功したときだけ k8s マニフェストへ PR する。
-    needs: [build-and-push, checks]
+    # ビルド・CI・ゴールデン画像テストが全て成功したときだけ k8s マニフェストへ PR する。
+    needs: [build-and-push, checks, golden]
     runs-on: ubuntu-latest
     permissions:
       contents: read

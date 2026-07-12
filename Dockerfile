@@ -83,3 +83,17 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "server.js"]
+
+# --- ゴールデン画像テスト（skia 実描画の見た目回帰）専用ステージ ---
+# 本番 runner はテスト道具を含まないため実行できない。代わりに、その runner を作った依存と
+# 同一の prisma ステージ（deps ＝ skia/sharp ネイティブ・devDeps(vitest/pixelmatch)・libc6-compat 入り
+# ＋ prisma generate 済み）を土台に、ソース・フォント・コミット済み正解 PNG を載せて比較する。
+# → 本番と同じランタイムで描画を検証できる。docker-build.yml がこのステージを build し docker run する。
+#
+# 比較:   docker run --rm <img>
+# 差分:   docker run --rm -e GOLDEN_DIFF_DIR=/out -v "$PWD/golden-out:/out" <img>
+# 更新:   docker run --rm -e GOLDEN_UPDATE=1 -v "$PWD/src/lib/image/__golden__:/app/src/lib/image/__golden__" <img>
+FROM prisma AS golden-test
+WORKDIR /app
+COPY . .
+CMD ["npm", "run", "test:golden"]
