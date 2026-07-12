@@ -14,30 +14,17 @@
 @custom-variant create-has-image (&:is([data-create-has-image] *));
 
 /* 下部メニューバー（BottomNav）ぶんの余白を本文末尾に確保（コンテンツが隠れないように）。
-   モバイル幅（<768px）では BottomNav を常時表示するので余白も常に確保し、
-   それより広い画面では standalone（PWA）起動時のみ確保する。
+   BottomNav はログイン時のみ描画するため（layout.tsx が <html> に data-logged-in を立てる）、
+   余白もログイン時だけ確保する。未ログインはバーが無いので余白も出さない（下部の無駄な空白防止）。
+   モバイル幅（<768px）では常時、それより広い画面では standalone（PWA）起動時のみ。
    iOSのホームインジケータ分も safe-area で足す。 */
 @media (max-width: 767px) {
-  body {
+  [data-logged-in] body {
     padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
   }
 }
-[data-standalone] body {
+[data-standalone][data-logged-in] body {
   padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
-}
-
-/* モバイル幅（<768px）では画面下部に固定バーが常に出る（通常は BottomNav、
-   /create の画像選択中は「プレビュー/投稿」アクションバー）。下寄せの sonner トーストが
-   これらと重ならないよう、モバイルのときだけトーストの下端を底上げする（PCは既定のまま）。 */
-@media (max-width: 767px) {
-  [data-sonner-toaster][data-y-position="bottom"] {
-    /* BottomNav(3.5rem) ＋ 余白。iOS のホームインジケータ分も safe-area で足す */
-    bottom: calc(env(safe-area-inset-bottom) + 4rem) !important;
-  }
-  /* create で画像選択中は BottomNav が隠れ、代わりに約4rem のアクションバーが出るぶん多く上げる */
-  [data-create-has-image] [data-sonner-toaster][data-y-position="bottom"] {
-    bottom: calc(env(safe-area-inset-bottom) + 4.75rem) !important;
-  }
 }
 
 /* エラートーストだけ、失敗に気づきやすいよう少し大きめ・目立つ表示にする（成功等は既定のまま）。

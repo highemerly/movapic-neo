@@ -92,7 +92,13 @@ export default async function RootLayout({
     : null;
 
   return (
-    <html lang="ja" suppressHydrationWarning>
+    <html
+      lang="ja"
+      suppressHydrationWarning
+      // 下部ナビ（BottomNav）とその余白をログイン時だけ有効化するためのフラグ。
+      // CSS（globals.css）が [data-logged-in] body で余白を出し分ける。
+      data-logged-in={claims != null ? "" : undefined}
+    >
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
@@ -130,14 +136,18 @@ export default async function RootLayout({
                   ここで同じ幅ぶん右パディングを空けてコンテンツが重ならないようにする。
                   幅を変える場合は AppMenu の RAIL_COLLAPSED と必ず合わせること。 */}
               <div className="md:pr-[60px]">{children}</div>
-              {/* PWA（standalone起動）時のみCSSで表示される下部ナビ */}
-              <Suspense fallback={null}>
-                <BottomNav
-                  selfSegment={selfSegment}
-                  instanceDomain={claims?.instanceDomain ?? null}
-                  avatarUrl={getAvatarUrl(claims?.avatarUrl)}
-                />
-              </Suspense>
+              {/* 下部ナビはログイン時のみ描画。未ログインはヘッダー（ハンバーガー＋
+                  「投稿をはじめる」）に導線を集約し、下部バーのビジーさを避ける。
+                  表示条件のCSS（モバイル常時／standalone）は BottomNav 側が持つ。 */}
+              {claims != null && (
+                <Suspense fallback={null}>
+                  <BottomNav
+                    selfSegment={selfSegment}
+                    instanceDomain={claims?.instanceDomain ?? null}
+                    avatarUrl={getAvatarUrl(claims?.avatarUrl)}
+                  />
+                </Suspense>
+              )}
             </MenuProvider>
             </NotificationsProvider>
           </ConfirmProvider>
