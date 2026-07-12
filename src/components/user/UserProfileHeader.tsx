@@ -157,7 +157,9 @@ export function UserProfileHeader({
                 )}
               >
                 <Icon className="w-4 h-4 shrink-0" />
-                <span className="hidden min-[375px]:inline">{tab.label}</span>
+                <span className={isActive ? "inline" : "hidden min-[375px]:inline"}>
+                  {tab.label}
+                </span>
                 {tab.badge && (
                   <span className="ml-0.5 rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200">
                     {tab.badge}

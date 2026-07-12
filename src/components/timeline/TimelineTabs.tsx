@@ -10,7 +10,7 @@ interface TimelineTabsProps {
 }
 
 const tab =
-  "flex items-center gap-1.5 px-3 py-[13px] text-[13px] font-medium border-b-2 transition-colors";
+  "flex items-center gap-1.5 px-3 py-[13px] text-sm font-medium border-b-2 transition-colors";
 const activeTab = "border-primary text-primary";
 const inactiveTab =
   "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30";
