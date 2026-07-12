@@ -14,6 +14,7 @@ import {
   COLOR_LABELS,
   ARRANGEMENT_LABELS,
 } from "@/types";
+import { SegmentControl, TwoRowSegmentControl } from "@/components/SegmentControl";
 
 interface OptionsPanelProps {
   position: Position;
@@ -27,96 +28,6 @@ interface OptionsPanelProps {
   onSizeChange: (value: Size) => void;
   onArrangementChange: (value: Arrangement) => void;
   disabled?: boolean;
-}
-
-function SegmentControl<T extends string>({
-  value,
-  options,
-  onChange,
-  disabled,
-  renderOption,
-}: {
-  value: T;
-  options: T[];
-  onChange: (value: T) => void;
-  disabled?: boolean;
-  renderOption: (option: T, isSelected: boolean) => React.ReactNode;
-}) {
-  return (
-    <div className="flex rounded-lg border bg-muted p-1 gap-1">
-      {options.map((option) => (
-        <button
-          key={option}
-          type="button"
-          onClick={() => onChange(option)}
-          disabled={disabled}
-          className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
-            value === option
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-        >
-          {renderOption(option, value === option)}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function TwoRowSegmentControl<T extends string>({
-  value,
-  options,
-  onChange,
-  disabled,
-  renderOption,
-}: {
-  value: T;
-  options: T[];
-  onChange: (value: T) => void;
-  disabled?: boolean;
-  renderOption: (option: T, isSelected: boolean) => React.ReactNode;
-}) {
-  const firstRow = options.slice(0, 4);
-  const secondRow = options.slice(4);
-
-  return (
-    <div className="rounded-lg border bg-muted p-1 space-y-1">
-      <div className="flex gap-1">
-        {firstRow.map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={() => onChange(option)}
-            disabled={disabled}
-            className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
-              value === option
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-          >
-            {renderOption(option, value === option)}
-          </button>
-        ))}
-      </div>
-      <div className="flex gap-1">
-        {secondRow.map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={() => onChange(option)}
-            disabled={disabled}
-            className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
-              value === option
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-          >
-            {renderOption(option, value === option)}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 export function OptionsPanel({

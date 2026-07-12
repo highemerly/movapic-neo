@@ -8,6 +8,7 @@ import { TextInput } from "@/components/TextInput";
 import { ImageUpload } from "@/components/ImageUpload";
 import { OptionsPanel } from "@/components/OptionsPanel";
 import { VisibilityPicker } from "@/components/VisibilityPicker";
+import { SegmentControl } from "@/components/SegmentControl";
 import { AltTextDialog } from "@/components/AltTextDialog";
 import { SaveDefaultsSection } from "@/components/SaveDefaultsSection";
 import { OtherPostMethods } from "@/components/OtherPostMethods";
@@ -1052,9 +1053,9 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                 </div>
 
                 {/* ④ 投稿する情報を追加（EXIF撮影情報）
-                  カメラ機種名と撮影場所を独立したセグメントで毎回選ぶ。デザインは
-                  OptionsPanel の SegmentControl と揃える。位置情報のセグメントは
-                  pref/city を選んだ初回タップ時のみ /geocode を呼んで結果をキャッシュ。 */}
+                  カメラ機種名と撮影場所を独立したセグメントで毎回選ぶ。共通の
+                  SegmentControl（ラベルが長いので size="xs"＋truncate）を使う。位置情報の
+                  セグメントは pref/city を選んだ初回タップ時のみ /geocode を呼んで結果をキャッシュ。 */}
                 <div className="space-y-4">
                   <StepHeader num={4} label="付与する情報を追加" />
                   {(() => {
@@ -1094,26 +1095,6 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                       );
                     }
 
-                    const segmentBtn = (
-                      selected: boolean,
-                      onClick: () => void,
-                      label: React.ReactNode,
-                      extraDisabled = false,
-                    ) => (
-                      <button
-                        type="button"
-                        onClick={onClick}
-                        disabled={disabled || extraDisabled}
-                        className={`min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${
-                          selected
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
-                        } ${disabled || extraDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
-                      >
-                        {label}
-                      </button>
-                    );
-
                     // セグメントボタンのラベル: 機種名は実値、撮影場所は解析後は実値、未解析時はプレースホルダ
                     const cameraShowLabel = cameraText
                       ? `📷 ${cameraText}`
@@ -1125,6 +1106,13 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                       ? `📍 ${geocoded.prefecture}${geocoded.city}`
                       : "📍 都道府県+市町村";
 
+                    const cameraOptions: CameraOption[] = ["none", "show"];
+                    const locationOptions: LocationOption[] = [
+                      "none",
+                      "pref",
+                      "city",
+                    ];
+
                     return (
                       <div className="space-y-5">
                         {/* カメラ機種名（機種情報がある画像のときだけ表示。
@@ -1132,43 +1120,42 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                         {cameraText && (
                           <div className="space-y-2">
                             <Label>カメラの機種名</Label>
-                            <div className="flex rounded-lg border bg-muted p-1 gap-1">
-                              {segmentBtn(
-                                cameraOption === "none",
-                                () => setCameraOption("none"),
-                                "表示しない",
-                              )}
-                              {segmentBtn(
-                                cameraOption === "show",
-                                () => setCameraOption("show"),
-                                cameraShowLabel,
-                              )}
-                            </div>
+                            <SegmentControl
+                              value={cameraOption}
+                              options={cameraOptions}
+                              onChange={setCameraOption}
+                              disabled={disabled}
+                              size="xs"
+                              truncate
+                              renderOption={(opt) =>
+                                opt === "none" ? "表示しない" : cameraShowLabel
+                              }
+                            />
                           </div>
                         )}
 
                         {/* 撮影場所 */}
                         <div className="space-y-2">
                           <Label>撮影場所</Label>
-                          <div className="flex rounded-lg border bg-muted p-1 gap-1">
-                            {segmentBtn(
-                              locationOption === "none",
-                              () => handleLocationOptionChange("none"),
-                              "表示しない",
-                            )}
-                            {segmentBtn(
-                              locationOption === "pref",
-                              () => handleLocationOptionChange("pref"),
-                              prefLabel,
-                              !prefAvailable,
-                            )}
-                            {segmentBtn(
-                              locationOption === "city",
-                              () => handleLocationOptionChange("city"),
-                              cityLabel,
-                              !cityAvailable,
-                            )}
-                          </div>
+                          <SegmentControl
+                            value={locationOption}
+                            options={locationOptions}
+                            onChange={handleLocationOptionChange}
+                            disabled={disabled}
+                            size="xs"
+                            truncate
+                            optionDisabled={(opt) =>
+                              (opt === "pref" && !prefAvailable) ||
+                              (opt === "city" && !cityAvailable)
+                            }
+                            renderOption={(opt) =>
+                              opt === "none"
+                                ? "表示しない"
+                                : opt === "pref"
+                                  ? prefLabel
+                                  : cityLabel
+                            }
+                          />
 
                           {/* GPSなし: 状況に応じた案内 */}
                           {!hasGps &&

@@ -1,6 +1,7 @@
 "use client";
 
 import { Visibility, VISIBILITY_LABELS } from "@/types";
+import { SegmentControl } from "@/components/SegmentControl";
 
 interface VisibilityPickerProps {
   value: Visibility;
@@ -12,22 +13,12 @@ const VISIBILITIES: Visibility[] = ["public", "unlisted", "local"];
 
 export function VisibilityPicker({ value, onChange, disabled }: VisibilityPickerProps) {
   return (
-    <div className="flex rounded-lg border bg-muted p-1 gap-1">
-      {VISIBILITIES.map((v) => (
-        <button
-          key={v}
-          type="button"
-          onClick={() => onChange(v)}
-          disabled={disabled}
-          className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
-            value === v
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-        >
-          {VISIBILITY_LABELS[v]}
-        </button>
-      ))}
-    </div>
+    <SegmentControl
+      value={value}
+      options={VISIBILITIES}
+      onChange={onChange}
+      disabled={disabled}
+      renderOption={(v) => VISIBILITY_LABELS[v]}
+    />
   );
 }
