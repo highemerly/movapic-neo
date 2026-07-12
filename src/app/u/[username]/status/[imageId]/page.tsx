@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "@/components/Link";
 import { getAvatarUrl } from "@/lib/avatar";
-import { getOgImageUrl } from "@/lib/ogImage";
+import { buildOgImage } from "@/lib/ogImage";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { DeleteLocationButton } from "./DeleteLocationButton";
@@ -83,20 +83,13 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const cardTitle = `${title} - ${authorName} | SHAMEZO`;
 
   // X はカード画像に AVIF 非対応。AVIF はメディアプロキシ（ogp モード）で WebP に変換して渡す。
-  // 変換時はサイズ決定をプロキシ側に委ねるため width/height は付けない（Xが実画像を実測する）。
-  // JPEG は変換不要でそのまま＋寸法/type を付ける。
-  const ogImageUrl = getOgImageUrl(imageUrl, image.mimeType);
-  const ogImageAlt = image.altText || image.overlayText;
-  const ogImage =
-    ogImageUrl !== imageUrl
-      ? { url: ogImageUrl, alt: ogImageAlt, type: "image/webp" }
-      : {
-          url: imageUrl,
-          width: image.width,
-          height: image.height,
-          alt: ogImageAlt,
-          type: image.mimeType,
-        };
+  const ogImage = buildOgImage({
+    url: imageUrl,
+    mimeType: image.mimeType,
+    alt: image.altText || image.overlayText,
+    width: image.width,
+    height: image.height,
+  });
 
   return {
     // HTMLの <title> はテンプレート（%s | SHAMEZO）でサービス名が付くので本文＋投稿者名まで。
@@ -117,7 +110,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       card: "summary_large_image",
       title: cardTitle,
       description,
-      images: [ogImageUrl],
+      images: [ogImage.url],
     },
   };
 }

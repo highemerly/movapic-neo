@@ -12,6 +12,7 @@ import { getRankCounts } from "@/lib/achievements/counts";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
 import { userPageRobotsMetadata } from "@/lib/crawlers";
+import { buildOgImage, DEFAULT_OG_IMAGE } from "@/lib/ogImage";
 import { ToastFlasher } from "@/components/ToastFlasher";
 import type { Metadata } from "next";
 
@@ -26,7 +27,85 @@ export async function generateMetadata({
   params,
 }: UserGalleryPageProps): Promise<Metadata> {
   const { username } = await params;
-  return userPageRobotsMetadata(username);
+  const robots = await userPageRobotsMetadata(username);
+
+  const { username: cleanUsername, domain } = parseUserHandle(username);
+  const user = await prisma.user.findFirst({
+    where: { username: cleanUsername, instance: { domain } },
+    select: {
+      username: true,
+      displayName: true,
+      avatarUrl: true,
+      bio: true,
+      instance: { select: { domain: true } },
+      // OGカードのヒーロー画像に使う最新の公開投稿1件
+      images: {
+        where: { isPublic: true, isDisabled: false },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: 1,
+        select: {
+          storageKey: true,
+          mimeType: true,
+          altText: true,
+          overlayText: true,
+          width: true,
+          height: true,
+        },
+      },
+    },
+  });
+
+  // ユーザー不明時は本文側で notFound。ここでは robots のみ返す（既定メタを継承）。
+  if (!user) return robots;
+
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
+  const publicUrl = (
+    process.env.S3_PUBLIC_URL ||
+    process.env.R2_PUBLIC_URL ||
+    ""
+  ).replace(/\/+$/, "");
+  const name = user.displayName || user.username;
+  const handle = `${user.username}@${user.instance.domain}`;
+  const cardTitle = `${name} | SHAMEZO`;
+  const description = user.bio?.trim() || `${name}（@${handle}）さんの投稿ギャラリー`;
+
+  // OG画像: 最新の公開投稿画像 > アバター > ブランド既定画像。
+  // 投稿画像がAVIFのときは buildOgImage がプロキシでWebP化する。
+  const latest = user.images[0];
+  const avatarUrl = getAvatarUrl(user.avatarUrl);
+  const ogImage = latest
+    ? buildOgImage({
+        url: `${publicUrl}/${latest.storageKey}`,
+        mimeType: latest.mimeType,
+        alt: latest.altText || latest.overlayText,
+        width: latest.width,
+        height: latest.height,
+      })
+    : avatarUrl
+      ? { url: avatarUrl, alt: name }
+      : DEFAULT_OG_IMAGE;
+
+  return {
+    ...robots,
+    // HTMLの <title> はテンプレート（%s | SHAMEZO）でサービス名が付く。
+    title: name,
+    description,
+    openGraph: {
+      type: "profile",
+      siteName: "SHAMEZO",
+      locale: "ja_JP",
+      title: cardTitle,
+      description,
+      url: `${appUrl}/u/${username}`,
+      images: [ogImage],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: cardTitle,
+      description,
+      images: [ogImage.url],
+    },
+  };
 }
 
 export default async function UserGalleryPage({
