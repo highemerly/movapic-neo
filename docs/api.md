@@ -1,0 +1,30 @@
+# API リファレンス
+
+入力オプションの各値は [README](../README.md) 参照。
+
+## POST /api/v1/generate
+- multipart/form-data。パラメータは入力オプションの API値（image/text/position/font/color/size/output）。
+- **レスポンス**: image/jpeg または image/avif（バイナリ）。ヘッダー: Content-Type, Content-Length, Content-Disposition, Cache-Control。
+- **エラー**: `{ success: false, error: { code, message, suggestion?, requestId? } }`
+
+## POST /api/v1/post
+- multipart/form-data・**認証必須**（JWT）。
+- パラメータ: image(生成済Blob), text, position/font/color/size/output（生成オプション）, mimeType, visibility(`public`/`unlisted`/`local`), altText(任意・画像の代替テキスト)。
+- **処理**: R2アップロード → DB保存 → Fediverse投稿（local時はスキップ）。
+- **レスポンス**: `{ success, imageId, imagePageUrl, postUrl? }`
+
+## POST /api/v1/ingest/email（内部API・worker-front配信）
+- Cloudflare Email Workerから転送されたraw emailを処理（元画像をR2一時領域へ置き、生成〜投稿は consumer へ enqueue）。`X-API-Key` 認証・`X-Email-Prefix` でユーザー特定。
+- 件名→オプション、本文→テキスト、添付→画像。デフォルトは「件名指定 > ユーザー設定 > ハードコード」。出力形式は連携インスタンスで自動決定。source: "email"。詳細は [メール投稿機能](./posting.md#メール投稿機能) 参照。
+
+## GET/POST/DELETE /api/v1/images/[id]/favorite
+- **GET**（認証不要）: `{ favoriteCount, isFavorited, recentFavoriters[] }`
+- **POST**（認証必須）: `{ success, favoriteCount, isFavorited: true }`
+- **DELETE**（認証必須）: `{ success, favoriteCount, isFavorited: false }`
+- お気に入りの実体・同期仕様は [`docs/favorite.md`](./favorite.md) に集約。
+
+## GET /api/v1/favorites（認証必須）
+- パラメータ cursor, limit。レスポンス `{ images[], nextCursor, hasMore }`。自分のお気に入り一覧を最新順で取得。
+
+## GET /api/v1/public/users/[username]/calendar
+- パラメータ year, month。レスポンスは `days`（日ごとの件数＋最新画像）と `hasPrevMonth`/`hasNextMonth`/`isPerfectAttendance`（皆勤賞）を含むカレンダー用月別データ。

@@ -6,7 +6,7 @@
 
 - **Framework**: Next.js 16
 - **UI**: Tailwind CSS + shadcn/ui
-- **Image Processing**: sharp + skia-canvas + heic-convert (server-side)
+- **Image Processing**: sharp + skia-canvas (server-side). HEIC/HEIF input is decoded by sharp via the system libvips (libheif/libde265).
 - **Language**: TypeScript
 
 ## Text Compositing
@@ -25,7 +25,7 @@ Generate composite images by overlaying text on images.
 | Font | Hui Font / Noto Sans JP / Light Novel POP |
 | Text Color | White / Red / Blue / Green / Yellow / Brown / Pink / Orange |
 | Size | Small / Medium / Large / Extra Large |
-| Output Format | Mastodon (AVIF) / Misskey (AVIF) / None (JPEG) |
+| Arrangement | None / Neon / Stamp |
 
 Font files are stored in a private repository to prevent license violations (redistribution).
 

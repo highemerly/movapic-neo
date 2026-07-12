@@ -7,7 +7,7 @@
 1. [必要な環境](#必要な環境)
 2. [ローカル開発環境のセットアップ](#ローカル開発環境のセットアップ)
 3. [環境変数の設定](#環境変数の設定)
-4. [Cloudflare R2のセットアップ](#cloudflare-r2のセットアップ)
+4. [オブジェクトストレージのセットアップ](#オブジェクトストレージのセットアップ)
 5. [Cloudflare Email Workerのセットアップ](#cloudflare-email-workerのセットアップ)
 6. [本番環境へのデプロイ](#本番環境へのデプロイ)
 
@@ -17,7 +17,8 @@
 
 - Node.js 20以上
 - Docker / Docker Compose
-- Cloudflareアカウント（R2、Email Routing、Workers用）
+- S3互換オブジェクトストレージ（AWS S3 / MinIO / Cloudflare R2 など）
+- Cloudflareアカウント（Email Routing・Workers用。メール投稿機能を使う場合）
 - PostgreSQL 16以上
 
 ---
@@ -75,12 +76,13 @@ JWT_SECRET="<32バイトのランダムな16進数文字列>"
 TOKEN_ENCRYPTION_KEY="<32バイトのランダムな16進数文字列>"
 INTERNAL_API_KEY="<32バイトのランダムな16進数文字列>"
 
-# Cloudflare R2
-CF_ACCOUNT_ID="<CloudflareアカウントID>"
-R2_ACCESS_KEY_ID="<R2 APIトークンのアクセスキーID>"
-R2_SECRET_ACCESS_KEY="<R2 APIトークンのシークレットアクセスキー>"
-R2_BUCKET_NAME="movapic-images"
-R2_PUBLIC_URL="https://img.pic.handon.club"
+# オブジェクトストレージ（S3互換。AWS S3 / MinIO / Cloudflare R2 など）
+S3_ENDPOINT="https://s3.ap-northeast-1.amazonaws.com"  # 例: MinIO は http://localhost:9000 / R2 は https://<account>.r2.cloudflarestorage.com
+S3_REGION="ap-northeast-1"                             # 省略時は "auto"（AWS S3 は実リージョン必須。MinIO/R2 は "auto" で可）
+S3_ACCESS_KEY_ID="<アクセスキーID>"
+S3_SECRET_ACCESS_KEY="<シークレットアクセスキー>"
+S3_BUCKET_NAME="movapic-images"
+S3_PUBLIC_URL="https://img.pic.handon.club"            # 画像を配信する公開ベースURL（バケットのパブリック配信 or CDN/カスタムドメイン）
 
 # App
 NEXT_PUBLIC_APP_URL="https://pic.handon.club"
@@ -98,31 +100,17 @@ openssl rand -hex 32
 
 ---
 
-## Cloudflare R2のセットアップ
+## オブジェクトストレージのセットアップ
 
-### 1. バケットの作成
+ストレージ層は **S3 互換 API（`@aws-sdk/client-s3`）** で実装しており、AWS S3・MinIO・Cloudflare R2 など任意のS3互換ストレージで動く（[storage.ts](../src/lib/storage/storage.ts)）。上記 `S3_*` 環境変数を使う。
 
-1. Cloudflareダッシュボード → R2 → バケットを作成
-2. バケット名: `movapic-images`（または任意の名前）
-3. リージョン: 自動
+必要なもの:
+1. **バケット**を1つ作成（例: `movapic-images`）→ `S3_BUCKET_NAME`。
+2. **アクセスキー**（読み書き権限。可能ならバケット限定）→ `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`。
+3. **エンドポイント / リージョン** → `S3_ENDPOINT` / `S3_REGION`（AWS S3 は実リージョン必須。MinIO・R2 は `S3_REGION=auto` で可）。
+4. **公開配信URL** → `S3_PUBLIC_URL`。生成画像は公開URLで直接配信するため、バケットのパブリック公開設定か、前段のCDN/カスタムドメインが必要。
 
-### 2. カスタムドメインの設定
-
-1. バケット設定 → カスタムドメイン
-2. `img.pic.handon.club` などを設定
-3. DNSレコードが自動作成される
-
-### 3. APIトークンの作成
-
-1. R2 → 概要 → R2 APIトークンを管理
-2. 「APIトークンを作成」
-3. 権限: オブジェクトの読み取りと書き込み
-4. バケット: 作成したバケットを指定
-5. 生成されたアクセスキーIDとシークレットを`.env`に設定
-
-### 4. CORSの設定（必要に応じて）
-
-バケット設定 → CORS → 以下を追加：
+CORS（ブラウザから直接読む場合に必要に応じて設定）:
 
 ```json
 [
@@ -134,6 +122,13 @@ openssl rand -hex 32
   }
 ]
 ```
+
+### プロバイダ別メモ
+
+- **MinIO（ローカル開発向け）**: `S3_ENDPOINT=http://localhost:9000` / `S3_REGION=auto`。バケットをpublic-readにするか、開発用に公開ポリシーを付与して `S3_PUBLIC_URL` を配信URLに合わせる。
+- **AWS S3**: `S3_ENDPOINT=https://s3.<region>.amazonaws.com` / `S3_REGION=<実リージョン>`。公開配信はバケットポリシー or CloudFront。
+- **Cloudflare R2**: `S3_ENDPOINT` は `https://<CF_ACCOUNT_ID>.r2.cloudflarestorage.com`。カスタムドメイン（例 `img.pic.handon.club`）を割り当てて `S3_PUBLIC_URL` に設定。
+  - 互換のため `S3_ENDPOINT` の代わりに `CF_ACCOUNT_ID` を渡すとR2エンドポイントを自動構築するフォールバックがある。`S3_*` 各変数も未設定なら `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET_NAME` / `R2_PUBLIC_URL` にフォールバックする（旧設定の互換用。新規は `S3_*` を推奨）。
 
 ---
 
@@ -196,7 +191,7 @@ docker compose logs -f app
 
 ```bash
 NEXT_PUBLIC_APP_URL="https://pic.handon.club"
-R2_PUBLIC_URL="https://img.pic.handon.club"
+S3_PUBLIC_URL="https://img.pic.handon.club"
 ```
 
 ### Nginxリバースプロキシの設定例
