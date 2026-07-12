@@ -11,6 +11,7 @@
 
 import { NextResponse } from "next/server";
 import { summarizeMentionStream } from "@/lib/mention/streamer";
+import { runtimeVersions } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,7 @@ export function GET() {
     ok: streamingExpected ? h.connected : true,
     role,
     streamingExpected,
+    versions: runtimeVersions(),
     ...h,
   };
 

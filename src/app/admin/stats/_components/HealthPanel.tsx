@@ -49,7 +49,7 @@ export function HealthPanel({ items }: { items: ComponentHealth[] }) {
   return (
     <section className="mb-10">
       <div className="mb-3 flex items-center gap-2">
-        <h2 className="text-xl font-bold">コンポーネント稼働状況</h2>
+        <h2 className="text-xl font-bold">稼働状況</h2>
         <span className={`flex items-center gap-1.5 text-xs font-semibold ${overall.text}`}>
           <span className={`inline-block h-2 w-2 rounded-full ${overall.dot}`} aria-hidden />
           {worst === "ok" ? "すべて正常" : overall.label}

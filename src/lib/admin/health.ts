@@ -22,7 +22,7 @@ import prisma from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { USER_AGENT } from "@/lib/userAgent";
 import type { MentionStreamHealth } from "@/lib/mention/streamer";
-import pkg from "../../../package.json";
+import { runtimeVersions } from "@/lib/version";
 
 /** ok=正常 / warn=稼働だが注意 / down=異常 / unknown=確認不可（未設定・非対象） */
 export type HealthState = "ok" | "warn" | "down" | "unknown";
@@ -77,33 +77,77 @@ async function fetchJson(
   }
 }
 
+/** ソフトウェアバージョン行（version / Next.js / Node.js）を in-process から組み立てる。 */
+function localVersionMeta(): HealthMeta[] {
+  const v = runtimeVersions();
+  return [
+    { label: "version", value: v.app },
+    { label: "Next.js", value: v.next },
+    { label: "Node.js", value: v.node },
+  ];
+}
+
+/** アプリバージョン行のみ（compute/worker-front 用。Next.js/Node.js は出さない）。 */
+function localAppVersionMeta(): HealthMeta[] {
+  return [{ label: "version", value: runtimeVersions().app }];
+}
+
+/** HTTP レスポンスからアプリバージョン行のみ抽出（compute/worker-front 用）。 */
+function appVersionMetaFrom(body: unknown): HealthMeta[] {
+  return versionMetaFrom(body).filter((m) => m.label === "version");
+}
+
+/** /api/health(/stream) レスポンスの versions からバージョン行を組み立てる。 */
+function versionMetaFrom(body: unknown): HealthMeta[] {
+  if (!body || typeof body !== "object") return [];
+  const v = (body as { versions?: unknown }).versions;
+  if (!v || typeof v !== "object") return [];
+  const o = v as Record<string, unknown>;
+  const meta: HealthMeta[] = [];
+  if (typeof o.app === "string") meta.push({ label: "version", value: o.app });
+  if (typeof o.next === "string") meta.push({ label: "Next.js", value: o.next });
+  if (typeof o.node === "string") meta.push({ label: "Node.js", value: o.node });
+  return meta;
+}
+
 /** web（自分自身）。描画できている時点で稼働。 */
 function checkWeb(): ComponentHealth {
   return {
     key: "web",
-    label: "Web（このpod）",
+    label: "web",
     state: "ok",
     summary: "稼働中",
-    meta: [
-      { label: "role", value: role || "all-in-one" },
-      { label: "version", value: pkg.version },
-      { label: "Node.js", value: process.version.replace(/^v/, "") },
-    ],
+    meta: [{ label: "role", value: role || "all-in-one" }, ...localVersionMeta()],
   };
 }
 
-/** データベース疎通（SELECT 1 の往復遅延）。 */
+/** データベース疎通（往復遅延）＋ バージョン・データ量・接続数。 */
 async function checkDb(): Promise<ComponentHealth> {
   const startedAt = Date.now();
   try {
-    await prisma.$queryRaw(Prisma.sql`SELECT 1`);
+    // 疎通確認を兼ねてサーバー情報を1往復で取得
+    const rows = await prisma.$queryRaw<
+      Array<{ version: string; size: string; conns: number }>
+    >(Prisma.sql`
+      SELECT
+        current_setting('server_version') AS version,
+        pg_size_pretty(pg_database_size(current_database())) AS size,
+        (SELECT count(*)::int FROM pg_stat_activity WHERE datname = current_database()) AS conns
+    `);
     const ms = Date.now() - startedAt;
+    const r = rows[0];
+    // "15.17 (Debian ...)" → "15.17"
+    const pgVersion = (r?.version ?? "?").split(" ")[0];
     return {
       key: "db",
-      label: "データベース",
+      label: "postgres",
       state: ms > 1000 ? "warn" : "ok",
-      summary: `疎通OK (${ms}ms)`,
-      meta: [{ label: "応答", value: `${ms}ms` }],
+      summary: `稼働中 (遅延: ${ms}ms)`,
+      meta: [
+        { label: "version", value: pgVersion },
+        { label: "データ量", value: r?.size ?? "—" },
+        { label: "接続数", value: r ? String(r.conns) : "—" },
+      ],
     };
   } catch (e) {
     return {
@@ -116,37 +160,68 @@ async function checkDb(): Promise<ComponentHealth> {
   }
 }
 
+/**
+ * sharp / libvips のバージョンを取得。all-in-one では in-process で読む。
+ * sharp は compute（と all-in-one）だけが積むため lazy import で非画像 pod に載せない。
+ */
+async function getSharpVersions(): Promise<{ sharp: string; vips: string } | null> {
+  try {
+    const sharp = (await import("sharp")).default;
+    return { sharp: sharp.versions.sharp, vips: sharp.versions.vips };
+  } catch {
+    return null;
+  }
+}
+
+/** /api/health レスポンスから sharp / libvips バージョン行を組み立てる。 */
+function sharpMetaFrom(body: unknown): HealthMeta[] {
+  if (!body || typeof body !== "object") return [];
+  const b = body as Record<string, unknown>;
+  const meta: HealthMeta[] = [];
+  if (typeof b.sharp === "string") meta.push({ label: "sharp", value: b.sharp });
+  if (typeof b.vips === "string") meta.push({ label: "libvips", value: b.vips });
+  return meta;
+}
+
 /** compute（画像生成専用サービス）の /api/health。 */
 async function checkCompute(): Promise<ComponentHealth> {
   const base = process.env.COMPUTE_SERVICE_URL?.replace(/\/+$/, "");
 
-  // all-in-one は同一プロセスで sharp/skia を持つ（compute サービス無し）
+  // all-in-one は同一プロセスで sharp/skia を持つ（compute サービス無し）。
+  // ステータス表記は web と揃え、sharp/libvips のバージョンだけ添える。
   if (isAllInOne) {
+    const sv = await getSharpVersions();
     return {
       key: "compute",
-      label: "compute（画像生成）",
+      label: "compute",
       state: "ok",
-      summary: "all-in-one（同一プロセス）",
-      meta: [],
+      summary: "稼働中",
+      meta: [
+        ...localAppVersionMeta(),
+        ...(sv
+          ? [
+              { label: "sharp", value: sv.sharp },
+              { label: "libvips", value: sv.vips },
+            ]
+          : []),
+      ],
     };
   }
   if (!base) {
     return {
       key: "compute",
-      label: "compute（画像生成）",
+      label: "compute",
       state: "unknown",
       summary: "COMPUTE_SERVICE_URL 未設定で確認できません",
       meta: [],
     };
   }
 
-  const startedAt = Date.now();
   const r = await fetchJson(`${base}/api/health`);
-  const ms = Date.now() - startedAt;
   if (!r) {
     return {
       key: "compute",
-      label: "compute（画像生成）",
+      label: "compute",
       state: "down",
       summary: "応答なし（到達不可 or タイムアウト）",
       meta: [{ label: "接続先", value: base }],
@@ -155,7 +230,7 @@ async function checkCompute(): Promise<ComponentHealth> {
   if (!r.ok) {
     return {
       key: "compute",
-      label: "compute（画像生成）",
+      label: "compute",
       state: "down",
       summary: `異常応答 HTTP ${r.status}`,
       meta: [{ label: "接続先", value: base }],
@@ -167,12 +242,13 @@ async function checkCompute(): Promise<ComponentHealth> {
       : "?";
   return {
     key: "compute",
-    label: "compute（画像生成）",
+    label: "compute",
     state: "ok",
-    summary: `正常 (${ms}ms)`,
+    summary: "稼働中",
     meta: [
       { label: "role", value: computeRole },
-      { label: "応答", value: `${ms}ms` },
+      ...appVersionMetaFrom(r.body),
+      ...sharpMetaFrom(r.body),
     ],
   };
 }
@@ -197,6 +273,32 @@ function pickStreamHealth(body: unknown): MentionStreamHealth | null {
 }
 
 /**
+ * Graphile Worker のキュー状況（待ち / 実行中 / 失敗）を DB から直接取得。
+ * 完了ジョブは削除されるため、jobs に残る行がおおむね未処理分。
+ * スキーマ未作成（worker 未起動）なら null。
+ */
+async function getQueueStats(): Promise<{
+  ready: number;
+  running: number;
+  failed: number;
+} | null> {
+  try {
+    const rows = await prisma.$queryRaw<
+      Array<{ ready: number; running: number; failed: number }>
+    >(Prisma.sql`
+      SELECT
+        count(*) FILTER (WHERE locked_at IS NULL AND run_at <= now())::int AS ready,
+        count(*) FILTER (WHERE locked_at IS NOT NULL)::int AS running,
+        count(*) FILTER (WHERE last_error IS NOT NULL)::int AS failed
+      FROM graphile_worker.jobs
+    `);
+    return rows[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * worker-front（キュー consumer＋Bot受信）と Bot Streaming を確認して2枚のカードを返す。
  * 1回の取得（in-process or /api/health/stream）から両方を導く。
  */
@@ -205,12 +307,18 @@ async function checkWorkerAndStream(): Promise<ComponentHealth[]> {
   // reachable: true=応答あり / false=到達不可 / null=確認不可（URL未設定）
   let reachable: boolean | null = null;
   let note = "";
+  // バージョン行の元ネタ。分離構成は /api/health/stream の body、all-in-one は in-process。
+  let versionMeta: HealthMeta[] = [];
+
+  // キュー状況は DB 直読みなので worker への到達性と独立に取れる（並行実行）
+  const queuePromise = getQueueStats();
 
   if (isAllInOne) {
     const { summarizeMentionStream } = await import("@/lib/mention/streamer");
     health = summarizeMentionStream();
     reachable = true;
     note = "all-in-one（同一プロセス）";
+    versionMeta = localAppVersionMeta();
   } else {
     const base = process.env.WORKER_FRONT_INTERNAL_URL?.replace(/\/+$/, "");
     if (!base) {
@@ -224,14 +332,17 @@ async function checkWorkerAndStream(): Promise<ComponentHealth[]> {
         // /api/health/stream は未接続時に 503 を返すが body は読める
         reachable = true;
         health = pickStreamHealth(r.body);
+        versionMeta = appVersionMetaFrom(r.body);
       }
     }
   }
 
   // --- worker-front プロセス自体の生死 ---
+  // 待ちジョブは worker 停止中でも意味がある（積み上がりの検知）ので到達性と無関係に表示
+  const queue = await queuePromise;
   const worker: ComponentHealth = {
     key: "worker-front",
-    label: "worker-front（ジョブ/Bot受信）",
+    label: "worker-front",
     state: reachable === true ? "ok" : reachable === false ? "down" : "unknown",
     summary:
       reachable === true
@@ -241,7 +352,18 @@ async function checkWorkerAndStream(): Promise<ComponentHealth[]> {
         : reachable === false
           ? note
           : note,
-    meta: isAllInOne ? [] : [{ label: "接続", value: reachable === true ? "OK" : reachable === false ? "NG" : "未確認" }],
+    meta: [
+      ...versionMeta,
+      ...(queue
+        ? [
+            { label: "待ちジョブ", value: String(queue.ready) },
+            { label: "実行中", value: String(queue.running) },
+            ...(queue.failed > 0
+              ? [{ label: "失敗(リトライ待ち)", value: String(queue.failed) }]
+              : []),
+          ]
+        : []),
+    ],
   };
 
   // --- Bot Streaming（メンション受信 WebSocket） ---
@@ -249,7 +371,7 @@ async function checkWorkerAndStream(): Promise<ComponentHealth[]> {
   if (!health) {
     stream = {
       key: "stream",
-      label: "Bot Streaming（メンション受信）",
+      label: "Streaming（Bot）",
       state: "unknown",
       summary: note || "状態を取得できません",
       meta: [],
@@ -272,7 +394,7 @@ async function checkWorkerAndStream(): Promise<ComponentHealth[]> {
     }
     stream = {
       key: "stream",
-      label: "Bot Streaming（メンション受信）",
+      label: "bot streaming（メンション受信）",
       state,
       summary,
       meta: [
