@@ -82,17 +82,17 @@ export default async function AdminAccountsPage({
               const avatar = getAvatarUrl(u.avatarUrl);
               return (
                 <tr key={u.id} className="border-b border-border/50">
-                  <td className="w-9 py-1.5">
+                  <td className="w-9 min-w-9 py-1.5">
                     <Link href={`/u/${seg}`} target="_blank" className="block">
                       {avatar ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={avatar}
                           alt=""
-                          className="h-7 w-7 rounded-full bg-muted object-cover"
+                          className="h-7 w-7 max-w-none shrink-0 rounded-full bg-muted object-cover"
                         />
                       ) : (
-                        <span className="block h-7 w-7 rounded-full bg-muted" />
+                        <span className="block h-7 w-7 shrink-0 rounded-full bg-muted" />
                       )}
                     </Link>
                   </td>
