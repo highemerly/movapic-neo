@@ -1160,15 +1160,15 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                           {/* GPSなし: 状況に応じた案内 */}
                           {!hasGps &&
                             (isLoadingLocations ? (
-                              <p className="text-[11px] text-muted-foreground">
+                              <p className="text-xs text-muted-foreground">
                                 過去に投稿した場所を読み込み中…
                               </p>
                             ) : hasManualLocations ? (
-                              <p className="text-[11px] text-muted-foreground">
+                              <p className="text-xs text-muted-foreground">
                                 この画像には位置情報がありません。過去に投稿したことのある場所から手動で選べます。
                               </p>
                             ) : (
-                              <p className="text-[11px] text-muted-foreground">
+                              <p className="text-xs text-muted-foreground">
                                 この画像には位置情報がありません。
                               </p>
                             ))}
@@ -1239,11 +1239,11 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                             locationOption !== "none" &&
                             !geocoded &&
                             (isGeocoding ? (
-                              <p className="text-[11px] text-muted-foreground">
+                              <p className="text-xs text-muted-foreground">
                                 撮影場所を解析中…
                               </p>
                             ) : geocodeError ? (
-                              <p className="text-[11px] text-destructive">
+                              <p className="text-xs text-destructive">
                                 {geocodeError}
                               </p>
                             ) : null)}
