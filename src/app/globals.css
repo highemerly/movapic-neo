@@ -107,6 +107,8 @@
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand: var(--brand);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -130,6 +132,10 @@
   --popover-foreground: oklch(0.145 0 0);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
+  /* ブランドピンク（ロゴ warm グラデ #FE5196 由来）。--primary（neutral黒）とは別に、
+     真の主役CTA（下部ナビ中央の投稿ボタン・アクティブタブ・未ログインCTA）だけに使う。 */
+  --brand: oklch(0.6 0.19 356);
+  --brand-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
@@ -164,6 +170,10 @@
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
+  /* ダークは暗背景で「濃すぎ」に見えるため、明るめ・やや低彩度の淡いピンクにする。
+     淡い背景には白文字だと読めないので、前景は濃い色（near-black）に反転。 */
+  --brand: oklch(0.72 0.16 356);
+  --brand-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);

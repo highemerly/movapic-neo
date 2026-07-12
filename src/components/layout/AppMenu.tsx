@@ -436,7 +436,7 @@ function AppMenuSheet({
           <Link
             href="/create"
             onClick={close}
-            className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-3 text-base font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            className="flex items-center justify-center gap-2 rounded-md bg-brand px-4 py-3 text-base font-semibold text-brand-foreground shadow-sm transition-colors hover:bg-brand/90"
           >
             <ImagePlus className="h-5 w-5" />
             写真を投稿
@@ -834,7 +834,7 @@ function RailRow({
 }) {
   const cls = `flex h-11 items-center justify-end gap-3 pl-3 pr-[18px] transition-colors ${
     highlight
-      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+      ? "bg-brand text-brand-foreground hover:bg-brand/90"
       : active
         ? "bg-accent text-primary"
         : "text-foreground hover:bg-accent"

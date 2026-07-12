@@ -96,7 +96,7 @@ export function BottomNav({
         aria-label="写真を投稿"
         className="flex flex-1 flex-col items-center justify-center"
       >
-        <span className="-mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition-transform active:scale-95">
+        <span className="-mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg ring-4 ring-background transition-transform active:scale-95">
           <ImagePlus className="h-6 w-6" />
         </span>
         <span className="sr-only">投稿</span>

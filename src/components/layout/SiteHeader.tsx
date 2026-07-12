@@ -45,7 +45,11 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
                   （create/page.tsx の login_required と同じ経路）。
                   ロゴ＋ハンバーガーと並ぶため、狭幅では「はじめる」に短縮して横はみ出しを防ぐ。 */}
               {!user && (
-                <Button asChild size="sm">
+                <Button
+                  asChild
+                  size="sm"
+                  className="bg-brand text-brand-foreground hover:bg-brand/90"
+                >
                   <Link href="/?reason=login_required&returnTo=%2Fcreate">
                     <LogIn className="h-4 w-4" />
                     {/* ラベルは1つの span にまとめる。直下に置くと flex の gap が

@@ -56,7 +56,11 @@ export function ActionButtons({
         onClick={onPost}
         disabled={postDisabled}
         variant={postDisabled ? "outline" : "default"}
-        className={`h-12 ${postDisabled ? "text-muted-foreground" : ""}`}
+        className={`h-12 ${
+          postDisabled
+            ? "text-muted-foreground"
+            : "bg-brand text-brand-foreground hover:bg-brand/90"
+        }`}
         size="lg"
       >
         {isPosting ? (

@@ -152,7 +152,7 @@ export function UserProfileHeader({
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-[13px] text-sm font-medium border-b-2 transition-colors",
                   isActive
-                    ? "border-primary text-primary"
+                    ? "border-brand text-brand"
                     : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
                 )}
               >

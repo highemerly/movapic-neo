@@ -243,7 +243,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
           onClick={() => handleLogin()}
           disabled={isLoading}
           aria-disabled={needsAgreement || undefined}
-          className={`w-full h-12 text-lg ${needsAgreement ? "opacity-50" : ""}`}
+          className={`bg-brand text-brand-foreground hover:bg-brand/90 w-full h-12 text-lg ${needsAgreement ? "opacity-50" : ""}`}
           size="lg"
         >
           {buttonLabel}
@@ -391,7 +391,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
         type="submit"
         disabled={isLoading}
         aria-disabled={needsInput || undefined}
-        className={`w-full h-12 text-lg ${needsInput ? "opacity-50" : ""}`}
+        className={`bg-brand text-brand-foreground hover:bg-brand/90 w-full h-12 text-lg ${needsInput ? "opacity-50" : ""}`}
         size="lg"
       >
         {isLoading ? "処理中..." : "ログイン"}
