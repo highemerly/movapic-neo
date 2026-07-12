@@ -15,6 +15,8 @@ interface GalleryGridProps<T> {
   renderItem: (item: T, fill: boolean) => ReactNode;
   /** 画像が0件のときに表示する文言 */
   emptyMessage: string;
+  /** 画像が0件のときに文言の下へ表示するCTA（任意） */
+  emptyAction?: ReactNode;
   /** 末尾（これ以上ない）で表示する文言 */
   endMessage: string;
   isLoading: boolean;
@@ -33,6 +35,7 @@ export function GalleryGrid<T>({
   aspect,
   renderItem,
   emptyMessage,
+  emptyAction,
   endMessage,
   isLoading,
   nextCursor,
@@ -41,7 +44,7 @@ export function GalleryGrid<T>({
   const [layout] = useGalleryLayout();
 
   if (images.length === 0) {
-    return <EmptyState message={emptyMessage} />;
+    return <EmptyState message={emptyMessage} action={emptyAction} />;
   }
 
   return (

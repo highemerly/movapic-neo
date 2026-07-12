@@ -1,5 +1,8 @@
 "use client";
 
+import { ImagePlus } from "lucide-react";
+import Link from "@/components/Link";
+import { Button } from "@/components/ui/button";
 import { ImageCard } from "@/components/gallery/ImageCard";
 import { GalleryGrid } from "@/components/gallery/GalleryGrid";
 import { useInfiniteImages } from "@/hooks/useInfiniteImages";
@@ -24,6 +27,8 @@ interface UserGalleryClientProps {
   publicUrl: string;
   username: string;
   pinnedImageIds?: string[];
+  /** 閲覧者がこのページのオーナー本人か（空状態のCTA表示に使用） */
+  isOwner?: boolean;
 }
 
 export function UserGalleryClient({
@@ -31,6 +36,7 @@ export function UserGalleryClient({
   publicUrl,
   username,
   pinnedImageIds = [],
+  isOwner = false,
 }: UserGalleryClientProps) {
   const { images, isLoading, nextCursor, loaderRef } = useInfiniteImages<GalleryImage>({
     initialImages,
@@ -54,6 +60,19 @@ export function UserGalleryClient({
       getKey={(image) => image.id}
       aspect={(image) => image.width / image.height}
       emptyMessage="まだ画像がありません"
+      emptyAction={
+        isOwner ? (
+          <Link href="/create" className="inline-block">
+            <Button
+              size="lg"
+              className="h-12 px-8 bg-brand text-brand-foreground hover:bg-brand/90"
+            >
+              <ImagePlus className="mr-2 h-5 w-5" />
+              写真を投稿する
+            </Button>
+          </Link>
+        ) : undefined
+      }
       endMessage="すべての画像を表示しました"
       isLoading={isLoading}
       nextCursor={nextCursor}

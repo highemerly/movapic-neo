@@ -269,6 +269,7 @@ export default async function UserGalleryPage({
             publicUrl={publicUrl}
             username={userPathSegment(cleanUsername, user.instance.domain)}
             pinnedImageIds={pinnedImageIds}
+            isOwner={currentUser?.id === user.id}
           />
         </TabTransition>
 
