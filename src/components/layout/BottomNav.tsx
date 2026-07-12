@@ -30,8 +30,8 @@ type BottomNavProps = {
  * （画像未選択＝アクションが無いうちは表示する）。CreateClient が <html> に立てる
  * data-create-has-image 属性を `create-has-image` バリアントで拾って隠す。
  *
- * 並び（左→右）: みんな / 同じサーバー / 投稿(中央・強調) / マイページ / メニュー。
- * ログイン必須の「同じサーバー」「マイページ」は未ログイン時は出さない。
+ * 並び（左→右）: みんな / 同じサーバー / 投稿(中央・強調) / あなた / メニュー。
+ * ログイン必須の「同じサーバー」「あなた」は未ログイン時は出さない。
  * 「メニュー」はページ遷移ではなく、ヘッダーと共有のスライドメニュー（AppMenu）を開く。
  */
 export function BottomNav({
@@ -47,7 +47,7 @@ export function BottomNav({
   const isCreate = pathname === "/create";
 
   // href・現在地判定はヘッダーのインラインナビと共有（primaryNav）。
-  // 下部ナビはここから「みんな／サーバー／マイページ」だけを使い、
+  // 下部ナビはここから「みんな／同じサーバー／あなた」だけを使い、
   // 中央の投稿ボタンとメニューボタンは独自に描画する。
   const items = getPrimaryNavItems({
     isLoggedIn: selfSegment != null,

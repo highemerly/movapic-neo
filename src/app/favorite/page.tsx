@@ -59,7 +59,7 @@ export default async function FavoritePage() {
     <>
       <SiteHeader user={{ username: currentUser.username, instanceDomain: currentUser.instance.domain, avatarUrl: getAvatarUrl(currentUser.avatarUrl) }} />
       <div className="container mx-auto px-4 pt-2 pb-8 max-w-6xl">
-        <h1 className="text-2xl font-bold">みんなの写真</h1>
+        <h1 className="text-2xl font-bold">写真をみる</h1>
         <TimelineTabs
           ownInstance={currentUser.instance.domain}
           active="favorites"

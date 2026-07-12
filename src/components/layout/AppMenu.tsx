@@ -171,7 +171,7 @@ function useMenuSections(nav: MenuNav): MenuSectionData[] {
     {
       key: "all",
       href: "/public",
-      label: "すべて",
+      label: "みんな",
       Icon: Globe,
       active: pathname === "/public" && !hasInstancesParam,
       primary: true,
@@ -181,7 +181,7 @@ function useMenuSections(nav: MenuNav): MenuSectionData[] {
     everyone.push({
       key: "instance",
       href: `/public?instances=${encodeURIComponent(instanceDomain)}`,
-      label: instanceDomain,
+      label: "同じサーバー",
       Icon: Server,
       active: pathname === "/public" && hasInstancesParam,
       primary: true,
@@ -208,7 +208,7 @@ function useMenuSections(nav: MenuNav): MenuSectionData[] {
       primary: true,
     });
   }
-  sections.push({ key: "everyone", title: "みんなの写真", items: everyone });
+  sections.push({ key: "everyone", title: "写真をみる", items: everyone });
 
   if (isLoggedIn && userBase) {
     sections.push({
@@ -694,7 +694,7 @@ function AppRail({ nav }: { nav: MenuNav }) {
           {isLoggedIn && userBase && (
             <RailRow
               href={userBase}
-              label={username || "マイページ"}
+              label={username || "あなた"}
               expanded={expanded}
               icon={
                 avatarUrl ? (

@@ -8,10 +8,10 @@ import {
 } from "lucide-react";
 
 /**
- * 主要動線（みんな／サーバー／お気に入り／マイページ）の定義を1箇所に集約する。
+ * 主要動線（みんな／同じサーバー／あなた／カレンダー／実績）の定義を1箇所に集約する。
  *
- * これまで href と「現在地（active）判定」が BottomNav（PWA下部ナビ）と
- * SiteHeader（PC幅インライン）で重複しがちだったため、両者が同じ定義を共有する。
+ * href と「現在地（active）判定」を1箇所に集約するのが目的。現状の消費側は
+ * BottomNav（PWA下部ナビ）で、そこから必要な項目だけを取り出して使う。
  * 見た目（ラベル表示有無・アイコン差し替え・並び順）は各UI側の責務とし、
  * ここでは「どこへ・現在地か」だけを持つ。
  *
@@ -79,7 +79,7 @@ export function getPrimaryNavItems({
     items.push({
       key: "instance",
       href: `/public?instances=${encodeURIComponent(instanceDomain)}`,
-      label: "サーバー",
+      label: "同じサーバー",
       Icon: Server,
       isActive: (pathname, hasInstances) =>
         pathname === "/public" && hasInstances,
@@ -92,7 +92,7 @@ export function getPrimaryNavItems({
       {
         key: "mypage",
         href: base,
-        label: "マイページ",
+        label: "あなた",
         Icon: User,
         isActive: (pathname) => pathname === base,
       },

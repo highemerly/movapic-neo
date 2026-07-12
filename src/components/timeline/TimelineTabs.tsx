@@ -16,7 +16,7 @@ const inactiveTab =
   "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30";
 
 /**
- * 公開タイムライン／お気に入りで共通のタブ（「すべて」／「自分のサーバー」／「お気に入り」）。
+ * 公開タイムライン／お気に入りで共通のタブ（「みんな」／「同じサーバー」／「お気に入り」）。
  * デザインはユーザーページのタブ（UserProfileHeader）に準拠。
  * いずれも認証必須のため、未ログイン時（ownInstance なし）は行ごと非表示。
  */
@@ -32,7 +32,7 @@ export function TimelineTabs({ ownInstance, active }: TimelineTabsProps) {
         >
           <Globe className="w-4 h-4 shrink-0" />
           <span className={active === "all" ? "inline" : "hidden min-[375px]:inline"}>
-            すべて
+            みんな
           </span>
         </Link>
         <Link
@@ -40,13 +40,8 @@ export function TimelineTabs({ ownInstance, active }: TimelineTabsProps) {
           className={cn(tab, active === "own" ? activeTab : inactiveTab)}
         >
           <Server className="w-4 h-4 shrink-0" />
-          <span
-            className={cn(
-              "truncate max-w-[30vw] sm:max-w-[240px]",
-              active === "own" ? "inline" : "hidden min-[375px]:inline"
-            )}
-          >
-            {ownInstance}
+          <span className={active === "own" ? "inline" : "hidden min-[375px]:inline"}>
+            同じサーバー
           </span>
         </Link>
         <Link
