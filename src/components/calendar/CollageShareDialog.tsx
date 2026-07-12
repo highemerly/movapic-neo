@@ -7,12 +7,13 @@ import {
   Share2,
   ExternalLink,
   ImageDown,
-  Server,
-  Smartphone,
+  Download,
   Sun,
   Moon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { MastodonIcon } from "@/components/icons/MastodonIcon";
+import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -76,12 +77,15 @@ export function CollageShareDialog({
   year,
   month,
   serverName,
+  instanceType,
   onClose,
 }: {
   year: number;
   month: number;
   /** 投稿先サーバー名（ボタン文言「○○へ投稿する」に使う）。 */
   serverName: string;
+  /** ログイン中インスタンスの種別（"mastodon" | "misskey"）。投稿ボタンのロゴ出し分けに使う。 */
+  instanceType: string;
   onClose: () => void;
 }) {
   const [generating, setGenerating] = useState(false);
@@ -216,9 +220,21 @@ export function CollageShareDialog({
   }, [year, month]);
 
   const destinationOptions: { value: Destination; label: React.ReactNode }[] = [
-    { value: "server", label: <><Server className="h-4 w-4" />自分のサーバー</> },
+    {
+      value: "server",
+      label: (
+        <>
+          {instanceType === "misskey" ? (
+            <MisskeyIcon className="h-4 w-4 text-[#86b300]" />
+          ) : (
+            <MastodonIcon className="h-4 w-4 text-[#6364ff]" />
+          )}
+          投稿する
+        </>
+      ),
+    },
     ...(canShareFiles
-      ? [{ value: "device" as Destination, label: <><Smartphone className="h-4 w-4" />端末で共有</> }]
+      ? [{ value: "device" as Destination, label: <><Download className="h-4 w-4" />画像を書き出す</> }]
       : []),
   ];
 
@@ -234,7 +250,7 @@ export function CollageShareDialog({
         <div className="mb-3 flex items-center justify-between">
           <h3 className="flex items-center gap-1.5 text-sm font-bold">
             <Share2 className="h-4 w-4" />
-            カレンダー画像を投稿
+            カレンダー画像をシェア
             <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
               ベータ
             </span>
@@ -313,7 +329,7 @@ export function CollageShareDialog({
           <div className="space-y-4">
             {/* 投稿先 */}
             <div className="space-y-2">
-              <Label>投稿先</Label>
+              <Label>シェア方法</Label>
               <SegmentControl
                 value={destination}
                 options={destinationOptions}
@@ -335,7 +351,11 @@ export function CollageShareDialog({
                   />
                 </div>
 
-                <Button className="w-full gap-1.5" onClick={handlePostServer} disabled={posting}>
+                <Button
+                  className="w-full gap-1.5 bg-brand text-brand-foreground hover:bg-brand/90"
+                  onClick={handlePostServer}
+                  disabled={posting}
+                >
                   {posting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -351,8 +371,8 @@ export function CollageShareDialog({
               </>
             ) : (
               <Button className="w-full gap-1.5" onClick={handleShareDevice}>
-                <Smartphone className="h-4 w-4" />
-                端末の共有機能で送る
+                <Share2 className="h-4 w-4" />
+                共有・保存する
               </Button>
             )}
           </div>

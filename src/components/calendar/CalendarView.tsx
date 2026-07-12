@@ -67,6 +67,8 @@ interface CalendarViewProps {
   grace: number;
   /** 投稿先サーバー名（カレンダー画像投稿ボタンの文言に使う）。 */
   serverName: string;
+  /** ログイン中インスタンスの種別（"mastodon" | "misskey"）。投稿ボタンのロゴ出し分けに使う。 */
+  instanceType: string;
 }
 
 /**
@@ -127,6 +129,7 @@ export function CalendarView({
   isOwner,
   grace,
   serverName,
+  instanceType,
 }: CalendarViewProps) {
   const router = useRouter();
   const [year, setYear] = useState(initialYear);
@@ -638,6 +641,7 @@ export function CalendarView({
           year={year}
           month={month}
           serverName={serverName}
+          instanceType={instanceType}
           onClose={() => setShareOpen(false)}
         />
       )}
