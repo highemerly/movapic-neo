@@ -79,3 +79,16 @@ export function isEmojiGrapheme(grapheme: string): boolean {
 export function hasEmoji(text: string): boolean {
   return EMOJI_COMPONENT.test(text) || EXTENDED_PICTOGRAPHIC.test(text);
 }
+
+/**
+ * 絵文字（および空白）以外の文字を1つでも含むか。
+ * 本文フォント（ふい字等）が実際に描画に使われるかの判定に使う。
+ * 絵文字だけ（＋空白）の場合、本文フォントは描画に寄与しないため false を返す。
+ */
+export function hasNonEmojiText(text: string): boolean {
+  for (const grapheme of splitGraphemes(text)) {
+    if (grapheme.trim() === "") continue; // 空白はグリフを持たないため無視
+    if (!isEmojiGrapheme(grapheme)) return true;
+  }
+  return false;
+}

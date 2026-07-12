@@ -8,7 +8,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { DeleteLocationButton } from "./DeleteLocationButton";
 import { ImageNavigation } from "./ImageNavigation";
 import { FontLicenseBadge } from "./FontLicenseBadge";
-import { hasEmoji } from "@/lib/text/grapheme";
+import { hasEmoji, hasNonEmojiText } from "@/lib/text/grapheme";
 import { ImageActionsMenu } from "./ImageActionsMenu";
 import { MisskeyOpenButton } from "./MisskeyOpenButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -427,7 +427,11 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               formattedCreatedAt
             )}
           </span>
-          <FontLicenseBadge font={image.font} hasEmoji={hasEmoji(image.overlayText)} />
+          <FontLicenseBadge
+            font={image.font}
+            hasEmoji={hasEmoji(image.overlayText)}
+            hasNonEmojiText={hasNonEmojiText(image.overlayText)}
+          />
           {/* 投稿ソース（Bot/メール）。Web投稿は既定なので非表示。クリックで投稿方法モーダル。 */}
           {image.source === "email" ? (
             <PostSourceBadge source="email" />

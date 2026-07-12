@@ -54,18 +54,32 @@ function LicenseBadge({
  *
  * `hasEmoji`（本文に絵文字を含む）が true のときは、本文フォントに関わらず絵文字が
  * Noto Emoji で描画される旨を「😀 Noto Emoji」バッジで別立て表示する。
+ *
+ * `hasNonEmojiText`（絵文字以外の文字を含む）が false＝テキストが絵文字だけのときは、
+ * 本文フォント（ふい字等）は描画に使われないため本文フォントバッジを表示しない。
+ * 省略時は後方互換で常に表示。
  */
-export function FontLicenseBadge({ font, hasEmoji }: { font: string; hasEmoji?: boolean }) {
+export function FontLicenseBadge({
+  font,
+  hasEmoji,
+  hasNonEmojiText = true,
+}: {
+  font: string;
+  hasEmoji?: boolean;
+  hasNonEmojiText?: boolean;
+}) {
   const label = FONT_LABELS[font as FontFamily] ?? font;
 
   return (
     <>
-      <LicenseBadge
-        icon={<Type className="h-3.5 w-3.5 shrink-0" aria-hidden />}
-        label={label}
-        license={FONT_LICENSES[font]}
-        title="フォントライセンス"
-      />
+      {hasNonEmojiText && (
+        <LicenseBadge
+          icon={<Type className="h-3.5 w-3.5 shrink-0" aria-hidden />}
+          label={label}
+          license={FONT_LICENSES[font]}
+          title="フォントライセンス"
+        />
+      )}
       {hasEmoji && (
         <LicenseBadge
           icon={<Smile className="h-3.5 w-3.5 shrink-0" aria-hidden />}
