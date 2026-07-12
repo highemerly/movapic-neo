@@ -25,7 +25,7 @@ export interface CalendarCollageSpec {
   month: number;
   /** ウォーターマークのサービス名（"SHAMEZO"）。 */
   serviceName: string;
-  /** ウォーターマークに併記するアプリのドメイン（例: "pic.handon.club"・scheme無し）。 */
+  /** ウォーターマークに併記するアプリのURL（例: "https://pic.handon.club"・scheme付き・末尾スラッシュ無し）。 */
   appDomain: string;
   /** 著作権表記のハンドル（例: "alice@handon.club"）。© は描画側で付ける（Noto から拾う）。 */
   authorHandle: string;

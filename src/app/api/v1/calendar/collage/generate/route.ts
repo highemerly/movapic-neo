@@ -117,10 +117,9 @@ export async function POST(request: NextRequest) {
 
     const caption = buildCollageCaption(year, month, resolved.isPerfectAttendance);
 
-    // ウォーターマーク: アプリのドメイン（scheme無し）と著作権（© username@domain）。
-    const appDomain = (process.env.NEXT_PUBLIC_APP_URL ?? "")
-      .replace(/^https?:\/\//, "")
-      .replace(/\/+$/, "");
+    // ウォーターマーク: アプリのURL（scheme付き・末尾スラッシュ無し。例: https://pic.handon.club）と
+    // 著作権（© username@domain）。
+    const appDomain = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
     const authorHandle = `@${user.username}@${user.instance.domain}`;
 
     // その月の祝日（日曜と同じ赤系で色付け・空きセル含め全日に効かせる）。
