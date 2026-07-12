@@ -16,7 +16,7 @@ import {
   PrefectureHeatmap,
   type PrefectureMapData,
 } from "@/components/map/PrefectureHeatmap";
-import { ImageCard } from "@/components/gallery/ImageCard";
+import { PrefectureImageGrid } from "@/components/map/PrefectureImageGrid";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
 import { userPageRobotsMetadata } from "@/lib/crawlers";
 import type { Metadata } from "next";
@@ -269,34 +269,23 @@ export default async function UserMapPage({
                     絞り込みを解除
                   </Link>
                 </div>
-                {prefectureImages.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    該当する画像が見つかりませんでした。
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-                    {prefectureImages.map((img) => (
-                      <ImageCard
-                        key={img.id}
-                        image={{
-                          id: img.id,
-                          storageKey: img.storageKey,
-                          width: img.width,
-                          height: img.height,
-                          overlayText: img.overlayText,
-                          altText: img.altText,
-                          position: img.position,
-                          size: img.size,
-                          favoriteCount: img.favoriteCount,
-                          createdAt: img.createdAt.toISOString(),
-                        }}
-                        publicUrl={publicUrl}
-                        username={seg}
-                        from={`user-map:${selectedPrefecture}`}
-                      />
-                    ))}
-                  </div>
-                )}
+                <PrefectureImageGrid
+                  images={prefectureImages.map((img) => ({
+                    id: img.id,
+                    storageKey: img.storageKey,
+                    width: img.width,
+                    height: img.height,
+                    overlayText: img.overlayText,
+                    altText: img.altText,
+                    position: img.position,
+                    size: img.size,
+                    favoriteCount: img.favoriteCount,
+                    createdAt: img.createdAt.toISOString(),
+                  }))}
+                  publicUrl={publicUrl}
+                  username={seg}
+                  selectedPrefecture={selectedPrefecture}
+                />
               </section>
             </ExpandReveal>
           )}
