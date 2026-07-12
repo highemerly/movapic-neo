@@ -2,7 +2,7 @@
 
 import Link from "@/components/Link";
 import Image from "next/image";
-import { Menu } from "lucide-react";
+import { Menu, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AnnouncementBar } from "./AnnouncementBar";
 import { NotificationBell } from "./NotificationBell";
@@ -38,6 +38,24 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
             </Link>
 
             <div className="flex items-center gap-2">
+              {/* 未ログイン時の主要動線。「ログイン」という語は新規ユーザーへの訴求が弱い
+                  （本サービスは独自登録がなく既存 Fediverse アカウントで連携する）ため、
+                  行動訴求の「投稿をはじめる」にする。トップのログインフォームへ飛ばし、
+                  returnTo=/create でログイン後に投稿ページへ自動遷移する
+                  （create/page.tsx の login_required と同じ経路）。
+                  ロゴ＋ハンバーガーと並ぶため、狭幅では「はじめる」に短縮して横はみ出しを防ぐ。 */}
+              {!user && (
+                <Button asChild size="sm">
+                  <Link href="/?reason=login_required&returnTo=%2Fcreate">
+                    <LogIn className="h-4 w-4" />
+                    {/* ラベルは1つの span にまとめる。直下に置くと flex の gap が
+                        「投稿を」と「はじめる」の間に入り不自然な空きになるため。 */}
+                    <span>
+                      <span className="hidden min-[380px]:inline">投稿を</span>はじめる
+                    </span>
+                  </Link>
+                </Button>
+              )}
               {/* 通知ベルは md 未満のみ。PC幅は右端レール（AppRail）の「通知」に既読管理ごと集約。 */}
               {user && (
                 <span className="md:hidden">
