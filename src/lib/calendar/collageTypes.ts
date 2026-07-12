@@ -5,6 +5,9 @@
  * skia/sharp に依存しない純粋な型だけをここに置く。
  */
 
+/** 配色テーマ。light=温かみのある紙色 / dark=暗い紙色。未指定は light 相当。 */
+export type CollageTheme = "light" | "dark";
+
 /** グリッドの1セル（投稿のある日・穴埋めされた日のみ）。空き日は cells に含めない。 */
 export interface CalendarCell {
   /** 日(1-31)。穴埋めセルではこれが「埋められた空き日（穴の日）」。 */
@@ -30,5 +33,7 @@ export interface CalendarCollageSpec {
   isPerfect: boolean;
   /** その月の祝日の日(1-31)一覧。日曜と同じ赤系で色付けする。 */
   holidays: number[];
+  /** 配色テーマ（未指定は light）。 */
+  theme?: CollageTheme;
   cells: CalendarCell[];
 }

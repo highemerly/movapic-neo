@@ -24,14 +24,42 @@ const HEADER_H = 108;
 const WEEKDAY_H = 40;
 const FOOTER_H = 92;
 
-// 配色（手書き感に合わせた温かみのある紙色ベース）。
-const BG = "#faf8f3";
-const CELL_EMPTY_BG = "#ece6da";
-const INK = "#3a352c";
-const SUB_INK = "#8a8272";
-const SUN = "#d1584f";
-const SAT = "#4f7bd1";
-// 写真上に日付を重ねるときの控えめな縁取り（DayCell の TEXT_OUTLINE 相当）。
+// 配色パレット（テーマ別）。写真の上に載る色（onPhoto時の白/明るい赤青・下方グラデ）は
+// テーマ非依存なので Palette には含めず、空セル・見出し・フッター等の「地の色」だけを切り替える。
+interface Palette {
+  bg: string; // 背景
+  cellEmptyBg: string; // 投稿のない日の空セル背景
+  ink: string; // 見出し・ブランド名などの主要文字色
+  subInk: string; // 曜日・ドメイン・著作権などの補助文字色
+  sun: string; // 日曜・祝日（赤）
+  sat: string; // 土曜（青）
+}
+
+// light: 手書き感に合わせた温かみのある紙色ベース。
+const LIGHT: Palette = {
+  bg: "#faf8f3",
+  cellEmptyBg: "#ece6da",
+  ink: "#3a352c",
+  subInk: "#8a8272",
+  sun: "#d1584f",
+  sat: "#4f7bd1",
+};
+
+// dark: 同じ温かみを保ったまま暗い紙色に。文字は明るく、赤青は暗背景で沈まないよう少し明るめ。
+const DARK: Palette = {
+  bg: "#26231d",
+  cellEmptyBg: "#38342c",
+  ink: "#f2ede2",
+  subInk: "#a89f8c",
+  sun: "#e57373",
+  sat: "#7fa8e8",
+};
+
+function paletteOf(theme: CalendarCollageSpec["theme"]): Palette {
+  return theme === "dark" ? DARK : LIGHT;
+}
+
+// 写真上に日付を重ねるときの控えめな縁取り（DayCell の TEXT_OUTLINE 相当）。テーマ非依存。
 const OUTLINE = "rgba(80,80,80,0.65)";
 
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -114,12 +142,17 @@ function fillTextOutlined(
 }
 
 /** その日の文字色（日/祝=赤・土=青・それ以外=白 or 平日色）。 */
-function dayColor(col: number, isHoliday: boolean, onPhoto: boolean): string {
+function dayColor(
+  col: number,
+  isHoliday: boolean,
+  onPhoto: boolean,
+  pal: Palette
+): string {
   const isRed = col === 0 || isHoliday;
   const isBlue = col === 6 && !isRed;
-  if (isRed) return onPhoto ? "#f87171" : SUN;
-  if (isBlue) return onPhoto ? "#60a5fa" : SAT;
-  return onPhoto ? "#ffffff" : SUB_INK;
+  if (isRed) return onPhoto ? "#f87171" : pal.sun;
+  if (isBlue) return onPhoto ? "#60a5fa" : pal.sat;
+  return onPhoto ? "#ffffff" : pal.subInk;
 }
 
 /**
@@ -135,9 +168,10 @@ function drawDayNumber(
   col: number,
   isHoliday: boolean,
   onPhoto: boolean,
+  pal: Palette,
   filledBy?: number
 ): void {
-  const color = dayColor(col, isHoliday, onPhoto);
+  const color = dayColor(col, isHoliday, onPhoto, pal);
   const size = 22;
   ctx.font = huiFont(size);
   ctx.textBaseline = "alphabetic";
@@ -197,6 +231,7 @@ export async function renderCalendarCollage(
   ensureFontsLoaded();
 
   const { year, month } = spec;
+  const pal = paletteOf(spec.theme);
   const holidays = new Set(spec.holidays);
   const fw = firstWeekdayOf(year, month);
   const dim = daysInMonthOf(year, month);
@@ -212,14 +247,14 @@ export async function renderCalendarCollage(
   const centerX = width / 2;
 
   // 背景
-  ctx.fillStyle = BG;
+  ctx.fillStyle = pal.bg;
   ctx.fillRect(0, 0, width, height);
 
   // ヘッダー: 年月（皆勤月は👑を右に添える／文字は入れない）
   const title = `${year}年${month}月`;
   const headerY = PAD + HEADER_H / 2;
   ctx.textBaseline = "middle";
-  ctx.fillStyle = INK;
+  ctx.fillStyle = pal.ink;
   if (spec.isPerfect) {
     ctx.textAlign = "left";
     ctx.font = huiFont(56);
@@ -230,7 +265,7 @@ export async function renderCalendarCollage(
     const gap = 14;
     const startX = centerX - (titleW + gap + crownW) / 2;
     ctx.font = huiFont(56);
-    ctx.fillStyle = INK;
+    ctx.fillStyle = pal.ink;
     ctx.fillText(title, startX, headerY);
     ctx.font = huiFont(44);
     ctx.fillText(crown, startX + titleW + gap, headerY);
@@ -247,7 +282,7 @@ export async function renderCalendarCollage(
   ctx.textBaseline = "middle";
   for (let c = 0; c < COLS; c++) {
     const cx = PAD + c * (CELL + GAP) + CELL / 2;
-    ctx.fillStyle = c === 0 ? SUN : c === 6 ? SAT : SUB_INK;
+    ctx.fillStyle = c === 0 ? pal.sun : c === 6 ? pal.sat : pal.subInk;
     ctx.fillText(WEEKDAY_LABELS[c], cx, weekdayTop + WEEKDAY_H / 2);
   }
 
@@ -285,12 +320,13 @@ export async function renderCalendarCollage(
         col,
         isHoliday,
         true,
+        pal,
         cell.kind === "makeup" ? cell.filledBy : undefined
       );
     } else {
-      ctx.fillStyle = CELL_EMPTY_BG;
+      ctx.fillStyle = pal.cellEmptyBg;
       ctx.fill();
-      drawDayNumber(ctx, day, x, y, col, isHoliday, false);
+      drawDayNumber(ctx, day, x, y, col, isHoliday, false, pal);
     }
   }
 
@@ -309,11 +345,11 @@ export async function renderCalendarCollage(
   const line1Start = centerX - (brandW + domainW) / 2;
   ctx.textAlign = "left";
   ctx.font = huiFont(34);
-  ctx.fillStyle = INK;
+  ctx.fillStyle = pal.ink;
   ctx.fillText(brand, line1Start, brandY);
   if (domainStr) {
     ctx.font = huiFont(20);
-    ctx.fillStyle = SUB_INK;
+    ctx.fillStyle = pal.subInk;
     ctx.fillText(domainStr, line1Start + brandW, brandY + 4);
   }
   // 2行目: © (ふい字は © グリフが空なので Noto から拾う) ＋ ハンドル(ふい字)
@@ -321,7 +357,7 @@ export async function renderCalendarCollage(
   const crY = footerTop + FOOTER_H * 0.78;
   const sym = "©";
   ctx.textAlign = "left";
-  ctx.fillStyle = SUB_INK;
+  ctx.fillStyle = pal.subInk;
   ctx.font = `${crSize}px "Noto Sans CJK JP"`;
   const symW = ctx.measureText(sym).width;
   const crGap = 5;

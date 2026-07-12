@@ -9,6 +9,8 @@ import {
   ImageDown,
   Server,
   Smartphone,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -17,11 +19,17 @@ import { cn } from "@/lib/utils";
 
 type Visibility = "public" | "unlisted" | "followers";
 type Destination = "server" | "device";
+type CollageTheme = "light" | "dark";
 
 const VISIBILITY_OPTIONS: { value: Visibility; label: string }[] = [
   { value: "public", label: "公開" },
   { value: "unlisted", label: "非収載" },
   { value: "followers", label: "フォロワー限定" },
+];
+
+const THEME_OPTIONS: { value: CollageTheme; label: React.ReactNode }[] = [
+  { value: "light", label: <><Sun className="h-4 w-4" />ライト</> },
+  { value: "dark", label: <><Moon className="h-4 w-4" />ダーク</> },
 ];
 
 /** OptionsPanel（文字合成オプション）と同じ見た目のセグメント選択。 */
@@ -78,6 +86,7 @@ export function CollageShareDialog({
 }) {
   const [generating, setGenerating] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [theme, setTheme] = useState<CollageTheme>("light");
   const [destination, setDestination] = useState<Destination>("server");
   const [visibility, setVisibility] = useState<Visibility>("public");
   const [posting, setPosting] = useState(false);
@@ -121,7 +130,7 @@ export function CollageShareDialog({
       const res = await fetch("/api/v1/calendar/collage/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ year, month }),
+        body: JSON.stringify({ year, month, theme }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -139,7 +148,22 @@ export function CollageShareDialog({
     } finally {
       setGenerating(false);
     }
-  }, [year, month, generating]);
+  }, [year, month, theme, generating]);
+
+  // テーマ変更時は生成済みプレビューを破棄して再生成を促す（テーマは生成時に焼き込むため）。
+  const handleThemeChange = useCallback((next: CollageTheme) => {
+    setTheme(next);
+    setBlobUrl((prev) => {
+      if (prev) {
+        blobRef.current = null;
+        if (objectUrlRef.current) {
+          URL.revokeObjectURL(objectUrlRef.current);
+          objectUrlRef.current = null;
+        }
+      }
+      return null;
+    });
+  }, []);
 
   const handlePostServer = useCallback(async () => {
     if (!blobRef.current || posting) return;
@@ -223,6 +247,19 @@ export function CollageShareDialog({
             <X className="h-4 w-4" />
           </button>
         </div>
+
+        {/* 配色テーマ（生成前に選択・変更するとプレビューを破棄して再生成を促す） */}
+        {postedUrl === null && (
+          <div className="mb-3 space-y-2">
+            <Label>配色</Label>
+            <SegmentControl
+              value={theme}
+              options={THEME_OPTIONS}
+              onChange={handleThemeChange}
+              disabled={generating || posting}
+            />
+          </div>
+        )}
 
         {/* プレビュー枠（生成前は枠自体が「画像を生成」ボタン） */}
         {blobUrl ? (

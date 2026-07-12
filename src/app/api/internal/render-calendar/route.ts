@@ -26,6 +26,7 @@ function isValidSpec(spec: unknown): spec is CalendarCollageSpec {
     typeof s.authorHandle === "string" &&
     typeof s.isPerfect === "boolean" &&
     Array.isArray(s.holidays) &&
+    (s.theme === undefined || s.theme === "light" || s.theme === "dark") &&
     Array.isArray(s.cells)
   );
 }

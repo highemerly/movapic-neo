@@ -20,7 +20,7 @@ import {
 import { getImage } from "@/lib/storage/storage";
 import { renderCalendarCollage } from "@/lib/compute/client";
 import { isJapaneseHoliday } from "@/lib/holidays";
-import type { CalendarCell } from "@/lib/calendar/collageTypes";
+import type { CalendarCell, CollageTheme } from "@/lib/calendar/collageTypes";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
 
-    let body: { year?: unknown; month?: unknown };
+    let body: { year?: unknown; month?: unknown; theme?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -40,6 +40,8 @@ export async function POST(request: NextRequest) {
     if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
       return NextResponse.json({ error: "年月が不正です" }, { status: 400 });
     }
+    // 配色テーマ（未指定・不正値は light）。
+    const theme: CollageTheme = body.theme === "dark" ? "dark" : "light";
 
     const images = await fetchCalendarImages(user.id, year, month);
     const resolved = resolveCalendarMonth({
@@ -140,6 +142,7 @@ export async function POST(request: NextRequest) {
         authorHandle,
         isPerfect: resolved.isPerfectAttendance,
         holidays,
+        theme,
         cells,
       },
       thumbnails,
