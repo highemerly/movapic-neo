@@ -51,6 +51,27 @@ interface Row {
   err: number;
 }
 
+/** バケットの to_char 断片から軸ラベル / ツールチップ用ラベルを組み立てる（粒度別）。 */
+function bucketLabels(
+  unit: Unit,
+  r: { yyyy: string; mm: string; dd: string; hh: string }
+): { label: string; fullLabel: string } {
+  return {
+    label:
+      unit === "hour"
+        ? `${Number(r.hh)}時`
+        : unit === "month"
+          ? `${r.yyyy}/${r.mm}`
+          : `${r.mm}/${r.dd}`,
+    fullLabel:
+      unit === "hour"
+        ? `${r.yyyy}/${r.mm}/${r.dd} ${r.hh}:00`
+        : unit === "month"
+          ? `${r.yyyy}年${r.mm}月`
+          : `${r.yyyy}/${r.mm}/${r.dd}`,
+  };
+}
+
 export async function getPostTimeSeries(period: Period): Promise<TimeBucket[]> {
   const unit = unitForPeriod(period);
   const range = periodRange(period, new Date());
@@ -111,21 +132,77 @@ export async function getPostTimeSeries(period: Period): Promise<TimeBucket[]> {
   `);
 
   return rows.map((r) => ({
-    label:
-      unit === "hour"
-        ? `${Number(r.hh)}時`
-        : unit === "month"
-          ? `${r.yyyy}/${r.mm}`
-          : `${r.mm}/${r.dd}`,
-    fullLabel:
-      unit === "hour"
-        ? `${r.yyyy}/${r.mm}/${r.dd} ${r.hh}:00`
-        : unit === "month"
-          ? `${r.yyyy}年${r.mm}月`
-          : `${r.yyyy}/${r.mm}/${r.dd}`,
+    ...bucketLabels(unit, r),
     posts: r.posts,
     unsynced: r.unsynced,
     ok: r.ok,
     err: r.err,
+  }));
+}
+
+export interface UserTimeBucket {
+  /** 軸ラベル（month=YYYY/MM, day=MM/DD, hour=HH時） */
+  label: string;
+  /** ツールチップ用の詳細ラベル */
+  fullLabel: string;
+  /** そのバケットの新規ユーザー登録数（初回ログイン=User.created_at 基準） */
+  users: number;
+}
+
+interface UserRow {
+  yyyy: string;
+  mm: string;
+  dd: string;
+  hh: string;
+  users: number;
+}
+
+/**
+ * 新規ユーザー登録数の時系列。ユーザー行は初回ログイン時に作られるため created_at 基準。
+ * 粒度・JST整列・生成範囲は getPostTimeSeries と同一（all は users 最古〜現在）。
+ */
+export async function getUserTimeSeries(period: Period): Promise<UserTimeBucket[]> {
+  const unit = unitForPeriod(period);
+  const range = periodRange(period, new Date());
+  const unitLit = Prisma.raw(`'${unit}'`);
+  const step = Prisma.raw(`interval '1 ${unit}'`);
+  const createdJst = Prisma.raw(
+    `((created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo')`
+  );
+
+  const startBucket = range
+    ? Prisma.sql`date_trunc(${unitLit}, (${range.from}::timestamptz AT TIME ZONE 'Asia/Tokyo'))`
+    : Prisma.sql`date_trunc(${unitLit}, (SELECT (min(created_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Tokyo' FROM users))`;
+  const endBucket = range
+    ? Prisma.sql`date_trunc(${unitLit}, ((${range.to}::timestamptz - interval '1 microsecond') AT TIME ZONE 'Asia/Tokyo'))`
+    : Prisma.sql`date_trunc(${unitLit}, (now() AT TIME ZONE 'Asia/Tokyo'))`;
+  const usrFilter = range
+    ? Prisma.sql`(created_at AT TIME ZONE 'UTC') >= ${range.from} AND (created_at AT TIME ZONE 'UTC') < ${range.to}`
+    : Prisma.sql`true`;
+
+  const rows = await prisma.$queryRaw<UserRow[]>(Prisma.sql`
+    WITH buckets AS (
+      SELECT generate_series(${startBucket}, ${endBucket}, ${step}) AS bucket
+    ),
+    usr AS (
+      SELECT date_trunc(${unitLit}, ${createdJst}) AS bucket
+      FROM users
+      WHERE ${usrFilter}
+    )
+    SELECT
+      to_char(b.bucket, 'YYYY') AS yyyy,
+      to_char(b.bucket, 'MM') AS mm,
+      to_char(b.bucket, 'DD') AS dd,
+      to_char(b.bucket, 'HH24') AS hh,
+      count(u.bucket)::int AS users
+    FROM buckets b
+    LEFT JOIN usr u ON u.bucket = b.bucket
+    GROUP BY b.bucket
+    ORDER BY b.bucket
+  `);
+
+  return rows.map((r) => ({
+    ...bucketLabels(unit, r),
+    users: r.users,
   }));
 }

@@ -7,13 +7,14 @@
  */
 
 import { getMainMetrics } from "@/lib/admin/metrics";
-import { getPostTimeSeries } from "@/lib/admin/timeseries";
+import { getPostTimeSeries, getUserTimeSeries } from "@/lib/admin/timeseries";
 import { getComponentHealth } from "@/lib/admin/health";
 import { normalizePeriod, periodRangeText, PERIOD_OPTIONS, type Period } from "@/lib/admin/periods";
 import { StatCard } from "../_components/StatCard";
 import { PeriodSelect } from "../_components/PeriodSelect";
 import { normalizeParams } from "../_components/query";
 import { PostTimeSeriesChart } from "./_components/PostTimeSeriesChart";
+import { UserTimeSeriesChart } from "./_components/UserTimeSeriesChart";
 import { HealthPanel } from "./_components/HealthPanel";
 
 export const dynamic = "force-dynamic";
@@ -39,9 +40,10 @@ export default async function AdminStatsPage({
   const params = normalizeParams(await searchParams);
   const period = normalizePeriod(params.range, "7d");
 
-  const [metrics, series, health] = await Promise.all([
+  const [metrics, series, userSeries, health] = await Promise.all([
     getMainMetrics(),
     getPostTimeSeries(period),
+    getUserTimeSeries(period),
     getComponentHealth(),
   ]);
 
@@ -101,6 +103,17 @@ export default async function AdminStatsPage({
           />
         </div>
         <PostTimeSeriesChart data={series} />
+      </section>
+
+      {/* 新規ユーザー登録数（上の期間セレクタと同じ range を共有） */}
+      <section className="mt-10">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-xl font-bold">新規ユーザー数</h2>
+          <span className="text-xs text-muted-foreground">
+            初回ログイン基準・{periodRangeText(period, new Date())}・{granularityLabel(period)}
+          </span>
+        </div>
+        <UserTimeSeriesChart data={userSeries} />
       </section>
     </>
   );
