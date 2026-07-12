@@ -222,13 +222,11 @@ export function ImageUpload({
                   <X className="h-4 w-4" />
                 </button>
               )}
-              {/* 画像中央のプレビューマーク（半透明ピル・クリックは透過して下のボタンを操作可能）。 */}
+              {/* 画像中央のプレビューマーク（半透明の横帯・クリックは透過して下のボタンを操作可能）。 */}
               {hasGenerated && !isBusy && (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <div className="flex items-center gap-1.5 rounded-full bg-black/55 px-3 py-1.5 text-white">
-                    <Eye className="h-4 w-4 shrink-0" />
-                    <span className="text-sm font-medium">プレビュー</span>
-                  </div>
+                <div className="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 items-center justify-center gap-1.5 bg-black/55 py-1.5 text-white">
+                  <Eye className="h-4 w-4 shrink-0" />
+                  <span className="text-sm font-medium">プレビュー</span>
                 </div>
               )}
             </div>
