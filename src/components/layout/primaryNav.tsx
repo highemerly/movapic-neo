@@ -1,14 +1,7 @@
-import {
-  Globe,
-  Server,
-  User,
-  Calendar,
-  Trophy,
-  type LucideIcon,
-} from "lucide-react";
+import { Globe, Server, User, type LucideIcon } from "lucide-react";
 
 /**
- * 主要動線（みんな／同じサーバー／あなた／カレンダー／実績）の定義を1箇所に集約する。
+ * 主要動線（みんな／同じサーバー／あなた）の定義を1箇所に集約する。
  *
  * href と「現在地（active）判定」を1箇所に集約するのが目的。現状の消費側は
  * BottomNav（PWA下部ナビ）で、そこから必要な項目だけを取り出して使う。
@@ -19,12 +12,7 @@ import {
  * ここには含めない。
  */
 
-export type PrimaryNavKey =
-  | "public"
-  | "instance"
-  | "mypage"
-  | "calendar"
-  | "achievements";
+export type PrimaryNavKey = "public" | "instance" | "mypage";
 
 export type PrimaryNavItem = {
   key: PrimaryNavKey;
@@ -50,14 +38,12 @@ export type PrimaryNavContext = {
 /**
  * 表示すべき主要動線を、ログイン状態に応じて絞り込んで返す。
  * - みんな: 常に表示
- * - サーバー: ログイン＋所属ドメインあり
- * - マイページ／カレンダー／実績: ログイン＋selfSegmentあり
+ * - 同じサーバー: ログイン＋所属ドメインあり
+ * - あなた（マイページ）: ログイン＋selfSegmentあり
  *
- * 現在地判定は各項目とも「そのページちょうど」の完全一致にしている。
- * マイページ配下（カレンダー/実績）を独立項目として並べるため、マイページを
- * startsWith にすると二重ハイライトになるのを避ける狙い。
- * （下部ナビの「あなた」タブはセクション全体を表すので、そちら側で別途
- *  startsWith 判定する。）
+ * 現在地判定は「そのページちょうど」の完全一致。下部ナビの「あなた」タブは
+ * ユーザーページ配下（カレンダー/地図/実績）も含むセクション全体を表すため、
+ * そちら側で別途 startsWith 判定する。
  */
 export function getPrimaryNavItems({
   isLoggedIn,
@@ -88,29 +74,13 @@ export function getPrimaryNavItems({
 
   if (isLoggedIn && selfSegment) {
     const base = `/u/${selfSegment}`;
-    items.push(
-      {
-        key: "mypage",
-        href: base,
-        label: "あなた",
-        Icon: User,
-        isActive: (pathname) => pathname === base,
-      },
-      {
-        key: "calendar",
-        href: `${base}/calendar`,
-        label: "カレンダー",
-        Icon: Calendar,
-        isActive: (pathname) => pathname === `${base}/calendar`,
-      },
-      {
-        key: "achievements",
-        href: `${base}/achievements`,
-        label: "実績",
-        Icon: Trophy,
-        isActive: (pathname) => pathname === `${base}/achievements`,
-      }
-    );
+    items.push({
+      key: "mypage",
+      href: base,
+      label: "あなた",
+      Icon: User,
+      isActive: (pathname) => pathname === base,
+    });
   }
 
   return items;
