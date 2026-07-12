@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useCallback } from "react";
-import { X, Loader2, ImagePlus, Eye, Camera } from "lucide-react";
+import { X, Loader2, ImagePlus, Eye, Camera, Plus } from "lucide-react";
 import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from "@/types";
 import { useIsHydrated } from "@/hooks/useIsHydrated";
 
@@ -187,7 +187,7 @@ export function ImageUpload({
                 </div>
               )}
               {/* 右下のALTバッジ（Mastodon風・画像詳細ページと位置を統一）。押すと親がALT編集
-                  ダイアログを開く。設定済みは強調表示（primary＋チェック）、未設定は半透明。 */}
+                  ダイアログを開く。未設定を primary で強調して入力を促し、設定済みは半透明で確定表示。 */}
               {onEditAlt && !isBusy && (
                 <button
                   type="button"
@@ -195,8 +195,8 @@ export function ImageUpload({
                   disabled={disabled}
                   className={`absolute bottom-2 right-2 flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold leading-none transition-colors disabled:opacity-50 ${
                     altText && altText.trim()
-                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
-                      : "bg-black/50 text-white hover:bg-black/70"
+                      ? "bg-black/50 text-white hover:bg-black/70"
+                      : "bg-primary text-primary-foreground hover:bg-primary/90"
                   }`}
                   aria-label={
                     altText && altText.trim()
@@ -204,6 +204,9 @@ export function ImageUpload({
                       : "代替テキスト（ALT）を設定"
                   }
                 >
+                  {!(altText && altText.trim()) && (
+                    <Plus className="h-3 w-3" strokeWidth={2.5} aria-hidden />
+                  )}
                   ALT
                 </button>
               )}
