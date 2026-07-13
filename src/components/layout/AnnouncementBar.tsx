@@ -20,7 +20,14 @@ let cachedActive: AnnouncementRecord[] | null = null;
 function getCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
-  return match ? match[2] : null;
+  if (!match) return null;
+  // cookies().set は値をパーセントエンコードして保存する（例: "2:4" → "2%3A4"）。
+  // 復号しないと ":" 区切りの新形式を旧形式（整数）と誤認するため必ずデコードする。
+  try {
+    return decodeURIComponent(match[2]);
+  } catch {
+    return match[2];
+  }
 }
 
 
