@@ -8,13 +8,27 @@ import {
   Megaphone,
   Heart,
   Settings,
+  ChevronDown,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 
+import Link from "@/components/Link";
 import { TabBar, type TabItem } from "@/components/TabBar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 /**
- * admin 配下の共通タブナビ。デザインはユーザーページ/タイムラインと共通の TabBar。
+ * admin 配下の共通タブナビ。
+ *
+ * - PC（md 以上）: ユーザーページ/タイムラインと共通の TabBar（横並びタブ）。
+ * - スマホ（md 未満）: 項目が7つと多く横スクロールになり見づらいため、
+ *   「現在のページ名」をトリガーにしたドロップダウンで切り替える。
+ *
  * layout は Server Component でパスを持たないため、アクティブ判定はここ（Client）で
  * usePathname により行う。
  */
@@ -35,17 +49,54 @@ const TABS: TabItem[] = [
 
 export function AdminNav() {
   const pathname = usePathname();
-  const active =
-    TABS.find((t) => pathname === t.href || pathname.startsWith(`${t.href}/`))
-      ?.key ?? "";
+  const activeTab = TABS.find(
+    (t) => pathname === t.href || pathname.startsWith(`${t.href}/`),
+  );
+  const ActiveIcon = activeTab?.icon;
 
   return (
-    <TabBar
-      tabs={TABS}
-      activeKey={active}
-      responsiveLabels
-      ariaLabel="管理メニュー"
-      className="mb-6"
-    />
+    <>
+      {/* PC: 横並びタブ */}
+      <div className="mb-6 hidden md:block">
+        <TabBar tabs={TABS} activeKey={activeTab?.key ?? ""} ariaLabel="管理メニュー" />
+      </div>
+
+      {/* スマホ: 現在地ドロップダウン */}
+      <div className="mb-6 border-b pb-3 md:hidden">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="flex items-center gap-2 text-base font-semibold text-foreground"
+              aria-label="管理メニュー"
+            >
+              {ActiveIcon && <ActiveIcon className="h-4 w-4 shrink-0" />}
+              <span>{activeTab?.label ?? "管理メニュー"}</span>
+              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-52">
+            {TABS.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = tab.key === activeTab?.key;
+              return (
+                <DropdownMenuItem key={tab.key} asChild>
+                  <Link
+                    href={tab.href}
+                    className={cn(
+                      "flex items-center gap-2",
+                      isActive && "text-brand font-medium",
+                    )}
+                  >
+                    {Icon && <Icon className="h-4 w-4 shrink-0" />}
+                    {tab.label}
+                  </Link>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </>
   );
 }
