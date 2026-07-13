@@ -10,6 +10,7 @@ import { NotificationsProvider } from "@/components/layout/useUnseenNotification
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { getSessionClaims } from "@/lib/auth/session";
+import { isAdmin } from "@/lib/auth/admin";
 import { userPathSegment, DEFAULT_INSTANCE } from "@/lib/userHandle";
 import { getAvatarUrl } from "@/lib/avatar";
 import { DEFAULT_OG_IMAGE } from "@/lib/ogImage";
@@ -90,6 +91,11 @@ export default async function RootLayout({
   const selfSegment = claims?.username
     ? userPathSegment(claims.username, claims.instanceDomain || DEFAULT_INSTANCE)
     : null;
+  // 管理者（ADMIN_ACCTS）判定。メニューに /admin/stats 導線を出すためだけの表示用。
+  // 実際のアクセス制御は admin/layout.tsx のガードが担う（ここは env 照合のみでDBアクセスなし）。
+  const isAdminUser = isAdmin(
+    claims ? `${claims.username}@${claims.instanceDomain}` : null
+  );
 
   return (
     <html
@@ -126,6 +132,7 @@ export default async function RootLayout({
             <NotificationsProvider enabled={claims != null}>
             <MenuProvider
               isLoggedIn={claims != null}
+              isAdmin={isAdminUser}
               selfSegment={selfSegment}
               username={claims?.username ?? null}
               instanceDomain={claims?.instanceDomain ?? null}

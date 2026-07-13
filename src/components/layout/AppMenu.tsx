@@ -29,6 +29,8 @@ import {
   ChartColumn,
   ScrollText,
   ShieldCheck,
+  Wrench,
+  Flag,
   Code,
   Type,
   Mail,
@@ -66,6 +68,8 @@ import { useUnseenNotifications } from "./useUnseenNotifications";
 
 type MenuNav = {
   isLoggedIn: boolean;
+  /** 管理者（ADMIN_ACCTS 該当）か。true のとき管理者向け導線（/admin/stats）を出す。 */
+  isAdmin?: boolean;
   /** ログインユーザーの /u/ パスセグメント（未ログインは null） */
   selfSegment?: string | null;
   /** ログインユーザー名（アカウント欄のハンドル表示用） */
@@ -162,7 +166,7 @@ type MenuSectionData = {
 function useMenuSections(nav: MenuNav): MenuSectionData[] {
   const pathname = usePathname();
   const hasInstancesParam = useSearchParams().has("instances");
-  const { isLoggedIn, selfSegment, instanceDomain } = nav;
+  const { isLoggedIn, isAdmin, selfSegment, instanceDomain } = nav;
   const userBase = selfSegment ? `/u/${selfSegment}` : null;
 
   const sections: MenuSectionData[] = [];
@@ -261,6 +265,32 @@ function useMenuSections(nav: MenuNav): MenuSectionData[] {
           label: "実績",
           Icon: Trophy,
           active: pathname === `${userBase}/achievements`,
+          primary: true,
+        },
+      ],
+    });
+  }
+
+  // 管理者のみ。実際のアクセス制御は admin/layout.tsx が担い、ここは導線表示だけ。
+  if (isAdmin) {
+    sections.push({
+      key: "admin",
+      title: "管理",
+      items: [
+        {
+          key: "admin-stats",
+          href: "/admin/stats",
+          label: "管理メニュー",
+          Icon: Wrench,
+          active: pathname === "/admin/stats",
+          primary: true,
+        },
+        {
+          key: "admin-reports",
+          href: "/admin/reports",
+          label: "通報",
+          Icon: Flag,
+          active: pathname.startsWith("/admin/reports"),
           primary: true,
         },
       ],
