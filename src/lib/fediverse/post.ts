@@ -3,6 +3,7 @@
  */
 
 import { USER_AGENT } from "@/lib/userAgent";
+import { truncateGraphemes } from "@/lib/text/grapheme";
 
 const REQUEST_TIMEOUT = 30000; // 30秒
 const MEDIA_READY_TIMEOUT = 25000; // Mastodonメディア処理完了待ちの上限
@@ -218,7 +219,8 @@ async function uploadMisskeyFile(
   formData.append("file", blob, filename);
   formData.append("i", accessToken);
   // 代替テキスト（ALT）。Misskey の comment 上限は512字なので切り詰める。未設定なら送らない。
-  if (altText) formData.append("comment", altText.slice(0, 512));
+  // 書記素境界で切る（結合絵文字・サロゲートペアを途中で割らない）。
+  if (altText) formData.append("comment", truncateGraphemes(altText, 512));
 
   const response = await fetch(`https://${server}/api/drive/files/create`, {
     method: "POST",
