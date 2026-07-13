@@ -21,9 +21,9 @@ import { HealthPanel } from "./_components/HealthPanel";
 export const dynamic = "force-dynamic";
 
 const SOURCE_LABEL: Record<string, string> = {
-  web: "🌐Web",
-  mention: "🤖Bot",
-  email: "📧メール",
+  web: "Web",
+  mention: "Bot",
+  email: "Mail",
 };
 
 /** 期間ごとのバケット粒度（getPostTimeSeries と一致）を説明文に使う。 */
@@ -31,6 +31,18 @@ function granularityLabel(p: Period): string {
   if (p === "all") return "月次";
   if (p === "1h" || p === "24h" || p === "72h" || p === "yesterday") return "時次";
   return "日次";
+}
+
+/** 直近7日間の増減（数値カウント）を StatCard の delta 形式に整形。 */
+function countDelta(n: number) {
+  const sign = n > 0 ? "+" : n < 0 ? "-" : "";
+  return { value: n, text: `${sign}${Math.abs(n).toLocaleString("ja-JP")}` };
+}
+
+/** 直近7日間の増減（バイト）を StatCard の delta 形式に整形。 */
+function bytesDelta(n: number) {
+  const sign = n > 0 ? "+" : n < 0 ? "-" : "";
+  return { value: n, text: `${sign}${fmtBytes(Math.abs(n))}` };
 }
 
 export default async function AdminStatsPage({
@@ -58,35 +70,42 @@ export default async function AdminStatsPage({
       {/* 主要メトリクス */}
       <h2 className="text-xl font-bold mt-6 mb-3">主要メトリクス</h2>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatCard label="総ユーザー数" value={metrics.userCount} href="/admin/accounts" />
+        <StatCard
+          label="総ユーザー数"
+          value={metrics.userCount}
+          delta={countDelta(metrics.deltas7d.userCount)}
+          href="/admin/accounts"
+        />
         <StatCard
           label="ユニークサーバー数"
           value={metrics.serverCount}
+          delta={countDelta(metrics.deltas7d.serverCount)}
           href="/admin/servers"
         />
         <StatCard
           label="総投稿数"
           value={metrics.imageCount}
           hint={sourceHint || undefined}
+          delta={countDelta(metrics.deltas7d.imageCount)}
           href="/public"
         />
         <StatCard
-          label="ストレージ概算"
+          label="ストレージ利用量（概算）"
           value={fmtBytes(metrics.storageApproxBytes)}
-          hint="本体画像の合計・概算"
+          delta={bytesDelta(metrics.deltas7d.storageApproxBytes)}
           href="/admin/system"
         />
         <StatCard
           label="未対応の通報"
           value={metrics.openReports}
           tone="warn"
+          delta={countDelta(metrics.deltas7d.openReports)}
           href="/admin/reports"
         />
         <StatCard
-          label="お気に入り未同期"
+          label="未同期のお気に入り"
           value={metrics.favUnsynced}
           tone="warn"
-          hint="一度も同期なし"
           href="/admin/favorites"
         />
       </div>
