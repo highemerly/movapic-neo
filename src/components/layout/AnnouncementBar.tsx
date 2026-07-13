@@ -1,16 +1,21 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "@/components/Link";
 import { X, Info, AlertTriangle } from "lucide-react";
 import {
-  announcements,
-  ANNOUNCEMENT_EXPIRY_DAYS,
-} from "@/data/announcements";
+  type AnnouncementRecord,
+  formatAnnouncementDate,
+  unreadBannerAnnouncements,
+} from "@/lib/announcements";
 import { dismissAnnouncements } from "@/app/actions/announcements";
-import { useIsHydrated } from "@/hooks/useIsHydrated";
 
 const COOKIE_NAME = "ann";
+
+// 掲載中お知らせのセッション内キャッシュ。ページ遷移（SPA）ごとの再取得を避ける。
+// 本体は unstable_cache 経由なのでDBは基本引かないが、往復自体もこれで省く。
+// フルリロードでモジュールが再評価され最新化される。
+let cachedActive: AnnouncementRecord[] | null = null;
 
 function getCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
@@ -18,38 +23,42 @@ function getCookie(name: string): string | null {
   return match ? match[2] : null;
 }
 
-function isWithinExpiryDays(createdAt: string): boolean {
-  const created = new Date(createdAt);
-  const now = new Date();
-  const diffDays = (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
-  return diffDays <= ANNOUNCEMENT_EXPIRY_DAYS;
-}
-
-function formatDate(createdAt: string): string {
-  const [, m, d] = createdAt.split("-");
-  return `${parseInt(m, 10)}/${parseInt(d, 10)}`;
-}
 
 export function AnnouncementBar() {
-  // cookie はクライアント専用のため hydration 後にのみ読む（SSR/初回 render は空）。
-  const hydrated = useIsHydrated();
+  const [active, setActive] = useState<AnnouncementRecord[] | null>(
+    cachedActive
+  );
   const [dismissed, setDismissed] = useState(false);
 
+  useEffect(() => {
+    // 既にセッションキャッシュ済みなら useState 初期値で反映済み。取得は未キャッシュ時のみ。
+    if (cachedActive !== null) return;
+    let alive = true;
+    fetch("/api/v1/announcements/active", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { announcements: [] }))
+      .then((data) => {
+        const list: AnnouncementRecord[] = data?.announcements ?? [];
+        cachedActive = list;
+        if (alive) setActive(list);
+      })
+      .catch(() => {
+        if (alive) setActive([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const unreadAnnouncements = useMemo(() => {
-    if (!hydrated || dismissed) return [];
-    const lastReadId = parseInt(getCookie(COOKIE_NAME) || "0", 10);
-    return announcements
-      .filter((a) => a.id > lastReadId && isWithinExpiryDays(a.createdAt))
-      .sort((a, b) => b.id - a.id);
-  }, [hydrated, dismissed]);
+    if (!active || dismissed) return [];
+    return unreadBannerAnnouncements(active, getCookie(COOKIE_NAME));
+  }, [active, dismissed]);
 
   const handleDismissAll = async () => {
-    const validAnnouncements = announcements.filter((a) =>
-      isWithinExpiryDays(a.createdAt)
-    );
-    if (validAnnouncements.length === 0) return;
-    const maxId = Math.max(...validAnnouncements.map((a) => a.id));
-    await dismissAnnouncements(maxId);
+    if (!active || active.length === 0) return;
+    // 「現在バナー掲載中の id だけ」を既読として保存（置換）。掲載が pinnedUntil で
+    // 失効すれば次回以降ここから外れるため、Cookie は同時掲載件数に張り付き肥大化しない。
+    await dismissAnnouncements(active.map((a) => a.id));
     setDismissed(true);
   };
 
@@ -76,12 +85,10 @@ export function AnnouncementBar() {
                 <Info className="h-3 w-3 flex-shrink-0" />
               )}
               {(() => {
-                const href =
-                  announcement.link ??
-                  (announcement.detail
-                    ? `/announcements/${announcement.id}`
-                    : null);
-                const content = `(${formatDate(announcement.createdAt)}) ${announcement.message}`;
+                const href = announcement.detail
+                  ? `/announcements/${announcement.id}`
+                  : null;
+                const content = `(${formatAnnouncementDate(announcement.publishAt)}) ${announcement.message}`;
                 return href ? (
                   <Link href={href} className="underline hover:no-underline">
                     {content}

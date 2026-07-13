@@ -18,6 +18,7 @@ const NAV: { href: string; label: string }[] = [
   { href: "/admin/accounts", label: "アカウント" },
   { href: "/admin/servers", label: "サーバー" },
   { href: "/admin/reports", label: "通報" },
+  { href: "/admin/announcements", label: "お知らせ" },
   { href: "/admin/favorites", label: "お気に入り" },
   { href: "/admin/system", label: "システム" },
 ];

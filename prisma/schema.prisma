@@ -258,3 +258,25 @@ enum MentionStatus {
   success
   failed
 }
+
+// 運営からのお知らせ（全ユーザー共通）。従来の静的ファイル（src/data/announcements.ts）を
+// 廃止しDBを正とする。取得は unstable_cache（タグ "announcements"）で抑え、Admin での編集時に
+// revalidateTag("announcements") で即時破棄する（毎回DBを引かず、編集は即反映）。
+model Announcement {
+  id          Int       @id @default(autoincrement())
+  // 重要度: "warning" | "info" | "low"。low は上部バナーに一切出さない（一覧・詳細のみ）。
+  type        String    @default("info") @db.VarChar(20)
+  message     String    @db.Text
+  // 詳細本文（設定すると /announcements/[id] へリンク。[テキスト](URL) 記法対応）
+  detail      String?   @db.Text
+  // 公開予定日時。publishAt <= now で一覧/バナーに出現（予約投稿）。
+  publishAt   DateTime  @map("publish_at")
+  // 上部バナーの常時表示を終了する日時。null=公開から既定日数（DEFAULT_BANNER_DAYS=7日）で自動終了。
+  // 指定時はその日時まで掲載。now < 終了時刻 の間だけバナーに出す（low は常に非掲載）。
+  pinnedUntil DateTime? @map("pinned_until")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([publishAt])
+  @@map("announcements")
+}

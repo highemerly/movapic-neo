@@ -1,16 +1,13 @@
 import { notFound } from "next/navigation";
 import Link from "@/components/Link";
-import { Info, AlertTriangle, ChevronLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
-import { announcements } from "@/data/announcements";
-
-function formatDate(createdAt: string): string {
-  const [y, m, d] = createdAt.split("-");
-  return `${y}/${parseInt(m, 10)}/${parseInt(d, 10)}`;
-}
+import { formatAnnouncementDate } from "@/lib/announcements";
+import { getAnnouncementForDetail } from "@/lib/announcements.server";
+import { AnnouncementTypeIcon } from "@/components/announcements/AnnouncementTypeIcon";
 
 // [テキスト](URL) 形式のリンクをパースして React ノードに変換する
 function renderDetail(detail: string) {
@@ -55,19 +52,13 @@ function renderDetail(detail: string) {
   return nodes;
 }
 
-export function generateStaticParams() {
-  return announcements
-    .filter((a) => a.detail)
-    .map((a) => ({ id: String(a.id) }));
-}
-
 export default async function AnnouncementDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const announcement = announcements.find((a) => String(a.id) === id);
+  const announcement = await getAnnouncementForDetail(Number(id));
 
   if (!announcement || !announcement.detail) {
     notFound();
@@ -92,13 +83,14 @@ export default async function AnnouncementDetailPage({
         <article>
           <header className="mb-6">
             <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-              {announcement.type === "warning" ? (
-                <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
-              ) : (
-                <Info className="h-3.5 w-3.5 text-blue-600" />
-              )}
-              <time dateTime={announcement.createdAt}>
-                {formatDate(announcement.createdAt)}
+              <AnnouncementTypeIcon
+                type={announcement.type}
+                className="h-3.5 w-3.5"
+              />
+              <time dateTime={announcement.publishAt}>
+                {formatAnnouncementDate(announcement.publishAt, {
+                  withYear: true,
+                })}
               </time>
             </div>
             <h1 className="text-xl font-semibold">{announcement.message}</h1>

@@ -1,19 +1,16 @@
 import Link from "@/components/Link";
-import { Info, AlertTriangle, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
-import { announcements } from "@/data/announcements";
-
-function formatDate(createdAt: string): string {
-  const [y, m, d] = createdAt.split("-");
-  return `${y}/${parseInt(m, 10)}/${parseInt(d, 10)}`;
-}
+import { formatAnnouncementDate } from "@/lib/announcements";
+import { getListedAnnouncements } from "@/lib/announcements.server";
+import { AnnouncementTypeIcon } from "@/components/announcements/AnnouncementTypeIcon";
 
 export default async function AnnouncementsPage() {
   const user = await getCurrentUser();
-  const sorted = [...announcements].sort((a, b) => b.id - a.id);
+  const sorted = await getListedAnnouncements();
 
   return (
     <>
@@ -28,24 +25,23 @@ export default async function AnnouncementsPage() {
         ) : (
           <ul className="divide-y border-t border-b">
             {sorted.map((announcement) => {
-              const href =
-                announcement.link ??
-                (announcement.detail
-                  ? `/announcements/${announcement.id}`
-                  : null);
+              const href = announcement.detail
+                ? `/announcements/${announcement.id}`
+                : null;
 
               const body = (
                 <div className="flex items-center gap-2 py-3">
-                  {announcement.type === "warning" ? (
-                    <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-red-600" />
-                  ) : (
-                    <Info className="h-3.5 w-3.5 flex-shrink-0 text-blue-600" />
-                  )}
+                  <AnnouncementTypeIcon
+                    type={announcement.type}
+                    className="h-3.5 w-3.5 flex-shrink-0"
+                  />
                   <time
-                    dateTime={announcement.createdAt}
+                    dateTime={announcement.publishAt}
                     className="text-xs text-muted-foreground flex-shrink-0 tabular-nums"
                   >
-                    {formatDate(announcement.createdAt)}
+                    {formatAnnouncementDate(announcement.publishAt, {
+                      withYear: true,
+                    })}
                   </time>
                   <span className="text-sm flex-1">{announcement.message}</span>
                   {href && (
