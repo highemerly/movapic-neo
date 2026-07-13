@@ -7,21 +7,11 @@
 
 import { notFound } from "next/navigation";
 
-import Link from "@/components/Link";
+import { AdminNav } from "@/app/admin/_components/AdminNav";
 import { getCurrentUser } from "@/lib/auth/session";
 import { isAdmin } from "@/lib/auth/admin";
 
 export const dynamic = "force-dynamic";
-
-const NAV: { href: string; label: string }[] = [
-  { href: "/admin/stats", label: "統計" },
-  { href: "/admin/accounts", label: "アカウント" },
-  { href: "/admin/servers", label: "サーバー" },
-  { href: "/admin/reports", label: "通報" },
-  { href: "/admin/announcements", label: "お知らせ" },
-  { href: "/admin/favorites", label: "お気に入り" },
-  { href: "/admin/system", label: "システム" },
-];
 
 export default async function AdminLayout({
   children,
@@ -38,17 +28,7 @@ export default async function AdminLayout({
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8">
-      <nav className="mb-6 flex flex-wrap gap-1 border-b border-border pb-3 text-sm">
-        {NAV.map((n) => (
-          <Link
-            key={n.href}
-            href={n.href}
-            className="rounded-md px-3 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            {n.label}
-          </Link>
-        ))}
-      </nav>
+      <AdminNav />
       {children}
     </div>
   );

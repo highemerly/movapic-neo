@@ -2,19 +2,11 @@
 
 import Link from "@/components/Link";
 import { Images, Calendar, Map as MapIcon, Trophy, Flame } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
+import { TabBar, type TabItem } from "@/components/TabBar";
 import { userPathSegment } from "@/lib/userHandle";
-
-interface Tab {
-  key: "photos" | "calendar" | "map" | "achievements";
-  label: string;
-  icon: typeof Images;
-  href: string;
-  badge?: string;
-}
 
 interface UserProfileHeaderProps {
   user: {
@@ -53,7 +45,7 @@ export function UserProfileHeader({
   const InstanceIcon = user.instance.type === "misskey" ? MisskeyIcon : MastodonIcon;
 
   // 地図タブは常に表示（オプトイン未済でも表示し、遷移先で公開設定の有無に応じた案内を出す）
-  const tabs: Tab[] = [
+  const tabs: TabItem[] = [
     {
       key: "photos",
       label: "一覧",
@@ -139,37 +131,7 @@ export function UserProfileHeader({
       </div>
 
       {/* タブナビゲーション */}
-      <div className="border-b">
-        <nav className="flex gap-0" aria-label="Tabs">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.key;
-            return (
-              <Link
-                key={tab.key}
-                href={tab.href}
-                prefetch
-                className={cn(
-                  "flex items-center gap-1.5 px-3 py-[13px] text-sm font-medium border-b-2 transition-colors",
-                  isActive
-                    ? "border-brand text-brand"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
-                )}
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span className={isActive ? "inline" : "hidden min-[375px]:inline"}>
-                  {tab.label}
-                </span>
-                {tab.badge && (
-                  <span className="ml-0.5 rounded-full bg-amber-100 px-1.5 py-0 text-[9px] font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-                    {tab.badge}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
+      <TabBar tabs={tabs} activeKey={activeTab} prefetch responsiveLabels />
     </div>
   );
 }
