@@ -14,6 +14,8 @@ export interface MainMetrics {
   serverCount: number;
   /** 総投稿数 */
   imageCount: number;
+  /** ストレージ概算容量（Image.file_size 合計・出力画像分のみ） */
+  storageApproxBytes: number;
   /** source 別の投稿数（web / email / mention）。多い順 */
   bySource: { source: string; count: number }[];
   /** 未対応（open）の通報数 */
@@ -23,12 +25,14 @@ export interface MainMetrics {
 }
 
 export async function getMainMetrics(): Promise<MainMetrics> {
-  const [userCount, serverCount, imageCount, bySourceRaw, openReports, favUnsynced] =
+  const [userCount, serverCount, imageCount, storageAgg, bySourceRaw, openReports, favUnsynced] =
     await Promise.all([
       prisma.user.count(),
       // ユーザーが1人以上いるサーバーだけを「連携サーバー」として数える
       prisma.instance.count({ where: { users: { some: {} } } }),
       prisma.image.count(),
+      // ストレージ概算（出力画像の file_size 合計）。/admin/system と同じ算出。
+      prisma.image.aggregate({ _sum: { fileSize: true } }),
       prisma.image.groupBy({ by: ["source"], _count: { _all: true } }),
       prisma.report.count({ where: { status: "open" } }),
       // Fediverse 投稿（post_id あり・非表示でない）で一度も sync していないもの
@@ -49,6 +53,7 @@ export async function getMainMetrics(): Promise<MainMetrics> {
     userCount,
     serverCount,
     imageCount,
+    storageApproxBytes: storageAgg._sum.fileSize ?? 0,
     bySource,
     openReports,
     favUnsynced,

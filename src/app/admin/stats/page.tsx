@@ -11,6 +11,7 @@ import { getPostTimeSeries, getUserTimeSeries } from "@/lib/admin/timeseries";
 import { getComponentHealth } from "@/lib/admin/health";
 import { normalizePeriod, periodRangeText, PERIOD_OPTIONS, type Period } from "@/lib/admin/periods";
 import { StatCard } from "../_components/StatCard";
+import { fmtBytes } from "../_components/ui";
 import { PeriodSelect } from "../_components/PeriodSelect";
 import { normalizeParams } from "../_components/query";
 import { PostTimeSeriesChart } from "./_components/PostTimeSeriesChart";
@@ -68,6 +69,12 @@ export default async function AdminStatsPage({
           value={metrics.imageCount}
           hint={sourceHint || undefined}
           href="/public"
+        />
+        <StatCard
+          label="ストレージ概算"
+          value={fmtBytes(metrics.storageApproxBytes)}
+          hint="本体画像の合計・概算"
+          href="/admin/system"
         />
         <StatCard
           label="未対応の通報"
