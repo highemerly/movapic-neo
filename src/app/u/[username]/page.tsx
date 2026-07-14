@@ -249,6 +249,7 @@ export default async function UserGalleryPage({
           streak={streak}
           perfectAttendance={perfectAttendance}
           activeTab="photos"
+          isOwner={currentUser?.id === user.id}
         />
 
         {/* 画像一覧（ピン留め画像を先頭に・タブ切替時に横スライドで表示） */}

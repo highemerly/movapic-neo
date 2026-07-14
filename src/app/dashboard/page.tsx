@@ -1,37 +1,21 @@
 import { redirect } from "next/navigation";
 import Link from "@/components/Link";
 import { getAvatarUrl } from "@/lib/avatar";
-import { Globe, Server, Heart, ChevronRight, Settings2, ShieldCheck, SlidersHorizontal, Trophy, Images, Calendar, Map as MapIcon, Trash2, Sparkles, ImagePlus } from "lucide-react";
+import { Globe, Server, Heart, ChevronRight, Settings, Trophy, Images, Calendar, Map as MapIcon, Sparkles, ImagePlus } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
-import { InstallEntry } from "@/components/pwa/InstallEntry";
 import { PostMethodTabs } from "./PostMethodTabs";
 import { MentionGuide } from "@/components/post-methods/MentionGuide";
 import { EmailGuide } from "@/components/post-methods/EmailGuide";
 import { getBotAcct, getEmailDomain } from "@/lib/postMethods";
-import { EmailPrefixRegenerate } from "./EmailPrefixRegenerate";
-import { BioEditForm } from "./BioEditForm";
-import { DefaultsEditor } from "./DefaultsEditor";
-import { LocationMapToggle } from "./LocationMapToggle";
-import { BlockCrawlersToggle } from "./BlockCrawlersToggle";
-import { AutoMakeupToggle } from "./AutoMakeupToggle";
-import { DisplayModeSelector } from "./DisplayModeSelector";
 import prisma from "@/lib/db";
 import { getUserProfileStats } from "@/lib/userStats";
 import { userPathSegment } from "@/lib/userHandle";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
-import {
-  Position,
-  FontFamily,
-  Color,
-  Size,
-  Arrangement,
-  Visibility,
-} from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -53,20 +37,9 @@ export default async function DashboardPage() {
   const [userWithPreferences, profileStats, favoritesAgg, topFavoriteImage, recentPublicImages, perfectAttendance, totalImageCount] = await Promise.all([
     prisma.user.findUnique({
       where: { id: user.id },
+      // 各種設定は /settings に移動したため、ここでは登録日（あなたの情報の表示用）のみ取得する。
       select: {
         createdAt: true,
-        bio: true,
-        mentionKeep: true,
-        defaultPosition: true,
-        defaultFont: true,
-        defaultColor: true,
-        defaultSize: true,
-        defaultArrangement: true,
-        defaultVisibility: true,
-        defaultCameraOption: true,
-        showLocationMap: true,
-        blockCrawlers: true,
-        autoMakeup: true,
       },
     }),
     getUserProfileStats(user.id),
@@ -338,91 +311,22 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        {/* セクション4: 設定を変更する */}
+        {/* セクション4: 設定を変更する（設定一式は /settings に移動。ここは誘導のみ残す） */}
         <section className="mb-4">
           <h2 className="text-lg font-semibold mb-2">設定を変更する</h2>
-
-          {/* 一般 */}
-          <div className="bg-muted rounded-lg p-4">
-            <p className="text-sm font-bold mb-4 flex items-center gap-1.5">
-              <Settings2 className="h-4 w-4 text-muted-foreground" />
-              一般
-            </p>
-            <div className="space-y-4">
-              <BioEditForm initialBio={userWithPreferences?.bio ?? null} />
-              <AutoMakeupToggle
-                initialDisabled={!(userWithPreferences?.autoMakeup ?? true)}
-              />
-              {/* 控えめなインストール導線（Android/iOS Safari・未インストール時のみ表示） */}
-              <InstallEntry />
-              <DisplayModeSelector />
+          <Link
+            href="/settings"
+            className="flex items-center gap-3 bg-muted rounded-lg p-4 hover:bg-muted/70 transition-colors"
+          >
+            <Settings className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium">設定は「設定」ページに移動しました</p>
+              <p className="text-xs text-muted-foreground">
+                プロフィール・投稿の初期設定・プライバシー・アカウント削除など
+              </p>
             </div>
-          </div>
-
-          {/* プライバシー・セキュリティ */}
-          <div className="mt-4 bg-muted rounded-lg p-4">
-            <p className="text-sm font-bold mb-4 flex items-center gap-1.5">
-              <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-              プライバシー・セキュリティ
-            </p>
-            <div className="space-y-4">
-              <Link
-                href="/dashboard/sessions"
-                className="flex items-center justify-between gap-4 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm">ログイン履歴を確認する</p>
-                </div>
-                <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-              </Link>
-              <EmailPrefixRegenerate />
-              <LocationMapToggle
-                initialEnabled={userWithPreferences?.showLocationMap ?? false}
-                username={selfSeg}
-              />
-              <BlockCrawlersToggle
-                initialEnabled={userWithPreferences?.blockCrawlers ?? false}
-              />
-            </div>
-          </div>
-
-          {/* 投稿の初期設定 */}
-          <div className="mt-4 bg-muted rounded-lg p-4">
-            <p className="text-sm font-bold mb-4 flex items-center gap-1.5">
-              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-              投稿の初期設定
-            </p>
-            <DefaultsEditor
-              initial={{
-                position: userWithPreferences?.defaultPosition as Position | null ?? null,
-                font: userWithPreferences?.defaultFont as FontFamily | null ?? null,
-                color: userWithPreferences?.defaultColor as Color | null ?? null,
-                size: userWithPreferences?.defaultSize as Size | null ?? null,
-                arrangement: userWithPreferences?.defaultArrangement as Arrangement | null ?? null,
-                visibility: userWithPreferences?.defaultVisibility as Visibility | null ?? null,
-                cameraOption: (userWithPreferences?.defaultCameraOption as "none" | "show" | null | undefined) ?? null,
-                mentionKeep: userWithPreferences?.mentionKeep ?? false,
-              }}
-              instanceDomain={user.instance.domain}
-            />
-          </div>
-
-          {/* アカウント削除 */}
-          <div className="mt-4 bg-muted rounded-lg p-4">
-            <p className="text-sm font-bold mb-4 flex items-center gap-1.5">
-              <Trash2 className="h-4 w-4 text-muted-foreground" />
-              アカウント削除
-            </p>
-            <Link
-              href="/dashboard/delete"
-              className="flex items-center justify-between gap-4 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="text-sm">アカウントを削除する</p>
-              </div>
-              <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-            </Link>
-          </div>
+            <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+          </Link>
         </section>
 
         <Footer />

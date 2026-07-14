@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { SETTINGS_TOAST_DURATION } from "./settingsToast";
 
 export function EmailPrefixRegenerate() {
   const router = useRouter();
@@ -38,10 +39,10 @@ export function EmailPrefixRegenerate() {
         throw new Error(data.error || "再生成に失敗しました");
       }
 
-      toast.success("投稿用メールアドレスを再生成しました");
+      toast.success("投稿用メールアドレスを再生成しました", { duration: SETTINGS_TOAST_DURATION });
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "再生成に失敗しました");
+      toast.error(error instanceof Error ? error.message : "再生成に失敗しました", { duration: SETTINGS_TOAST_DURATION });
     } finally {
       setIsRegenerating(false);
     }

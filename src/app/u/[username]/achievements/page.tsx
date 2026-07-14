@@ -112,6 +112,7 @@ export default async function AchievementsPage({
           streak={streak}
           perfectAttendance={perfectAttendance}
           activeTab="achievements"
+          isOwner={currentUser?.id === user.id}
         />
 
         {/* 実績一覧（タブ切替時に横スライドで表示） */}

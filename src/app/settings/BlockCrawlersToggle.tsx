@@ -1,15 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { SaveStatus, type SaveStatusState } from "@/components/ui/save-status";
+import { toastSaved, toastSettingsError } from "./settingsToast";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
 
 interface BlockCrawlersToggleProps {
   initialEnabled: boolean;
 }
-
-type SaveState = SaveStatusState;
 
 /**
  * 検索エンジン/AI Botのクロール拒否トグル。
@@ -21,17 +19,12 @@ type SaveState = SaveStatusState;
 export function BlockCrawlersToggle({ initialEnabled }: BlockCrawlersToggleProps) {
   const router = useRouter();
   const [enabled, setEnabled] = useState(initialEnabled);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [error, setError] = useState<string | null>(null);
-  const savedClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const isSaving = saveState === "saving";
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleToggle = async () => {
     const next = !enabled;
     setEnabled(next);
-    setSaveState("saving");
-    setError(null);
+    setIsSaving(true);
     try {
       const res = await fetch("/api/v1/me", {
         method: "PATCH",
@@ -43,13 +36,12 @@ export function BlockCrawlersToggle({ initialEnabled }: BlockCrawlersToggleProps
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.error || "保存に失敗しました");
       }
-      setSaveState("saved");
+      toastSaved("settings-blockcrawlers");
       router.refresh();
-      if (savedClearRef.current) clearTimeout(savedClearRef.current);
-      savedClearRef.current = setTimeout(() => setSaveState("idle"), 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "保存に失敗しました");
-      setSaveState("error");
+      toastSettingsError(err instanceof Error ? err.message : "保存に失敗しました");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -57,10 +49,7 @@ export function BlockCrawlersToggle({ initialEnabled }: BlockCrawlersToggleProps
     <div>
       <label className="flex items-center justify-between gap-4 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
         <div className="flex-1 min-w-0">
-          <p className="text-sm flex items-center flex-wrap gap-x-2">
-            クローラーのアクセスを拒否する
-            <SaveStatus state={saveState} error={error} />
-          </p>
+          <p className="text-sm">クローラーのアクセスを拒否する</p>
           <p className="text-xs text-muted-foreground">
             検索エンジン・AIエージェントに対し、あなたのページを利用しないよう要望します。設定の反映には時間がかかります。また、要望を無視するクローラーには効果がありません。
           </p>

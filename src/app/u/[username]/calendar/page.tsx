@@ -127,6 +127,7 @@ export default async function CalendarPage({
           streak={streak}
           perfectAttendance={perfectAttendance}
           activeTab="calendar"
+          isOwner={isOwner}
         />
 
         {/* カレンダー（タブ切替時に横スライドで表示） */}

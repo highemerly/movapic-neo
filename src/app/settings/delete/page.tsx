@@ -20,7 +20,7 @@ export default async function DeleteAccountPage() {
     <>
       <SiteHeader user={{ username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) }} />
       <PageContainer>
-        <BackLink href="/dashboard">ダッシュボード</BackLink>
+        <BackLink href="/settings">設定</BackLink>
 
         <h1 className="text-xl font-semibold mb-3 flex items-center gap-2">
           <Trash2 className="h-5 w-5 text-destructive" />

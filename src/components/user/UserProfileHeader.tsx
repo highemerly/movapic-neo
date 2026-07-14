@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "@/components/Link";
-import { Images, Calendar, Map as MapIcon, Trophy, Flame } from "lucide-react";
+import { Images, Calendar, Map as MapIcon, Trophy, Flame, Settings } from "lucide-react";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
@@ -27,6 +27,8 @@ interface UserProfileHeaderProps {
   /** 直近（先月/今月）の皆勤賞を獲得していればアバターに王冠を表示 */
   perfectAttendance?: boolean;
   activeTab: "photos" | "calendar" | "map" | "achievements";
+  /** 閲覧者が本人のとき、上部右に設定（/settings）への歯車リンクを表示 */
+  isOwner?: boolean;
 }
 
 export function UserProfileHeader({
@@ -37,6 +39,7 @@ export function UserProfileHeader({
   streak = 0,
   perfectAttendance = false,
   activeTab,
+  isOwner = false,
 }: UserProfileHeaderProps) {
   // /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）
   const seg = userPathSegment(user.username, user.instance.domain);
@@ -128,6 +131,17 @@ export function UserProfileHeader({
             )}
           </div>
         </div>
+        {/* 本人が自分のページを見ているときだけ、上部右に設定への歯車を出す */}
+        {isOwner && (
+          <Link
+            href="/settings"
+            aria-label="設定"
+            title="設定"
+            className="shrink-0 self-start -mr-1 p-1 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Settings className="h-5 w-5" />
+          </Link>
+        )}
       </div>
 
       {/* タブナビゲーション */}

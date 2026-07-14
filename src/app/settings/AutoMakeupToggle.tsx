@@ -1,16 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { SaveStatus, type SaveStatusState } from "@/components/ui/save-status";
+import { toastSaved, toastSettingsError } from "./settingsToast";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
 
 interface AutoMakeupToggleProps {
   /** 「自動穴埋めをしない」が有効か（＝autoMakeup=false）。デフォルトは false（＝自動穴埋めする）。 */
   initialDisabled: boolean;
 }
-
-type SaveState = SaveStatusState;
 
 /**
  * カレンダーの自動穴埋めを「しない」設定トグル。
@@ -23,17 +21,12 @@ export function AutoMakeupToggle({ initialDisabled }: AutoMakeupToggleProps) {
   const router = useRouter();
   // enabled = 「自動穴埋めをしない」が有効か
   const [enabled, setEnabled] = useState(initialDisabled);
-  const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [error, setError] = useState<string | null>(null);
-  const savedClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const isSaving = saveState === "saving";
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleToggle = async () => {
     const next = !enabled; // 「しない」の新しい状態
     setEnabled(next);
-    setSaveState("saving");
-    setError(null);
+    setIsSaving(true);
     try {
       const res = await fetch("/api/v1/me", {
         method: "PATCH",
@@ -46,13 +39,12 @@ export function AutoMakeupToggle({ initialDisabled }: AutoMakeupToggleProps) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.error || "保存に失敗しました");
       }
-      setSaveState("saved");
+      toastSaved("settings-automakeup");
       router.refresh();
-      if (savedClearRef.current) clearTimeout(savedClearRef.current);
-      savedClearRef.current = setTimeout(() => setSaveState("idle"), 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "保存に失敗しました");
-      setSaveState("error");
+      toastSettingsError(err instanceof Error ? err.message : "保存に失敗しました");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -60,10 +52,7 @@ export function AutoMakeupToggle({ initialDisabled }: AutoMakeupToggleProps) {
     <div>
       <label className="flex items-center justify-between gap-4 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
         <div className="flex-1 min-w-0">
-          <p className="text-sm flex items-center flex-wrap gap-x-2">
-            カレンダーの自動穴埋めをしない
-            <SaveStatus state={saveState} error={error} />
-          </p>
+          <p className="text-sm">カレンダーの自動穴埋めをしない</p>
           <p className="text-xs text-muted-foreground">
             投稿を忘れたとき、1日に2枚以上投稿しても、未投稿日を穴埋めしません。
           </p>

@@ -44,7 +44,7 @@ export default async function SessionsPage() {
     <>
       <SiteHeader user={{ username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) }} />
       <PageContainer>
-        <BackLink href="/dashboard">ダッシュボード</BackLink>
+        <BackLink href="/settings">設定</BackLink>
 
         <h1 className="text-lg font-semibold mb-2">ログイン履歴</h1>
         <p className="text-xs text-muted-foreground mb-6">

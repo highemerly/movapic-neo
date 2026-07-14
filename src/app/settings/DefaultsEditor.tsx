@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toastSaved, toastSettingsError } from "./settingsToast";
 import { Label } from "@/components/ui/label";
-import { SaveStatus, type SaveStatusState } from "@/components/ui/save-status";
 import { ToggleSwitch } from "@/components/ui/toggle-switch";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { OptionsPanel } from "@/components/OptionsPanel";
@@ -38,8 +38,6 @@ interface DefaultsEditorProps {
   instanceDomain: string;
 }
 
-type SaveState = SaveStatusState;
-
 const SAVE_DEBOUNCE_MS = 400;
 
 export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps) {
@@ -68,43 +66,34 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
 
   const [mentionKeep, setMentionKeep] = useState(initial.mentionKeep);
   const [isMentionKeepSaving, setIsMentionKeepSaving] = useState(false);
-  const [mentionKeepSaveState, setMentionKeepSaveState] = useState<SaveState>("idle");
-  const [mentionKeepError, setMentionKeepError] = useState<string | null>(null);
-
-  const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [error, setError] = useState<string | null>(null);
   const [isTogglingSave, setIsTogglingSave] = useState(false);
 
-  const isFirstRender = useRef(true);
+  // 直近で永続化済みの値のスナップショット（初期は props＝DB値）。現在値がこれと一致する間は
+  // 自動保存しない。マウント時や React Strict Mode（dev）の二重マウントでは値が変わらないため
+  // 発火せず、開いた瞬間に不要な「保存しました」が出るのを防ぐ。
+  const lastSavedRef = useRef(
+    JSON.stringify({
+      position: initial.position ?? DEFAULT_POSITION,
+      font: initial.font ?? DEFAULT_FONT,
+      color: initial.color ?? DEFAULT_COLOR,
+      size: initial.size ?? DEFAULT_SIZE,
+      arrangement: initial.arrangement ?? DEFAULT_ARRANGEMENT,
+      visibility: initial.visibility ?? "public",
+      cameraOption: initial.cameraOption ?? "none",
+    })
+  );
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savedClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mentionKeepSavedClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const flashSaved = () => {
-    setSaveState("saved");
-    if (savedClearRef.current) clearTimeout(savedClearRef.current);
-    savedClearRef.current = setTimeout(() => setSaveState("idle"), 1500);
-  };
-
-  const flashMentionKeepSaved = () => {
-    setMentionKeepSaveState("saved");
-    if (mentionKeepSavedClearRef.current) clearTimeout(mentionKeepSavedClearRef.current);
-    mentionKeepSavedClearRef.current = setTimeout(() => setMentionKeepSaveState("idle"), 1500);
-  };
 
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-
     // 「保存する」がOFFのときは自動保存しない
     if (!saveEnabled) return;
 
+    const snapshot = JSON.stringify({ position, font, color, size, arrangement, visibility, cameraOption });
+    // 永続化済みの値と同じなら何もしない（初回マウント・Strict Modeの二重マウントで発火させない）
+    if (snapshot === lastSavedRef.current) return;
+
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(async () => {
-      setSaveState("saving");
-      setError(null);
       try {
         const response = await fetch("/api/v1/me/preferences", {
           method: "POST",
@@ -123,11 +112,12 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
           const data = await response.json();
           throw new Error(data.error?.message || "保存に失敗しました");
         }
+        lastSavedRef.current = snapshot;
         router.refresh();
-        flashSaved();
+        // オプション連続変更時にトーストが積み上がらないよう安定 id で1枚に集約
+        toastSaved("settings-defaults");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "保存に失敗しました");
-        setSaveState("error");
+        toastSettingsError(err instanceof Error ? err.message : "保存に失敗しました");
       }
     }, SAVE_DEBOUNCE_MS);
 
@@ -140,8 +130,6 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
     const next = !mentionKeep;
     setMentionKeep(next);
     setIsMentionKeepSaving(true);
-    setMentionKeepSaveState("saving");
-    setMentionKeepError(null);
     try {
       const response = await fetch("/api/v1/me", {
         method: "PATCH",
@@ -154,10 +142,9 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
         throw new Error(data?.error || "保存に失敗しました");
       }
       router.refresh();
-      flashMentionKeepSaved();
+      toastSaved("settings-mentionkeep");
     } catch (err) {
-      setMentionKeepError(err instanceof Error ? err.message : "保存に失敗しました");
-      setMentionKeepSaveState("error");
+      toastSettingsError(err instanceof Error ? err.message : "保存に失敗しました");
     } finally {
       setIsMentionKeepSaving(false);
     }
@@ -177,8 +164,6 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
       if (!confirmed) return;
     }
     setIsTogglingSave(true);
-    setSaveState("saving");
-    setError(null);
     // 切替時のデバウンス中の自動保存をキャンセル
     if (timerRef.current) clearTimeout(timerRef.current);
     try {
@@ -201,6 +186,8 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
           const data = await response.json();
           throw new Error(data.error?.message || "保存に失敗しました");
         }
+        // 保存済みスナップショットを現在値に更新（直後の自動保存 effect を発火させない）
+        lastSavedRef.current = JSON.stringify({ position, font, color, size, arrangement, visibility, cameraOption });
       } else {
         // OFF: 全てクリアしてシステム標準に戻す
         const response = await fetch("/api/v1/me/preferences", { method: "DELETE" });
@@ -209,7 +196,6 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
           throw new Error(data.error?.message || "保存解除に失敗しました");
         }
         // 表示値もシステム標準に戻す（再度ONにしたとき素の状態から始められるように）
-        isFirstRender.current = true;
         setPosition(DEFAULT_POSITION);
         setFont(DEFAULT_FONT);
         setColor(DEFAULT_COLOR);
@@ -217,13 +203,22 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
         setArrangement(DEFAULT_ARRANGEMENT);
         setVisibility("public");
         setCameraOption("none");
+        // スナップショットもシステム標準に合わせる（再ON時に不要な自動保存を出さない）
+        lastSavedRef.current = JSON.stringify({
+          position: DEFAULT_POSITION,
+          font: DEFAULT_FONT,
+          color: DEFAULT_COLOR,
+          size: DEFAULT_SIZE,
+          arrangement: DEFAULT_ARRANGEMENT,
+          visibility: "public",
+          cameraOption: "none",
+        });
       }
       setSaveEnabled(next);
       router.refresh();
-      flashSaved();
+      toastSaved("settings-defaults");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "保存に失敗しました");
-      setSaveState("error");
+      toastSettingsError(err instanceof Error ? err.message : "保存に失敗しました");
     } finally {
       setIsTogglingSave(false);
     }
@@ -233,10 +228,7 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
     <div className="space-y-4">
       <label className="flex items-center justify-between gap-4 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
         <div className="flex-1 min-w-0">
-          <p className="text-sm flex items-center flex-wrap gap-x-2">
-            設定を保存する
-            <SaveStatus state={saveState} error={error} />
-          </p>
+          <p className="text-sm">設定を保存する</p>
           <p className="text-xs text-muted-foreground">
             文字の合成オプションなど好みの設定を保存しておき、初期値として読み込みます。投稿時に変更可能です。原則、全ての投稿方法（Web、Bot、メール）が対象となります。
           </p>
@@ -303,7 +295,6 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
           <p className="text-sm flex items-center flex-wrap gap-x-2">
             元投稿を残す
             <span className="text-xs font-normal text-muted-foreground">（Bot投稿のみ）</span>
-            <SaveStatus state={mentionKeepSaveState} error={mentionKeepError} />
           </p>
           <p className="text-xs text-muted-foreground">
             Botにメンションを送って投稿したとき、写真の投稿が正常に完了しても、元の投稿を自動で削除しません。

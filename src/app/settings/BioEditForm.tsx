@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
-import { SaveStatus, type SaveStatusState } from "@/components/ui/save-status";
+import { toastSaved, toastSettingsError } from "./settingsToast";
 
 const BIO_MAX_LENGTH = 40;
 const SAVE_DEBOUNCE_MS = 800;
@@ -13,17 +13,12 @@ interface BioEditFormProps {
   initialBio: string | null;
 }
 
-type SaveState = SaveStatusState;
-
 export function BioEditForm({ initialBio }: BioEditFormProps) {
   const router = useRouter();
   const [bio, setBio] = useState(initialBio ?? "");
-  const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [error, setError] = useState<string | null>(null);
 
   const savedBioRef = useRef(initialBio ?? "");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savedClearRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isOverLimit = bio.length > BIO_MAX_LENGTH;
 
@@ -33,8 +28,6 @@ export function BioEditForm({ initialBio }: BioEditFormProps) {
 
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(async () => {
-      setSaveState("saving");
-      setError(null);
       try {
         const response = await fetch("/api/v1/me", {
           method: "PATCH",
@@ -46,13 +39,10 @@ export function BioEditForm({ initialBio }: BioEditFormProps) {
           throw new Error(data.error || "保存に失敗しました");
         }
         savedBioRef.current = bio;
-        setSaveState("saved");
+        toastSaved("settings-bio");
         router.refresh();
-        if (savedClearRef.current) clearTimeout(savedClearRef.current);
-        savedClearRef.current = setTimeout(() => setSaveState("idle"), 1500);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "保存に失敗しました");
-        setSaveState("error");
+        toastSettingsError(err instanceof Error ? err.message : "保存に失敗しました");
       }
     }, SAVE_DEBOUNCE_MS);
 
@@ -66,10 +56,8 @@ export function BioEditForm({ initialBio }: BioEditFormProps) {
       <div className="flex justify-between items-center gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <Label htmlFor="bio-input">プロフィール</Label>
-          {isOverLimit ? (
+          {isOverLimit && (
             <span className="text-xs text-destructive truncate">{BIO_MAX_LENGTH}文字以内で入力してください</span>
-          ) : (
-            <SaveStatus state={saveState} error={error} />
           )}
         </div>
         <span className={`text-xs flex-shrink-0 ${isOverLimit ? "text-destructive" : "text-muted-foreground"}`}>

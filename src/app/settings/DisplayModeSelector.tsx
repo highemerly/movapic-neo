@@ -19,9 +19,9 @@ const LAYOUT_OPTIONS: { value: GalleryLayout; label: string; icon: typeof Monito
   { value: "packed", label: "積み上げ", icon: Columns3 },
 ];
 
-// 「表示」設定グループ。デザインは「設定を保存する」（DefaultsEditor）を参考に、
-// タイトル＋説明の下に子設定を border-l-2 でネストして並べる。
-// どちらもブラウザローカル（テーマ=next-themes/localStorage、レイアウト=useGalleryLayout）。
+// 「外観」セクションの中身。デザイン（テーマ）とタイムライン表示を並べる。
+// 見出しは親セクション（page.tsx の「外観」）が担うため、ここではブラウザローカルの注意書き＋
+// 各設定を直接並べる（テーマ=next-themes/localStorage、レイアウト=useGalleryLayout）。
 export function DisplayModeSelector() {
   // テーマは localStorage 一本化（next-themes）。DB同期は廃止。
   const { theme, setTheme } = useTheme();
@@ -30,71 +30,66 @@ export function DisplayModeSelector() {
   const [layout, setLayout] = useGalleryLayout();
 
   return (
-    <div className="space-y-4">
-      <div className="p-3 rounded-lg border">
-        <p className="text-sm">表示</p>
-        <p className="text-xs text-muted-foreground">
-          この設定はお使いのブラウザにのみ反映されます（別のブラウザや端末には影響しません）。
-        </p>
+    <div className="space-y-5">
+      <p className="text-xs text-muted-foreground">
+        この設定はお使いのブラウザにのみ反映されます（別のブラウザや端末には影響しません）。
+      </p>
+
+      {/* デザイン */}
+      <div className="space-y-2">
+        <Label>デザイン</Label>
+        <div role="radiogroup" className="flex rounded-lg border bg-muted p-1 gap-1">
+          {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
+            const selected = mounted && theme === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setTheme(value)}
+                className={`flex-1 rounded-md border px-2 py-1.5 text-sm font-medium transition-colors ${
+                  selected
+                    ? "border-border bg-background text-foreground shadow-sm"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span className="flex items-center justify-center gap-1">
+                  <Icon className="h-4 w-4" />
+                  <span>{label}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="space-y-5 ml-4 pl-4 border-l-2 border-border">
-        {/* デザイン */}
-        <div className="space-y-2">
-          <Label>デザイン</Label>
-          <div role="radiogroup" className="flex rounded-lg border bg-muted p-1 gap-1">
-            {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
-              const selected = mounted && theme === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  onClick={() => setTheme(value)}
-                  className={`flex-1 rounded-md border px-2 py-1.5 text-sm font-medium transition-colors ${
-                    selected
-                      ? "border-border bg-background text-foreground shadow-sm"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <span className="flex items-center justify-center gap-1">
-                    <Icon className="h-4 w-4" />
-                    <span>{label}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* タイムライン表示 */}
-        <div className="space-y-2">
-          <Label>タイムライン表示</Label>
-          <div role="radiogroup" className="flex rounded-lg border bg-muted p-1 gap-1">
-            {LAYOUT_OPTIONS.map(({ value, label, icon: Icon }) => {
-              const selected = mounted && layout === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  onClick={() => setLayout(value)}
-                  className={`flex-1 rounded-md border px-2 py-1.5 text-sm font-medium transition-colors ${
-                    selected
-                      ? "border-border bg-background text-foreground shadow-sm"
-                      : "border-transparent text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <span className="flex items-center justify-center gap-1">
-                    <Icon className="h-4 w-4" />
-                    <span>{label}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+      {/* タイムライン表示 */}
+      <div className="space-y-2">
+        <Label>タイムライン表示</Label>
+        <div role="radiogroup" className="flex rounded-lg border bg-muted p-1 gap-1">
+          {LAYOUT_OPTIONS.map(({ value, label, icon: Icon }) => {
+            const selected = mounted && layout === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setLayout(value)}
+                className={`flex-1 rounded-md border px-2 py-1.5 text-sm font-medium transition-colors ${
+                  selected
+                    ? "border-border bg-background text-foreground shadow-sm"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span className="flex items-center justify-center gap-1">
+                  <Icon className="h-4 w-4" />
+                  <span>{label}</span>
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

@@ -19,6 +19,9 @@ const nextConfig: NextConfig = {
       // 旧「技術仕様」URL（/spec）は「ドキュメント」（/docs）へ恒久リダイレクト。
       { source: "/spec", destination: "/docs", permanent: true },
       { source: "/spec/:path*", destination: "/docs/:path*", permanent: true },
+      // 設定は /dashboard 配下から /settings 配下へ移動。旧URL（ブックマーク）を恒久リダイレクト。
+      { source: "/dashboard/sessions", destination: "/settings/sessions", permanent: true },
+      { source: "/dashboard/delete", destination: "/settings/delete", permanent: true },
     ];
   },
   async headers() {

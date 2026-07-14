@@ -92,6 +92,7 @@ export default async function UserMapPage({
       streak={streak}
       perfectAttendance={perfectAttendance}
       activeTab="map"
+      isOwner={isOwner}
     />
   );
 
@@ -116,10 +117,10 @@ export default async function UserMapPage({
             {isOwner ? (
               <div className="rounded-lg border border-amber-300 bg-amber-50 p-8 text-center text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
                 地図はまだ公開されていません。
-                <Link href="/dashboard" className="font-medium underline">
-                  メニュー
+                <Link href="/settings#privacy" className="font-medium underline">
+                  設定
                 </Link>
-                で「地図を公開する」をONにすると、ここに地図が表示され、訪問者にも見せられるようになります。
+                で「地図を有効にする」をONにすると、ここに地図が表示され、訪問者にも見せられるようになります。
               </div>
             ) : (
               <div className="rounded-lg border bg-muted/30 p-8 text-center text-sm text-muted-foreground">

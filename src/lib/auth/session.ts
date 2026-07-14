@@ -356,7 +356,7 @@ export async function getCurrentUserWithPreferences(): Promise<SessionUserWithPr
 
 /**
  * 現在のセッションのjtiを取得（DB問い合わせなし）
- * /dashboard/sessions で「これは現在のセッション」を示すために使う
+ * /settings/sessions で「これは現在のセッション」を示すために使う
  */
 export async function getCurrentSessionJti(): Promise<string | null> {
   const payload = await getSessionPayload();
