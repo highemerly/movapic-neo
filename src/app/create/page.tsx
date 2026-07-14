@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUserWithPreferences } from "@/lib/auth/session";
 import { getAvatarUrl } from "@/lib/avatar";
 import { getActiveSeason, seasonPeriodLabel } from "@/lib/seasons/catalog";
+import { getBotAcct, getEmailDomain } from "@/lib/postMethods";
 import prisma from "@/lib/db";
 import { CreateClient } from "./CreateClient";
 import type {
@@ -67,6 +68,11 @@ export default async function CreatePage({
         username: user.username,
         instance: { domain: user.instanceDomain, type: user.instanceType },
         avatarUrl: getAvatarUrl(user.avatarUrl),
+      }}
+      postMethods={{
+        botAcct: getBotAcct(),
+        emailPrefix: user.emailPrefix,
+        emailDomain: getEmailDomain(),
       }}
       preferences={{
         position: user.preferences.position as Position | null,

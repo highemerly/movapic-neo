@@ -466,7 +466,7 @@ export default async function SpecPage() {
                     <li>iOS: 写真選択時、画面下部のオプションにて位置情報を含める設定に変更することで、位置情報をアップロードできます</li>
                     <li>Android: 必ず回避できる方法はありませんが、機種・OSバージョンによって以下いずれの方法かで成功することもあります
                       <ul className="list-disc list-inside space-y-1 mt-1 pl-5">
-                        <li>(1) 「タップして写真を撮る」でその場で撮影</li>
+                        <li>(1) 「写真を撮る」でその場で撮影</li>
                         <li>(2) OS標準の共有機能で、SHAMEZOのPWAアプリに写真を送信</li>
                       </ul>
                     </li>
@@ -491,12 +491,26 @@ export default async function SpecPage() {
                   <p className="text-sm text-muted-foreground">
                     Bot宛にメンション付きで画像とコメントを送信して投稿します。BotはWebSocketでメンションを監視しており、ほぼ即座に処理が開始されます。定期的なポーリングで取りこぼしを補完します。処理が正常に完了した場合、元投稿は削除される仕組みとなっています（設定で変更可能）。
                   </p>
+                  <Link
+                    href="/create/bot"
+                    className="mt-2 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                  >
+                    使い方・稼働状況をみる
+                    <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+                  </Link>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">メール投稿</p>
                   <p className="text-sm text-muted-foreground">
                     メニューで確認できる専用のメールアドレスに画像を添付して送信して投稿します。メールは Cloudflare Email Routing により Cloudflare Workers で処理され、ほぼ即座に処理が開始されます。セキュリティ対策（リスト型攻撃対策・MTAのバウンス防止）のため、投稿の成功・失敗によらず、サービス側からは一切のメール返信を行いません。
                   </p>
+                  <Link
+                    href="/create/mail"
+                    className="mt-2 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                  >
+                    使い方をみる
+                    <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+                  </Link>
                 </div>
               </div>
             </div>

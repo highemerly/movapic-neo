@@ -120,6 +120,12 @@ export interface CreateClientProps {
   firstTime?: boolean;
   /** 初回ログイン直後（?welcome=1）＝歓迎バナーを表示する */
   showWelcome?: boolean;
+  /** 「他の投稿方法」モーダル用の設定（Bot宛先・メール宛先）。env/ユーザー由来でサーバー側から渡す */
+  postMethods: {
+    botAcct: string;
+    emailPrefix: string;
+    emailDomain: string;
+  };
 }
 
 // インスタンス種別から出力形式を自動決定
@@ -188,7 +194,7 @@ const UPLOAD_ERROR_MESSAGES: Record<
   },
 };
 
-export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn, firstTime = false, showWelcome = false }: CreateClientProps) {
+export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn, firstTime = false, showWelcome = false, postMethods }: CreateClientProps) {
   const router = useRouter();
   // 初回投稿者は③以降（色・位置などの詳細オプション）を折りたたんで最初は隠す。
   // 既定はデフォルト値で投稿できるので、写真→コメント→投稿の最短動線を邪魔しない。
@@ -875,9 +881,8 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                 : "space-y-6"
             }
           >
-            {/* ① 写真を選ぶ */}
+            {/* 写真を選ぶ（番号なし・アップロードが起点。番号付きガイドは①コメントから始まる） */}
             <div className="space-y-2">
-              <StepHeader num={1} label="写真を選ぶ" />
               <ImageUpload
                 imageFile={formState.imageFile}
                 imagePreview={formState.imagePreview}
@@ -891,6 +896,19 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                 altText={altText}
                 onEditAlt={() => setAltDialogOpen(true)}
               />
+
+              {/* 他の投稿方法（Fediverse／メール）。写真アップロードの代替手段として、
+                  カメラ撮影ボタンと同じ「または」区切り＋破線ボタンでアップロード直下に並べる。
+                  写真を選ぶと非表示。初回投稿者にはまず1枚目に集中してもらうため出さない。 */}
+              {!firstTime && !formState.imageFile && (
+                <OtherPostMethods
+                  botAcct={postMethods.botAcct}
+                  emailPrefix={postMethods.emailPrefix}
+                  emailDomain={postMethods.emailDomain}
+                  instanceDomain={user.instance.domain}
+                  instanceType={user.instance.type}
+                />
+              )}
             </div>
 
             {/* 注意事項（画像直下に常に表示・公開範囲と撮影場所に応じて動的に変化） */}
@@ -905,13 +923,13 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
             </div>
           </div>
 
-          {/* 右列: ②コメント入力 → ③オプション → ④追加情報 → ⑤同時投稿先 → ⑥設定保存
+          {/* 右列: ①コメント入力 → ②オプション → ③追加情報 → ④同時投稿先 → ⑤設定保存
               （投稿ボタンは段組の外・従来位置に配置）。アップロード時に にゅーっと出現。 */}
           {formState.imageFile && (
             <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-500 ease-out">
               <div className="space-y-2">
                 <StepHeader
-                  num={2}
+                  num={1}
                   label="合成するコメントを入力"
                   right={`${formState.text.length} / ${MAX_TEXT_LENGTH}`}
                 />
@@ -924,7 +942,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                 />
               </div>
 
-              {/* 初回投稿者向け: ③以降は最初は隠し、このボタンを押すと展開する。
+              {/* 初回投稿者向け: ②以降は最初は隠し、このボタンを押すと展開する。
                   一度開いたら閉じ操作は不要（＝再度折りたためない）ので、開いたらボタン自体を消す。 */}
               {firstTime && !optionsOpen && (
                 <button
@@ -937,7 +955,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                 </button>
               )}
 
-              {/* ③〜⑥: 初回投稿者は上のボタンを押して展開したときだけ表示。2回目以降は常に表示し、
+              {/* ②〜⑤: 初回投稿者は上のボタンを押して展開したときだけ表示。2回目以降は常に表示し、
                   コメント未入力のうちは「非アクティブ風」（淡色＋操作不可）で見せる。 */}
               {(!firstTime || optionsOpen) && (
               <div
@@ -948,9 +966,9 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                 }`}
                 aria-disabled={!firstTime && formState.text.trim().length === 0}
               >
-                {/* ③ コメント合成オプションを変更 */}
+                {/* ② コメント合成オプションを変更 */}
                 <div className="space-y-4">
-                  <StepHeader num={3} label="コメント合成オプションを変更" />
+                  <StepHeader num={2} label="コメント合成オプションを変更" />
 
                   {/* シーズン（期間限定）: アクティブなシーズン中のみ最上位に表示。
                       「使う」にすると他のオプションはすべて消え、プリセットで自動生成される。 */}
@@ -1057,7 +1075,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                   SegmentControl（ラベルが長いので size="xs"＋truncate）を使う。位置情報の
                   セグメントは pref/city を選んだ初回タップ時のみ /geocode を呼んで結果をキャッシュ。 */}
                 <div className="space-y-4">
-                  <StepHeader num={4} label="付与する情報を追加" />
+                  <StepHeader num={3} label="付与する情報を追加" />
                   {(() => {
                     const cameraText = exif?.cameraModel
                       ? exif.cameraMake &&
@@ -1253,10 +1271,10 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                   })()}
                 </div>
 
-                {/* ⑤ 同時投稿先（連携サーバーへの公開範囲） */}
+                {/* ④ 同時投稿先(連携サーバーへの公開範囲) */}
                 <div className="space-y-2">
                   <StepHeader
-                    num={5}
+                    num={4}
                     label={`${user.instance.domain || "連携サーバー"} への同時投稿`}
                   />
                   <VisibilityPicker
@@ -1266,9 +1284,9 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                   />
                 </div>
 
-                {/* ⑥ 設定保存（投稿ボタンは段組の外・従来位置に配置） */}
+                {/* ⑤ 設定保存（投稿ボタンは段組の外・従来位置に配置） */}
                 <div className="space-y-3">
-                  <StepHeader num={6} label="設定保存・投稿" />
+                  <StepHeader num={5} label="設定保存・投稿" />
                   {/* 現在の設定を初期値として保存（プレビュー/投稿ボタンの上に配置）。
                       期間限定アレンジ使用中はスタイルがプリセット固定のため保存対象がなく、非表示にする。 */}
                   {!formState.season && (
@@ -1297,14 +1315,6 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
         {hasGenerated && resultInfo && !isLoading && (
           <div className="mt-6">
             <ResultDetails resultInfo={resultInfo} />
-          </div>
-        )}
-
-        {/* 他の投稿方法（PC では2列合計の幅いっぱいに配置）。
-            初回投稿者にはまず1枚目に集中してもらうため非表示にする。 */}
-        {!firstTime && (
-          <div className="mt-6">
-            <OtherPostMethods />
           </div>
         )}
 

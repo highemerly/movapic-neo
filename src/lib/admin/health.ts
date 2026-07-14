@@ -21,7 +21,7 @@
 import prisma from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { USER_AGENT } from "@/lib/userAgent";
-import type { MentionStreamHealth } from "@/lib/mention/streamer";
+import { getMentionStreamHealth, STREAM_STALE_MS } from "@/lib/mention/streamStatus";
 import { runtimeVersions } from "@/lib/version";
 
 /** ok=正常 / warn=稼働だが注意 / down=異常 / unknown=確認不可（未設定・非対象） */
@@ -44,8 +44,6 @@ export interface ComponentHealth {
 
 const role = process.env.COMPONENT_ROLE || "";
 const isAllInOne = role === "";
-/** streaming の受信停滞をどれだけ許容するか（超過で warn）。heartbeat 込みで通常 ~30s 間隔。 */
-const STREAM_STALE_MS = 3 * 60_000;
 
 /** 経過ミリ秒を人間可読（秒/分/時間/日）に整形。 */
 function fmtAge(ms: number | null): string {
@@ -253,25 +251,6 @@ async function checkCompute(): Promise<ComponentHealth> {
   };
 }
 
-/** /api/health/stream 相当のレスポンスから streaming 部分を取り出す。 */
-function pickStreamHealth(body: unknown): MentionStreamHealth | null {
-  if (!body || typeof body !== "object") return null;
-  const b = body as Record<string, unknown>;
-  if (typeof b.connected !== "boolean") return null;
-  return {
-    connected: Boolean(b.connected),
-    started: Boolean(b.started),
-    streamingHost: (b.streamingHost as string | null) ?? null,
-    mentionCount: Number(b.mentionCount ?? 0),
-    reconnectAttempts: Number(b.reconnectAttempts ?? 0),
-    lastCloseCode: (b.lastCloseCode as number | null) ?? null,
-    connectedSince: (b.connectedSince as number | null) ?? null,
-    uptimeMs: (b.uptimeMs as number | null) ?? null,
-    lastEventAgeMs: (b.lastEventAgeMs as number | null) ?? null,
-    lastMentionAgeMs: (b.lastMentionAgeMs as number | null) ?? null,
-  };
-}
-
 /**
  * Graphile Worker のキュー状況（待ち / 実行中 / 失敗）を DB から直接取得。
  * 完了ジョブは削除されるため、jobs に残る行がおおむね未処理分。
@@ -303,39 +282,18 @@ async function getQueueStats(): Promise<{
  * 1回の取得（in-process or /api/health/stream）から両方を導く。
  */
 async function checkWorkerAndStream(): Promise<ComponentHealth[]> {
-  let health: MentionStreamHealth | null = null;
-  // reachable: true=応答あり / false=到達不可 / null=確認不可（URL未設定）
-  let reachable: boolean | null = null;
-  let note = "";
-  // バージョン行の元ネタ。分離構成は /api/health/stream の body、all-in-one は in-process。
-  let versionMeta: HealthMeta[] = [];
-
   // キュー状況は DB 直読みなので worker への到達性と独立に取れる（並行実行）
   const queuePromise = getQueueStats();
 
-  if (isAllInOne) {
-    const { summarizeMentionStream } = await import("@/lib/mention/streamer");
-    health = summarizeMentionStream();
-    reachable = true;
-    note = "all-in-one（同一プロセス）";
-    versionMeta = localAppVersionMeta();
-  } else {
-    const base = process.env.WORKER_FRONT_INTERNAL_URL?.replace(/\/+$/, "");
-    if (!base) {
-      note = "WORKER_FRONT_INTERNAL_URL 未設定で確認できません";
-    } else {
-      const r = await fetchJson(`${base}/api/health/stream`);
-      if (!r) {
-        reachable = false;
-        note = "応答なし（到達不可 or タイムアウト）";
-      } else {
-        // /api/health/stream は未接続時に 503 を返すが body は読める
-        reachable = true;
-        health = pickStreamHealth(r.body);
-        versionMeta = appVersionMetaFrom(r.body);
-      }
-    }
-  }
+  // streaming の取得（in-process / HTTP）は streamStatus に集約。ここでは取得結果から
+  // worker-front と Bot Streaming の2カードを組み立てる。
+  // reachable: true=応答あり / false=到達不可 / null=確認不可（URL未設定）
+  const acq = await getMentionStreamHealth();
+  const { health, reachable, note } = acq;
+  // バージョン行の元ネタ。分離構成は /api/health/stream の body、all-in-one は in-process。
+  const versionMeta: HealthMeta[] = acq.inProcess
+    ? localAppVersionMeta()
+    : appVersionMetaFrom(acq.body);
 
   // --- worker-front プロセス自体の生死 ---
   // 待ちジョブは worker 停止中でも意味がある（積み上がりの検知）ので到達性と無関係に表示

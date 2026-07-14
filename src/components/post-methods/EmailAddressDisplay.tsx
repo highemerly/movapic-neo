@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { Copy, Check, Eye, EyeOff } from "lucide-react";
 
+/**
+ * メール投稿の「宛先」行。ユーザー固有のメールアドレスを既定でぼかし、
+ * 表示トグルとコピーボタンを添える。EmailGuide 内で使う。
+ */
+
 interface EmailAddressDisplayProps {
   emailPrefix: string;
   emailDomain: string;

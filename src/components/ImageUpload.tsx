@@ -4,6 +4,7 @@ import { useRef, useState, useCallback } from "react";
 import { X, Loader2, ImagePlus, Eye, Camera, Plus } from "lucide-react";
 import { MAX_FILE_SIZE, ALLOWED_FILE_TYPES } from "@/types";
 import { useIsHydrated } from "@/hooks/useIsHydrated";
+import { OrDivider } from "@/components/OrDivider";
 
 interface ImageUploadProps {
   imageFile: File | null;
@@ -266,7 +267,7 @@ export function ImageUpload({
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`flex ${isAndroid ? "h-40" : "h-64"} cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed transition-colors ${
+          className={`flex ${isAndroid ? "h-30" : "h-64"} cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed transition-colors ${
             isDragging
               ? "border-primary bg-primary/5"
               : "border-muted-foreground/25 hover:border-primary/50"
@@ -276,30 +277,29 @@ export function ImageUpload({
             <ImagePlus className={`${isAndroid ? "h-6 w-6" : "h-7 w-7"} text-primary`} />
           </div>
           <p className="text-base font-medium text-foreground">
-            タップして写真をアップロード
+            写真をアップロード
           </p>
         </div>
       )}
       {!imageFile && isAndroid && (
         <>
           {/* 「または」: 2つの選択肢が並列であることを視覚的に示す */}
-          <div className="flex items-center gap-3 text-[11px] uppercase tracking-wider text-muted-foreground">
-            <div className="h-px flex-1 bg-border" />
-            <span>または</span>
-            <div className="h-px flex-1 bg-border" />
-          </div>
+          <OrDivider />
+          {/* ドロップゾーン（写真をアップロード）と縦幅・見た目を揃える（同じ h-30 の破線ボックス）。 */}
           <button
             type="button"
             onClick={() => cameraInputRef.current?.click()}
             disabled={disabled}
-            className={`flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-3 text-base font-medium text-foreground transition-colors ${
+            className={`flex h-30 w-full flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed px-4 text-base font-medium text-foreground transition-colors ${
               disabled
                 ? "cursor-not-allowed border-muted-foreground/25 opacity-50"
                 : "border-muted-foreground/25 hover:border-primary/50"
             }`}
           >
-            <Camera className="h-5 w-5 text-primary" />
-            タップして写真を撮る
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <Camera className="h-6 w-6 text-primary" />
+            </div>
+            写真を撮る
           </button>
         </>
       )}

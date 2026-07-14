@@ -3,17 +3,25 @@
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 
-interface MentionSettingsFormProps {
+/**
+ * Bot（メンション）投稿の説明。ダッシュボード・/create/bot・/create のモーダルで共有する。
+ * サーバー種別（Mastodon/Misskey）で share 画面の公開範囲だけ出し分ける。
+ */
+
+interface MentionGuideProps {
+  /** Botのメンション宛先（例 "pic@handon.club"） */
   botAcct: string;
+  /** ログインユーザーの所属サーバードメイン（/share 投稿画面・プロフィールリンク用） */
   userInstanceDomain: string;
+  /** ログインユーザーのサーバー種別（"misskey" | "mastodon"）。share の visibility 出し分け用 */
   userInstanceType: string;
 }
 
-export function MentionSettingsForm({
+export function MentionGuide({
   botAcct,
   userInstanceDomain,
   userInstanceType,
-}: MentionSettingsFormProps) {
+}: MentionGuideProps) {
   const [isCopied, setIsCopied] = useState(false);
 
   const botMention = `@${botAcct}`;
@@ -117,7 +125,7 @@ export function MentionSettingsForm({
             <strong>公開範囲:</strong> public unlisted
           </li>
         </ul>
-        <p className="text-muted-foreground text-xs">※カメラ機種および位置情報には非対応です</p>        
+        <p className="text-muted-foreground text-xs">※カメラ機種および位置情報には非対応です</p>
         <div className="p-3 bg-muted/50 rounded-lg space-y-2">
           <code className="block text-xs bg-background p-2 rounded border">
             @{botAcct} [右 赤 ネオン] マックチキン！
