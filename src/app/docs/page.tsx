@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
+import { PermissionTabs } from "@/components/auth/PermissionTabs";
 import { sortedReleaseNotes } from "@/data/releaseNotes";
 import { version } from "../../../package.json";
 
@@ -80,29 +81,196 @@ export default async function SpecPage() {
           <div className="space-y-4">
 
             <div className="bg-muted rounded-lg p-4">
+              <p className="font-medium mb-3">システム構成</p>
+              <div className="space-y-4 text-sm text-muted-foreground">
+                <p>
+                  処理を担う3コンポーネント（プロセス）と、共有するデータストアで構成されます。画像処理のような重い処理は専用のコンポーネントへ隔離し、スケールできるように配慮されています。
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">構成要素</th>
+                        <th className="text-left py-2 font-medium text-xs text-muted-foreground">役割</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-sm text-muted-foreground">
+                      <tr className="border-b border-border align-top">
+                        <td className="py-2 pr-4">web (Node.js)</td>
+                        <td className="py-2">フロントエンドです。レンダリングと軽量なAPIを公開します。</td>
+                      </tr>
+                      <tr className="border-b border-border align-top">
+                        <td className="py-2 pr-4">worker-front (Node.js)</td>
+                        <td className="py-2">ジョブ管理です。Web・Bot・メールの各経路からのリクエストを管理し、画像処理ノードへの指示、およびそのためのAPIを公開します。また、一部の定期ジョブのスケジューラーも兼ねています。
+                        </td>
+                      </tr>
+                      <tr className="border-b border-border align-top">
+                        <td className="py-2 pr-4">worker (Node.js)</td>
+                        <td className="py-2">画像処理です。外部には公開されていません。</td>
+                      </tr>
+                      <tr className="border-b border-border align-top">
+                        <td className="py-2 pr-4">PostgreSQL</td>
+                        <td className="py-2">投稿・ユーザー・実績などのデータを保存します。</td>
+                      </tr>
+                      <tr className="align-top">
+                        <td className="py-2 pr-4">Object Storage</td>
+                        <td className="py-2">生成した画像やサムネイルを保存します。</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-muted rounded-lg p-4">
+              <p className="font-medium mb-3">画像処理</p>
+              <p className="text-sm text-muted-foreground mb-3">
+                元画像とパラメーターを受け取ると、即座に画像処理を行い、出力します。処理は、ベータテスト期間中のA/Bテストを通じて、品質を確保しつつより早い処理を実現するパイプライン処理を最適化しています。
+              </p>
+              <figure className="mb-4">
+                <div className="overflow-x-auto rounded-lg bg-background/40 p-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/diagrams/pipeline-light.svg"
+                    alt="画像処理フロー: 回転→HEIC/HEIF判定でJPEG化→長辺2048px判定で縮小→テキスト合成→中間JPEG→AVIF化（上限超過なら品質を下げて再試行）→生成画像"
+                    className="block dark:hidden h-[220px] w-auto max-w-none"
+                  />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/diagrams/pipeline-dark.svg"
+                    alt=""
+                    aria-hidden="true"
+                    className="hidden dark:block h-[220px] w-auto max-w-none"
+                  />
+                </div>
+                <figcaption className="mt-2 text-center text-xs text-muted-foreground">
+                  生成リクエスト受信後のサーバー側画像処理フロー（横にスクロールできます）
+                </figcaption>
+              </figure>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium mb-1">向きの補正・デコード</p>
+                  <p className="text-sm text-muted-foreground">
+                    スマートフォンなどでは、縦向きで撮影した場合でも、画像自体は横向きに保存されることが多いです。EXIF の Orientation タグを参照したうえで、向きを補正します。
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium mb-1">リサイズ</p>
+                  <p className="text-sm text-muted-foreground">
+                    長辺が 2048px を超える入力画像は、あらかじめアスペクト比を保ったまま長辺 2048px へ縮小してから後続の処理に回します。
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium mb-1">文字合成</p>
+                  <p className="text-sm text-muted-foreground">
+                    テキストオーバーレイを Canvas 描画し、画像に合成します。パフォーマンスを維持するため、合成画像は一度JPEG（quality 90）で出力します。
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium mb-1">最終出力</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    投稿先に応じた形式・サイズ上限で書き出します。この出力時の再エンコードで、元画像の EXIF メタデータは全て取り除かれます。
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">投稿先</th>
+                          <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">形式</th>
+                          <th className="text-left py-2 font-medium text-xs text-muted-foreground">サイズ上限</th>
+                          <th className="text-left py-2 font-medium text-xs text-muted-foreground">EXIF</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-sm text-muted-foreground">
+                        <tr className="border-b border-border">
+                          <td className="py-2 pr-4">Mastodon</td>
+                          <td className="py-2 pr-4">AVIF</td>
+                          <td className="py-2">16MB</td>
+                          <td className="py-2">削除</td>
+                        </tr>
+                        <tr className="border-b border-border">
+                          <td className="py-2 pr-4">Misskey</td>
+                          <td className="py-2 pr-4">AVIF</td>
+                          <td className="py-2">250MB</td>
+                          <td className="py-2">削除</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="mt-2 pl-3 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground/80">
+                    AVIF出力では、 quality 80, effort 2 で書き出し、サイズを確認します。万が一出力がサイズ上限を超えた場合、quality を段階的に下げて再エンコードし、上限以下に収まった時点の出力を採用します。
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium mb-1">派生画像</p>
+                  <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                    <li>カレンダー用サムネイル： WebP, 128×128px, quality 80  / あらかじめ作成し、ストレージに保存</li>
+                    <li>OGP用サムネイル： WebP / 必要に応じてオンデマンドで作成し、ストレージに保存しない</li>
+                  </ul>
+                  <p className="mt-2 pl-3 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground/80">
+                    通常、OGP用には本来の生成画像を指定することも可能です。しかし、XはAVIFに対応していないため、他のレガシーなフォーマットへの変換が必要です。そこで、SHAMEZO内ではWebP変換を行わず、管理者が開発・運用している別インフラ（自前のMisskeyメディアプロキシ）でオンデマンド変換を行い、OGP用のサムネイルを作成しています。このサムネイルはストレージには格納されず、主にCDNのキャッシュに頼っています。
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium mb-1">タイムアウト</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    不明なエラーを発生させないため、Tier ごとにカスケードタイムアウトを設定しています。
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">Tier</th>
+                          <th className="text-left py-2 font-medium text-xs text-muted-foreground">制限時間</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-sm text-muted-foreground">
+                        <tr className="border-b border-border">
+                          <td className="py-2 pr-4">画像処理本体</td>
+                          <td className="py-2">18秒</td>
+                        </tr>
+                        <tr className="border-b border-border">
+                          <td className="py-2 pr-4">API</td>
+                          <td className="py-2">22秒</td>
+                        </tr>
+                        <tr>
+                          <td className="py-2 pr-4">ブラウザ（Web投稿の場合）</td>
+                          <td className="py-2">25秒</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="mt-2 pl-3 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground/80">
+                    アップロード処理は全体のタイムアウト値に含まれません。アップロードのタイムアウト値はなく、回線が遅い場合でも原則として永遠に待ち続けます。ただし、アップロードが20秒以上まったく進まなくなった場合のみ、中断されます。
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-3">入力制限</p>
               <div className="space-y-3">
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">画像</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li>枚数: 1枚 / 1投稿</li>
-                    <li>フォーマット: JPEG, PNG, WebP, AVIF, HEIC/HEIF</li>
+                    <li>枚数: 1枚</li>
+                    <li>フォーマット: JPEG, PNG, WebP, AVIF, HEIC, HEIF</li>
                     <li>最大ファイルサイズ: 20MB</li>
                   </ul>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">合成テキスト</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li>文字数: 1〜140文字</li>
+                    <li>文字数: 1〜140 文字</li>
                   </ul>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">代替テキスト（ALT）</p>
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li>文字数: 0〜1,500文字</li>
+                    <li>文字数: 0〜1,500 文字</li>
                   </ul>
                   <p className="mt-2 pl-3 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground/80">
-                    Misskeyへ投稿する場合、代替テキストの上限は512文字に自動で切り詰められます。ただし、SHAMEZO上には1,500文字が保存されています。
+                    Misskeyへ投稿する場合、代替テキストの上限は 512 文字に自動で切り詰められます。ただし、その場合でも SHAMEZO 上には最大 1,500 文字が保存されます。
                   </p>
                 </div>
               </div>
@@ -116,7 +284,7 @@ export default async function SpecPage() {
                   <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                     <li>方向: 上下は横書き、左右は縦書き</li>
                     <li>マージン: 全方向に画像短辺の5%または10pxの大きい方のマージンを設けて文字を描画（文字サイズ・文字位置により変動しない）</li>
-                    <li>折り返し: マージンを除いた描画領域で、超過した位置で改行（書記素単位）</li>
+                    <li>折り返し: マージンを除いた描画領域で、超過した位置で改行</li>
                   </ul>
                 </div>
                 <div>
@@ -128,9 +296,9 @@ export default async function SpecPage() {
                     <table className="min-w-full text-sm">
                       <thead>
                         <tr className="border-b border-border">
-                          <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">サイズ設定</th>
-                          <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">基準（中）に対する倍率</th>
-                          <th className="text-left py-2 font-medium text-xs text-muted-foreground">短辺に納まる文字数の目安</th>
+                          <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">設定</th>
+                          <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">基準に対する倍率</th>
+                          <th className="text-left py-2 font-medium text-xs text-muted-foreground">短辺に納まる文字数</th>
                         </tr>
                       </thead>
                       <tbody className="text-sm text-muted-foreground">
@@ -140,7 +308,7 @@ export default async function SpecPage() {
                           <td className="py-2">約18文字</td>
                         </tr>
                         <tr className="border-b border-border">
-                          <td className="py-2 pr-4">中（基準）</td>
+                          <td className="py-2 pr-4">中</td>
                           <td className="py-2 pr-4">1.0倍</td>
                           <td className="py-2">約14文字</td>
                         </tr>
@@ -168,7 +336,7 @@ export default async function SpecPage() {
                     <li>ふい字・ラノベPOP（等幅フォント）： 等幅で描画</li>
                   </ul>
                   <p className="mt-2 pl-3 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground/80">
-                    等幅フォントの場合でも、ASCII文字列 U+0020–U+007E と半角カナ U+FF61–U+FF9F は半分の幅になるよう調整されます。また、後述する Emoji は別処理となります。
+                    等幅フォントの場合でも、ASCII文字列 U+0020–U+007E と半角カナ U+FF61–U+FF9F は半分の幅になるよう調整します。また、後述する Emoji は別処理となります。
                   </p>
                 </div>
                 <div>
@@ -239,172 +407,6 @@ export default async function SpecPage() {
             </div>
 
             <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-3">システム構成</p>
-              <div className="space-y-4 text-sm text-muted-foreground">
-                <p>
-                  処理を担う3つのコンポーネント（プロセス）と、それらが共有するデータストアで構成されます。画像処理のような重い処理は専用のコンポーネントへ隔離し、スケールできるように配慮されています。
-                </p>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">構成要素</th>
-                        <th className="text-left py-2 font-medium text-xs text-muted-foreground">役割</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-sm text-muted-foreground">
-                      <tr className="border-b border-border align-top">
-                        <td className="py-2 pr-4">Node.js（web）</td>
-                        <td className="py-2">フロントエンドです。レンダリングと軽量なAPIを担当します。</td>
-                      </tr>
-                      <tr className="border-b border-border align-top">
-                        <td className="py-2 pr-4">Node.js（worker-front）</td>
-                        <td className="py-2">ジョブ管理です。APIを直接（Bot投稿・メール投稿の場合）、または web コンポーネント経由で提供します。一部の定期ジョブも担当しています。</td>
-                      </tr>
-                      <tr className="border-b border-border align-top">
-                        <td className="py-2 pr-4">Node.js（compute）</td>
-                        <td className="py-2">画像処理です。外部には公開されていません。</td>
-                      </tr>
-                      <tr className="border-b border-border align-top">
-                        <td className="py-2 pr-4">PostgreSQL</td>
-                        <td className="py-2">投稿・ユーザー・実績などのデータを保存します。</td>
-                      </tr>
-                      <tr className="align-top">
-                        <td className="py-2 pr-4">オブジェクトストレージ</td>
-                        <td className="py-2">生成した画像やサムネイルを保存します。</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-3">画像処理</p>
-              <p className="text-sm text-muted-foreground mb-3">
-                元画像を受け取ると、サーバー側で処理を行い、AVIFを書き出します。処理順は、ベータテスト期間中のA/Bテストを通じ、品質を確保しつつより早い処理を実現するために最適化されています。
-              </p>
-              <figure className="mb-4">
-                <div className="overflow-x-auto rounded-lg bg-background/40 p-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/diagrams/pipeline-light.svg"
-                    alt="画像処理フロー: 回転→HEIC/HEIF判定でJPEG化→長辺2048px判定で縮小→テキスト合成→中間JPEG→AVIF化（上限超過なら品質を下げて再試行）→生成画像"
-                    className="block dark:hidden h-[220px] w-auto max-w-none"
-                  />
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/diagrams/pipeline-dark.svg"
-                    alt=""
-                    aria-hidden="true"
-                    className="hidden dark:block h-[220px] w-auto max-w-none"
-                  />
-                </div>
-                <figcaption className="mt-2 text-center text-xs text-muted-foreground">
-                  生成リクエスト受信後のサーバー側画像処理フロー（横にスクロールできます）
-                </figcaption>
-              </figure>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium mb-1">向きの補正・デコード</p>
-                  <p className="text-sm text-muted-foreground">
-                    スマートフォンなどでは、縦向きで撮影した場合でも、画像自体は横向きに保存されることが多いです。EXIF の Orientation タグを参照したうえで、向きを補正します。
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium mb-1">リサイズ</p>
-                  <p className="text-sm text-muted-foreground">
-                    長辺が2048pxを超える画像は、アスペクト比を保ったまま長辺2048pxへ縮小してから処理します。以降の文字合成・出力変換はこのサイズで行われます。
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium mb-1">文字合成</p>
-                  <p className="text-sm text-muted-foreground">
-                    テキストオーバーレイをCanvas（skia-canvas）で描画し、画像に合成します。パフォーマンス向上のため、合成はJPEG（quality 90）で行います。
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium mb-1">最終出力</p>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    投稿先に応じた形式・サイズ上限で書き出します。この出力時の再エンコードで、元画像のEXIFメタデータは全て取り除かれます。
-                  </p>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">投稿先</th>
-                          <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">形式</th>
-                          <th className="text-left py-2 font-medium text-xs text-muted-foreground">サイズ上限</th>
-                          <th className="text-left py-2 font-medium text-xs text-muted-foreground">EXIF</th>
-                        </tr>
-                      </thead>
-                      <tbody className="text-sm text-muted-foreground">
-                        <tr className="border-b border-border">
-                          <td className="py-2 pr-4">Mastodon</td>
-                          <td className="py-2 pr-4">AVIF</td>
-                          <td className="py-2">16MB</td>
-                          <td className="py-2">削除</td>
-                        </tr>
-                        <tr className="border-b border-border">
-                          <td className="py-2 pr-4">Misskey</td>
-                          <td className="py-2 pr-4">AVIF</td>
-                          <td className="py-2">250MB</td>
-                          <td className="py-2">削除</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="mt-2 pl-3 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground/80">
-                    AVIF出力では、 quality 80, effort 2 で書き出し、サイズを確認します。万が一出力がサイズ上限を超えた場合、quality を段階的に下げて再エンコードし、上限以下に収まった時点の出力を採用します。
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium mb-1">派生画像</p>
-                  <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li>カレンダー用サムネイル： WebP, 128×128px, quality 80  / あらかじめ作成し、ストレージに保存</li>
-                    <li>OGP用サムネイル： WebP / 必要に応じてオンデマンドで作成し、ストレージに保存しない</li>
-                  </ul>
-                  <p className="mt-2 pl-3 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground/80">
-                    通常、OGP用には本来の生成画像を指定することも可能ですが、XがAVIFに対応していないため、他のレガシーなフォーマットへの変換が必要となります。そこで、SHAMEZO内ではWebP変換を行わず、管理者が開発・運用している別インフラ（自前のMisskeyメディアプロキシ）でオンデマンド変換を行い、OGP用のサムネイルを作成します。このサムネイルはストレージには格納されず、CDNのキャッシュに頼っています。
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium mb-1">タイムアウト</p>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    カスケードタイムアウトが設定されており、画像処理本体は18秒間でタイムアウトします。
-                  </p>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-border">
-                          <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">層</th>
-                          <th className="text-left py-2 font-medium text-xs text-muted-foreground">制限時間</th>
-                        </tr>
-                      </thead>
-                      <tbody className="text-sm text-muted-foreground">
-                        <tr className="border-b border-border">
-                          <td className="py-2 pr-4">画像処理本体</td>
-                          <td className="py-2">18秒</td>
-                        </tr>
-                        <tr className="border-b border-border">
-                          <td className="py-2 pr-4">API</td>
-                          <td className="py-2">22秒</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 pr-4">ブラウザ（Web投稿の場合）</td>
-                          <td className="py-2">25秒</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="mt-2 pl-3 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground/80">
-                    アップロード処理は全体のタイムアウト値に含まれません。アップロードのタイムアウト値はなく、回線が遅い場合でも原則として永遠に待ち続けます。ただし、アップロードが20秒以上まったく進まなくなった場合のみ、中断されます。
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-3">EXIFに関する追加処理</p>
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>
@@ -447,22 +449,22 @@ export default async function SpecPage() {
                 <div>
                   <p className="text-xs font-medium mb-1">解析方法</p>
                   <ul className="list-disc list-inside space-y-1">
-                    <li>Web投稿: 画像を選択した時点で、お使いのブラウザ上でEXIF解析を行います</li>
-                    <li>Bot投稿: Fediverseサーバー投稿時に通常EXIFが除去されてしまうため、EXIF解析は行いません</li>
-                    <li>メール投稿: EXIFを付与したまま送信されていれば、サーバー側で元画像のEXIF解析を行います</li>
+                    <li>Web投稿: 画像を選択した時点で、お使いのブラウザ上で EXIF 解析を行います（サーバー上では解析しません）</li>
+                    <li>Bot投稿: Fediverse サーバー投稿時に EXIF が除去されてしまうため、EXIF 解析はサポートしていません</li>
+                    <li>メール投稿: メール受信時、サーバー上で元画像の EXIF 解析を行います</li>
                   </ul>
                 </div>
                 <div>
                   <p className="text-xs font-medium mb-1">位置情報の変換</p>
-                  <p>位置情報を含む選択肢を選んだ場合のみ、SHAMEZOサーバーから国土地理院（GSI）の逆ジオコーディングAPIにGPS座標を送信し、市区町村コードを取得して保存します。
-                     Web投稿ではGPS座標をブラウザからSHAMEZOサーバーへ一度送信し、市区町村コードに変換します（この場合でも、GPS座標そのものはサーバーには保存されません）。</p>
+                  <p>ユーザーが希望した場合のみ、国土地理院の逆ジオコーディング API に GPS 座標を送信し、市区町村コードを取得します。
+                     この場合でも、保存されるのは都道府県または市町村までの情報で、GPS 座標は詳細なデバッグ用のログを含め、一切記録されません。</p>
                 </div>
                 <div>
                   <p className="text-xs font-medium mb-1">ブラウザの制限についての補足</p>
                   <p>スマートフォンのプライバシー保護機能により、Web投稿の場合、位置情報のみが自動的に除去されることがあります。</p>
                   <ul className="list-disc list-inside space-y-1 mb-2 mt-2">
-                    <li>iOS: アップロード時、画面下のオプションにて位置情報を含める設定に変更することで、位置情報をアップロードできます</li>
-                    <li>Android: 必ず回避できる方法はなく、機種・OSバージョンによっていずれかで成功することもあります
+                    <li>iOS: 写真選択時、画面下部のオプションにて位置情報を含める設定に変更することで、位置情報をアップロードできます</li>
+                    <li>Android: 必ず回避できる方法はありませんが、機種・OSバージョンによって以下いずれの方法かで成功することもあります
                       <ul className="list-disc list-inside space-y-1 mt-1 pl-5">
                         <li>(1) 「タップして写真を撮る」でその場で撮影</li>
                         <li>(2) OS標準の共有機能で、SHAMEZOのPWAアプリに写真を送信</li>
@@ -549,8 +551,20 @@ export default async function SpecPage() {
             <div className="bg-muted rounded-lg p-4">
               <p className="font-medium mb-2">機能: カレンダー</p>
               <p className="text-sm text-muted-foreground">
-                ユーザーページの「カレンダー」タブでは、その月の投稿を日ごとのサムネイルで一覧表示します。編集モードでは、各日に表示するサムネイルを変更できるほか、皆勤賞の穴埋めに使う投稿も選び直せます。
+                ユーザーページの「カレンダー」タブでは、その月の投稿を日ごとのサムネイルで一覧表示します。
+                編集モードでは、各日に表示するサムネイルを変更できるほか、皆勤賞の穴埋めに使う投稿も選び直せます
+                （サムネイルを変更後、その画像が削除された場合は、自動で再選出されます）。
               </p>
+            </div>
+
+            <div className="bg-muted rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <p className="font-medium">トークンに必要な権限</p>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                ログイン時、連携する Fediverse サーバーに対し、以下の権限スコープを要求します。投稿・画像アップロード・お気に入りなど、必要な最小限の範囲に限っています。
+              </p>
+              <PermissionTabs />
             </div>
 
           </div>
