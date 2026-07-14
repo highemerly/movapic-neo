@@ -47,7 +47,8 @@ export function TimelineImageCard({
 }) {
   const imageUrl = `${publicUrl}/${image.storageKey}`;
   const base = `/u/${userPathSegment(image.user.username, image.user.instance)}/status/${image.id}`;
-  const detailUrl = from ? `${base}?from=${from}` : base;
+  // from は "public:<instances>" のように状態を含みうるのでエンコードする（ImageNavigation と同様）。
+  const detailUrl = from ? `${base}?from=${encodeURIComponent(from)}` : base;
 
   return (
     <Link

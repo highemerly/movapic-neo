@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "@/components/Link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
 import { sortedReleaseNotes } from "@/data/releaseNotes";
+import { BackLink } from "@/components/BackLink";
+import { PageContainer } from "@/components/PageContainer";
 
 export const metadata: Metadata = {
   title: "リリースノート",
@@ -24,16 +26,8 @@ export default async function ReleaseNoteListPage() {
   return (
     <>
       <SiteHeader user={user ? { username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) } : null} />
-      <div className="container mx-auto px-4 py-3 max-w-2xl">
-        <div className="mb-2">
-          <Link
-            href="/docs"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            ドキュメントへ
-          </Link>
-        </div>
+      <PageContainer>
+        <BackLink href="/docs">ドキュメントへ</BackLink>
 
         <h1 className="text-lg font-semibold mb-6">リリースノート</h1>
 
@@ -69,7 +63,7 @@ export default async function ReleaseNoteListPage() {
         )}
 
         <Footer />
-      </div>
+      </PageContainer>
     </>
   );
 }

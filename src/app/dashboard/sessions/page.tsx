@@ -1,6 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "@/components/Link";
-import { ChevronLeft } from "lucide-react";
 import { getCurrentUser, getCurrentSessionJti } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
@@ -9,6 +7,8 @@ import { parseUserAgent } from "@/lib/auth/uaParser";
 import prisma from "@/lib/db";
 import { RevokeSessionButton } from "./RevokeSessionButton";
 import { RevokeAllSessionsButton } from "./RevokeAllSessionsButton";
+import { BackLink } from "@/components/BackLink";
+import { PageContainer } from "@/components/PageContainer";
 
 export const dynamic = "force-dynamic";
 
@@ -43,16 +43,8 @@ export default async function SessionsPage() {
   return (
     <>
       <SiteHeader user={{ username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) }} />
-      <div className="container mx-auto px-4 py-3 max-w-2xl">
-        <div className="mb-2">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            ダッシュボード
-          </Link>
-        </div>
+      <PageContainer>
+        <BackLink href="/dashboard">ダッシュボード</BackLink>
 
         <h1 className="text-lg font-semibold mb-2">ログイン履歴</h1>
         <p className="text-xs text-muted-foreground mb-6">
@@ -127,7 +119,7 @@ export default async function SessionsPage() {
         )}
 
         <Footer />
-      </div>
+      </PageContainer>
     </>
   );
 }

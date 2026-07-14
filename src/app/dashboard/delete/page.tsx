@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
-import Link from "@/components/Link";
-import { ChevronLeft, Trash2, AlertTriangle } from "lucide-react";
+import { Trash2, AlertTriangle } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
 import { DeleteAccountConfirm } from "./DeleteAccountConfirm";
+import { BackLink } from "@/components/BackLink";
+import { PageContainer } from "@/components/PageContainer";
 
 export const dynamic = "force-dynamic";
 
@@ -18,16 +19,8 @@ export default async function DeleteAccountPage() {
   return (
     <>
       <SiteHeader user={{ username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) }} />
-      <div className="container mx-auto px-4 py-3 max-w-2xl">
-        <div className="mb-2">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            ダッシュボード
-          </Link>
-        </div>
+      <PageContainer>
+        <BackLink href="/dashboard">ダッシュボード</BackLink>
 
         <h1 className="text-xl font-semibold mb-3 flex items-center gap-2">
           <Trash2 className="h-5 w-5 text-destructive" />
@@ -91,7 +84,7 @@ export default async function DeleteAccountPage() {
         />
 
         <Footer />
-      </div>
+      </PageContainer>
     </>
   );
 }

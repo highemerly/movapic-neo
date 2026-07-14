@@ -47,7 +47,7 @@ export function FavoritesClient({
       nextCursor={nextCursor}
       loaderRef={loaderRef}
       renderItem={(image, fill) => (
-        <TimelineImageCard image={image} publicUrl={publicUrl} fill={fill} />
+        <TimelineImageCard image={image} publicUrl={publicUrl} fill={fill} from="favorite" />
       )}
     />
   );

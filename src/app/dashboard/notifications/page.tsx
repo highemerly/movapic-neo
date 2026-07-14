@@ -1,6 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "@/components/Link";
-import { ChevronLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getRecentNotifications } from "@/lib/achievements/notifications";
 import { userPathSegment } from "@/lib/userHandle";
@@ -8,6 +6,8 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
 import { NotificationsList } from "@/components/notifications/NotificationsList";
+import { BackLink } from "@/components/BackLink";
+import { PageContainer } from "@/components/PageContainer";
 
 export const dynamic = "force-dynamic";
 
@@ -25,16 +25,8 @@ export default async function NotificationsPage() {
       <SiteHeader
         user={{ username: currentUser.username, instanceDomain: currentUser.instance.domain, avatarUrl: getAvatarUrl(currentUser.avatarUrl) }}
       />
-      <div className="container mx-auto px-4 py-3 max-w-xl">
-        <div className="mb-2">
-          <Link
-            href="/dashboard"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            ダッシュボード
-          </Link>
-        </div>
+      <PageContainer width="xl">
+        <BackLink href="/dashboard">ダッシュボード</BackLink>
 
         <div className="mb-3 flex items-baseline justify-between">
           <h1 className="text-base font-bold">通知</h1>
@@ -44,7 +36,7 @@ export default async function NotificationsPage() {
         <NotificationsList items={items} selfSeg={selfSeg} />
 
         <Footer />
-      </div>
+      </PageContainer>
     </>
   );
 }

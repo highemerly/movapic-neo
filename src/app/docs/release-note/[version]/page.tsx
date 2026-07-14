@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Link from "@/components/Link";
-import { ChevronLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
 import { releaseNotes } from "@/data/releaseNotes";
 import { renderInlineLinks } from "@/lib/markdownLinks";
+import { BackLink } from "@/components/BackLink";
+import { PageContainer } from "@/components/PageContainer";
 
 function formatDate(date: string): string {
   const [y, m, d] = date.split("-");
@@ -56,16 +56,8 @@ export default async function ReleaseNoteDetailPage({
   return (
     <>
       <SiteHeader user={user ? { username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) } : null} />
-      <div className="container mx-auto px-4 py-3 max-w-2xl">
-        <div className="mb-2">
-          <Link
-            href="/docs/release-note"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            リリースノート一覧へ
-          </Link>
-        </div>
+      <PageContainer>
+        <BackLink href="/docs/release-note">リリースノート一覧へ</BackLink>
 
         <article>
           <header className="mb-6">
@@ -103,7 +95,7 @@ export default async function ReleaseNoteDetailPage({
         </article>
 
         <Footer />
-      </div>
+      </PageContainer>
     </>
   );
 }

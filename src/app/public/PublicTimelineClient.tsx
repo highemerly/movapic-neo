@@ -59,7 +59,9 @@ export function PublicTimelineClient({
           image={image}
           publicUrl={publicUrl}
           fill={fill}
-          from="public"
+          // 「同じサーバー」タブ（instances 絞り込みあり）は from に状態として載せ、
+          // 画像詳細の戻る導線でタブ・絞り込みを復元する（"public:<instances>"）。
+          from={instancesParam ? `public:${instancesParam}` : "public"}
         />
       )}
     />

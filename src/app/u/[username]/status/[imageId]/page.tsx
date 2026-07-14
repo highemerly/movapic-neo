@@ -4,6 +4,7 @@ import Link from "@/components/Link";
 import { getAvatarUrl } from "@/lib/avatar";
 import { buildOgImage } from "@/lib/ogImage";
 import prisma from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/session";
 import { DeleteLocationButton } from "./DeleteLocationButton";
 import { ImageNavigation } from "./ImageNavigation";
@@ -15,6 +16,8 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
 import { RetryImage } from "@/components/gallery/RetryImage";
 import { AltTextReveal } from "@/components/AltTextReveal";
+import { BackLink } from "@/components/BackLink";
+import { PageContainer } from "@/components/PageContainer";
 import {
   classifyPostStatus,
   favoriteErrorMessage,
@@ -36,7 +39,7 @@ import { AttendanceCrown } from "@/components/user/AttendanceCrown";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import { PostSourceBadge } from "./PostSourceBadge";
-import { User, CalendarDays, Camera, MapPin, Reply, Repeat2, Bookmark, Share2, ChevronLeft } from "lucide-react";
+import { User, CalendarDays, Camera, MapPin, Reply, Repeat2, Bookmark, Share2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -138,6 +141,12 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   const fromKind = fromSep === -1 ? (from ?? "") : from!.slice(0, fromSep);
   const fromState = fromSep === -1 ? "" : from!.slice(fromSep + 1);
   const isFromPublic = fromKind === "public";
+  // 「同じサーバー」タブ由来なら fromState に絞り込みサーバー（instances, カンマ区切り）が入る。
+  const publicInstances =
+    isFromPublic && fromState
+      ? fromState.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+  const isFromFavorite = fromKind === "favorite";
   const justPosted = posted === "1";
   // SHAMEZOへの保存は成功したが Fediverse 投稿だけ失敗したケース（部分的成功）
   const fediverseFailed = justPosted && federr === "1";
@@ -218,11 +227,33 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     },
   };
 
+  // 前後ナビの対象範囲を遷移元で切り替える。
+  // - 公開（みんな/同じサーバー）: 全体、または該当サーバーに限定
+  // - お気に入り: 閲覧者がお気に入りした投稿に限定（要ログイン）
+  // - それ以外（ギャラリー等）: その投稿のユーザーに限定
+  let navigationScope: Prisma.ImageWhereInput;
+  if (isFromPublic) {
+    navigationScope =
+      publicInstances.length > 0
+        ? { user: { instance: { domain: { in: publicInstances } } } }
+        : {};
+  } else if (isFromFavorite && currentUser) {
+    navigationScope = {
+      favoritersCache: {
+        array_contains: [
+          { acct: `${currentUser.username}@${currentUser.instance.domain}` },
+        ] as Prisma.InputJsonValue,
+      },
+    };
+  } else {
+    navigationScope = { userId: image.userId };
+  }
+
   const [prevImage, nextImage, earnedAchievementRows] = await Promise.all([
     // 前の画像（古い方向）
     prisma.image.findFirst({
       where: {
-        ...(isFromPublic ? {} : { userId: image.userId }),
+        ...navigationScope,
         isPublic: true,
         isDisabled: false,
         createdAt: { lt: image.createdAt },
@@ -233,7 +264,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     // 次の画像（新しい方向）
     prisma.image.findFirst({
       where: {
-        ...(isFromPublic ? {} : { userId: image.userId }),
+        ...navigationScope,
         isPublic: true,
         isDisabled: false,
         createdAt: { gt: image.createdAt },
@@ -310,8 +341,17 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   let backUrl = `/u/${username}`;
   let backLabel = `${galleryName} のギャラリーに戻る`;
   if (fromKind === "public") {
-    backUrl = "/public";
-    backLabel = "公開タイムラインに戻る";
+    if (publicInstances.length > 0) {
+      // 「同じサーバー」タブ由来。instances 絞り込みを保って戻す。
+      backUrl = `/public?instances=${encodeURIComponent(publicInstances.join(","))}`;
+      backLabel = "同じサーバーの投稿一覧に戻る";
+    } else {
+      backUrl = "/public";
+      backLabel = "みんなの投稿一覧に戻る";
+    }
+  } else if (fromKind === "favorite") {
+    backUrl = "/favorite";
+    backLabel = "お気に入りの投稿一覧に戻る";
   } else if (fromKind === "user-calendar") {
     // fromState = "YYYY-M"（CalendarView が埋め込む）。遷移元の月のカレンダーへ戻す。
     const [cy, cm] = fromState.split("-");
@@ -341,17 +381,9 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         />
       )}
       {justPosted && <AchievementCelebration username={username} />}
-      <main className="container mx-auto max-w-2xl px-4 py-3">
+      <PageContainer>
         {/* ヘッダー */}
-        <div className="mb-2">
-          <Link
-            href={backUrl}
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            {backLabel}
-          </Link>
-        </div>
+        <BackLink href={backUrl}>{backLabel}</BackLink>
 
         {/* 画像。ALTがある場合は右下に「ALT」バッジを重ね、押すと画像下にALTテキストを展開。 */}
         <div className="mb-2">
@@ -627,7 +659,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         />
 
         <Footer />
-      </main>
+      </PageContainer>
       {/* 非ログインユーザーには投稿FABを出さない（ガイドのログイン導線へ誘導） */}
     </div>
   );

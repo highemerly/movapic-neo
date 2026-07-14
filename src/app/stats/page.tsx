@@ -7,14 +7,14 @@
  */
 
 import type { Metadata } from "next";
-import Link from "@/components/Link";
-import { ChevronLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getAvatarUrl } from "@/lib/avatar";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { BarList } from "./_components/BarList";
 import { getCachedStats } from "@/lib/stats/publicStats";
+import { BackLink } from "@/components/BackLink";
+import { PageContainer } from "@/components/PageContainer";
 
 export const dynamic = "force-dynamic";
 
@@ -52,16 +52,8 @@ export default async function StatsPage() {
             : null
         }
       />
-      <div className="container mx-auto max-w-6xl px-4 pt-4 pb-10">
-        <div className="mb-2">
-          <Link
-            href="/docs"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            ドキュメントへ
-          </Link>
-        </div>
+      <PageContainer width="6xl">
+        <BackLink href="/docs">ドキュメントへ</BackLink>
         {/* 投稿オプションの利用傾向 */}
         <section className="mt-4">
           <h2 className="mb-1 text-xl font-bold">文字合成オプションの利用傾向</h2>
@@ -140,7 +132,7 @@ export default async function StatsPage() {
         </section>
 
         <Footer />
-      </div>
+      </PageContainer>
     </>
   );
 }

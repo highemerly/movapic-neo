@@ -1,11 +1,11 @@
-import Link from "@/components/Link";
-import { ChevronLeft } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
 import { FontLicenseCard } from "@/components/fonts/FontLicenseCard";
 import { FONT_LICENSE_LIST } from "@/lib/fonts/licenses";
+import { BackLink } from "@/components/BackLink";
+import { PageContainer } from "@/components/PageContainer";
 
 export default async function LicensePage() {
   const user = await getCurrentUser();
@@ -13,17 +13,9 @@ export default async function LicensePage() {
   return (
     <>
       <SiteHeader user={user ? { username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) } : null} />
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <PageContainer>
 
-        <div className="mb-2">
-          <Link
-            href="/docs"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            ドキュメントへ
-          </Link>
-        </div>
+        <BackLink href="/docs">ドキュメントへ</BackLink>
 
         <section className="mb-8">
           <h2 className="text-lg font-semibold mb-4">フォントライセンス</h2>
@@ -45,7 +37,7 @@ export default async function LicensePage() {
         </section>
 
         <Footer />
-      </div>
+      </PageContainer>
     </>
   );
 }

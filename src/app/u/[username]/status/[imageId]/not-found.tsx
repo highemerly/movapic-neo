@@ -2,20 +2,16 @@ import Link from "@/components/Link";
 import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
+import { BackLink } from "@/components/BackLink";
+import { PageContainer } from "@/components/PageContainer";
 
 export default function ImageNotFound() {
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader user={null} />
-      <main className="container mx-auto max-w-2xl px-4 py-8">
+      <PageContainer>
         {/* ヘッダー */}
-        <div className="mb-6">
-          <Link href="/public">
-            <Button variant="ghost" size="sm">
-              ← 公開タイムラインに戻る
-            </Button>
-          </Link>
-        </div>
+        <BackLink href="/public">みんなの投稿一覧に戻る</BackLink>
 
         {/* ダミー画像（404風） */}
         <div className="mb-6">
@@ -132,7 +128,7 @@ export default function ImageNotFound() {
         </div>
 
         <Footer />
-      </main>
+      </PageContainer>
     </div>
   );
 }
