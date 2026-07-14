@@ -95,8 +95,8 @@ export default async function UserMapPage({
     />
   );
 
-  // オプトインされていない他人 → 公開していません案内
-  if (!isOptedIn && !isOwner) {
+  // 未公開なら本人でも地図は見せない。本人には公開への導線、他人には非公開案内を出す
+  if (!isOptedIn) {
     return (
       <>
         <SiteHeader
@@ -113,9 +113,19 @@ export default async function UserMapPage({
         <div className="container mx-auto max-w-6xl px-4 pt-4 pb-8 overflow-x-clip">
           {profileHeader}
           <TabTransition tab="map">
-            <div className="rounded-lg border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
-              このユーザーは地図機能を公開していません。
-            </div>
+            {isOwner ? (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 p-8 text-center text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+                地図はまだ公開されていません。
+                <Link href="/dashboard" className="font-medium underline">
+                  メニュー
+                </Link>
+                で「地図を公開する」をONにすると、ここに地図が表示され、訪問者にも見せられるようになります。
+              </div>
+            ) : (
+              <div className="rounded-lg border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
+                このユーザーは地図機能を公開していません。
+              </div>
+            )}
           </TabTransition>
           <Footer />
         </div>
@@ -212,17 +222,6 @@ export default async function UserMapPage({
 
         {/* 地図タブの本文（タブ切替時に横スライドで表示） */}
         <TabTransition tab="map">
-          {/* オプトイン未済の本人 → 案内 */}
-          {!isOptedIn && isOwner && (
-            <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
-              この地図はまだ公開されていません。
-              <Link href="/dashboard" className="font-medium underline">
-                メニュー
-              </Link>
-              で「地図を公開する」をONにすると、ユーザーページの「地図」タブを訪問者にも見せられるようになります。現在の表示は本人のみのプレビューです。
-            </div>
-          )}
-
           {total === 0 ? (
             <div className="rounded-lg border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
               位置情報付きの投稿がまだありません。投稿時に「📍を含む」を選ぶと、この地図にプロットされます。

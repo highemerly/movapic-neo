@@ -15,7 +15,7 @@ type SaveState = SaveStatusState;
 /**
  * 地図機能の公開オプトイントグル。
  * ON → ユーザーページに「地図」タブが他人にも表示され、都道府県別投稿数が公開される。
- * OFF（デフォルト） → 本人にしか地図が見えない。
+ * OFF（デフォルト） → 本人を含め地図は表示されない（非公開）。
  */
 export function LocationMapToggle({ initialEnabled, username }: LocationMapToggleProps) {
   const router = useRouter();
@@ -57,11 +57,11 @@ export function LocationMapToggle({ initialEnabled, username }: LocationMapToggl
       <label className="flex items-center justify-between gap-4 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
         <div className="flex-1 min-w-0">
           <p className="text-sm flex items-center flex-wrap gap-x-2">
-            地図を公開する
+            地図を有効にする
             <SaveStatus state={saveState} error={error} />
           </p>
           <p className="text-xs text-muted-foreground">
-            都道府県別の投稿数をユーザーページで他のユーザーに公開します（投稿時に位置情報を明示的に含めた画像のみが集計対象です）。
+            都道府県別の投稿数をユーザーページに表示します（投稿時に位置情報を明示的に含めた画像のみが集計対象です）。
           </p>
           {enabled && (
             <a

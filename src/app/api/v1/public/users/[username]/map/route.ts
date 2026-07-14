@@ -4,12 +4,11 @@
  *
  * locationPrefecture が non-null な公開画像を都道府県別にカウントし、
  * 各都道府県の最新画像（サムネイル表示用）も含めて返す。
- * 対象ユーザーが showLocationMap=false の場合、本人以外には 403 を返す。
+ * 対象ユーザーが showLocationMap=false の場合、本人を含め 403 を返す。
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth/session";
 import { parseUserHandle } from "@/lib/userHandle";
 
 interface PrefectureEntry {
@@ -45,10 +44,8 @@ export async function GET(
       return NextResponse.json({ error: "ユーザーが見つかりません" }, { status: 404 });
     }
 
-    // オプトインされていない場合、本人のみアクセス可能（プレビュー用）
-    const currentUser = await getCurrentUser();
-    const isOwner = currentUser?.id === user.id;
-    if (!user.showLocationMap && !isOwner) {
+    // 未公開なら本人を含めアクセス不可
+    if (!user.showLocationMap) {
       return NextResponse.json(
         { error: "このユーザーは地図機能を公開していません" },
         { status: 403 }
