@@ -1,6 +1,6 @@
-# 技術仕様ページの図（プリレンダーSVG）
+# ドキュメントページの図（プリレンダーSVG）
 
-`/spec` の画像処理フロー図は、mermaid ソースを**ビルド前に一度だけ静的SVGへ変換**し、
+`/docs` の画像処理フロー図は、mermaid ソースを**ビルド前に一度だけ静的SVGへ変換**し、
 `public/diagrams/` に置いて `<img>` で読み込む（実行時mermaid不使用＝CSP `script-src` 非依存）。
 
 - ソース: [pipeline.mmd](pipeline.mmd)
@@ -17,11 +17,11 @@
 export PUPPETEER_SKIP_DOWNLOAD=true PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 
 npx -y @mermaid-js/mermaid-cli@latest \
-  -i src/app/spec/_diagrams/pipeline.mmd \
+  -i src/app/docs/_diagrams/pipeline.mmd \
   -o public/diagrams/pipeline-light.svg \
   -t default -b transparent \
-  -p src/app/spec/_diagrams/puppeteer.json \
-  -c src/app/spec/_diagrams/mermaid-config.json
+  -p src/app/docs/_diagrams/puppeteer.json \
+  -c src/app/docs/_diagrams/mermaid-config.json
 
 # ダークは -t dark、-o を pipeline-dark.svg に変えるだけ
 ```

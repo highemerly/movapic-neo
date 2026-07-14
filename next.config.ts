@@ -14,6 +14,13 @@ const nextConfig: NextConfig = {
     // Route Handler（API）のボディサイズ制限
     proxyClientMaxBodySize: "20mb",
   },
+  async redirects() {
+    return [
+      // 旧「技術仕様」URL（/spec）は「ドキュメント」（/docs）へ恒久リダイレクト。
+      { source: "/spec", destination: "/docs", permanent: true },
+      { source: "/spec/:path*", destination: "/docs/:path*", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

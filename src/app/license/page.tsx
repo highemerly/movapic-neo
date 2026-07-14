@@ -17,11 +17,11 @@ export default async function LicensePage() {
 
         <div className="mb-2">
           <Link
-            href="/spec"
+            href="/docs"
             className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
-            技術仕様へ
+            ドキュメントへ
           </Link>
         </div>
 

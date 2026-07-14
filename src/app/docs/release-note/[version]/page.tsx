@@ -59,7 +59,7 @@ export default async function ReleaseNoteDetailPage({
       <div className="container mx-auto px-4 py-3 max-w-2xl">
         <div className="mb-2">
           <Link
-            href="/spec/release-note"
+            href="/docs/release-note"
             className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />

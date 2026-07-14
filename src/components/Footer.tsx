@@ -39,10 +39,10 @@ export function Footer() {
           統計
         </Link>
         <Link
-          href="/spec"
+          href="/docs"
           className="py-1 text-sm text-muted-foreground hover:text-foreground hover:underline"
         >
-          技術仕様
+          ドキュメント
         </Link>
         <a
           href="https://highemerly.net/contact.html"

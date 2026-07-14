@@ -27,11 +27,11 @@ export default async function ReleaseNoteListPage() {
       <div className="container mx-auto px-4 py-3 max-w-2xl">
         <div className="mb-2">
           <Link
-            href="/spec"
+            href="/docs"
             className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
-            技術仕様へ
+            ドキュメントへ
           </Link>
         </div>
 
@@ -46,7 +46,7 @@ export default async function ReleaseNoteListPage() {
             {notes.map((note) => (
               <li key={note.version}>
                 <Link
-                  href={`/spec/release-note/${note.version}`}
+                  href={`/docs/release-note/${note.version}`}
                   className="flex items-center gap-3 py-3 hover:bg-muted/50 transition-colors"
                 >
                   <span className="text-sm font-medium tabular-nums flex-shrink-0">

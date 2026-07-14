@@ -325,10 +325,10 @@ function useMenuSections(nav: MenuNav): MenuSectionData[] {
       },
       {
         key: "spec",
-        href: "/spec",
-        label: "技術仕様",
+        href: "/docs",
+        label: "ドキュメント",
         Icon: Code,
-        active: pathname === "/spec",
+        active: pathname === "/docs",
         primary: false,
       },
       {

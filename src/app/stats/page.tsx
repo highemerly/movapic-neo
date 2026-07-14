@@ -55,11 +55,11 @@ export default async function StatsPage() {
       <div className="container mx-auto max-w-6xl px-4 pt-4 pb-10">
         <div className="mb-2">
           <Link
-            href="/spec"
+            href="/docs"
             className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
-            技術仕様へ
+            ドキュメントへ
           </Link>
         </div>
         {/* 投稿オプションの利用傾向 */}

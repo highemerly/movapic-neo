@@ -9,8 +9,8 @@ import { sortedReleaseNotes } from "@/data/releaseNotes";
 import { version } from "../../../package.json";
 
 export const metadata: Metadata = {
-  title: "技術仕様",
-  description: "SHAMEZOの技術仕様・制限事項",
+  title: "ドキュメント",
+  description: "SHAMEZOのドキュメント・制限事項",
 };
 
 export default async function SpecPage() {
@@ -24,7 +24,7 @@ export default async function SpecPage() {
 
         <section className="mb-8">
           <div className="flex items-baseline gap-2 mb-4">
-            <h2 className="text-lg font-semibold">技術仕様</h2>
+            <h2 className="text-lg font-semibold">ドキュメント</h2>
             <span className="text-xs text-muted-foreground tabular-nums">v{version}</span>
           </div>
 
@@ -37,7 +37,7 @@ export default async function SpecPage() {
               <div className="flex flex-wrap gap-2">
                 {latestVersion && (
                   <Link
-                    href={`/spec/release-note/${latestVersion}`}
+                    href={`/docs/release-note/${latestVersion}`}
                     className="inline-flex items-center gap-1 rounded-md bg-background/60 px-3 py-2 text-sm hover:bg-background transition-colors"
                   >
                     最新（v{latestVersion}）
@@ -45,7 +45,7 @@ export default async function SpecPage() {
                   </Link>
                 )}
                 <Link
-                  href="/spec/release-note"
+                  href="/docs/release-note"
                   className="inline-flex items-center gap-1 rounded-md bg-background/60 px-3 py-2 text-sm hover:bg-background transition-colors"
                 >
                   すべての履歴

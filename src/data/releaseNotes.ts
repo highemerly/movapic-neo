@@ -1,5 +1,5 @@
 export type ReleaseNote = {
-  version: string; // "1.1" → URLスラッグ /spec/release-note/[version] に使う
+  version: string; // "1.1" → URLスラッグ /docs/release-note/[version] に使う
   date: string; // YYYY-MM-DD
   title?: string; // 任意の見出し（一覧・詳細の主タイトル。未指定なら「v{version}」を表示）
   add?: string[]; // Add（新機能・追加）
@@ -9,7 +9,7 @@ export type ReleaseNote = {
 
 // リリースノートを追加するときは配列の先頭/末尾どちらでもよい（表示は version 降順）。
 // 各項目（add/fix/change の文字列）には [テキスト](URL) 形式のリンクを埋め込める。
-//   例: "地図機能を追加しました。詳しくは[技術仕様](/spec)を参照"
+//   例: "地図機能を追加しました。詳しくは[ドキュメント](/docs)を参照"
 export const releaseNotes: ReleaseNote[] = [
   {
     version: "1.3",
