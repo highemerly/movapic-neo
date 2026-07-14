@@ -1,0 +1,5 @@
+{
+  "htmlLabels": false,
+  "securityLevel": "strict",
+  "flowchart": { "htmlLabels": false, "useMaxWidth": true, "curve": "basis" }
+}

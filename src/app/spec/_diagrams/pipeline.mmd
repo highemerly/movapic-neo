@@ -1,0 +1,25 @@
+flowchart LR
+    A(["元画像"]) --> RQ
+
+    RQ{"EXIF Orientationで<br/>回転が必要?"}
+    RQ -->|Yes| RR["sharp:<br/>画像を回転"]
+    RQ -->|No| HQ
+    RR --> HQ
+
+    HQ{"HEIC/HEIF<br/>形式?"}
+    HQ -->|Yes| HJ["libheif:<br/>JPEG化<br/>(quality 95)"]
+    HQ -->|No| SQ
+    HJ --> SQ
+
+    SQ{"長辺<br/>&gt; 2048px?"}
+    SQ -->|Yes| SR["sharp:<br/>長辺2048pxへ縮小"]
+    SQ -->|No| TX
+    SR --> TX
+
+    TX["skia-canvas:<br/>テキスト<br/>オーバーレイ生成"] --> MJ
+    MJ["sharp:<br/>合成+中間JPEG生成<br/>(quality 90)"] --> EN
+
+    EN["sharp:<br/>AVIF化<br/>(quality 80)"] --> SZ
+    SZ{"サイズ上限<br/>超過?"}
+    SZ -->|"Yes: quality を10下げて<br/>再試行 (最小20)"| EN
+    SZ -->|No| OUT(["生成画像"])
