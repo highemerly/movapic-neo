@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { InstallEntry } from "@/components/pwa/InstallEntry";
 import { RetryImg } from "@/components/RetryImg";
+import Link from "@/components/Link";
 import { SettingLinkRow } from "@/components/SettingRow";
 import { userPathSegment } from "@/lib/userHandle";
 import { getEmailDomain } from "@/lib/postMethods";
@@ -101,15 +102,21 @@ export default async function SettingsPage() {
         <SettingsSection id="profile" icon={User} title="プロフィール">
           {/* ユーザー情報は表示のみ（設定項目ではない）なので枠を付けない */}
           <div className="flex items-center gap-3">
-            {avatarUrl ? (
-              <RetryImg
-                src={avatarUrl}
-                alt={user.displayName || user.username}
-                className="h-12 w-12 rounded-full flex-shrink-0"
-              />
-            ) : (
-              <span className="h-12 w-12 rounded-full bg-muted flex-shrink-0" aria-hidden />
-            )}
+            <Link
+              href={`/u/${selfSeg}`}
+              className="flex-shrink-0"
+              aria-label="自分のページを開く"
+            >
+              {avatarUrl ? (
+                <RetryImg
+                  src={avatarUrl}
+                  alt={user.displayName || user.username}
+                  className="h-12 w-12 rounded-full"
+                />
+              ) : (
+                <span className="h-12 w-12 rounded-full bg-muted block" aria-hidden />
+              )}
+            </Link>
             <div className="min-w-0">
               <p className="font-medium truncate">{user.displayName || user.username}</p>
               <a
