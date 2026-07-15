@@ -62,6 +62,12 @@ interface UseInfiniteImagesResult<T> {
   loaderRef: RefObject<HTMLDivElement | null>;
   /** 直近の更新で新しく先頭に加わった id 群（にゅるっと追加アニメ用）。数百ms後に空へ戻る。 */
   newIds: ReadonlySet<string>;
+  /**
+   * 手動更新（自前 pull-to-refresh 用）。再前面化と同じ reconcile を走らせる。
+   * ユーザー操作なので連打スロットルを飛ばす（force）。完了まで待てる Promise を返す。
+   * fetchFirstPage 未指定なら何もしない。
+   */
+  refresh: () => Promise<void>;
 }
 
 /**
@@ -132,6 +138,9 @@ export function useInfiniteImages<T extends { id: string }>({
   useEffect(() => {
     onChangeRef.current?.(images, nextCursor);
   }, [images, nextCursor]);
+
+  // 更新効果の内部 refresh を手動更新（自前PTR）から叩くための橋渡し。
+  const refreshRef = useRef<((force?: boolean) => Promise<void>) | null>(null);
 
   // prepend した id のアニメ印は一定時間後に外す（DOM は残し class だけ落とす）。
   const clearNewIdsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -242,11 +251,13 @@ export function useInfiniteImages<T extends { id: string }>({
       flashNewIds(res.newIds);
     };
 
-    const refresh = async () => {
+    // force=true は連打スロットルを飛ばす（ユーザー操作の pull-to-refresh 用）。
+    // 同時実行ガード（refreshing）は force でも維持する。
+    const refresh = async (force = false) => {
       if (refreshing) return;
       // performance.now は Date と違い単調増加で環境依存が少ない。
       const now = typeof performance !== "undefined" ? performance.now() : 0;
-      if (now - lastRefreshedAt < MIN_INTERVAL_MS) return;
+      if (!force && now - lastRefreshedAt < MIN_INTERVAL_MS) return;
       refreshing = true;
       try {
         const first = fetchFirstPageRef.current;
@@ -258,6 +269,8 @@ export function useInfiniteImages<T extends { id: string }>({
         refreshing = false;
       }
     };
+    // 手動更新（自前PTR）から叩けるよう ref に載せる。
+    refreshRef.current = refresh;
 
     // マウント後に永続化スナップショットを適用する（ハイドレーション不整合を避けるため
     // 初期レンダーではなくここで上書きする）。復元後に必ず reconcile を走らせ、離席中の
@@ -284,11 +297,15 @@ export function useInfiniteImages<T extends { id: string }>({
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pageshow", onPageShow);
+      refreshRef.current = null;
     };
     // マウント時に一度だけ実行する（fetch/keep/restore はすべて ref 経由）。呼び出し側は
     // fetch 系を毎レンダー再生成するため、依存に入れるとリスナ再登録と復元の多重実行を招く。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { images, isLoading, nextCursor, loaderRef, newIds };
+  // 手動更新の安定した公開ハンドル（自前 pull-to-refresh から呼ぶ）。
+  const refresh = useCallback(() => refreshRef.current?.(true) ?? Promise.resolve(), []);
+
+  return { images, isLoading, nextCursor, loaderRef, newIds, refresh };
 }

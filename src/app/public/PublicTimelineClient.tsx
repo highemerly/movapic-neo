@@ -8,6 +8,7 @@ import {
 } from "@/components/gallery/TimelineImageCard";
 import { useInfiniteImages } from "@/hooks/useInfiniteImages";
 import { useTimelinePersistence } from "@/hooks/useTimelinePersistence";
+import { PullToRefresh } from "@/components/gallery/PullToRefresh";
 
 type TimelineImage = TimelineCardImage;
 
@@ -34,7 +35,7 @@ export function PublicTimelineClient({
   const { restore, onChange } = useTimelinePersistence<TimelineImage>(
     `tl:public:${instancesParam ?? "all"}`
   );
-  const { images, isLoading, nextCursor, loaderRef, newIds } = useInfiniteImages<TimelineImage>({
+  const { images, isLoading, nextCursor, loaderRef, newIds, refresh } = useInfiniteImages<TimelineImage>({
     initialImages,
     // カーソルは生の initialImages 基準（フィルタ前）で決める。除外で表示が減っても
     // ページングは壊れない（loaderRef が見え続ければ次ページを自動取得して埋める）。
@@ -67,26 +68,29 @@ export function PublicTimelineClient({
   });
 
   return (
-    <GalleryGrid
-      images={images}
-      getKey={(image) => image.id}
-      aspect={(image) => image.width / image.height}
-      emptyMessage="まだ画像が投稿されていません"
-      endMessage="すべての画像を表示しました"
-      isLoading={isLoading}
-      nextCursor={nextCursor}
-      loaderRef={loaderRef}
-      newIds={newIds}
-      renderItem={(image, fill) => (
-        <TimelineImageCard
-          image={image}
-          publicUrl={publicUrl}
-          fill={fill}
-          // 「同じサーバー」タブ（instances 絞り込みあり）は from に状態として載せ、
-          // 画像詳細の戻る導線でタブ・絞り込みを復元する（"public:<instances>"）。
-          from={instancesParam ? `public:${instancesParam}` : "public"}
-        />
-      )}
-    />
+    <>
+      <PullToRefresh onRefresh={refresh} />
+      <GalleryGrid
+        images={images}
+        getKey={(image) => image.id}
+        aspect={(image) => image.width / image.height}
+        emptyMessage="まだ画像が投稿されていません"
+        endMessage="すべての画像を表示しました"
+        isLoading={isLoading}
+        nextCursor={nextCursor}
+        loaderRef={loaderRef}
+        newIds={newIds}
+        renderItem={(image, fill) => (
+          <TimelineImageCard
+            image={image}
+            publicUrl={publicUrl}
+            fill={fill}
+            // 「同じサーバー」タブ（instances 絞り込みあり）は from に状態として載せ、
+            // 画像詳細の戻る導線でタブ・絞り込みを復元する（"public:<instances>"）。
+            from={instancesParam ? `public:${instancesParam}` : "public"}
+          />
+        )}
+      />
+    </>
   );
 }
