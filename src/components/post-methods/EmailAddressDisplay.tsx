@@ -11,9 +11,11 @@ import { Copy, Check, Eye, EyeOff } from "lucide-react";
 interface EmailAddressDisplayProps {
   emailPrefix: string;
   emailDomain: string;
+  /** アドレスの前に付けるラベル。空文字なら省略（設定画面など見出しが別にある場合）。 */
+  label?: string;
 }
 
-export function EmailAddressDisplay({ emailPrefix, emailDomain }: EmailAddressDisplayProps) {
+export function EmailAddressDisplay({ emailPrefix, emailDomain, label = "宛先:" }: EmailAddressDisplayProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
@@ -26,9 +28,15 @@ export function EmailAddressDisplay({ emailPrefix, emailDomain }: EmailAddressDi
   };
 
   return (
-    <li>
-      <strong>宛先:</strong>
-      <span className="mt-1 ml-[1.5em] flex items-center gap-2 sm:mt-0 sm:ml-2 sm:inline-flex sm:align-middle">
+    <li className={label ? undefined : "list-none"}>
+      {label && <strong>{label}</strong>}
+      <span
+        className={
+          label
+            ? "mt-1 ml-[1.5em] flex items-center gap-2 sm:mt-0 sm:ml-2 sm:inline-flex sm:align-middle"
+            : "flex items-center gap-2"
+        }
+      >
         <code className="flex-1 min-w-0 bg-background px-2 py-1 rounded text-xs break-all sm:flex-none">
           {isVisible ? (
             fullEmail

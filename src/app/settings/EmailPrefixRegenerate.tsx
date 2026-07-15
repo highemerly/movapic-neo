@@ -5,9 +5,20 @@ import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { Button } from "@/components/ui/button";
+import { EmailAddressDisplay } from "@/components/post-methods/EmailAddressDisplay";
 import { SETTINGS_TOAST_DURATION } from "./settingsToast";
 
-export function EmailPrefixRegenerate() {
+interface EmailPrefixRegenerateProps {
+  emailPrefix: string;
+  emailDomain: string;
+}
+
+/**
+ * 投稿用メールアドレスの確認（既定はぼかし・表示/コピー可能な EmailAddressDisplay を再利用）と、
+ * その再生成をまとめたフィールド。再生成は不可逆なため confirm で警告してから実行する。
+ */
+export function EmailPrefixRegenerate({ emailPrefix, emailDomain }: EmailPrefixRegenerateProps) {
   const router = useRouter();
   const confirm = useConfirm();
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -49,18 +60,33 @@ export function EmailPrefixRegenerate() {
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleRegenerate}
-      disabled={isRegenerating}
-      className="w-full flex items-center justify-between gap-4 p-3 rounded-lg border hover:bg-muted/50 transition-colors text-left disabled:opacity-60"
-    >
-      <div className="flex-1 min-w-0">
-        <p className="text-sm">投稿用メールアドレスを再生成する</p>
+    // 「初期設定を保存する」と同じ 1枠＋区切り線パターン: 上=アドレス確認 / 下=再生成
+    <div className="rounded-lg border">
+      <div className="space-y-2 p-3">
+        <div>
+          <p className="text-sm">投稿用メールアドレス</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+            このアドレスに画像を添付して送ると投稿できます。第三者に知られないようご注意ください。
+          </p>
+        </div>
+        <ul className="list-none text-sm">
+          <EmailAddressDisplay emailPrefix={emailPrefix} emailDomain={emailDomain} label="" />
+        </ul>
       </div>
-      <RefreshCw
-        className={`h-4 w-4 flex-shrink-0 text-muted-foreground ${isRegenerating ? "animate-spin" : ""}`}
-      />
-    </button>
+      {/* 不可逆な操作なので destructive 色のアウトラインボタンで警告 */}
+      <div className="border-t p-3">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={handleRegenerate}
+          disabled={isRegenerating}
+          className="border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isRegenerating ? "animate-spin" : ""}`} />
+          メールアドレスを再生成する
+        </Button>
+      </div>
+    </div>
   );
 }

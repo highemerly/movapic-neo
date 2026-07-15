@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SettingField } from "@/components/SettingRow";
 import { useRouter } from "next/navigation";
 import { toastSaved, toastSettingsError } from "./settingsToast";
 
@@ -52,10 +53,10 @@ export function BioEditForm({ initialBio }: BioEditFormProps) {
   }, [bio, isOverLimit, router]);
 
   return (
-    <div className="space-y-2">
+    <SettingField className="space-y-2">
       <div className="flex justify-between items-center gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <Label htmlFor="bio-input">プロフィール</Label>
+          <Label htmlFor="bio-input">自己紹介</Label>
           {isOverLimit && (
             <span className="text-xs text-destructive truncate">{BIO_MAX_LENGTH}文字以内で入力してください</span>
           )}
@@ -69,9 +70,9 @@ export function BioEditForm({ initialBio }: BioEditFormProps) {
         type="text"
         value={bio}
         onChange={(e) => setBio(e.target.value)}
-        placeholder="プロフィールを入力"
+        placeholder="自己紹介を入力"
         maxLength={BIO_MAX_LENGTH + 10}
       />
-    </div>
+    </SettingField>
   );
 }

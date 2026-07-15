@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toastSaved, toastSettingsError } from "./settingsToast";
-import { ToggleSwitch } from "@/components/ui/toggle-switch";
+import { SettingToggleRow } from "@/components/SettingRow";
 
 interface BlockCrawlersToggleProps {
   initialEnabled: boolean;
@@ -46,16 +46,12 @@ export function BlockCrawlersToggle({ initialEnabled }: BlockCrawlersToggleProps
   };
 
   return (
-    <div>
-      <label className="flex items-center justify-between gap-4 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm">クローラーのアクセスを拒否する</p>
-          <p className="text-xs text-muted-foreground">
-            検索エンジン・AIエージェントに対し、あなたのページを利用しないよう要望します。設定の反映には時間がかかります。また、要望を無視するクローラーには効果がありません。
-          </p>
-        </div>
-        <ToggleSwitch checked={enabled} onChange={handleToggle} disabled={isSaving} />
-      </label>
-    </div>
+    <SettingToggleRow
+      title="クローラーのアクセスを拒否する"
+      description="検索エンジン・AIエージェントに、あなたのページを利用しないよう要望します。反映には時間がかかり、要望を無視するクローラーには効果がありません。"
+      checked={enabled}
+      onChange={handleToggle}
+      disabled={isSaving}
+    />
   );
 }

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { ChevronRight } from "lucide-react";
+import { Download } from "lucide-react";
 import { toast } from "sonner";
-import Link from "@/components/Link";
+import { SettingLinkRow, SettingActionRow } from "@/components/SettingRow";
 import {
   subscribeInstall,
   getCanInstall,
@@ -15,10 +15,6 @@ import {
 
 // 値が変化しない購読（プラットフォーム/standalone は実行中ほぼ不変）
 const noopSubscribe = () => () => {};
-
-// 「ログイン履歴を確認する」と同じ行デザイン
-const ROW_CLASS =
-  "flex items-center justify-between gap-4 p-3 rounded-lg border hover:bg-muted/50 transition-colors";
 
 function usePwaInstallState() {
   const platform = useSyncExternalStore<PwaPlatform>(
@@ -56,17 +52,18 @@ export function InstallEntry() {
   const showAndroid = platform === "android" && canInstall;
   const showIos = platform === "ios-safari";
 
+  // iOS Safari: 手順説明ページへ遷移（link）
   if (showIos) {
     return (
-      <Link href="/dashboard/install" className={ROW_CLASS}>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm">ホーム画面に追加する</p>
-        </div>
-        <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-      </Link>
+      <SettingLinkRow
+        href="/dashboard/install"
+        title="ホーム画面に追加する"
+        description="アプリのように起動できます。"
+      />
     );
   }
 
+  // Android: その場で beforeinstallprompt を発火（action）
   if (showAndroid) {
     return <AndroidInstallRow />;
   }
@@ -90,16 +87,13 @@ function AndroidInstallRow() {
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
+    <SettingActionRow
+      title="アプリをインストールする"
+      description="アプリのように起動できます。"
+      icon={Download}
+      busy={busy}
       disabled={busy}
-      className={`${ROW_CLASS} w-full text-left disabled:opacity-60`}
-    >
-      <div className="flex-1 min-w-0">
-        <p className="text-sm">アプリをインストールする</p>
-      </div>
-      <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-    </button>
+      onClick={handleClick}
+    />
   );
 }

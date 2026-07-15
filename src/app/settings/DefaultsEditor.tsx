@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toastSaved, toastSettingsError } from "./settingsToast";
 import { Label } from "@/components/ui/label";
-import { ToggleSwitch } from "@/components/ui/toggle-switch";
+import { SettingToggleRow } from "@/components/SettingRow";
+import { SegmentControl } from "@/components/SegmentControl";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { OptionsPanel } from "@/components/OptionsPanel";
 import { VisibilityPicker } from "@/components/VisibilityPicker";
@@ -155,9 +156,9 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
     // OFFにする際は警告
     if (!next) {
       const confirmed = await confirm({
-        title: "「設定を保存する」を無効にする",
+        title: "「初期設定を保存する」を無効にする",
         description:
-          "保存済みの設定は全て削除され、サービスの初期値に戻ります。\nよろしいですか？",
+          "保存済みの初期設定を全て削除し、サービスの初期値に戻します。\n本当によろしいですか？",
         confirmText: "OFFにする",
         destructive: true,
       });
@@ -226,86 +227,66 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
 
   return (
     <div className="space-y-4">
-      <label className="flex items-center justify-between gap-4 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm">設定を保存する</p>
-          <p className="text-xs text-muted-foreground">
-            文字の合成オプションなど好みの設定を保存しておき、初期値として読み込みます。投稿時に変更可能です。原則、全ての投稿方法（Web、Bot、メール）が対象となります。
-          </p>
-        </div>
-        <ToggleSwitch
+      {/* トグルと配下を1つの枠にまとめ、区切り線で「初期設定保存の中身」だと示す */}
+      <div className="rounded-lg border">
+        <SettingToggleRow
+          bare
+          title="初期設定を保存する"
+          description="お好みの文字合成オプションを保存しておき、初期値として読み込みます。"
           checked={saveEnabled}
           onChange={handleToggleSave}
           disabled={isTogglingSave}
         />
-      </label>
 
-      {saveEnabled && (
-        <div className="space-y-5 ml-4 pl-4 border-l-2 border-border">
-          <OptionsPanel
-            position={position}
-            font={font}
-            color={color}
-            size={size}
-            arrangement={arrangement}
-            onPositionChange={setPosition}
-            onFontChange={setFont}
-            onColorChange={setColor}
-            onSizeChange={setSize}
-            onArrangementChange={setArrangement}
-          />
+        {saveEnabled && (
+          <div className="space-y-5 border-t p-3">
+            <OptionsPanel
+              position={position}
+              font={font}
+              color={color}
+              size={size}
+              arrangement={arrangement}
+              onPositionChange={setPosition}
+              onFontChange={setFont}
+              onColorChange={setColor}
+              onSizeChange={setSize}
+              onArrangementChange={setArrangement}
+            />
 
-          <div className="space-y-2">
-            <Label>{instanceDomain} への同時投稿</Label>
-            <VisibilityPicker value={visibility} onChange={setVisibility} />
-          </div>
-
-          <div className="space-y-2">
-            <Label>
-              カメラ機種
-              <span className="ml-2 text-xs text-muted-foreground">（Web投稿・メール投稿のみ）</span>
-            </Label>
-            <div className="flex rounded-lg border bg-muted p-1 gap-1">
-              {(["none", "show"] as CameraOption[]).map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => setCameraOption(opt)}
-                  className={`flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
-                    cameraOption === opt
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {opt === "none" ? "表示しない" : "機種名を表示"}
-                </button>
-              ))}
+            <div className="space-y-2">
+              <Label>{instanceDomain} への同時投稿</Label>
+              <VisibilityPicker value={visibility} onChange={setVisibility} />
             </div>
+
+            <div className="space-y-2">
+              <Label>
+                カメラ機種
+                <span className="ml-2 text-xs text-muted-foreground">（Web投稿・メール投稿のみ）</span>
+              </Label>
+              <SegmentControl
+                value={cameraOption}
+                options={["none", "show"] as CameraOption[]}
+                onChange={setCameraOption}
+                renderOption={(opt) => (opt === "none" ? "表示しない" : "機種名を表示")}
+              />
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              位置情報は毎回オプトインが必要なため、この初期設定の対象外です。
+            </p>
           </div>
+        )}
+      </div>
 
-          <p className="text-xs text-muted-foreground">
-            プライバシー保護のため、位置情報の投稿設定はこの機能の対象外です（位置情報の投稿には毎回オプトインが必要です）。
-          </p>
-
-        </div>
-      )}
-
-      <label className="flex items-center justify-between gap-4 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm flex items-center flex-wrap gap-x-2">
-            元投稿を残す
-            <span className="text-xs font-normal text-muted-foreground">（Bot投稿のみ）</span>
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Botにメンションを送って投稿したとき、写真の投稿が正常に完了しても、元の投稿を自動で削除しません。
-          </p>
-        </div>
-        <ToggleSwitch
-          checked={mentionKeep}
-          onChange={handleToggleMentionKeep}
-          disabled={isMentionKeepSaving}
-        />
-      </label>
+      {/* 表示は肯定形「削除する」。DBは mentionKeep（残す）なので checked は反転して渡す。 */}
+      <SettingToggleRow
+        title="元投稿を自動で削除する"
+        tag="（Bot投稿のみ）"
+        description="Botにメンションして投稿したとき、写真の投稿が成功したら、元の投稿を自動で削除します。"
+        checked={!mentionKeep}
+        onChange={handleToggleMentionKeep}
+        disabled={isMentionKeepSaving}
+      />
     </div>
   );
 }

@@ -3,36 +3,34 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toastSaved, toastSettingsError } from "./settingsToast";
-import { ToggleSwitch } from "@/components/ui/toggle-switch";
+import { SettingToggleRow } from "@/components/SettingRow";
 
 interface AutoMakeupToggleProps {
-  /** 「自動穴埋めをしない」が有効か（＝autoMakeup=false）。デフォルトは false（＝自動穴埋めする）。 */
-  initialDisabled: boolean;
+  /** 自動穴埋めが有効か（＝ User.autoMakeup。既定 true）。 */
+  initialEnabled: boolean;
 }
 
 /**
- * カレンダーの自動穴埋めを「しない」設定トグル。
- * OFF（デフォルト） → 投稿の瞬間に、1日2枚以上投稿（ダブル投稿）した分で過去の未投稿日を自動的に穴埋めする。
- * ON（自動穴埋めをしない） → 自動では穴埋めせず、カレンダーの編集モードで明示的に指定した穴だけを埋める。
+ * カレンダーの自動穴埋め設定トグル（肯定形＝ONで穴埋めする）。
+ * ON（デフォルト） → 投稿の瞬間に、1日2枚以上投稿（ダブル投稿）した分で過去の未投稿日を自動的に穴埋めする。
+ * OFF → 自動では穴埋めせず、カレンダーの編集モードで明示的に指定した穴だけを埋める。
  * ※過去に確定した穴埋めや皆勤賞には影響しない（未来の投稿の自動割当だけを切り替える）。
- * DBの User.autoMakeup（既定true）に対し、このトグルは「しない＝autoMakeup:false」を送る反転UI。
+ * DB の User.autoMakeup（既定 true）をそのまま送る（以前の「しない」反転UIは二重否定で分かりづらいため肯定形に変更）。
  */
-export function AutoMakeupToggle({ initialDisabled }: AutoMakeupToggleProps) {
+export function AutoMakeupToggle({ initialEnabled }: AutoMakeupToggleProps) {
   const router = useRouter();
-  // enabled = 「自動穴埋めをしない」が有効か
-  const [enabled, setEnabled] = useState(initialDisabled);
+  const [enabled, setEnabled] = useState(initialEnabled);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleToggle = async () => {
-    const next = !enabled; // 「しない」の新しい状態
+    const next = !enabled;
     setEnabled(next);
     setIsSaving(true);
     try {
       const res = await fetch("/api/v1/me", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        // 「しない」がON → autoMakeup=false
-        body: JSON.stringify({ autoMakeup: !next }),
+        body: JSON.stringify({ autoMakeup: next }),
       });
       if (!res.ok) {
         setEnabled(!next); // ロールバック
@@ -49,16 +47,12 @@ export function AutoMakeupToggle({ initialDisabled }: AutoMakeupToggleProps) {
   };
 
   return (
-    <div>
-      <label className="flex items-center justify-between gap-4 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm">カレンダーの自動穴埋めをしない</p>
-          <p className="text-xs text-muted-foreground">
-            投稿を忘れたとき、1日に2枚以上投稿しても、未投稿日を穴埋めしません。
-          </p>
-        </div>
-        <ToggleSwitch checked={enabled} onChange={handleToggle} disabled={isSaving} />
-      </label>
-    </div>
+    <SettingToggleRow
+      title="カレンダーを自動で穴埋めする"
+      description="1日に2枚以上投稿したとき、余った分で過去の未投稿日を自動的に埋めます。"
+      checked={enabled}
+      onChange={handleToggle}
+      disabled={isSaving}
+    />
   );
 }

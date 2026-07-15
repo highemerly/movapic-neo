@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toastSaved, toastSettingsError } from "./settingsToast";
-import { ToggleSwitch } from "@/components/ui/toggle-switch";
+import { SettingToggleRow } from "@/components/SettingRow";
 
 interface LocationMapToggleProps {
   initialEnabled: boolean;
@@ -45,24 +45,24 @@ export function LocationMapToggle({ initialEnabled, username }: LocationMapToggl
   };
 
   return (
-    <div>
-      <label className="flex items-center justify-between gap-4 p-3 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm">地図を有効にする</p>
-          <p className="text-xs text-muted-foreground">
-            都道府県別の投稿数をユーザーページに表示します（投稿時に位置情報を明示的に含めた画像のみが集計対象です）。
-          </p>
+    <SettingToggleRow
+      title="地図を公開する"
+      description={
+        <>
+          都道府県別の投稿数をユーザーページに表示します（位置情報を明示的に含めた画像のみが集計対象）。
           {enabled && (
             <a
               href={`/u/${username}/map`}
-              className="mt-1 inline-block text-xs text-primary hover:underline"
+              className="mt-1 inline-block text-primary hover:underline"
             >
               → 自分の地図を確認する
             </a>
           )}
-        </div>
-        <ToggleSwitch checked={enabled} onChange={handleToggle} disabled={isSaving} />
-      </label>
-    </div>
+        </>
+      }
+      checked={enabled}
+      onChange={handleToggle}
+      disabled={isSaving}
+    />
   );
 }
