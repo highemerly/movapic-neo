@@ -26,6 +26,8 @@ export const CANVAS_FONT_NAMES: Record<FontFamily, string> = {
   "hui-font": "HuiFont",
   "noto-sans-jp": "Noto Sans CJK JP",
   "light-novel-pop": "LightNovelPopV2",
+  // OTF 内部のファミリ名（skia はこの名前でフォントを引く。和名は "07ふぉんとうは怖い明朝体"）。
+  "horror-mincho": "07ReallyScaryMinchotai",
 };
 
 /**
@@ -71,21 +73,30 @@ export async function createTextOverlay(
   const isVertical = position === "left" || position === "right";
 
   // シーズン（期間限定）: 特殊モードとして背景＋テキストを専用に描いて return する。
-  // 七夕は「上部に穴のための余白（topInset）＋縦書き（右ほど大きく＝立体感）」。
+  // 縦書き方向はプリセットの position、上部余白と文字の影は装飾（decoration）ごとに変える。
   const seasonDef = season ? getSeasonByKey(season) : undefined;
   if (seasonDef) {
-    // 真正面の短冊。上部に穴のための余白(topInset)を空けて縦書き（右）で描く。
-    const topInset = fontSize * 1.7;
+    const vpos: "left" | "right" = seasonDef.preset.position === "left" ? "left" : "right";
+    // tanzaku は上部に「穴＋紐」のための余白が要る。obake は不要（0）。
+    const topInset = seasonDef.decoration === "tanzaku" ? fontSize * 1.7 : 0;
     drawSeasonBackground(ctx, seasonDef.decoration, text, width, height, fontSize, margin, topInset);
-    // マジックで書いたような、ほんの少しのにじみ（同色・オフセット0の弱い影）。
-    ctx.shadowColor = "rgba(25, 25, 25, 0.5)";
-    ctx.shadowBlur = Math.max(1.5, fontSize * 0.05);
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
+    if (seasonDef.decoration === "tanzaku") {
+      // マジックで書いたような、ほんの少しのにじみ（同色・オフセット0の弱い影）。
+      ctx.shadowColor = "rgba(25, 25, 25, 0.5)";
+      ctx.shadowBlur = Math.max(1.5, fontSize * 0.05);
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+    } else {
+      // 肝試し: 暗転した写真の上で骨白の文字をぼうっと浮かせる、暗く柔らかい影。
+      ctx.shadowColor = "rgba(8, 8, 14, 0.85)";
+      ctx.shadowBlur = Math.max(2, fontSize * 0.3);
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = Math.max(1, fontSize * 0.06);
+    }
     drawVerticalText(
       ctx,
       text,
-      "right",
+      vpos,
       width,
       height,
       fontSize,

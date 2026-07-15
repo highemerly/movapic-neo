@@ -17,6 +17,7 @@
 import { CanvasRenderingContext2D } from "skia-canvas";
 import type { SeasonDecoration } from "@/lib/seasons/catalog";
 import { drawTanabata } from "./tanabata";
+import { drawObake } from "./obake";
 
 /** 装飾種別ごとに背景を描く。テキストより先に呼ぶこと。topInset=上部（穴）の余白。 */
 export function drawSeasonBackground(
@@ -32,6 +33,9 @@ export function drawSeasonBackground(
   switch (decoration) {
     case "tanzaku":
       drawTanabata(ctx, text, width, height, fontSize, margin, topInset);
+      return;
+    case "obake":
+      drawObake(ctx, text, width, height, fontSize, margin, topInset);
       return;
   }
 }

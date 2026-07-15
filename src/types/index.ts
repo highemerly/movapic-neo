@@ -1,6 +1,9 @@
 export type Position = "top" | "right" | "left" | "bottom";
 
-export type FontFamily = "hui-font" | "noto-sans-jp" | "light-novel-pop";
+// horror-mincho は「肝試し」シーズン専用の限定フォント。VALID_FONTS には入れないため
+// 通常の /create・generate・post では選択できず、シーズンのプリセット経由でのみ描画に使う。
+// 型・ラベル・ファイル名は Record<FontFamily> の網羅性のためここに載せる必要がある。
+export type FontFamily = "hui-font" | "noto-sans-jp" | "light-novel-pop" | "horror-mincho";
 
 export type Color =
   | "white"
@@ -106,6 +109,7 @@ export const FONT_LABELS: Record<FontFamily, string> = {
   "hui-font": "ふい字",
   "noto-sans-jp": "Noto Sans JP",
   "light-novel-pop": "ラノベPOP",
+  "horror-mincho": "ふぉんとうは怖い明朝体",
 };
 
 // フォントファイル名のマッピング
@@ -113,6 +117,8 @@ export const FONT_FILES: Record<FontFamily, string> = {
   "hui-font": "HuiFont29.ttf",
   "noto-sans-jp": "NotoSansJP-Regular.ttf",
   "light-novel-pop": "LightNovelPOPv2.otf",
+  // IPA明朝の派生フォント（IPA Font License v1.0）。無改変・リネームせず同梱すること。
+  "horror-mincho": "ふぉんとうは怖い明朝体.otf",
 };
 
 // サイズ係数（mediumを1.0として）

@@ -16,7 +16,7 @@
 import type { Position, Color, Size, FontFamily } from "@/types";
 
 /** compute のレンダラ分岐キー（装飾の種類） */
-export type SeasonDecoration = "tanzaku";
+export type SeasonDecoration = "tanzaku" | "obake";
 
 export interface SeasonDef {
   /** 永続キー。例: "tanabata-2026"（実績キーになるためリネーム禁止） */
@@ -70,6 +70,22 @@ export const SEASONS: SeasonDef[] = [
     },
     decoration: "tanzaku", // 短冊風の背景
     description: "縦書き・短冊風の七夕限定デコレーション",
+  },
+  {
+    key: "kimodameshi-2026",
+    label: "肝試し",
+    start: "2026-07-19T00:00:00+09:00",
+    end: "2026-08-01T23:59:59+09:00",
+    preset: {
+      position: "right", // 縦書き（右）
+      color: "white", // DB列用（描画は骨白＝下の textColorHex で上書き）
+      size: "medium",
+      font: "horror-mincho", // 肝試し限定の怖い明朝（通常は選択不可）
+      textColorHex: "#e8e6dc", // 夜に浮かぶ骨白
+      strokeColorHex: "rgba(15, 12, 20, 0.85)", // 暗い縁取りで暗転写真の明部でも読める
+    },
+    decoration: "obake", // 暗転＋ヴィネット＋おばけ＋人魂
+    description: "縦書き・肝試し風の夏休み限定デコレーション",
   },
 ];
 

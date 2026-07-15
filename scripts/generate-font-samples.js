@@ -37,8 +37,12 @@ const fonts = [
   { id: "noto-sans-jp", file: "NotoSansJP-Regular.ttf", text: SAMPLE },
   { id: "hui-font", file: "HuiFont29.ttf", text: SAMPLE },
   { id: "light-novel-pop", file: "LightNovelPOPv2.otf", text: SAMPLE },
+  { id: "horror-mincho", file: "ふぉんとうは怖い明朝体.otf", text: SAMPLE },
   { id: "noto-emoji", file: "NotoEmoji-VariableFont_wght.ttf", text: EMOJI_SAMPLE },
 ];
+
+// 特定フォントだけ再生成したいとき: node scripts/generate-font-samples.js horror-mincho
+const ONLY = process.argv.slice(2);
 
 const SCALE = 2; // Retina 用に2倍で焼く
 const WIDTH = 600; // 論理px（ページの max-w-2xl 内に収まる）
@@ -122,7 +126,8 @@ async function generate(font) {
 }
 
 async function main() {
-  for (const font of fonts) {
+  const targets = ONLY.length ? fonts.filter((f) => ONLY.includes(f.id)) : fonts;
+  for (const font of targets) {
     await generate(font);
   }
   console.log("Done!");

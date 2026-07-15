@@ -30,6 +30,13 @@ export interface FontLicense {
   link?: { href: string; label: string };
   /** 補足（noto-emoji の「絵文字は全てこのフォント」等） */
   note?: string;
+  /**
+   * シーズン限定フォントの紐付けキー（例: "kimodameshi-2026"）。
+   * これが設定されたフォントは /license 一覧では期間中のみ表示する。
+   * 一方、画像詳細ページのバッジ→モーダルはキー引き（FONT_LICENSES）なので、
+   * 期間終了後も過去投稿から常に表示できる（このフィールドは一覧の出し分けだけに使う）。
+   */
+  seasonKey?: string;
 }
 
 /** 表示順を保った一覧（/license ページ用）。 */
@@ -71,6 +78,29 @@ export const FONT_LICENSE_LIST: FontLicense[] = [
     ],
     body: ["本フォントは M+ FONTS License のもとで配布されています。"],
     link: { href: "https://booth.pm/ja/items/2328262", label: "https://booth.pm/ja/items/2328262" },
+  },
+  {
+    // 肝試しシーズン限定フォント。通常は選択不可だが、詳細ページのフォント名バッジは
+    // image.font（=preset.font="horror-mincho"）から FONT_LICENSES[font] で引くため一覧に必要。
+    key: "horror-mincho",
+    label: "ふぉんとうは怖い明朝体",
+    sampleSrc: "/font-samples/horror-mincho.avif",
+    sampleAlt: "ふぉんとうは怖い明朝体の見本",
+    sampleWidth: 1200,
+    sampleHeight: 628,
+    copyright: [
+      "Copyright © KATO MASASHI",
+      "Derived from IPA明朝: Copyright © 2003–2012 Information-technology Promotion Agency, Japan (IPA)",
+    ],
+    body: [
+      "本フォントは IPA明朝 を基に制作された派生フォントで、IPA Font License Agreement v1.0 のもとで配布されています。",
+    ],
+    link: {
+      href: "https://moji.or.jp/ipafont/license/",
+      label: "IPA Font License Agreement v1.0",
+    },
+    note: "夏休み限定「肝試し」アレンジ専用のフォントです。",
+    seasonKey: "kimodameshi-2026", // /license 一覧は期間中のみ表示（詳細ページは常時表示）
   },
   {
     key: "noto-emoji",

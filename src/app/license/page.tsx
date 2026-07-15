@@ -4,11 +4,19 @@ import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
 import { FontLicenseCard } from "@/components/fonts/FontLicenseCard";
 import { FONT_LICENSE_LIST } from "@/lib/fonts/licenses";
+import { isSeasonActiveNow } from "@/lib/seasons/catalog";
 import { BackLink } from "@/components/BackLink";
 import { PageContainer } from "@/components/PageContainer";
 
 export default async function LicensePage() {
   const user = await getCurrentUser();
+
+  // シーズン限定フォントは期間中のみ一覧に出す（期間外は非表示）。
+  // 期間の境界は JST の絶対時刻で比較するのでサーバーTZに依存しない。
+  const now = new Date();
+  const licenses = FONT_LICENSE_LIST.filter(
+    (l) => !l.seasonKey || isSeasonActiveNow(l.seasonKey, now)
+  );
 
   return (
     <>
@@ -23,7 +31,7 @@ export default async function LicensePage() {
             本サービスでは以下のフォントを使用しています。
           </p>
           <div className="space-y-4">
-            {FONT_LICENSE_LIST.map((license) => (
+            {licenses.map((license) => (
               <FontLicenseCard key={license.key} license={license} />
             ))}
           </div>

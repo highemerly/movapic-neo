@@ -20,6 +20,8 @@ export function ensureFontsLoaded(): void {
     path.join(fontsDir, "HuiFont29.ttf"),
     path.join(fontsDir, "NotoSansJP-Regular.ttf"),
     path.join(fontsDir, "LightNovelPOPv2.otf"),
+    // 肝試しシーズン限定の怖い明朝（IPA明朝の派生・IPA Font License v1.0）。無改変・リネーム禁止で同梱。
+    path.join(fontsDir, "ふぉんとうは怖い明朝体.otf"),
     // 絵文字（モノクロ）。本文フォントが持たない絵文字グリフをフォールバックで描画する。
     path.join(fontsDir, "NotoEmoji-VariableFont_wght.ttf"),
   ]);

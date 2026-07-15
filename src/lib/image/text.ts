@@ -8,8 +8,13 @@ import { isEmojiGrapheme, splitGraphemes } from "@/lib/text/grapheme";
 // プロポーショナルフォント（横書き時のみ）
 export const PROPORTIONAL_FONTS: Set<FontFamily> = new Set(["noto-sans-jp"]);
 
-// 等幅フォント（半角文字の幅を半分にする）
-export const MONOSPACE_FONTS: Set<FontFamily> = new Set(["hui-font", "light-novel-pop"]);
+// 等幅フォント（半角文字の幅を半分にする）。
+// 怖い明朝（horror-mincho）は全角グリッドの和文フォントなので縦書きの列組みを等幅扱いにする。
+export const MONOSPACE_FONTS: Set<FontFamily> = new Set([
+  "hui-font",
+  "light-novel-pop",
+  "horror-mincho",
+]);
 
 // 絵文字フォント（NotoEmoji-VariableFont_wght.ttf 内のファミリ名）。
 // 本文フォントが絵文字グリフを持たないため、フォントスタックの末尾に置いて
