@@ -66,7 +66,7 @@ export function EmailPrefixRegenerate({ emailPrefix, emailDomain }: EmailPrefixR
         <div>
           <p className="text-sm">投稿用メールアドレス</p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
-            このアドレスに画像を添付して送ると投稿できます。第三者に知られないようご注意ください。
+            コメントを本文に、画像を添付してこのアドレス宛に送ると、投稿できます。第三者に知られないようご注意ください。
           </p>
         </div>
         <ul className="list-none text-sm">

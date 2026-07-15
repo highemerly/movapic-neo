@@ -280,8 +280,8 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
 
       {/* 表示は肯定形「削除する」。DBは mentionKeep（残す）なので checked は反転して渡す。 */}
       <SettingToggleRow
-        title="元投稿を自動で削除する"
-        tag="（Bot投稿のみ）"
+        title="元投稿を自動削除する"
+        tag="推奨"
         description="Botにメンションして投稿したとき、写真の投稿が成功したら、元の投稿を自動で削除します。"
         checked={!mentionKeep}
         onChange={handleToggleMentionKeep}

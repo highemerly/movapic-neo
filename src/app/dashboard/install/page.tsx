@@ -44,7 +44,7 @@ const STEPS: { body: React.ReactNode }[] = [
 
 /**
  * iOS Safari 向けの「ホーム画面に追加」手順ページ。
- * dashboard の控えめなインストール導線（InstallEntry）から遷移してくる。
+ * 設定「アカウント・セキュリティ」の控えめなインストール導線（InstallEntry）から遷移してくる。
  */
 export default async function InstallGuidePage() {
   const user = await getCurrentUser();
@@ -62,7 +62,7 @@ export default async function InstallGuidePage() {
         }}
       />
       <PageContainer>
-        <BackLink href="/dashboard">ダッシュボード</BackLink>
+        <BackLink href="/settings">設定</BackLink>
 
         <h1 className="text-lg font-semibold mb-2">ホーム画面に追加する</h1>
         <p className="text-muted-foreground mb-6">

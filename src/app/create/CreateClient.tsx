@@ -9,6 +9,7 @@ import { ImageUpload } from "@/components/ImageUpload";
 import { OptionsPanel } from "@/components/OptionsPanel";
 import { VisibilityPicker } from "@/components/VisibilityPicker";
 import { SegmentControl } from "@/components/SegmentControl";
+import { SeasonToggle } from "./SeasonToggle";
 import { AltTextDialog } from "@/components/AltTextDialog";
 import { SaveDefaultsSection } from "@/components/SaveDefaultsSection";
 import { OtherPostMethods } from "@/components/OtherPostMethods";
@@ -978,62 +979,19 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                         <Sparkles className="h-4 w-4" />
                         <span>【おすすめ】期間限定アレンジ</span>
                       </div>
-                      {/* シーズンON時のみアンバーで強調。「なし」選択時は他のパネルと同じニュートラル色。 */}
-                      {(() => {
-                        const seasonOn = formState.season !== null;
-                        return (
-                          <div
-                            className={`flex rounded-lg border p-1 gap-1 ${
-                              seasonOn
-                                ? "border-amber-300 bg-amber-100/70 dark:border-amber-800/70 dark:bg-amber-950/40"
-                                : "bg-muted"
-                            }`}
-                          >
-                            {([
-                              { v: false, label: "なし" },
-                              {
-                                v: true,
-                                label: (
-                                  <>
-                                    {activeSeason.label}
-                                    <span className="text-xs">
-                                      （{activeSeason.period}限定）
-                                    </span>
-                                  </>
-                                ),
-                              },
-                            ] as const).map((opt) => {
-                              const selected = seasonOn === opt.v;
-                              return (
-                                <button
-                                  key={String(opt.v)}
-                                  type="button"
-                                  disabled={isLoading || isPosting}
-                                  onClick={() =>
-                                    setFormState((prev) => ({
-                                      ...prev,
-                                      season: opt.v ? activeSeason.key : null,
-                                    }))
-                                  }
-                                  className={`${
-                                    opt.v ? "flex-[2_1_0%]" : "flex-[1_1_0%]"
-                                  } rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
-                                    selected
-                                      ? seasonOn
-                                        ? "bg-amber-500 text-white shadow-sm"
-                                        : "bg-background text-foreground shadow-sm"
-                                      : seasonOn
-                                        ? "text-amber-700 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100"
-                                        : "text-muted-foreground hover:text-foreground"
-                                  } ${isLoading || isPosting ? "opacity-50 cursor-not-allowed" : ""}`}
-                                >
-                                  {opt.label}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        );
-                      })()}
+                      {/* シーズントグル（不等幅＋色可変サムの専用実装）。 */}
+                      <SeasonToggle
+                        seasonLabel={activeSeason.label}
+                        seasonPeriod={activeSeason.period}
+                        seasonOn={formState.season !== null}
+                        disabled={isLoading || isPosting}
+                        onChange={(on) =>
+                          setFormState((prev) => ({
+                            ...prev,
+                            season: on ? activeSeason.key : null,
+                          }))
+                        }
+                      />
                       {formState.season && (
                         <p className="text-xs text-muted-foreground">
                           位置・色・サイズ・フォント・アレンジは自動で設定されます。

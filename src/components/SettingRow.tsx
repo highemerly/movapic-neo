@@ -39,8 +39,11 @@ function RowBody({
     <div className="flex-1 min-w-0">
       <p className={`text-sm flex items-center flex-wrap gap-x-2 ${titleClassName ?? ""}`}>
         {title}
+        {/* 補足バッジ（例: 既定ONの「推奨」）。緑系で肯定的なラベルだと分かるようにする。 */}
         {tag != null && (
-          <span className="text-xs font-normal text-muted-foreground">{tag}</span>
+          <span className="rounded-full bg-green-500/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-green-700 dark:text-green-400">
+            {tag}
+          </span>
         )}
       </p>
       {description != null && (

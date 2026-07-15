@@ -48,7 +48,8 @@ export function AutoMakeupToggle({ initialEnabled }: AutoMakeupToggleProps) {
 
   return (
     <SettingToggleRow
-      title="カレンダーを自動で穴埋めする"
+      title="カレンダーを自動穴埋めする"
+      tag="推奨"
       description="1日に2枚以上投稿したとき、余った分で過去の未投稿日を自動的に埋めます。"
       checked={enabled}
       onChange={handleToggle}

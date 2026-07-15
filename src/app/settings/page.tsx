@@ -130,8 +130,8 @@ export default async function SettingsPage() {
           <DisplayModeSelector />
         </SettingsSection>
 
-        {/* 投稿の初期設定 */}
-        <SettingsSection id="defaults" icon={SlidersHorizontal} title="投稿の初期設定">
+        {/* 投稿設定 */}
+        <SettingsSection id="defaults" icon={SlidersHorizontal} title="投稿設定">
           <DefaultsEditor
             initial={{
               position: preferences?.defaultPosition as Position | null ?? null,
@@ -149,6 +149,8 @@ export default async function SettingsPage() {
           <AutoMakeupToggle
             initialEnabled={preferences?.autoMakeup ?? true}
           />
+          {/* 投稿用メールアドレス（確認＋再生成）。メール投稿の設定なので投稿設定に置く */}
+          <EmailPrefixRegenerate emailPrefix={user.emailPrefix} emailDomain={emailDomain} />
         </SettingsSection>
 
         {/* プライバシー（公開範囲のオプトイン設定） */}
@@ -164,14 +166,13 @@ export default async function SettingsPage() {
 
         {/* アカウント・セキュリティ（ログイン履歴・投稿用メール・アプリ導入・退会） */}
         <SettingsSection id="account" icon={Lock} title="アカウント・セキュリティ">
+          {/* 控えめなインストール導線（Android/iOS Safari・未インストール時のみ表示） */}
+          <InstallEntry />
           <SettingLinkRow
             href="/settings/sessions"
             title="ログイン履歴を確認する"
             description="直近90日のログインを確認し、身に覚えのないセッションを失効できます。"
           />
-          <EmailPrefixRegenerate emailPrefix={user.emailPrefix} emailDomain={emailDomain} />
-          {/* 控えめなインストール導線（Android/iOS Safari・未インストール時のみ表示） */}
-          <InstallEntry />
           {/* 退会は破線で区切り、他の設定と同じ視覚的重みにならないよう最下部に隔離 */}
           <div className="border-t border-dashed border-destructive/30 pt-4">
             <SettingLinkRow
