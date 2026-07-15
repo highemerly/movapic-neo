@@ -7,8 +7,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
-import { calculateStreak, toJstDateString } from "@/lib/streak";
-import { getRankCounts } from "@/lib/achievements/counts";
+import { toJstDateString } from "@/lib/streak";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
 import { perfectMonthGrace } from "@/lib/achievements/perfectMonth";
@@ -77,20 +76,8 @@ export default async function CalendarPage({
   const initialYear = isValidYear ? queryYear : Number(jstToday.slice(0, 4));
   const initialMonth = isValidMonth ? queryMonth : Number(jstToday.slice(5, 7));
 
-  // 総画像数・連続投稿日数・実績ランク数の算出データを取得
-  const [totalImageCount, postDates, rankCounts, perfectAttendance] =
-    await Promise.all([
-      prisma.image.count({
-        where: { userId: user.id, isPublic: true, isDisabled: false },
-      }),
-      prisma.image.findMany({
-        where: { userId: user.id, isPublic: true, isDisabled: false },
-        select: { createdAt: true },
-      }),
-      getRankCounts(user.id),
-      hasRecentPerfectAttendance(user.id),
-    ]);
-  const streak = calculateStreak(postDates.map((p) => p.createdAt));
+  // ヘッダーのアバター王冠用（皆勤賞判定）
+  const perfectAttendance = await hasRecentPerfectAttendance(user.id);
 
   // 閲覧者がこのカレンダーの持ち主本人かどうか（穴埋め促しコールアウトは本人のみ表示）
   const isOwner =
@@ -117,14 +104,8 @@ export default async function CalendarPage({
             username: cleanUsername,
             displayName: user.displayName,
             avatarUrl: getAvatarUrl(user.avatarUrl),
-            bio: user.bio,
-            createdAt: user.createdAt.toISOString(),
             instance: { domain: user.instance.domain, type: user.instance.type },
           }}
-          imageCount={totalImageCount}
-          goldCount={rankCounts.gold}
-          silverCount={rankCounts.silver}
-          streak={streak}
           perfectAttendance={perfectAttendance}
           activeTab="calendar"
           isOwner={isOwner}

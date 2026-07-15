@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 // ユーザーページのタブ並び順。左右どちら向きにスライドするかの判定に使う。
-const TAB_ORDER = ["photos", "calendar", "map", "achievements"] as const;
+const TAB_ORDER = ["home", "photos", "calendar", "map", "achievements"] as const;
 type TabKey = (typeof TAB_ORDER)[number];
 
 const STORAGE_KEY = "movapic_user_tab";

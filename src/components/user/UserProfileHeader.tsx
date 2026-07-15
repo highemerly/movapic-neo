@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "@/components/Link";
-import { Images, Calendar, Map as MapIcon, Trophy, Flame, Settings } from "lucide-react";
+import { Home, Images, Calendar, Map as MapIcon, Trophy, Settings } from "lucide-react";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
@@ -13,30 +13,26 @@ interface UserProfileHeaderProps {
     username: string;
     displayName: string | null;
     avatarUrl: string | null;
-    bio: string | null;
-    createdAt: string;
     instance: {
       domain: string;
       type: string;
     };
   };
-  imageCount: number;
-  goldCount?: number;
-  silverCount?: number;
-  streak?: number;
   /** 直近（先月/今月）の皆勤賞を獲得していればアバターに王冠を表示 */
   perfectAttendance?: boolean;
-  activeTab: "photos" | "calendar" | "map" | "achievements";
+  activeTab: "home" | "photos" | "calendar" | "map" | "achievements";
   /** 閲覧者が本人のとき、上部右に設定（/settings）への歯車リンクを表示 */
   isOwner?: boolean;
 }
 
+/**
+ * ユーザーページ共通ヘッダー。
+ *
+ * 自己紹介・投稿数・実績・連続投稿などのプロフィール情報は「ホーム」タブ（概要ページ）に
+ * 集約したため、ここはアバター・名前・ハンドル・タブだけのスリムな見出しに徹する。
+ */
 export function UserProfileHeader({
   user,
-  imageCount,
-  goldCount = 0,
-  silverCount = 0,
-  streak = 0,
   perfectAttendance = false,
   activeTab,
   isOwner = false,
@@ -50,10 +46,16 @@ export function UserProfileHeader({
   // 地図タブは常に表示（オプトイン未済でも表示し、遷移先で公開設定の有無に応じた案内を出す）
   const tabs: TabItem[] = [
     {
+      key: "home",
+      label: "ホーム",
+      icon: Home,
+      href: `/u/${seg}`,
+    },
+    {
       key: "photos",
       label: "一覧",
       icon: Images,
-      href: `/u/${seg}`,
+      href: `/u/${seg}/photos`,
     },
     {
       key: "calendar",
@@ -86,7 +88,7 @@ export function UserProfileHeader({
               <img
                 src={user.avatarUrl}
                 alt={user.displayName || user.username}
-                className="w-[52px] h-[52px] rounded-full hover:opacity-80 transition-opacity"
+                className="w-11 h-11 rounded-full hover:opacity-80 transition-opacity"
                 loading="lazy"
               />
             </Link>
@@ -106,30 +108,6 @@ export function UserProfileHeader({
             <InstanceIcon className="w-2.5 h-2.5" />
             @{user.username}@{user.instance.domain}
           </a>
-          {user.bio && (
-            <p className="text-[11px] leading-tight text-muted-foreground mt-[3px] line-clamp-2">{user.bio}</p>
-          )}
-          <div className="text-[11px] leading-tight text-muted-foreground mt-[3px] flex flex-wrap items-center gap-x-1">
-            <span>{imageCount}枚の画像</span>
-            <span>·</span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-0.5">
-                <Trophy className="w-3 h-3 fill-amber-400 text-amber-600" />
-                <span className="font-semibold text-foreground">{goldCount}</span>
-              </span>
-              <span className="inline-flex items-center gap-0.5">
-                <Trophy className="w-3 h-3 fill-slate-300 text-slate-500" />
-                <span className="font-semibold text-foreground">{silverCount}</span>
-              </span>
-            </span>
-            {streak > 0 && (
-              <>
-                <span>·</span>
-                <Flame className="w-3 h-3 -translate-y-px" />
-                <span>{streak}日連続投稿中</span>
-              </>
-            )}
-          </div>
         </div>
         {/* 本人が自分のページを見ているときだけ、上部右に設定への歯車を出す */}
         {isOwner && (
@@ -144,8 +122,8 @@ export function UserProfileHeader({
         )}
       </div>
 
-      {/* タブナビゲーション */}
-      <TabBar tabs={tabs} activeKey={activeTab} prefetch responsiveLabels />
+      {/* タブナビゲーション（5タブで狭幅だと溢れるため md 未満は非アクティブのラベルを隠す） */}
+      <TabBar tabs={tabs} activeKey={activeTab} prefetch responsiveLabels labelBreakpoint="md" />
     </div>
   );
 }

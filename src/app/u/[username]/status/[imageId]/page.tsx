@@ -338,7 +338,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   // 投稿者の所属インスタンス種別に応じたアイコン（Misskey/Mastodon）
   const PosterInstanceIcon =
     image.user.instance.type === "misskey" ? MisskeyIcon : MastodonIcon;
-  let backUrl = `/u/${username}`;
+  let backUrl = `/u/${username}/photos`;
   let backLabel = `${galleryName} のギャラリーに戻る`;
   if (fromKind === "public") {
     if (publicInstances.length > 0) {
@@ -365,6 +365,10 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     // fromState = 都道府県名。遷移元の絞り込み状態へ戻す。
     backUrl = `/u/${username}/map${fromState ? `?prefecture=${encodeURIComponent(fromState)}` : ""}`;
     backLabel = `${galleryName} の地図に戻る`;
+  } else if (fromKind === "user-home") {
+    // ホーム（概要）のフィードカード由来。ホームへ戻す。
+    backUrl = `/u/${username}`;
+    backLabel = `${galleryName} のホームに戻る`;
   }
 
   return (

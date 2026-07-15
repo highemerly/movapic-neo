@@ -236,10 +236,10 @@ function useMenuSections(nav: MenuNav): MenuSectionData[] {
         },
         {
           key: "photos",
-          href: userBase,
+          href: `${userBase}/photos`,
           label: "写真",
           Icon: Images,
-          active: pathname === userBase,
+          active: pathname === `${userBase}/photos`,
           primary: true,
         },
         {

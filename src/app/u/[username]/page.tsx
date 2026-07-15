@@ -1,31 +1,32 @@
 import { notFound } from "next/navigation";
+import Link from "@/components/Link";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getAvatarUrl } from "@/lib/avatar";
-import { UserGalleryClient } from "./UserGalleryClient";
+import { Button } from "@/components/ui/button";
+import { Images, Calendar, Map as MapIcon, Trophy, ChevronRight } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
-import { calculateStreak } from "@/lib/streak";
-import { getRankCounts } from "@/lib/achievements/counts";
+import { getUserProfileStats } from "@/lib/userStats";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
 import { userPageRobotsMetadata } from "@/lib/crawlers";
 import { buildOgImage, DEFAULT_OG_IMAGE } from "@/lib/ogImage";
-import { ToastFlasher } from "@/components/ToastFlasher";
+import { ProfileFeedCard, type ProfileFeedImage } from "@/components/user/ProfileFeedCard";
+import type { CachedFavoriter } from "@/lib/fediverse/favorite";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
-interface UserGalleryPageProps {
+interface UserHomePageProps {
   params: Promise<{ username: string }>;
-  searchParams: Promise<{ deleted?: string }>;
 }
 
 export async function generateMetadata({
   params,
-}: UserGalleryPageProps): Promise<Metadata> {
+}: UserHomePageProps): Promise<Metadata> {
   const { username } = await params;
   const robots = await userPageRobotsMetadata(username);
 
@@ -108,12 +109,8 @@ export async function generateMetadata({
   };
 }
 
-export default async function UserGalleryPage({
-  params,
-  searchParams,
-}: UserGalleryPageProps) {
+export default async function UserHomePage({ params }: UserHomePageProps) {
   const { username } = await params;
-  const { deleted } = await searchParams;
   const currentUser = await getCurrentUser();
 
   // username@domain を分解（既定インスタンスは domain 省略可）
@@ -136,92 +133,114 @@ export default async function UserGalleryPage({
     notFound();
   }
 
-  // ピン留め画像を取得（最大4つ、pinnedAtの降順）
-  const pinnedImages = await prisma.image.findMany({
-    where: {
-      userId: user.id,
-      isPublic: true, isDisabled: false,
-      pinnedAt: { not: null },
-    },
-    orderBy: { pinnedAt: "desc" },
-    select: {
-      id: true,
-      storageKey: true,
-      width: true,
-      height: true,
-      overlayText: true,
-      altText: true,
-      position: true,
-      size: true,
-      blurDataUrl: true,
-      favoriteCount: true,
-      pinnedAt: true,
-      createdAt: true,
-    },
-  });
-
-  const pinnedImageIds = pinnedImages.map((img) => img.id);
-
-  // 通常の公開画像を取得（ピン留め画像を除く）
-  const images = await prisma.image.findMany({
-    where: {
-      userId: user.id,
-      isPublic: true, isDisabled: false,
-      id: { notIn: pinnedImageIds },
-    },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: 20,
-    select: {
-      id: true,
-      storageKey: true,
-      width: true,
-      height: true,
-      overlayText: true,
-      altText: true,
-      position: true,
-      size: true,
-      blurDataUrl: true,
-      favoriteCount: true,
-      pinnedAt: true,
-      createdAt: true,
-    },
-  });
-
+  const seg = userPathSegment(cleanUsername, user.instance.domain);
   const publicUrl = (
     process.env.S3_PUBLIC_URL ||
     process.env.R2_PUBLIC_URL ||
     ""
   ).replace(/\/+$/, "");
 
-  // 総画像数と連続投稿日数の算出データを取得
-  const [totalImageCount, postDates, rankCounts, perfectAttendance] =
+  // フィードカードに必要な列（実画像＋タイルクロップ用の位置/サイズ・投稿日・カメラ/位置・お気に入り）。
+  const feedSelect = {
+    id: true,
+    storageKey: true,
+    overlayText: true,
+    altText: true,
+    position: true,
+    size: true,
+    blurDataUrl: true,
+    createdAt: true,
+    favoriteCount: true,
+    favoritersCache: true,
+    cameraModel: true,
+    locationPrefecture: true,
+    locationCity: true,
+  } as const;
+
+  // 概要（ホーム）の表示データ。統計はユーザーページ各タブと共通の集計（getUserProfileStats）。
+  // ピン留め（最上位）／人気（お気に入り数順）／最近（新着）を取得。人気・最近は後で
+  // ピン留め・人気との重複を除いて各2件に絞るため、除外分を見込んで多めに取る。
+  const [profileStats, pinnedRaw, popularRaw, recentPool, perfectAttendance] =
     await Promise.all([
-      prisma.image.count({
-        where: { userId: user.id, isPublic: true, isDisabled: false },
+      getUserProfileStats(user.id),
+      prisma.image.findMany({
+        where: { userId: user.id, isPublic: true, isDisabled: false, pinnedAt: { not: null } },
+        orderBy: { pinnedAt: "desc" },
+        take: 4,
+        select: feedSelect,
+      }),
+      prisma.image.findMany({
+        where: { userId: user.id, isPublic: true, isDisabled: false, favoriteCount: { gt: 0 } },
+        orderBy: [{ favoriteCount: "desc" }, { createdAt: "desc" }],
+        take: 2 + 4,
+        select: feedSelect,
       }),
       prisma.image.findMany({
         where: { userId: user.id, isPublic: true, isDisabled: false },
-        select: { createdAt: true },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: 2 + 4 + 2,
+        select: feedSelect,
       }),
-      getRankCounts(user.id),
       hasRecentPerfectAttendance(user.id),
     ]);
-  const streak = calculateStreak(postDates.map((p) => p.createdAt));
+
+  // JSON列 favoritersCache を型付きに直し、フィードカード用の形へ整える。
+  const toFeedImage = (img: {
+    id: string;
+    storageKey: string;
+    overlayText: string;
+    altText: string | null;
+    position: string;
+    size: string;
+    blurDataUrl: string | null;
+    createdAt: Date;
+    favoriteCount: number;
+    favoritersCache: unknown;
+    cameraModel: string | null;
+    locationPrefecture: string | null;
+    locationCity: string | null;
+  }): ProfileFeedImage => ({
+    id: img.id,
+    storageKey: img.storageKey,
+    overlayText: img.overlayText,
+    altText: img.altText,
+    position: img.position,
+    size: img.size,
+    blurDataUrl: img.blurDataUrl,
+    createdAt: img.createdAt.toISOString(),
+    favoriteCount: img.favoriteCount,
+    favoriters: (img.favoritersCache as CachedFavoriter[] | null) ?? [],
+    cameraModel: img.cameraModel,
+    locationPrefecture: img.locationPrefecture,
+    locationCity: img.locationCity,
+  });
+
+  const pinnedImages = pinnedRaw.map(toFeedImage);
+  const pinnedIds = new Set(pinnedImages.map((img) => img.id));
+
+  // 人気はピン留めと重複しないものを先頭2件（ピン留めが上に出るため）。
+  const popularImages = popularRaw
+    .filter((img) => !pinnedIds.has(img.id))
+    .slice(0, 2)
+    .map(toFeedImage);
+  const popularIds = new Set(popularImages.map((img) => img.id));
+
+  // 最近はピン留め・人気に出したものを除いて先頭2件（同じ投稿の二重掲載を避ける）。
+  const recentImages = recentPool
+    .filter((img) => !pinnedIds.has(img.id) && !popularIds.has(img.id))
+    .slice(0, 2)
+    .map(toFeedImage);
+
+  const registeredAt = user.createdAt.toLocaleDateString("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  });
+  const isOwner = currentUser?.id === user.id;
 
   return (
     <>
-      {(deleted === "1" || deleted === "remote") && (
-        <ToastFlasher
-          flash={{
-            variant: "success",
-            message:
-              deleted === "remote"
-                ? "連携先の投稿も削除しました"
-                : "画像を削除しました",
-          }}
-          clearParams={["deleted"]}
-        />
-      )}
       <SiteHeader
         user={
           currentUser
@@ -239,39 +258,145 @@ export default async function UserGalleryPage({
             username: cleanUsername,
             displayName: user.displayName,
             avatarUrl: getAvatarUrl(user.avatarUrl),
-            bio: user.bio,
-            createdAt: user.createdAt.toISOString(),
             instance: { domain: user.instance.domain, type: user.instance.type },
           }}
-          imageCount={totalImageCount}
-          goldCount={rankCounts.gold}
-          silverCount={rankCounts.silver}
-          streak={streak}
           perfectAttendance={perfectAttendance}
-          activeTab="photos"
-          isOwner={currentUser?.id === user.id}
+          activeTab="home"
+          isOwner={isOwner}
         />
 
-        {/* 画像一覧（ピン留め画像を先頭に・タブ切替時に横スライドで表示） */}
-        <TabTransition tab="photos">
-          <UserGalleryClient
-            initialImages={[
-              ...pinnedImages.map((img) => ({
-                ...img,
-                pinnedAt: img.pinnedAt?.toISOString() ?? null,
-                createdAt: img.createdAt.toISOString(),
-              })),
-              ...images.map((img) => ({
-                ...img,
-                pinnedAt: img.pinnedAt?.toISOString() ?? null,
-                createdAt: img.createdAt.toISOString(),
-              })),
-            ]}
-            publicUrl={publicUrl}
-            username={userPathSegment(cleanUsername, user.instance.domain)}
-            pinnedImageIds={pinnedImageIds}
-            isOwner={currentUser?.id === user.id}
-          />
+        {/* 概要（ホーム）本文。プロフィールカード的に読みやすい幅で中央寄せ。 */}
+        <TabTransition tab="home">
+          <div className="mx-auto max-w-2xl space-y-4">
+            {/* 概要: 見出し → 各タブへの4ボタン → 自己紹介・登録日・連続投稿 */}
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold">概要</h2>
+
+              {/* 統計ボタン（各タブへの入口）。ダッシュボードの「あなたの情報」と同じ4指標。 */}
+              <div className="grid grid-cols-4 gap-2">
+              <Link href={`/u/${seg}/photos`}>
+                <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="一覧" title="投稿数">
+                  <Images className="h-5 w-5" />
+                  <span className="leading-none whitespace-nowrap">
+                    <span className="text-sm font-semibold tabular-nums">{profileStats.imageCount}</span>
+                    <span className="text-[10px]">枚</span>
+                  </span>
+                </Button>
+              </Link>
+              <Link href={`/u/${seg}/calendar`}>
+                <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="カレンダー" title="連続投稿日数">
+                  <Calendar className="h-5 w-5" />
+                  <span className="leading-none whitespace-nowrap">
+                    <span className="text-[10px]">連続</span>
+                    <span className="text-sm font-semibold tabular-nums">{profileStats.streak}</span>
+                    <span className="text-[10px]">日</span>
+                  </span>
+                </Button>
+              </Link>
+              {/* 地図が非公開のユーザーは非アクティブ表示（都道府県数も出さない） */}
+              {user.showLocationMap ? (
+                <Link href={`/u/${seg}/map`}>
+                  <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="地図" title="都道府県数">
+                    <MapIcon className="h-5 w-5" />
+                    <span className="leading-none whitespace-nowrap">
+                      <span className="text-sm font-semibold tabular-nums">{profileStats.prefectureCount}</span>
+                      <span className="text-[10px]">カ所</span>
+                    </span>
+                  </Button>
+                </Link>
+              ) : (
+                <Button
+                  variant="outline"
+                  disabled
+                  className="w-full h-14 flex flex-col gap-0.5"
+                  aria-label="地図（非公開）"
+                  title="地図は非公開です"
+                >
+                  <MapIcon className="h-5 w-5" />
+                  <span className="text-[10px] leading-none">地図</span>
+                </Button>
+              )}
+              <Link href={`/u/${seg}/achievements`}>
+                <Button variant="outline" className="w-full h-14 flex flex-col gap-1 justify-center" aria-label="実績" title="獲得実績（金・銀）">
+                  <span className="flex items-center gap-1 leading-none whitespace-nowrap">
+                    <Trophy className="h-3.5 w-3.5 fill-amber-400 text-amber-600" />
+                    <span className="text-sm font-semibold tabular-nums">{profileStats.goldCount}</span>
+                  </span>
+                  <span className="flex items-center gap-1 leading-none whitespace-nowrap">
+                    <Trophy className="h-3.5 w-3.5 fill-slate-300 text-slate-500" />
+                    <span className="text-sm font-semibold tabular-nums">{profileStats.silverCount}</span>
+                  </span>
+                </Button>
+              </Link>
+              </div>
+
+              {/* 自己紹介・登録日・連続投稿 */}
+              <div className="space-y-1 text-xs">
+                {user.bio && (
+                  <p className="whitespace-pre-wrap leading-relaxed">
+                    <span className="text-muted-foreground">自己紹介：</span>
+                    {user.bio}
+                  </p>
+                )}
+                <p>
+                  <span className="text-muted-foreground">登録日：</span>
+                  {registeredAt}
+                </p>
+                {profileStats.streak > 0 && (
+                  <p>
+                    <span className="text-muted-foreground">連続投稿：</span>
+                    {profileStats.streak}日
+                  </p>
+                )}
+              </div>
+            </section>
+
+            {/* ピン留めした投稿（あれば人気より上に固定表示） */}
+            {pinnedImages.length > 0 && (
+              <section className="space-y-2">
+                <h2 className="text-sm font-semibold">ピン留めした投稿</h2>
+                {pinnedImages.map((img) => (
+                  <ProfileFeedCard key={img.id} image={img} seg={seg} publicUrl={publicUrl} />
+                ))}
+              </section>
+            )}
+
+            {/* 人気の投稿（お気に入り数順・最大2件） */}
+            {popularImages.length > 0 && (
+              <section className="space-y-2">
+                <h2 className="text-sm font-semibold">人気の投稿</h2>
+                {popularImages.map((img) => (
+                  <ProfileFeedCard key={img.id} image={img} seg={seg} publicUrl={publicUrl} />
+                ))}
+              </section>
+            )}
+
+            {/* 最近の投稿（新しい順・最大2件）。3枚目のカード位置に「すべて見る」を置く。 */}
+            {recentImages.length > 0 && (
+              <section className="space-y-2">
+                <h2 className="text-sm font-semibold">最近の投稿</h2>
+                {recentImages.map((img) => (
+                  <ProfileFeedCard key={img.id} image={img} seg={seg} publicUrl={publicUrl} />
+                ))}
+                <Link
+                  href={`/u/${seg}/photos`}
+                  className="flex items-center justify-center gap-0.5 rounded-lg border p-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
+                >
+                  すべて見る
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              </section>
+            )}
+
+            {/* 投稿がまだ無いとき */}
+            {pinnedImages.length === 0 && popularImages.length === 0 && recentImages.length === 0 && (
+              <div className="rounded-lg border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
+                {isOwner
+                  ? "まだ投稿がありません。写真を投稿すると、ここに表示されます。"
+                  : "まだ投稿がありません。"}
+              </div>
+            )}
+          </div>
         </TabTransition>
 
         <Footer />

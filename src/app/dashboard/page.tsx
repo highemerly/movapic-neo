@@ -172,7 +172,7 @@ export default async function DashboardPage() {
               </p>
             )}
             <div className="mt-3 grid grid-cols-4 gap-2">
-              <Link href={`/u/${selfSeg}`} prefetch>
+              <Link href={`/u/${selfSeg}/photos`} prefetch>
                 <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="一覧" title="投稿数">
                   <Images className="h-5 w-5" />
                   <span className="leading-none whitespace-nowrap">

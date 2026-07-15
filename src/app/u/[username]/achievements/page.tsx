@@ -7,11 +7,9 @@ import { Footer } from "@/components/Footer";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
 import { AchievementsView } from "@/components/achievements/AchievementsView";
-import { countRanks } from "@/lib/achievements/catalog";
 import { perfectMonthKey, perfectMonthGrace } from "@/lib/achievements/perfectMonth";
 import { lastMonthYm, thisMonthYm } from "@/lib/achievements/lastMonthPerfect";
 import { collectLadderValues } from "@/lib/achievements/stats";
-import { calculateStreak } from "@/lib/streak";
 import { parseUserHandle } from "@/lib/userHandle";
 import { userPageRobotsMetadata } from "@/lib/crawlers";
 import type { Metadata } from "next";
@@ -51,28 +49,20 @@ export default async function AchievementsPage({
     notFound();
   }
 
-  const [totalImageCount, postDates, achievements, ladderValues] =
-    await Promise.all([
-      prisma.image.count({ where: { userId: user.id, isPublic: true, isDisabled: false } }),
-      prisma.image.findMany({
-        where: { userId: user.id, isPublic: true, isDisabled: false },
-        select: { createdAt: true },
-      }),
-      prisma.achievement.findMany({
-        where: { userId: user.id },
-        select: { key: true, category: true, grantedAt: true },
-        orderBy: { grantedAt: "desc" },
-      }),
-      collectLadderValues(user.id),
-    ]);
-  const streak = calculateStreak(postDates.map((p) => p.createdAt));
+  const [achievements, ladderValues] = await Promise.all([
+    prisma.achievement.findMany({
+      where: { userId: user.id },
+      select: { key: true, category: true, grantedAt: true },
+      orderBy: { grantedAt: "desc" },
+    }),
+    collectLadderValues(user.id),
+  ]);
 
   const granted = achievements.map((a) => ({
     key: a.key,
     category: a.category,
     grantedAt: a.grantedAt.toISOString(),
   }));
-  const ranks = countRanks(achievements);
 
   // 直近（先月/今月）の皆勤賞を取っていればアバターに王冠を表示（取得済みデータから判定）
   const recentPerfectKeys = new Set([
@@ -102,14 +92,8 @@ export default async function AchievementsPage({
             username: cleanUsername,
             displayName: user.displayName,
             avatarUrl: getAvatarUrl(user.avatarUrl),
-            bio: user.bio,
-            createdAt: user.createdAt.toISOString(),
             instance: { domain: user.instance.domain, type: user.instance.type },
           }}
-          imageCount={totalImageCount}
-          goldCount={ranks.gold}
-          silverCount={ranks.silver}
-          streak={streak}
           perfectAttendance={perfectAttendance}
           activeTab="achievements"
           isOwner={currentUser?.id === user.id}

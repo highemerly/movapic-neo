@@ -15,6 +15,12 @@ interface ThumbnailImageProps {
   fill?: boolean;
   /** Blurプレースホルダ用 LQIP（data URI）。読み込み中のぼかしプレビューに使う */
   blurDataUrl?: string | null;
+  /**
+   * コンテナ枠のクラスを上書きする（既定の aspect-square / fill を使わないケース向け）。
+   * 画像の拡大・文字位置クロップ（imgClass）はそのまま活かすので、親側で高さを与えた
+   * 正方形枠（h-full aspect-square 等）に敷き詰めたいときに使う。overflow-hidden は各自で付ける。
+   */
+  containerClassName?: string;
 }
 
 // grid 表示の拡大率を文字サイズで出し分ける。
@@ -58,12 +64,15 @@ export function ThumbnailImage({
   loading = "lazy",
   fill = false,
   blurDataUrl,
+  containerClassName,
 }: ThumbnailImageProps) {
   // fill: 親の枠（画像と同比率）にそのまま収める＝実質トリミングなし。
-  // 既定: 正方形にクロップ（拡大＋文字位置基準）。
-  const containerClass = fill
-    ? "h-full w-full overflow-hidden"
-    : "aspect-square w-full overflow-hidden";
+  // 既定: 正方形にクロップ（拡大＋文字位置基準）。呼び出し側が枠を指定したいときは上書き。
+  const containerClass =
+    containerClassName ??
+    (fill
+      ? "h-full w-full overflow-hidden"
+      : "aspect-square w-full overflow-hidden");
   const imgClass = fill
     ? "absolute inset-0 h-full w-full object-cover"
     : `absolute inset-0 h-full w-full ${gridScaleClass(size)} object-cover ${getPositionClasses(position)}`;

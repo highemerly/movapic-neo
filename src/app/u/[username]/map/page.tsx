@@ -9,8 +9,6 @@ import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
 import { ExpandReveal } from "@/components/ExpandReveal";
 import { ScrollIntoViewOnSelect } from "@/components/ScrollIntoViewOnSelect";
-import { calculateStreak } from "@/lib/streak";
-import { getRankCounts } from "@/lib/achievements/counts";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import {
   PrefectureHeatmap,
@@ -62,19 +60,8 @@ export default async function UserMapPage({
   // /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）
   const seg = userPathSegment(cleanUsername, user.instance.domain);
 
-  const [totalImageCount, postDates, rankCounts, perfectAttendance] =
-    await Promise.all([
-      prisma.image.count({
-        where: { userId: user.id, isPublic: true, isDisabled: false },
-      }),
-      prisma.image.findMany({
-        where: { userId: user.id, isPublic: true, isDisabled: false },
-        select: { createdAt: true },
-      }),
-      getRankCounts(user.id),
-      hasRecentPerfectAttendance(user.id),
-    ]);
-  const streak = calculateStreak(postDates.map((p) => p.createdAt));
+  // ヘッダーのアバター王冠用（皆勤賞判定）
+  const perfectAttendance = await hasRecentPerfectAttendance(user.id);
 
   const profileHeader = (
     <UserProfileHeader
@@ -82,14 +69,8 @@ export default async function UserMapPage({
         username: cleanUsername,
         displayName: user.displayName,
         avatarUrl: getAvatarUrl(user.avatarUrl),
-        bio: user.bio,
-        createdAt: user.createdAt.toISOString(),
         instance: { domain: user.instance.domain, type: user.instance.type },
       }}
-      imageCount={totalImageCount}
-      goldCount={rankCounts.gold}
-      silverCount={rankCounts.silver}
-      streak={streak}
       perfectAttendance={perfectAttendance}
       activeTab="map"
       isOwner={isOwner}
