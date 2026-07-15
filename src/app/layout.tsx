@@ -8,7 +8,7 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { MenuProvider } from "@/components/layout/AppMenu";
 import { NotificationsProvider } from "@/components/layout/useUnseenNotifications";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
-import { PullToRefresh } from "@/components/PullToRefresh";
+import { PullToRefreshProvider } from "@/components/PullToRefresh";
 import { getSessionClaims } from "@/lib/auth/session";
 import { isAdmin } from "@/lib/auth/admin";
 import { userPathSegment, DEFAULT_INSTANCE } from "@/lib/userHandle";
@@ -125,6 +125,9 @@ export default async function RootLayout({
               依存する Sheet 本体／BottomNav はそれぞれ内部で Suspense 境界を持つ。
               ログアウトの確認モーダル（useConfirm）が Sheet からも使えるよう、ConfirmProvider で
               MenuProvider ごと包む。 */}
+          {/* 全ページ共通の pull-to-refresh（standalone のみ）。一覧ページは
+              useRegisterPullToRefresh で in-place 更新を登録、未登録ページはリロード。 */}
+          <PullToRefreshProvider>
           <ConfirmProvider>
             {/* 通知の未読状態はページごとに1回だけ取得して共有する（ベル＝NotificationBell と
                 PCレール＝AppRail が同時マウントで二重取得していたのを集約）。両者を子に含むよう
@@ -159,8 +162,7 @@ export default async function RootLayout({
             </NotificationsProvider>
           </ConfirmProvider>
           <Toaster />
-          {/* iOS PWA（standalone）専用の引っ張って更新。Androidはネイティブ任せ */}
-          <PullToRefresh />
+          </PullToRefreshProvider>
           <ServiceWorkerRegister />
         </ThemeProvider>
       </body>

@@ -6,7 +6,7 @@ import {
   type TimelineCardImage,
 } from "@/components/gallery/TimelineImageCard";
 import { useInfiniteImages } from "@/hooks/useInfiniteImages";
-import { PullToRefresh } from "@/components/gallery/PullToRefresh";
+import { useRegisterPullToRefresh } from "@/components/PullToRefresh";
 
 type FavoriteImage = TimelineCardImage;
 
@@ -37,22 +37,22 @@ export function FavoritesClient({
     },
   });
 
+  // standalone の pull-to-refresh をこの一覧の in-place 更新に紐づける。
+  useRegisterPullToRefresh(refresh);
+
   return (
-    <>
-      <PullToRefresh onRefresh={refresh} />
-      <GalleryGrid
-        images={images}
-        getKey={(image) => image.id}
-        aspect={(image) => image.width / image.height}
-        emptyMessage="まだお気に入りに登録した画像がありません"
-        endMessage="すべてのお気に入りを表示しました"
-        isLoading={isLoading}
-        nextCursor={nextCursor}
-        loaderRef={loaderRef}
-        renderItem={(image, fill) => (
-          <TimelineImageCard image={image} publicUrl={publicUrl} fill={fill} from="favorite" />
-        )}
-      />
-    </>
+    <GalleryGrid
+      images={images}
+      getKey={(image) => image.id}
+      aspect={(image) => image.width / image.height}
+      emptyMessage="まだお気に入りに登録した画像がありません"
+      endMessage="すべてのお気に入りを表示しました"
+      isLoading={isLoading}
+      nextCursor={nextCursor}
+      loaderRef={loaderRef}
+      renderItem={(image, fill) => (
+        <TimelineImageCard image={image} publicUrl={publicUrl} fill={fill} from="favorite" />
+      )}
+    />
   );
 }
