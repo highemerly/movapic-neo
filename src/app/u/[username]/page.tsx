@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { isMutedByViewer } from "@/lib/mutes";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Button } from "@/components/ui/button";
-import { Images, Calendar, Map as MapIcon, Trophy, ChevronRight } from "lucide-react";
+import { Images, Calendar, Map as MapIcon, Trophy, ChevronRight, ImagePlus } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
@@ -388,13 +388,38 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
               </section>
             )}
 
-            {/* 投稿がまだ無いとき */}
-            {featuredImages.length === 0 && recentImages.length === 0 && (
-              <div className="rounded-lg border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
-                {isOwner
-                  ? "まだ投稿がありません。写真を投稿すると、ここに表示されます。"
-                  : "まだ投稿がありません。"}
-              </div>
+            {/* 投稿がまだ無いとき。本人には投稿を促す文言＋CTA、他者には案内のみ。 */}
+            {featuredImages.length === 0 && recentImages.length === 0 &&
+              (isOwner ? (
+                <div className="rounded-lg border bg-muted/30 p-8 text-center space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    まだ投稿がありません。
+                    <br />
+                    最初の一枚に文字を入れて投稿してみましょう。
+                  </p>
+                  <Link
+                    href="/create"
+                    className="inline-flex items-center justify-center gap-2 rounded-md bg-brand px-6 py-3 text-base font-semibold text-brand-foreground shadow-sm transition-colors hover:bg-brand/90"
+                  >
+                    <ImagePlus className="h-5 w-5" />
+                    写真を投稿する
+                  </Link>
+                </div>
+              ) : (
+                <div className="rounded-lg border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
+                  まだ投稿がありません。
+                </div>
+              ))}
+
+            {/* 本人のページの最下部に投稿への導線（CTA）。投稿ゼロ時は上の空状態内に出すため重複させない。 */}
+            {isOwner && (featuredImages.length > 0 || recentImages.length > 0) && (
+              <Link
+                href="/create"
+                className="flex items-center justify-center gap-2 rounded-md bg-brand px-6 py-3 text-base font-semibold text-brand-foreground shadow-sm transition-colors hover:bg-brand/90"
+              >
+                <ImagePlus className="h-5 w-5" />
+                写真を投稿する
+              </Link>
             )}
           </div>
         </TabTransition>
