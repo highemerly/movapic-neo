@@ -77,6 +77,12 @@ App Router の `<Link>` はビューポート進入で RSC ペイロードを自
 - 主要動線だけ `<Link prefetch>` でオプトイン。**同一URLは1箇所だけ** prefetch（複数だと同時発火でキャッシュミスし重複リクエスト）。
 - 現在のオプトイン箇所は `/u/[username]` タブ・`/dashboard` の「あなたの情報」。メニューは共有スライドメニュー（[AppMenu.tsx](src/components/layout/AppMenu.tsx)）に統合済みで既定 prefetch 無効。
 
+### タイムライン更新（reconcile / PTR / 画像キャッシュ）
+一覧（`/public`・同じサーバー・`/favorite`・`/u/[username]/photos`）は共通フック [useInfiniteImages.ts](src/hooks/useInfiniteImages.ts)。
+- 更新は **reconcile 型**（最新ページで head を作り直し・古い tail は維持）。prepend だと削除/編集が消えず残るため。ロジックは [`reconcileTimeline`](src/lib/pagination.ts)。永続化は [useTimelinePersistence.ts](src/hooks/useTimelinePersistence.ts)（sessionStorage・復元後 reconcile）。可視化は `.tl-enter`・「N件の新着」ピル・PTR完了✓。
+- **カスタムPTR**（[PullToRefresh.tsx](src/components/PullToRefresh.tsx)・layout に1個）は **standalone PWA 限定**（iOSはネイティブPTR無し／Androidは全リロードのため自前化。タブは触らない）。一覧は `useRegisterPullToRefresh(refresh)` で in-place 更新、他ページは `location.reload`。Android ネイティブPTRは `overscroll-behavior:contain` で抑止。
+- **SW画像キャッシュ**（[public/sw.js](public/sw.js)）: iOS が画像を退避し再DLするため、投稿画像をパス `/YYYY/MM/DD/` で CacheFirst（FIFO50・cors非opaque）。
+
 ### プライバシー制御
 - `User.blockCrawlers` フラグで検索（noindexメタ）とAI Bot（robots.txt Disallow）をユーザー単位制御・`revalidateTag`で即反映。
 
