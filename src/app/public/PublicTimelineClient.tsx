@@ -10,6 +10,7 @@ import { useInfiniteImages } from "@/hooks/useInfiniteImages";
 import { useTimelinePersistence } from "@/hooks/useTimelinePersistence";
 import { useRegisterPullToRefresh } from "@/components/PullToRefresh";
 import { NewItemsPill } from "@/components/gallery/NewItemsPill";
+import { RefreshResultPill } from "@/components/gallery/RefreshResultPill";
 
 type TimelineImage = TimelineCardImage;
 
@@ -36,7 +37,7 @@ export function PublicTimelineClient({
   const { restore, onChange } = useTimelinePersistence<TimelineImage>(
     `tl:public:${instancesParam ?? "all"}`
   );
-  const { images, isLoading, nextCursor, loaderRef, newIds, newCount, clearNewCount, refresh } = useInfiniteImages<TimelineImage>({
+  const { images, isLoading, nextCursor, loaderRef, newIds, newCount, clearNewCount, refreshResult, refresh } = useInfiniteImages<TimelineImage>({
     initialImages,
     // カーソルは生の initialImages 基準（フィルタ前）で決める。除外で表示が減っても
     // ページングは壊れない（loaderRef が見え続ければ次ページを自動取得して埋める）。
@@ -80,6 +81,7 @@ export function PublicTimelineClient({
           clearNewCount();
         }}
       />
+      <RefreshResultPill result={refreshResult} />
       <GalleryGrid
         images={images}
         getKey={(image) => image.id}

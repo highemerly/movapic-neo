@@ -349,9 +349,36 @@
   animation: pill-in 0.25s ease both;
 }
 
+/* 「最新です」ピルの一発表示（降りてきて少し留まり、自分でフェードアウト）。
+   reconcile が綺麗すぎて手動更新で無変化のとき「効いた？」となるのを補うため、
+   結果が最新だったことを一瞬だけ伝える。表示時間はフックの自動クローズと揃える。 */
+@keyframes pill-flash {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  8% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  85% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.pill-flash {
+  animation: pill-flash 1.6s ease both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tl-enter,
-  .pill-in {
+  .pill-in,
+  .pill-flash {
     animation: none;
   }
 }

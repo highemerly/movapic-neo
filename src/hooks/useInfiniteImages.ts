@@ -71,11 +71,18 @@ interface UseInfiniteImagesResult<T> {
   /** 新着ピルを消す（タップで先頭へ移動したとき等に呼ぶ）。 */
   clearNewCount: () => void;
   /**
+   * 手動更新（自前PTR）の結果表示用。PTR で reconcile が走った直後だけ非 null。
+   * count>0 なら「N件の更新」、0 なら「最新です」。数秒後に自動で null へ戻る。
+   * 自動更新（再前面化）では立てない＝手動操作の確認フィードバック専用。
+   */
+  refreshResult: { count: number } | null;
+  /**
    * 手動更新（自前 pull-to-refresh 用）。再前面化と同じ reconcile を走らせる。
    * ユーザー操作なので連打スロットルを飛ばす（force）。完了まで待てる Promise を返す。
+   * 解決値の showsPill は「結果ピルを出した（PTR自身の✓は不要）」ことを表す。
    * fetchFirstPage 未指定なら何もしない。
    */
-  refresh: () => Promise<void>;
+  refresh: () => Promise<{ showsPill: boolean }>;
 }
 
 // この位置より下（px）にスクロールしている時に来た新着だけ「N件の新着」ピルに積む
@@ -119,6 +126,16 @@ export function useInfiniteImages<T extends { id: string }>({
   // スクロール中に積まれた新着の累計（「N件の新着」ピル用）。
   const [newCount, setNewCount] = useState(0);
   const clearNewCount = useCallback(() => setNewCount(0), []);
+  // 手動更新の結果（「N件の更新」／「最新です」ピル用）。数秒後に自動で null へ戻す。
+  const [refreshResult, setRefreshResult] = useState<{ count: number } | null>(
+    null
+  );
+  const refreshResultTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (refreshResultTimer.current) clearTimeout(refreshResultTimer.current);
+    };
+  }, []);
   const loaderRef = useRef<HTMLDivElement>(null);
 
   // 先頭付近へ戻ったら新着ピルを消す（スクロールで自然に見えたら不要になるため）。
@@ -165,7 +182,9 @@ export function useInfiniteImages<T extends { id: string }>({
   }, [images, nextCursor]);
 
   // 更新効果の内部 refresh を手動更新（自前PTR）から叩くための橋渡し。
-  const refreshRef = useRef<((force?: boolean) => Promise<void>) | null>(null);
+  const refreshRef = useRef<
+    ((force?: boolean) => Promise<{ showsPill: boolean }>) | null
+  >(null);
 
   // prepend した id のアニメ印は一定時間後に外す（DOM は残し class だけ落とす）。
   const clearNewIdsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -261,11 +280,22 @@ export function useInfiniteImages<T extends { id: string }>({
       clearNewIdsTimer.current = setTimeout(() => setNewIds(new Set()), 700);
     };
 
+    const flashRefreshResult = (result: { count: number }) => {
+      setRefreshResult(result);
+      if (refreshResultTimer.current) clearTimeout(refreshResultTimer.current);
+      // CSS の pill-flash（1.6s）と揃える。
+      refreshResultTimer.current = setTimeout(() => setRefreshResult(null), 1600);
+    };
+
     // 最新ページ（サーバ真実）で head を作り直す。tail（窓より古い既存要素）は維持する。
     // マージ判定は純粋ロジック reconcileTimeline に委譲（テスト済み）。
-    const reconcile = (page: InfiniteImagesPage<T>) => {
+    // added=新規に取り込んだ件数、changed=id 列が prev と少しでも変わったか（削除・並び替え含む）。
+    const reconcile = (
+      page: InfiniteImagesPage<T>
+    ): { added: number; changed: boolean } => {
+      const prevImages = imagesRef.current;
       const res = reconcileTimeline(
-        imagesRef.current,
+        prevImages,
         keep(page.images),
         page.hasMore,
         page.nextCursor
@@ -282,25 +312,41 @@ export function useInfiniteImages<T extends { id: string }>({
       ) {
         setNewCount((c) => c + res.newIds.size);
       }
+      const changed =
+        res.images.length !== prevImages.length ||
+        res.images.some((img, i) => img.id !== prevImages[i]?.id);
+      return { added: res.newIds.size, changed };
     };
 
     // force=true は連打スロットルを飛ばす（ユーザー操作の pull-to-refresh 用）。
     // 同時実行ガード（refreshing）は force でも維持する。
-    const refresh = async (force = false) => {
-      if (refreshing) return;
+    // 手動更新（force）のときだけ結果ピルを一瞬出す（新規 added>0→「N件の更新」／無変化→「最新です」）。
+    // 削除・並び替えのみ（added=0 だが changed）は画面が動くのでピルは出さず PTR の✓に任せる。
+    // 自動更新（force=false）は従来どおり無音。
+    const refresh = async (force = false): Promise<{ showsPill: boolean }> => {
+      if (refreshing) return { showsPill: false };
       // performance.now は Date と違い単調増加で環境依存が少ない。
       const now = typeof performance !== "undefined" ? performance.now() : 0;
-      if (!force && now - lastRefreshedAt < MIN_INTERVAL_MS) return;
+      if (!force && now - lastRefreshedAt < MIN_INTERVAL_MS)
+        return { showsPill: false };
       refreshing = true;
+      let showsPill = false;
       try {
         const first = fetchFirstPageRef.current;
-        if (first) reconcile(await first());
+        if (first) {
+          const { added, changed } = reconcile(await first());
+          if (force && (added > 0 || !changed)) {
+            flashRefreshResult({ count: added });
+            showsPill = true;
+          }
+        }
         lastRefreshedAt = typeof performance !== "undefined" ? performance.now() : 0;
       } catch (error) {
         console.error("Refresh error:", error);
       } finally {
         refreshing = false;
       }
+      return { showsPill };
     };
     // 手動更新（自前PTR）から叩けるよう ref に載せる。
     refreshRef.current = refresh;
@@ -338,7 +384,10 @@ export function useInfiniteImages<T extends { id: string }>({
   }, []);
 
   // 手動更新の安定した公開ハンドル（自前 pull-to-refresh から呼ぶ）。
-  const refresh = useCallback(() => refreshRef.current?.(true) ?? Promise.resolve(), []);
+  const refresh = useCallback(
+    () => refreshRef.current?.(true) ?? Promise.resolve({ showsPill: false }),
+    []
+  );
 
   return {
     images,
@@ -348,6 +397,7 @@ export function useInfiniteImages<T extends { id: string }>({
     newIds,
     newCount,
     clearNewCount,
+    refreshResult,
     refresh,
   };
 }

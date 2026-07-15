@@ -9,6 +9,7 @@ import { useInfiniteImages } from "@/hooks/useInfiniteImages";
 import { useTimelinePersistence } from "@/hooks/useTimelinePersistence";
 import { useRegisterPullToRefresh } from "@/components/PullToRefresh";
 import { NewItemsPill } from "@/components/gallery/NewItemsPill";
+import { RefreshResultPill } from "@/components/gallery/RefreshResultPill";
 
 interface GalleryImage {
   id: string;
@@ -45,7 +46,7 @@ export function UserGalleryClient({
   const { restore, onChange } = useTimelinePersistence<GalleryImage>(
     `tl:user:${username}`
   );
-  const { images, isLoading, nextCursor, loaderRef, newIds, newCount, clearNewCount, refresh } = useInfiniteImages<GalleryImage>({
+  const { images, isLoading, nextCursor, loaderRef, newIds, newCount, clearNewCount, refreshResult, refresh } = useInfiniteImages<GalleryImage>({
     initialImages,
     initialCursor:
       initialImages.length >= 20
@@ -84,6 +85,7 @@ export function UserGalleryClient({
           clearNewCount();
         }}
       />
+      <RefreshResultPill result={refreshResult} />
       <GalleryGrid
         images={images}
         getKey={(image) => image.id}

@@ -13,7 +13,9 @@ import {
 } from "react";
 import { Check, RefreshCw } from "lucide-react";
 
-type RefreshHandler = () => Promise<void>;
+// 解決値の showsPill=true は「一覧側が結果ピル（N件の更新／最新です）を出した」。この場合は
+// PTR 自身の完了✓は出さず（二重表示を避けて）引っ込める。
+type RefreshHandler = () => Promise<{ showsPill?: boolean } | void>;
 
 // 現在ページが「in-place 更新ハンドラ」を登録するための context。
 // 登録があればリロードせずそれを呼ぶ。無ければ location.reload にフォールバック。
@@ -161,21 +163,28 @@ function PullToRefresh({
       const handler = handlerRef.current;
       if (handler) {
         // 一覧ページ: in-place 更新（リロードしない）。
+        let showsPill = false;
         try {
-          await handler();
+          const result = await handler();
+          showsPill = !!(result && result.showsPill);
         } catch {
           // 更新側でログ済み。ここは指標を戻すだけ。
         } finally {
           refreshingRef.current = false;
           setRefreshing(false);
-          // 完了をチェックマークで一瞬見せてから引っ込める（しきい値位置で保持）。
-          setDone(true);
-          set(THRESHOLD);
-          if (doneTimer.current) clearTimeout(doneTimer.current);
-          doneTimer.current = setTimeout(() => {
-            setDone(false);
+          if (showsPill) {
+            // 一覧側が結果ピル（N件の更新／最新です）を出す。PTR の✓は出さず静かに引っ込める。
             set(0);
-          }, 650);
+          } else {
+            // 完了をチェックマークで一瞬見せてから引っ込める（しきい値位置で保持）。
+            setDone(true);
+            set(THRESHOLD);
+            if (doneTimer.current) clearTimeout(doneTimer.current);
+            doneTimer.current = setTimeout(() => {
+              setDone(false);
+              set(0);
+            }, 650);
+          }
         }
       } else {
         // それ以外: スピナーを一瞬見せてからリロード。

@@ -8,6 +8,7 @@ import {
 import { useInfiniteImages } from "@/hooks/useInfiniteImages";
 import { useRegisterPullToRefresh } from "@/components/PullToRefresh";
 import { NewItemsPill } from "@/components/gallery/NewItemsPill";
+import { RefreshResultPill } from "@/components/gallery/RefreshResultPill";
 
 type FavoriteImage = TimelineCardImage;
 
@@ -22,7 +23,7 @@ export function FavoritesClient({
   publicUrl,
   initialCursor,
 }: FavoritesClientProps) {
-  const { images, isLoading, nextCursor, loaderRef, newCount, clearNewCount, refresh } = useInfiniteImages<FavoriteImage>({
+  const { images, isLoading, nextCursor, loaderRef, newCount, clearNewCount, refreshResult, refresh } = useInfiniteImages<FavoriteImage>({
     initialImages,
     initialCursor,
     fetchPage: async (cursor) => {
@@ -50,6 +51,7 @@ export function FavoritesClient({
           clearNewCount();
         }}
       />
+      <RefreshResultPill result={refreshResult} />
       <GalleryGrid
         images={images}
         getKey={(image) => image.id}
