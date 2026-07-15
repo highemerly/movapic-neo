@@ -275,11 +275,12 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
           canMute={canMute}
         />
 
-        {/* 概要（ホーム）本文。プロフィールカード的に読みやすい幅で中央寄せ。 */}
+        {/* 概要（ホーム）本文。フィード（注目/最近）はPCで2列に広げるため外枠を広めに取り、
+            概要ボタンや空状態・CTAなど読み物系は内側で max-w-2xl に絞って幅を揃える。 */}
         <TabTransition tab="home">
-          <div className="mx-auto max-w-2xl space-y-4">
-            {/* 概要: 見出し → 各タブへの4ボタン → 自己紹介・登録日・連続投稿 */}
-            <section className="space-y-3">
+          <div className="mx-auto max-w-4xl space-y-4">
+            {/* 概要: 見出し → 各タブへの4ボタン → 自己紹介・登録日・連続投稿。左揃えで幅のみ制限。 */}
+            <section className="w-full max-w-2xl space-y-3">
               <h2 className="text-sm font-semibold">概要</h2>
 
               {/* 統計ボタン（各タブへの入口）。ダッシュボードの「あなたの情報」と同じ4指標。 */}
@@ -359,15 +360,18 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
             {featuredImages.length > 0 && (
               <section className="space-y-2">
                 <h2 className="text-sm font-semibold">注目の投稿</h2>
-                {featuredImages.map((img) => (
-                  <ProfileFeedCard
-                    key={img.id}
-                    image={img}
-                    seg={seg}
-                    publicUrl={publicUrl}
-                    isPinned={pinnedIds.has(img.id)}
-                  />
-                ))}
+                {/* PCは2列（md:grid-cols-2）・モバイルは1列。 */}
+                <div className="grid gap-2 md:grid-cols-2">
+                  {featuredImages.map((img) => (
+                    <ProfileFeedCard
+                      key={img.id}
+                      image={img}
+                      seg={seg}
+                      publicUrl={publicUrl}
+                      isPinned={pinnedIds.has(img.id)}
+                    />
+                  ))}
+                </div>
               </section>
             )}
 
@@ -375,23 +379,27 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
             {recentImages.length > 0 && (
               <section className="space-y-2">
                 <h2 className="text-sm font-semibold">最近の投稿</h2>
-                {recentImages.map((img) => (
-                  <ProfileFeedCard key={img.id} image={img} seg={seg} publicUrl={publicUrl} />
-                ))}
-                <Link
-                  href={`/u/${seg}/photos`}
-                  className="flex items-center justify-center gap-0.5 rounded-lg border p-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
-                >
-                  すべて見る
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
+                {/* PCは2列。「すべて見る」はカードと同じグリッドの1セルとして続けて置く。 */}
+                <div className="grid gap-2 md:grid-cols-2">
+                  {recentImages.map((img) => (
+                    <ProfileFeedCard key={img.id} image={img} seg={seg} publicUrl={publicUrl} />
+                  ))}
+                  {/* 「すべて見る」はグリッド幅いっぱい（2列にまたがる）に置く。 */}
+                  <Link
+                    href={`/u/${seg}/photos`}
+                    className="flex items-center justify-center gap-0.5 rounded-lg border p-3 text-sm text-muted-foreground hover:bg-muted/50 transition-colors md:col-span-2"
+                  >
+                    すべて見る
+                    <ChevronRight className="h-4 w-4" />
+                  </Link>
+                </div>
               </section>
             )}
 
             {/* 投稿がまだ無いとき。本人には投稿を促す文言＋CTA、他者には案内のみ。 */}
             {featuredImages.length === 0 && recentImages.length === 0 &&
               (isOwner ? (
-                <div className="rounded-lg border bg-muted/30 p-8 text-center space-y-4">
+                <div className="mx-auto w-full max-w-2xl rounded-lg border bg-muted/30 p-8 text-center space-y-4">
                   <p className="text-sm text-muted-foreground">
                     まだ投稿がありません。
                     <br />
@@ -406,7 +414,7 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
                   </Link>
                 </div>
               ) : (
-                <div className="rounded-lg border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
+                <div className="mx-auto w-full max-w-2xl rounded-lg border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
                   まだ投稿がありません。
                 </div>
               ))}
@@ -415,7 +423,7 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
             {isOwner && (featuredImages.length > 0 || recentImages.length > 0) && (
               <Link
                 href="/create"
-                className="flex items-center justify-center gap-2 rounded-md bg-brand px-6 py-3 text-base font-semibold text-brand-foreground shadow-sm transition-colors hover:bg-brand/90"
+                className="flex w-full items-center justify-center gap-2 rounded-md bg-brand px-6 py-3 text-base font-semibold text-brand-foreground shadow-sm transition-colors hover:bg-brand/90"
               >
                 <ImagePlus className="h-5 w-5" />
                 写真を投稿する
