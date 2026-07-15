@@ -115,17 +115,17 @@ describe("POST /api/v1/generate: バリデーション（統一エラー形 {suc
 });
 
 describe("POST /api/v1/generate: レート制限", () => {
-  it("同一IPの連続リクエストは2回目が429（Retry-Afterヘッダー付き）", async () => {
+  it("同一IPは10秒あたり2回まで許可し、3回目が429（Retry-Afterヘッダー付き）", async () => {
     mockRender.mockResolvedValue(okResult());
     const ip = "rate-limit-ip";
 
-    const first = await POST(makeReq({}, ip));
-    expect(first.status).toBe(200);
+    expect((await POST(makeReq({}, ip))).status).toBe(200);
+    expect((await POST(makeReq({}, ip))).status).toBe(200);
 
-    const second = await POST(makeReq({}, ip));
-    expect(second.status).toBe(429);
-    expect(second.headers.get("Retry-After")).toBeTruthy();
-    expect((await errorBody(second)).error.code).toBe(ErrorCodes.RATE_LIMIT);
+    const third = await POST(makeReq({}, ip));
+    expect(third.status).toBe(429);
+    expect(third.headers.get("Retry-After")).toBeTruthy();
+    expect((await errorBody(third)).error.code).toBe(ErrorCodes.RATE_LIMIT);
   });
 });
 

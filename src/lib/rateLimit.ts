@@ -1,33 +1,33 @@
 /**
- * シンプルなIPベースのレート制限
- * 前回アクセスから指定秒数以内のリクエストを拒否する
+ * IPベースのスライディングウィンドウ・レート制限（画像プレビュー生成用）。
+ * ウィンドウ内の許可回数を超えたリクエストを拒否する。
+ * Web Pod は1インスタンス前提のため、分散共有せずインメモリで判定する。
  */
 
-const lastAccessMap = new Map<string, number>();
+// キー（IP）ごとの、直近ウィンドウ内アクセス時刻（昇順）。
+const accessLog = new Map<string, number[]>();
 
-// 設定
-const RATE_LIMIT_MS = 8000; // 8秒
+// 画像プレビュー生成: WINDOW 内で MAX 回まで許可する。
+// NOTE: この2値は将来的に環境変数へ切り出す想定（公開リポジトリで閾値を隠すため）。現状はハードコード。
+const PREVIEW_WINDOW_MS = 10_000; // 10秒
+const PREVIEW_MAX = 2; // 10秒あたり2回
+
 const CLEANUP_INTERVAL_MS = 60000; // 1分ごとにクリーンアップ
-const ENTRY_TTL_MS = 60000; // 1分以上古いエントリは削除
-
 let lastCleanup = Date.now();
 
 /**
- * 古いエントリを削除してメモリリークを防止
+ * ウィンドウより古い記録しか残っていないキーを削除してメモリリークを防止する。
  */
-function cleanupOldEntries(): void {
-  const now = Date.now();
-
-  // クリーンアップ間隔が経過していない場合はスキップ
+function cleanupOldEntries(now: number): void {
   if (now - lastCleanup < CLEANUP_INTERVAL_MS) {
     return;
   }
-
   lastCleanup = now;
 
-  for (const [ip, timestamp] of lastAccessMap.entries()) {
-    if (now - timestamp > ENTRY_TTL_MS) {
-      lastAccessMap.delete(ip);
+  for (const [ip, times] of accessLog.entries()) {
+    // 直近の記録すらウィンドウ外なら、このキーは丸ごと不要
+    if (times.length === 0 || now - times[times.length - 1] > PREVIEW_WINDOW_MS) {
+      accessLog.delete(ip);
     }
   }
 }
@@ -42,22 +42,22 @@ export function checkRateLimit(ip: string): {
   retryAfter?: number;
 } {
   const now = Date.now();
+  cleanupOldEntries(now);
 
-  // 定期的にクリーンアップを実行
-  cleanupOldEntries();
+  const windowStart = now - PREVIEW_WINDOW_MS;
+  // ウィンドウ外の古い記録を落とす
+  const times = (accessLog.get(ip) ?? []).filter((t) => t > windowStart);
 
-  const lastAccess = lastAccessMap.get(ip);
-
-  if (lastAccess) {
-    const elapsed = now - lastAccess;
-    if (elapsed < RATE_LIMIT_MS) {
-      const retryAfter = Math.ceil((RATE_LIMIT_MS - elapsed) / 1000);
-      return { allowed: false, retryAfter };
-    }
+  if (times.length >= PREVIEW_MAX) {
+    // 最も古い記録がウィンドウから外れれば1枠空く
+    const retryAfter = Math.ceil((times[0] + PREVIEW_WINDOW_MS - now) / 1000);
+    // 拒否時も掃除済みの配列を書き戻す（際限なく伸びるのを防ぐ）
+    accessLog.set(ip, times);
+    return { allowed: false, retryAfter };
   }
 
-  // アクセス時刻を記録
-  lastAccessMap.set(ip, now);
+  times.push(now);
+  accessLog.set(ip, times);
   return { allowed: true };
 }
 

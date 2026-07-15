@@ -5,12 +5,14 @@
 ## POST /api/v1/generate
 - multipart/form-data。パラメータは入力オプションの API値（image/text/position/font/color/size/output）。
 - **レスポンス**: image/jpeg または image/avif（バイナリ）。ヘッダー: Content-Type, Content-Length, Content-Disposition, Cache-Control。
+- **レート制限**（IP単位・[rateLimit.ts](../src/lib/rateLimit.ts)）: スライディングウィンドウ方式。超過で 429（Retry-After付き）。Web Pod 1台前提のインメモリ判定。
 - **エラー**: `{ success: false, error: { code, message, suggestion?, requestId? } }`
 
 ## POST /api/v1/post
 - multipart/form-data・**認証必須**（JWT）。
 - パラメータ: image(生成済Blob), text, position/font/color/size/output（生成オプション）, mimeType, visibility(`public`/`unlisted`/`local`), altText(任意・画像の代替テキスト)。
 - **処理**: R2アップロード → DB保存 → Fediverse投稿（local時はスキップ）。
+- **レート制限**（ユーザー単位・[postRateLimit.ts](../src/lib/postRateLimit.ts)）: 認証直後、重い画像処理の前に判定。①直近15分の投稿数 ②直近24時間の投稿数（上限は直近1週間の投稿数に応じて増える）の2窓を、Image履歴の1クエリで算出。超過で 429（Retry-After付き）。
 - **レスポンス**: `{ success, imageId, imagePageUrl, postUrl? }`
 
 ## POST /api/v1/ingest/email（内部API・worker-front配信）

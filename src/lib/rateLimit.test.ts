@@ -10,36 +10,45 @@ describe("checkRateLimit", () => {
     vi.useRealTimers();
   });
 
-  it("初回は許可、8秒以内の再アクセスは retryAfter つきで拒否", () => {
+  it("10秒あたり2回まで許可、3回目は retryAfter つきで拒否", () => {
     const ip = "win-1";
-    expect(checkRateLimit(ip)).toEqual({ allowed: true });
-    // 直後は残り8秒
-    expect(checkRateLimit(ip)).toEqual({ allowed: false, retryAfter: 8 });
-    // 3秒経過で残り5秒（切り上げ）
+    expect(checkRateLimit(ip)).toEqual({ allowed: true }); // t=0
+    expect(checkRateLimit(ip)).toEqual({ allowed: true }); // t=0（2回目まではOK）
+    // 3回目は拒否。最古(t=0)がウィンドウを抜ける t=10000 まで残り10秒
+    expect(checkRateLimit(ip)).toEqual({ allowed: false, retryAfter: 10 });
+    // 3秒経過で残り7秒（切り上げ）
     vi.advanceTimersByTime(3000);
-    expect(checkRateLimit(ip)).toEqual({ allowed: false, retryAfter: 5 });
+    expect(checkRateLimit(ip)).toEqual({ allowed: false, retryAfter: 7 });
   });
 
-  it("8秒経過後は再び許可される", () => {
+  it("最古の記録がウィンドウを抜ければ1枠空く", () => {
     const ip = "win-2";
-    expect(checkRateLimit(ip).allowed).toBe(true);
-    vi.advanceTimersByTime(8000);
-    expect(checkRateLimit(ip).allowed).toBe(true);
+    expect(checkRateLimit(ip).allowed).toBe(true); // t=0
+    vi.advanceTimersByTime(4000);
+    expect(checkRateLimit(ip).allowed).toBe(true); // t=4000（2枠使用）
+    expect(checkRateLimit(ip).allowed).toBe(false); // t=4000 3回目は拒否
+    vi.advanceTimersByTime(6001); // t=10001（t=0 の記録がウィンドウ外に）
+    expect(checkRateLimit(ip).allowed).toBe(true); // 1枠空いて許可
+    // ただし t=4000 の記録はまだ生きているので、直後の追加は拒否
+    expect(checkRateLimit(ip).allowed).toBe(false);
   });
 
-  it("拒否されたリクエストは基準時刻を更新しない（窓は初回許可からの8秒）", () => {
+  it("拒否されたリクエストは記録を増やさない（窓は許可された時刻基準）", () => {
     const ip = "win-3";
-    expect(checkRateLimit(ip).allowed).toBe(true); // t=0 記録
+    expect(checkRateLimit(ip).allowed).toBe(true); // t=0
+    expect(checkRateLimit(ip).allowed).toBe(true); // t=0
     vi.advanceTimersByTime(5000);
-    expect(checkRateLimit(ip).allowed).toBe(false); // 拒否（更新しない）
-    vi.advanceTimersByTime(3000); // t=8000（初回から8秒）
+    expect(checkRateLimit(ip).allowed).toBe(false); // t=5000 拒否（記録しない）
+    vi.advanceTimersByTime(5000); // t=10000（最初の2件がウィンドウ外に）
+    expect(checkRateLimit(ip).allowed).toBe(true);
     expect(checkRateLimit(ip).allowed).toBe(true);
   });
 
   it("IPごとに独立して判定する", () => {
     expect(checkRateLimit("indep-a").allowed).toBe(true);
-    expect(checkRateLimit("indep-b").allowed).toBe(true); // 別IPは即許可
-    expect(checkRateLimit("indep-a").allowed).toBe(false); // 同IPは拒否
+    expect(checkRateLimit("indep-a").allowed).toBe(true); // 同IP2回目まで許可
+    expect(checkRateLimit("indep-b").allowed).toBe(true); // 別IPは影響を受けず許可
+    expect(checkRateLimit("indep-a").allowed).toBe(false); // 同IP3回目は拒否
   });
 
   it("クリーンアップ間隔を超えても正常に判定できる（古いエントリのGC経路）", () => {

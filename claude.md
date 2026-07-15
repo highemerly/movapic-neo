@@ -60,7 +60,7 @@
 - 代替テキスト(ALT)は `altText` を1本の配管で通す（`/api/v1/generate`には送らず`/api/v1/post`のFormDataのみ）。
 
 ### API（詳細: [docs/api.md](docs/api.md)）
-- レート制限8秒/1req（IP単位）・処理タイムアウト30秒（超過で504）・レスポンスにContent-Lengthを含む。
+- レート制限: プレビュー生成(`/api/v1/generate`)はIP単位のスライディングウィンドウ（[rateLimit.ts](src/lib/rateLimit.ts)）、投稿(`/api/v1/post`)はユーザー単位でDB履歴ベース（[postRateLimit.ts](src/lib/postRateLimit.ts)・15分/24時間の2窓、24時間は直近1週間の投稿数で上限が上がる）。閾値定数は将来env切り出し予定。処理タイムアウト30秒（超過で504）・レスポンスにContent-Lengthを含む。
 - エラー形式は `{ success:false, error:{ code, message, suggestion?, requestId? } }`。
 
 ### テスト / CI

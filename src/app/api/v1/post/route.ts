@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserWithValidation } from "@/lib/auth/session";
+import { checkPostRateLimit } from "@/lib/postRateLimit";
 import { decryptToken } from "@/lib/auth/tokens";
 import { reverseGeocode } from "@/lib/geocode/gsi";
 import { userHasPostedLocation } from "@/lib/locations";
@@ -43,6 +44,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "認証が必要です" },
         { status: 401 }
+      );
+    }
+
+    // 投稿レート制限（ユーザー単位）。重い画像処理の前に弾く。
+    const rate = await checkPostRateLimit(user.id);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "投稿が多すぎます。しばらく待ってから再度お試しください。" },
+        {
+          status: 429,
+          headers: rate.retryAfter
+            ? { "Retry-After": String(rate.retryAfter) }
+            : undefined,
+        }
       );
     }
 

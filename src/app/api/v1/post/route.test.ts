@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 
 // 境界を全てモック（DB / R2 / Fediverse / compute / 逆ジオコーディングを読ませない）。
 vi.mock("@/lib/auth/session", () => ({ getCurrentUserWithValidation: vi.fn() }));
+vi.mock("@/lib/postRateLimit", () => ({ checkPostRateLimit: vi.fn() }));
 vi.mock("@/lib/auth/tokens", () => ({ decryptToken: vi.fn((t: string) => `dec:${t}`) }));
 vi.mock("@/lib/compute/client", () => ({ finalizeImage: vi.fn() }));
 vi.mock("@/lib/publish/publishImage", () => ({ publishImage: vi.fn() }));
@@ -11,12 +12,14 @@ vi.mock("@/lib/locations", () => ({ userHasPostedLocation: vi.fn() }));
 
 import { POST } from "./route";
 import { getCurrentUserWithValidation } from "@/lib/auth/session";
+import { checkPostRateLimit } from "@/lib/postRateLimit";
 import { finalizeImage } from "@/lib/compute/client";
 import { publishImage } from "@/lib/publish/publishImage";
 import { reverseGeocode } from "@/lib/geocode/gsi";
 import { MAX_FILE_SIZE, MAX_TEXT_LENGTH } from "@/types";
 
 const mockAuth = vi.mocked(getCurrentUserWithValidation);
+const mockRateLimit = vi.mocked(checkPostRateLimit);
 const mockFinalize = vi.mocked(finalizeImage);
 const mockPublish = vi.mocked(publishImage);
 const mockGeocode = vi.mocked(reverseGeocode);
@@ -62,11 +65,13 @@ const finalizeOk = () => ({
 
 beforeEach(() => {
   mockAuth.mockReset();
+  mockRateLimit.mockReset();
   mockFinalize.mockReset();
   mockPublish.mockReset();
   mockGeocode.mockReset();
-  // 既定: 認証OK・finalize成功・publish成功
+  // 既定: 認証OK・レート制限OK・finalize成功・publish成功
   mockAuth.mockResolvedValue(USER);
+  mockRateLimit.mockResolvedValue({ allowed: true });
   mockFinalize.mockResolvedValue(finalizeOk());
   mockPublish.mockResolvedValue({
     imageId: "img1",
@@ -87,6 +92,19 @@ describe("POST /api/v1/post: 認証", () => {
     const res = await POST(makeReq());
     expect(res.status).toBe(401);
     expect((await body(res)).error).toBe("認証が必要です");
+    expect(mockPublish).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/v1/post: レート制限", () => {
+  it("レート制限超過は 429（Retry-Afterヘッダー付き・画像処理せず）", async () => {
+    mockRateLimit.mockResolvedValue({ allowed: false, retryAfter: 120 });
+    const res = await POST(makeReq());
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("120");
+    expect((await body(res)).error).toContain("投稿が多すぎます");
+    // 重い処理の手前で弾く
+    expect(mockFinalize).not.toHaveBeenCalled();
     expect(mockPublish).not.toHaveBeenCalled();
   });
 });
