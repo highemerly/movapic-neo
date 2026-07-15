@@ -156,9 +156,9 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
     // OFFにする際は警告
     if (!next) {
       const confirmed = await confirm({
-        title: "「初期設定を保存する」を無効にする",
+        title: "「初期設定を変更する」を無効にする",
         description:
-          "保存済みの初期設定を全て削除し、サービスの初期値に戻します。\n本当によろしいですか？",
+          "保存済みのオプション設定を全て削除し、サービスの規定値に戻します。\n本当によろしいですか？",
         confirmText: "OFFにする",
         destructive: true,
       });
@@ -231,8 +231,8 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
       <div className="rounded-lg border">
         <SettingToggleRow
           bare
-          title="初期設定を保存する"
-          description="お好みの文字合成オプションを保存しておき、初期値として読み込みます。"
+          title="初期設定を変更する"
+          description="お好みの文字合成オプションを保存しておき、初期値として読み込むようにします。"
           checked={saveEnabled}
           onChange={handleToggleSave}
           disabled={isTogglingSave}

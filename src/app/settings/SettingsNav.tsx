@@ -106,14 +106,25 @@ export function SettingsNav() {
                 }}
                 onClick={() => setActiveId(id)}
                 aria-current={active ? "true" : undefined}
-                className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                  active
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-muted text-muted-foreground hover:bg-accent hover:text-foreground"
+                className={`relative flex shrink-0 items-center overflow-hidden rounded-full border px-3 py-1.5 text-xs font-medium transition-[border-color] duration-500 ease-out ${
+                  active ? "border-primary bg-muted" : "border-border bg-muted hover:bg-accent"
                 }`}
               >
-                <Icon className="h-3.5 w-3.5" />
-                {label}
+                {/* アクティブの塗りは重ねた層の opacity で表現し、切り替えを瞬時でなく徐々にフェードさせる */}
+                <span
+                  aria-hidden
+                  className={`absolute inset-0 bg-primary transition-opacity duration-500 ease-out ${
+                    active ? "opacity-100" : "opacity-0"
+                  }`}
+                />
+                <span
+                  className={`relative z-10 flex items-center gap-1.5 transition-colors duration-500 ease-out ${
+                    active ? "text-primary-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {label}
+                </span>
               </a>
             );
           })}
