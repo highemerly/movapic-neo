@@ -159,8 +159,8 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
   } as const;
 
   // 概要（ホーム）の表示データ。統計はユーザーページ各タブと共通の集計（getUserProfileStats）。
-  // ピン留め（最上位）／人気（お気に入り数順）／最近（新着）を取得。人気・最近は後で
-  // ピン留め・人気との重複を除いて各2件に絞るため、除外分を見込んで多めに取る。
+  // 注目の投稿=ピン留め（最上位）＋人気（お気に入り数順）、および最近（新着）を取得。
+  // 人気・最近は後でピン留め・人気との重複を除いて絞るため、除外分を見込んで多めに取る。
   const [profileStats, pinnedRaw, popularRaw, recentPool, perfectAttendance] =
     await Promise.all([
       getUserProfileStats(user.id),
@@ -219,12 +219,17 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
   const pinnedImages = pinnedRaw.map(toFeedImage);
   const pinnedIds = new Set(pinnedImages.map((img) => img.id));
 
-  // 人気はピン留めと重複しないものを先頭2件（ピン留めが上に出るため）。
+  // 注目の投稿はピン留めを最上位、続けてお気に入りの多い投稿を並べる。ピン留めが1件以上
+  // あればお気に入りは2件、ピン留めが無ければ3件まで拾い、注目枠の露出量を揃える。
+  const popularTake = pinnedImages.length > 0 ? 2 : 3;
   const popularImages = popularRaw
     .filter((img) => !pinnedIds.has(img.id))
-    .slice(0, 2)
+    .slice(0, popularTake)
     .map(toFeedImage);
   const popularIds = new Set(popularImages.map((img) => img.id));
+
+  // 注目の投稿（ピン留め→人気）を1枠にまとめて表示する。
+  const featuredImages = [...pinnedImages, ...popularImages];
 
   // 最近はピン留め・人気に出したものを除いて先頭2件（同じ投稿の二重掲載を避ける）。
   const recentImages = recentPool
@@ -350,21 +355,11 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
               </div>
             </section>
 
-            {/* ピン留めした投稿（あれば人気より上に固定表示） */}
-            {pinnedImages.length > 0 && (
+            {/* 注目の投稿（ピン留めを最上位・続けてお気に入りの多い投稿） */}
+            {featuredImages.length > 0 && (
               <section className="space-y-2">
-                <h2 className="text-sm font-semibold">ピン留めした投稿</h2>
-                {pinnedImages.map((img) => (
-                  <ProfileFeedCard key={img.id} image={img} seg={seg} publicUrl={publicUrl} />
-                ))}
-              </section>
-            )}
-
-            {/* 人気の投稿（お気に入り数順・最大2件） */}
-            {popularImages.length > 0 && (
-              <section className="space-y-2">
-                <h2 className="text-sm font-semibold">人気の投稿</h2>
-                {popularImages.map((img) => (
+                <h2 className="text-sm font-semibold">注目の投稿</h2>
+                {featuredImages.map((img) => (
                   <ProfileFeedCard key={img.id} image={img} seg={seg} publicUrl={publicUrl} />
                 ))}
               </section>
@@ -388,7 +383,7 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
             )}
 
             {/* 投稿がまだ無いとき */}
-            {pinnedImages.length === 0 && popularImages.length === 0 && recentImages.length === 0 && (
+            {featuredImages.length === 0 && recentImages.length === 0 && (
               <div className="rounded-lg border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
                 {isOwner
                   ? "まだ投稿がありません。写真を投稿すると、ここに表示されます。"
