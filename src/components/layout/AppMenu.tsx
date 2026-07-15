@@ -49,7 +49,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
-import { useUnseenNotifications } from "./useUnseenNotifications";
+import { useUnseenNotifications, useUnseenBadge } from "./useUnseenNotifications";
 
 /**
  * メニューの2つの姿:
@@ -651,7 +651,9 @@ function AppRail({ nav }: { nav: MenuNav }) {
 
   // 通知の未読ドット（PCはヘッダーのベルを廃し、このレールの「通知」だけで既読管理する）。
   // 取得は NotificationsProvider が1回だけ行い、ここは共有状態を読むだけ（未ログインは未取得）。
-  const { hasUnseen, markSeen } = useUnseenNotifications();
+  // ドット表示は useUnseenBadge（マウント後のみ true）で hydration mismatch を避ける。
+  const { markSeen } = useUnseenNotifications();
+  const hasUnseen = useUnseenBadge();
 
   const [expanded, setExpanded] = useState(false);
   const collapse = useCallback(() => setExpanded(false), []);

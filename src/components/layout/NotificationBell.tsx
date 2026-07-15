@@ -13,10 +13,12 @@ import {
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { favoriteNotificationText, formatNotificationDate } from "@/lib/notifications/format";
-import { useUnseenNotifications } from "./useUnseenNotifications";
+import { useUnseenNotifications, useUnseenBadge } from "./useUnseenNotifications";
 
 export function NotificationBell() {
   const { notifications, hasUnseen, markSeen } = useUnseenNotifications();
+  // ドット表示はマウント後のみ true（hydration mismatch 回避）。開閉時の既読化は hasUnseen を使う。
+  const showUnseenDot = useUnseenBadge();
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
@@ -36,7 +38,7 @@ export function NotificationBell() {
           className="relative text-muted-foreground hover:text-foreground"
         >
           <Bell className="size-5" />
-          {hasUnseen && (
+          {showUnseenDot && (
             <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-red-500" />
           )}
           <span className="sr-only">通知を開く</span>

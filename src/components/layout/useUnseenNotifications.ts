@@ -7,6 +7,7 @@ import {
   useContext,
   useEffect,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { markNotificationsSeen } from "@/app/actions/notifications";
@@ -127,4 +128,29 @@ export function NotificationsProvider({
  */
 export function useUnseenNotifications(): NotificationsValue {
   return useContext(NotificationsContext) ?? EMPTY;
+}
+
+/**
+ * 赤ドット描画用に、マウント（ハイドレーション完了）後のみ hasUnseen を返す。
+ *
+ * pitfall: hasUnseen は fetch/Cookie 由来のクライアント専用状態。ストリーミングSSR +
+ * <Suspense> 下では、AppRail 等の遅延ハイドレートするサブツリーが provider 更新後の値
+ * （true）を読んでドットを描画し、サーバHTML（ドット無し）と食い違って hydration mismatch に
+ * なる。各消費側で「自分のマウント後」にのみ true を返すことで、初回ハイドレーション描画を
+ * 必ずサーバと一致させる（provider 側の mounted では遅延サブツリーに間に合わず不可）。
+ *
+ * hydration 判定は useSyncExternalStore を使う。getServerSnapshot=false がハイドレーション
+ * 描画でも使われるため、初回は必ず false でサーバと一致し、以後クライアントで true になる
+ * （effect 内 setState を使わないので cascading render も起こさない）。
+ */
+const emptySubscribe = () => () => {};
+
+export function useUnseenBadge(): boolean {
+  const { hasUnseen } = useUnseenNotifications();
+  const hydrated = useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false
+  );
+  return hydrated && hasUnseen;
 }
