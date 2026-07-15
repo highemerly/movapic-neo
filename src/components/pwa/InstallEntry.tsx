@@ -36,9 +36,9 @@ function usePwaInstallState() {
 }
 
 /**
- * dashboard「設定を変更する → 一般」の最下部に置く、控えめなインストール導線。
+ * 設定ページの最下部に置く、控えめなインストール導線。
  *
- * - **iOS Safari**: 説明用の専用ページ（/dashboard/install）へ遷移するリンク。
+ * - **iOS Safari**: 説明用の専用ページ（/settings/install）へ遷移するリンク。
  * - **Android（インストール可能なとき）**: タップで beforeinstallprompt を発火（行ボタン）。
  * - デスクトップ／インストール済み／Android非対応時は何も出さない。
  *
@@ -56,7 +56,7 @@ export function InstallEntry() {
   if (showIos) {
     return (
       <SettingLinkRow
-        href="/dashboard/install"
+        href="/settings/install"
         title="ホーム画面に追加する"
         description="アプリのように起動できます。"
       />

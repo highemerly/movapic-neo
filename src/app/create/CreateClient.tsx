@@ -47,6 +47,7 @@ import {
   type ParsedApiError,
 } from "@/lib/errors";
 import { extractExif, type ExtractedExif } from "@/lib/exif/parser";
+import { userPathSegment } from "@/lib/userHandle";
 import {
   uploadWithProgress,
   UploadError,
@@ -696,7 +697,9 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
           : "";
         router.push(`${path}${sep}posted=1${federr}`);
       } else {
-        router.push("/dashboard");
+        // imagePageUrl が返らなかった稀なケースのフォールバック。投稿は保存済みなので、
+        // 自分のユーザーページへ送って保存物を確認できるようにする。
+        router.push(`/u/${userPathSegment(user.username, user.instance.domain)}`);
       }
     } catch (err) {
       if (err instanceof UploadError) {

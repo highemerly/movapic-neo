@@ -33,7 +33,7 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
         <div className="container mx-auto px-4 max-w-6xl">
           {/* 行の高さは PC レール（AppRail）の開閉トグル（h-12）と揃える。スマホも同じ。 */}
           <div className="flex h-12 items-center justify-between">
-            <Link href="/dashboard" className="flex items-center hover:opacity-80 transition-opacity">
+            <Link href="/public" className="flex items-center hover:opacity-80 transition-opacity">
               <Image src="/shamezo_logo.svg" alt="SHAMEZO" width={160} height={29} priority />
             </Link>
 

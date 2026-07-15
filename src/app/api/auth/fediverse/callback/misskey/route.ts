@@ -8,6 +8,7 @@ import { cookies } from "next/headers";
 import { nanoid } from "nanoid";
 import { checkMisskeySession } from "@/lib/auth/fediverse";
 import { verifyMiAuthSignature, sanitizeRedirectUrl } from "@/lib/auth/crypto";
+import { resolveLoginRedirect } from "@/lib/auth/loginRedirect";
 import { encryptToken } from "@/lib/auth/tokens";
 import { createSession, getCurrentUser } from "@/lib/auth/session";
 import { extractLoginRequestInfo } from "@/lib/auth/requestInfo";
@@ -58,7 +59,12 @@ export async function GET(request: NextRequest) {
       const existingUser = await getCurrentUser();
       if (existingUser) {
         console.warn("[miauth] duplicate misskey callback detected; treating as success");
-        return NextResponse.redirect(new URL(redirectTo, baseUrl));
+        const dupRedirect = resolveLoginRedirect(redirectTo, {
+          isNewUser: false,
+          username: existingUser.username,
+          instanceDomain: existingUser.instance.domain,
+        });
+        return NextResponse.redirect(new URL(dupRedirect, baseUrl));
       }
       return NextResponse.redirect(new URL("/?error=invalid_state", baseUrl));
     }
@@ -139,9 +145,13 @@ export async function GET(request: NextRequest) {
       extractLoginRequestInfo(request)
     );
 
-    // リダイレクト。初回ログインで遷移先が既定（/dashboard）のときだけ /create?welcome=1 へ。
-    const finalRedirect =
-      isNewUser && redirectTo === "/dashboard" ? "/create?welcome=1" : redirectTo;
+    // 遷移先が既定（/dashboard センチネル）のときは、初回ログインなら /create?welcome=1、
+    // 既存ユーザーなら自分のユーザーページへ。明示的な returnTo はそのまま尊重する。
+    const finalRedirect = resolveLoginRedirect(redirectTo, {
+      isNewUser,
+      username: user.username,
+      instanceDomain: instance.domain,
+    });
     return NextResponse.redirect(new URL(finalRedirect, baseUrl));
   } catch (error) {
     console.error("MiAuth callback error:", error);

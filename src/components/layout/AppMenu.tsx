@@ -19,7 +19,6 @@ import {
   Server,
   Shuffle,
   Heart,
-  LayoutDashboard,
   Bell,
   Images,
   Calendar,
@@ -219,19 +218,11 @@ function useMenuSections(nav: MenuNav): MenuSectionData[] {
       title: "あなたの情報",
       items: [
         {
-          key: "dashboard",
-          href: "/dashboard",
-          label: "ダッシュボード",
-          Icon: LayoutDashboard,
-          active: pathname === "/dashboard",
-          primary: true,
-        },
-        {
           key: "notifications",
-          href: "/dashboard/notifications",
+          href: "/notifications",
           label: "通知",
           Icon: Bell,
-          active: pathname === "/dashboard/notifications",
+          active: pathname === "/notifications",
           primary: true,
         },
         {

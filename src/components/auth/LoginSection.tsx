@@ -9,6 +9,8 @@ import { AboutShamezo } from "@/components/onboarding/AboutShamezo";
 interface LoginSectionProps {
   allowedServers?: string[];
   initialIsLoggedIn?: boolean;
+  /** 既にログイン済みでボタンを押したときの遷移先（自分のユーザーページ）。 */
+  loggedInHref?: string;
 }
 
 function getLoginRequiredMessage(returnTo: string): string {
@@ -49,7 +51,7 @@ function sanitizeReturnTo(value: string | null): string | undefined {
   return value;
 }
 
-export function LoginSection({ allowedServers, initialIsLoggedIn }: LoginSectionProps) {
+export function LoginSection({ allowedServers, initialIsLoggedIn, loggedInHref }: LoginSectionProps) {
   const params = useSearchParams();
   const reason = params.get("reason");
   const errorCode = params.get("error");
@@ -81,7 +83,7 @@ export function LoginSection({ allowedServers, initialIsLoggedIn }: LoginSection
         {!initialIsLoggedIn && <AboutShamezo />}
         {/* 見出し〜「他のユーザーの投稿を見てみる」まで、画像詳細ページのガイドと共通のブロックをカード内に収める。 */}
         <LoginPrompt showPrompt={!initialIsLoggedIn && !hasBanner}>
-          <LoginButton allowedServers={allowedServers} callbackUrl={returnTo} initialIsLoggedIn={initialIsLoggedIn} />
+          <LoginButton allowedServers={allowedServers} callbackUrl={returnTo} loggedInHref={loggedInHref} initialIsLoggedIn={initialIsLoggedIn} />
         </LoginPrompt>
       </div>
     </div>

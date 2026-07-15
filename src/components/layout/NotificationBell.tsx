@@ -58,7 +58,7 @@ export function NotificationBell() {
               const a = !isReminder && !isFavorite && n.achievementKey ? resolveAchievement(n.achievementKey) : null;
               const href = isReminder
                 ? `/u/${n.recipientUsername}/calendar`
-                : n.image?.pageUrl ?? "/dashboard/notifications";
+                : n.image?.pageUrl ?? "/notifications";
               return (
                 <li key={n.id}>
                   <Link href={href} className="flex items-start gap-2.5 px-3 py-2 hover:bg-accent">
@@ -96,7 +96,7 @@ export function NotificationBell() {
           </ul>
         )}
         <Link
-          href="/dashboard/notifications"
+          href="/notifications"
           className="flex items-center justify-center gap-1 border-t px-3 py-2.5 text-sm font-medium text-primary hover:bg-accent"
         >
           もっと見る

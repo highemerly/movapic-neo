@@ -15,6 +15,7 @@ import {
   verifyOAuthState,
   sanitizeRedirectUrl,
 } from "@/lib/auth/crypto";
+import { resolveLoginRedirect } from "@/lib/auth/loginRedirect";
 import { encryptToken } from "@/lib/auth/tokens";
 import { createSession, getCurrentUser } from "@/lib/auth/session";
 import { extractLoginRequestInfo } from "@/lib/auth/requestInfo";
@@ -55,10 +56,15 @@ export async function GET(request: NextRequest) {
       if (existingUser) {
         console.warn("[oauth] duplicate mastodon callback detected; treating as success");
         const stateData = verifyOAuthState(state);
-        const redirectTo = stateData
+        const sanitized = stateData
           ? sanitizeRedirectUrl(stateData.callbackUrl)
           : "/dashboard";
-        return NextResponse.redirect(new URL(redirectTo, baseUrl));
+        const dupRedirect = resolveLoginRedirect(sanitized, {
+          isNewUser: false,
+          username: existingUser.username,
+          instanceDomain: existingUser.instance.domain,
+        });
+        return NextResponse.redirect(new URL(dupRedirect, baseUrl));
       }
       return NextResponse.redirect(new URL("/?error=invalid_state", baseUrl));
     }
@@ -177,12 +183,15 @@ export async function GET(request: NextRequest) {
       extractLoginRequestInfo(request)
     );
 
-    // コールバックURLにリダイレクト（安全なパスのみ許可）。
-    // 初回ログインで、かつ遷移先が既定（/dashboard＝特定ページへ戻る指定ではない）のときだけ、
-    // 初めての投稿を促すため /create?welcome=1 に差し替える。
+    // コールバックURLにリダイレクト（安全なパスのみ許可）。遷移先が既定（/dashboard センチネル
+    // ＝特定ページへ戻る指定ではない）のときは、初回ログインなら /create?welcome=1、既存ユーザーなら
+    // 自分のユーザーページへ。明示的な returnTo はそのまま尊重する。
     const sanitized = sanitizeRedirectUrl(stateData.callbackUrl);
-    const redirectTo =
-      isNewUser && sanitized === "/dashboard" ? "/create?welcome=1" : sanitized;
+    const redirectTo = resolveLoginRedirect(sanitized, {
+      isNewUser,
+      username: user.username,
+      instanceDomain: instance.domain,
+    });
     return NextResponse.redirect(new URL(redirectTo, baseUrl));
   } catch (error) {
     console.error("OAuth callback error:", error);

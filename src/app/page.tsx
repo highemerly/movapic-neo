@@ -99,6 +99,10 @@ export default async function HomePage() {
     }
   }
   const isLoggedIn = currentUser !== null;
+  // ログイン済みユーザーがトップのログインフォームを押したときの戻り先（自分のユーザーページ）。
+  const loggedInHref = currentUser
+    ? `/u/${userPathSegment(currentUser.username, currentUser.instance.domain)}`
+    : undefined;
 
   // フィーチャー画像を取得（最新16件・5分キャッシュ）
   const featuredImages = await getFeaturedImages();
@@ -141,13 +145,13 @@ export default async function HomePage() {
                   <div className="px-5 py-5">
                     {!isLoggedIn && <AboutShamezo />}
                     <LoginPrompt showPrompt={!isLoggedIn}>
-                      <LoginButton allowedServers={allowedServers} initialIsLoggedIn={isLoggedIn} />
+                      <LoginButton allowedServers={allowedServers} loggedInHref={loggedInHref} initialIsLoggedIn={isLoggedIn} />
                     </LoginPrompt>
                   </div>
                 </div>
               }
             >
-              <LoginSection allowedServers={allowedServers} initialIsLoggedIn={isLoggedIn} />
+              <LoginSection allowedServers={allowedServers} initialIsLoggedIn={isLoggedIn} loggedInHref={loggedInHref} />
             </Suspense>
           </div>
 

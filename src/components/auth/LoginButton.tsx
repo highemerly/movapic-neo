@@ -35,9 +35,15 @@ interface LoginButtonProps {
    */
   allowedServers?: string[];
   /**
-   * ログイン成功後の遷移先パス（省略時は /dashboard）
+   * ログイン成功後の遷移先パス（省略時は既定センチネル /dashboard）。
+   * 未ログインユーザーの認証開始時に register へ渡され、コールバック側が新規/既存で振り分ける。
    */
   callbackUrl?: string;
+  /**
+   * 既にログイン済みの状態でこのボタンを押したときの遷移先（自分のユーザーページ）。
+   * サーバー側でセッションから解決して渡す。未ログイン時の認証フローには使わない。
+   */
+  loggedInHref?: string;
   /**
    * ログイン済みか（サーバーで JWT 検証して渡す）。
    * 旧来のクライアント側 fetch("/api/v1/me") を廃止し、初回描画時点で確定させる。
@@ -46,8 +52,12 @@ interface LoginButtonProps {
   initialIsLoggedIn?: boolean;
 }
 
-export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: LoginButtonProps) {
-  const targetUrl = callbackUrl || "/dashboard";
+export function LoginButton({ allowedServers, callbackUrl, loggedInHref, initialIsLoggedIn }: LoginButtonProps) {
+  // 認証開始時に register へ渡すコールバック（既定センチネル /dashboard）。
+  // コールバックルートがこのセンチネルを見て、新規は初回投稿・既存は自分のページへ振り分ける。
+  const registerCallbackUrl = callbackUrl || "/dashboard";
+  // 既にログイン済みで押した場合の遷移先。明示 returnTo > 自分のページ > 既定 の順。
+  const loggedInTarget = callbackUrl || loggedInHref || "/dashboard";
   const router = useRouter();
   const [server, setServer] = useState(
     allowedServers?.length === 1 ? allowedServers[0] : ""
@@ -107,9 +117,9 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
   const handleLogin = async (e?: React.FormEvent) => {
     e?.preventDefault();
 
-    // ログイン済みの場合はコールバック先（または既定の /dashboard）へ
+    // ログイン済みの場合は自分のページ（または明示 returnTo）へ
     if (isLoggedIn) {
-      router.push(targetUrl);
+      router.push(loggedInTarget);
       return;
     }
 
@@ -137,7 +147,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
         },
         body: JSON.stringify({
           server: targetServer,
-          callbackUrl: targetUrl,
+          callbackUrl: registerCallbackUrl,
         }),
       });
 
@@ -222,7 +232,7 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
 
   // 単一サーバー限定モード: シンプルなボタン
   if (singleServerMode) {
-    const loggedInLabel = callbackUrl ? "戻る" : "ダッシュボードへ";
+    const loggedInLabel = callbackUrl ? "戻る" : "マイページへ";
     const buttonLabel = isLoggedIn
       ? loggedInLabel
       : isLoading
@@ -262,11 +272,11 @@ export function LoginButton({ allowedServers, callbackUrl, initialIsLoggedIn }: 
     return (
       <div className="space-y-4">
         <Button
-          onClick={() => router.push(targetUrl)}
+          onClick={() => router.push(loggedInTarget)}
           className="w-full h-12 text-lg"
           size="lg"
         >
-          {callbackUrl ? "戻る" : "ダッシュボードへ"}
+          {callbackUrl ? "戻る" : "マイページへ"}
         </Button>
       </div>
     );
