@@ -60,7 +60,7 @@ export function UserProfileHeader({
     },
     {
       key: "photos",
-      label: "一覧",
+      label: "ギャラリー",
       icon: Images,
       href: `/u/${seg}/photos`,
     },

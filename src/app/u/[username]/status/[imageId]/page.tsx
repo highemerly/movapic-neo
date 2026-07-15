@@ -40,7 +40,7 @@ import { AttendanceCrown } from "@/components/user/AttendanceCrown";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import { PostSourceBadge } from "./PostSourceBadge";
-import { User, CalendarDays, Camera, MapPin, Reply, Repeat2, Bookmark, Share2 } from "lucide-react";
+import { Images, CalendarDays, Camera, MapPin, Reply, Repeat2, Bookmark, Share2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -635,11 +635,11 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <Link
-              href={`/u/${username}`}
+              href={`/u/${username}/photos`}
               className="p-2.5 rounded-full hover:bg-background transition-colors"
-              title="ユーザーページ"
+              title="ギャラリー"
             >
-              <User className="w-5 h-5 text-muted-foreground" />
+              <Images className="w-5 h-5 text-muted-foreground" />
             </Link>
             <Link
               href={`/u/${username}/calendar`}
