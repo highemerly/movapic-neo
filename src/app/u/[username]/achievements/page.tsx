@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
+import { isMutedByViewer } from "@/lib/mutes";
 import { getAvatarUrl } from "@/lib/avatar";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
@@ -48,6 +49,9 @@ export default async function AchievementsPage({
   if (!user) {
     notFound();
   }
+
+  const isMuted = await isMutedByViewer(currentUser?.id, user.id);
+  const canMute = !!currentUser && currentUser.id !== user.id;
 
   const [achievements, ladderValues] = await Promise.all([
     prisma.achievement.findMany({
@@ -97,6 +101,8 @@ export default async function AchievementsPage({
           perfectAttendance={perfectAttendance}
           activeTab="achievements"
           isOwner={currentUser?.id === user.id}
+          isMuted={isMuted}
+          canMute={canMute}
         />
 
         {/* 実績一覧（タブ切替時に横スライドで表示） */}

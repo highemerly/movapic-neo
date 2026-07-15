@@ -8,7 +8,10 @@
 
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth/session";
+import { getActiveMutedUserIds } from "@/lib/mutes";
 import { userPathSegment } from "@/lib/userHandle";
+import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -28,8 +31,19 @@ function redirectTo(path: string) {
 }
 
 export async function GET() {
-  // 公開タイムラインと同じ可視条件（isPublic かつ管理者取り下げでない）
-  const where = { isPublic: true, isDisabled: false } as const;
+  // ミュートは通常クライアント側で除外するが、ランダムはリダイレクト先をサーバーが
+  // 1件選んで決めるため表示側で弾く余地がない。ここだけサーバー側で notIn 除外する。
+  const currentUser = await getCurrentUser();
+  const mutedUserIds = currentUser
+    ? await getActiveMutedUserIds(currentUser.id)
+    : [];
+
+  // 公開タイムラインと同じ可視条件（isPublic かつ管理者取り下げでない）＋ミュート除外
+  const where: Prisma.ImageWhereInput = {
+    isPublic: true,
+    isDisabled: false,
+    ...(mutedUserIds.length > 0 && { userId: { notIn: mutedUserIds } }),
+  };
 
   const totalCount = await prisma.image.count({ where });
   if (totalCount === 0) {

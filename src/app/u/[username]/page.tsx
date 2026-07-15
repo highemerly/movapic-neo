@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "@/components/Link";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
+import { isMutedByViewer } from "@/lib/mutes";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Button } from "@/components/ui/button";
 import { Images, Calendar, Map as MapIcon, Trophy, ChevronRight } from "lucide-react";
@@ -238,6 +239,8 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
     day: "numeric",
   });
   const isOwner = currentUser?.id === user.id;
+  const canMute = !!currentUser && !isOwner;
+  const isMuted = await isMutedByViewer(currentUser?.id, user.id);
 
   return (
     <>
@@ -263,6 +266,8 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
           perfectAttendance={perfectAttendance}
           activeTab="home"
           isOwner={isOwner}
+          isMuted={isMuted}
+          canMute={canMute}
         />
 
         {/* 概要（ホーム）本文。プロフィールカード的に読みやすい幅で中央寄せ。 */}

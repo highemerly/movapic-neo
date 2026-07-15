@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
+import { isMutedByViewer } from "@/lib/mutes";
 import { getAvatarUrl } from "@/lib/avatar";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -84,6 +85,8 @@ export default async function CalendarPage({
     !!currentUser &&
     currentUser.username === cleanUsername &&
     currentUser.instance.domain === user.instance.domain;
+  const isMuted = await isMutedByViewer(currentUser?.id, user.id);
+  const canMute = !!currentUser && !isOwner;
 
   return (
     <>
@@ -109,6 +112,8 @@ export default async function CalendarPage({
           perfectAttendance={perfectAttendance}
           activeTab="calendar"
           isOwner={isOwner}
+          isMuted={isMuted}
+          canMute={canMute}
         />
 
         {/* カレンダー（タブ切替時に横スライドで表示） */}

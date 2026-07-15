@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
+import { isMutedByViewer } from "@/lib/mutes";
 import { getAvatarUrl } from "@/lib/avatar";
 import { UserGalleryClient } from "./UserGalleryClient";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -56,6 +57,9 @@ export default async function UserGalleryPage({
   if (!user) {
     notFound();
   }
+
+  const isMuted = await isMutedByViewer(currentUser?.id, user.id);
+  const canMute = !!currentUser && currentUser.id !== user.id;
 
   // ピン留め画像を取得（最大4つ、pinnedAtの降順）
   const pinnedImages = await prisma.image.findMany({
@@ -153,6 +157,8 @@ export default async function UserGalleryPage({
           perfectAttendance={perfectAttendance}
           activeTab="photos"
           isOwner={currentUser?.id === user.id}
+          isMuted={isMuted}
+          canMute={canMute}
         />
 
         {/* 画像一覧（ピン留め画像を先頭に・タブ切替時に横スライドで表示） */}

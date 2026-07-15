@@ -24,6 +24,12 @@ interface UseInfiniteImagesOptions<T> {
   fetchFirstPage?: () => Promise<InfiniteImagesPage<T>>;
   /** id の重複を除外して追加する（同一画像が複数取得され得る場合に true） */
   dedupe?: boolean;
+  /**
+   * 表示から除外する要素を落とすフィルタ（true=残す）。ミュートのクライアント側除外に使う。
+   * サーバーのページカーソル（nextCursor）は生の応答基準のまま保つため、フィルタで
+   * 件数が減ってもページングは壊れない（loaderRef が見え続ければ次ページを自動取得して埋める）。
+   */
+  filterItem?: (item: T) => boolean;
 }
 
 interface UseInfiniteImagesResult<T> {
@@ -44,8 +50,23 @@ export function useInfiniteImages<T extends { id: string }>({
   fetchPage,
   fetchFirstPage,
   dedupe = false,
+  filterItem,
 }: UseInfiniteImagesOptions<T>): UseInfiniteImagesResult<T> {
-  const [images, setImages] = useState(initialImages);
+  // filterItem は毎レンダー再生成されうるため ref に逃がす。フィルタ適用時に呼ぶだけで
+  // 依存配列には入れない（keep が変わっても既存表示は作り直さない＝画面のちらつきを避ける）。
+  const filterRef = useRef(filterItem);
+  useEffect(() => {
+    filterRef.current = filterItem;
+  }, [filterItem]);
+  const keep = useCallback((items: T[]) => {
+    const fn = filterRef.current;
+    return fn ? items.filter(fn) : items;
+  }, []);
+
+  // 初期値は ref ではなくプロップを直接使う（レンダー中に ref を読まない）。
+  const [images, setImages] = useState(() =>
+    filterItem ? initialImages.filter(filterItem) : initialImages
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [nextCursor, setNextCursor] = useState<string | null>(initialCursor);
   const loaderRef = useRef<HTMLDivElement>(null);
@@ -68,10 +89,11 @@ export function useInfiniteImages<T extends { id: string }>({
     setIsLoading(true);
     try {
       const data = await fetchPageRef.current(nextCursor);
+      const incoming = keep(data.images);
       setImages((prev) => {
-        if (!dedupe) return [...prev, ...data.images];
+        if (!dedupe) return [...prev, ...incoming];
         const seen = new Set(prev.map((img) => img.id));
-        return [...prev, ...data.images.filter((img) => !seen.has(img.id))];
+        return [...prev, ...incoming.filter((img) => !seen.has(img.id))];
       });
       setNextCursor(data.hasMore ? data.nextCursor : null);
     } catch (error) {
@@ -79,7 +101,7 @@ export function useInfiniteImages<T extends { id: string }>({
     } finally {
       setIsLoading(false);
     }
-  }, [nextCursor, isLoading, dedupe]);
+  }, [nextCursor, isLoading, dedupe, keep]);
 
   useEffect(() => {
     const loader = loaderRef.current;
@@ -118,7 +140,7 @@ export function useInfiniteImages<T extends { id: string }>({
       try {
         const data = await fn();
         lastRefreshedAt = typeof performance !== "undefined" ? performance.now() : 0;
-        setImages(data.images);
+        setImages(keep(data.images));
         setNextCursor(data.hasMore ? data.nextCursor : null);
       } catch (error) {
         console.error("Refresh error:", error);
@@ -141,7 +163,7 @@ export function useInfiniteImages<T extends { id: string }>({
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pageshow", onPageShow);
     };
-  }, [fetchFirstPage]);
+  }, [fetchFirstPage, keep]);
 
   return { images, isLoading, nextCursor, loaderRef };
 }

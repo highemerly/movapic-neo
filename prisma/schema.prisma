@@ -71,10 +71,31 @@ model User {
   achievements  Achievement[]
   notifications Notification[]
   reports       Report[]
+  mutesCreated  Mute[]         @relation("Muter")
+  mutedBy       Mute[]         @relation("Muted")
 
   @@unique([instanceId, remoteId])
   @@unique([instanceId, username])
   @@map("users")
+}
+
+// ユーザーミュート。muter が mutedUser の投稿を公開タイムライン／同じサーバー／ランダムから隠す。
+// お気に入りは対象外。相手には通知しない（片方向・秘匿）。
+// expiresAt=null は無期。期限切れ判定はクエリ時に行い（expiresAt が null または未来のものだけ有効）、
+// 期限切れ行の物理削除は定期ジョブ（30分毎メンテ）に委ねる。
+model Mute {
+  id          String    @id @default(uuid())
+  muterId     String    @map("muter_id")
+  mutedUserId String    @map("muted_user_id")
+  expiresAt   DateTime? @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  muter     User @relation("Muter", fields: [muterId], references: [id], onDelete: Cascade)
+  mutedUser User @relation("Muted", fields: [mutedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([muterId, mutedUserId]) // 同一相手への重複ミュートを防ぐ（再ミュートは期間更新=upsert）
+  @@index([muterId])
+  @@map("mutes")
 }
 
 // 実績（トロフィー）。獲得は永続（要件を満たさなくなっても剥奪しない）。

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { GalleryGrid } from "@/components/gallery/GalleryGrid";
 import {
   TimelineImageCard,
@@ -14,19 +15,32 @@ interface PublicTimelineClientProps {
   publicUrl: string;
   /** サーバー絞り込みパラメータ（カンマ区切り）。未指定なら null */
   instancesParam: string | null;
+  /**
+   * ミュート中の投稿者キー（`username@domain`）。クライアント側でこの投稿者の
+   * 画像を一覧から除外する（API は全員共通データを返し、除外は表示側で行う）。
+   */
+  mutedAuthorKeys?: string[];
 }
 
 export function PublicTimelineClient({
   initialImages,
   publicUrl,
   instancesParam,
+  mutedAuthorKeys,
 }: PublicTimelineClientProps) {
+  const mutedSet = useMemo(() => new Set(mutedAuthorKeys ?? []), [mutedAuthorKeys]);
   const { images, isLoading, nextCursor, loaderRef } = useInfiniteImages<TimelineImage>({
     initialImages,
+    // カーソルは生の initialImages 基準（フィルタ前）で決める。除外で表示が減っても
+    // ページングは壊れない（loaderRef が見え続ければ次ページを自動取得して埋める）。
     initialCursor:
       initialImages.length >= 20
         ? initialImages[initialImages.length - 1]?.id ?? null
         : null,
+    filterItem:
+      mutedSet.size > 0
+        ? (img) => !mutedSet.has(`${img.user.username}@${img.user.instance}`)
+        : undefined,
     fetchPage: async (cursor) => {
       const params = new URLSearchParams({ cursor, limit: "20" });
       if (instancesParam) params.set("instances", instancesParam);

@@ -6,6 +6,7 @@ import { buildOgImage } from "@/lib/ogImage";
 import prisma from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/session";
+import { isMutedByViewer } from "@/lib/mutes";
 import { DeleteLocationButton } from "./DeleteLocationButton";
 import { ImageNavigation } from "./ImageNavigation";
 import { FontLicenseBadge } from "./FontLicenseBadge";
@@ -289,6 +290,8 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
 
   // 自分の画像かどうか
   const isOwner = currentUser?.id === image.userId;
+  // 閲覧者が投稿者を既にミュート中か（メニューの文言・解除導線の出し分け用）
+  const isMutingAuthor = await isMutedByViewer(currentUser?.id, image.userId);
 
   // 「あなたのサーバーで開く」動線。閲覧者自身のサーバーで元投稿を解決して開き、
   // 返信・リノート・お気に入り等ができるようにする。条件は閲覧者がそのサーバーWebに
@@ -572,6 +575,8 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               isOwner={isOwner}
               initialIsPinned={!!image.pinnedAt}
               canReport={!isOwner}
+              canMute={!isOwner}
+              isMuted={isMutingAuthor}
               options={{
                 position: image.position,
                 color: image.color,

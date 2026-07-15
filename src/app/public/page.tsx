@@ -1,5 +1,6 @@
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
+import { getMutedAuthorKeys } from "@/lib/mutes";
 import { getAvatarUrl } from "@/lib/avatar";
 import { PublicTimelineClient } from "./PublicTimelineClient";
 import { TimelineTabs } from "@/components/timeline/TimelineTabs";
@@ -15,6 +16,11 @@ export default async function PublicTimelinePage({
   searchParams: Promise<{ instances?: string }>;
 }) {
   const currentUser = await getCurrentUser();
+
+  // ミュート中の投稿者はクライアント側で一覧から除外する（API は全員共通データを返す）。
+  const mutedAuthorKeys = currentUser
+    ? await getMutedAuthorKeys(currentUser.id)
+    : [];
 
   // サーバー（インスタンス）絞り込み。カンマ区切りで複数指定可。
   const { instances: instancesParam } = await searchParams;
@@ -100,6 +106,7 @@ export default async function PublicTimelinePage({
           }))}
           publicUrl={publicUrl}
           instancesParam={instancesParam ?? null}
+          mutedAuthorKeys={mutedAuthorKeys}
         />
 
         <Footer />

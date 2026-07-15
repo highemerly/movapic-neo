@@ -169,6 +169,11 @@ export default async function SettingsPage() {
           {/* 控えめなインストール導線（Android/iOS Safari・未インストール時のみ表示） */}
           <InstallEntry />
           <SettingLinkRow
+            href="/settings/mutes"
+            title="ミュートを管理する"
+            description="ミュート中のユーザーを確認し、解除できます。"
+          />
+          <SettingLinkRow
             href="/settings/sessions"
             title="ログイン履歴を確認する"
             description="直近90日のログインを確認し、身に覚えのないセッションを失効できます。"

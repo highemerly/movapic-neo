@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pin, Trash2, Flag, Share, Image as ImageIcon, Settings2 } from "lucide-react";
+import { MoreHorizontal, Pin, Trash2, Flag, Share, Image as ImageIcon, Settings2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -15,7 +15,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   POSITION_LABELS,
@@ -31,6 +30,7 @@ import {
 } from "@/types";
 import { seasonLabel } from "@/lib/seasons/catalog";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { MuteDialog } from "@/components/mute/MuteDialog";
 import { ReportDialog } from "./ReportDialog";
 import { useNativeShare, type NativeShareParams } from "./useNativeShare";
 
@@ -41,6 +41,10 @@ interface ImageActionsMenuProps {
   initialIsPinned: boolean;
   /** 通報可能か（ログイン済み かつ 自分の画像でない） */
   canReport: boolean;
+  /** このユーザーをミュート可能か（ログイン済み かつ 自分の画像でない）。 */
+  canMute: boolean;
+  /** 閲覧者が投稿者を既にミュート中か（文言・解除導線の出し分け）。 */
+  isMuted: boolean;
   /** トリガー（ミートボール）に足すクラス（非ログイン時に狭い画面のみ表示する等） */
   triggerClassName?: string;
   /** 狭い画面でメニュー内に出すネイティブ共有（広い画面では行内のボタンが担当） */
@@ -68,6 +72,8 @@ export function ImageActionsMenu({
   isOwner,
   initialIsPinned,
   canReport,
+  canMute,
+  isMuted,
   triggerClassName,
   nativeShare,
   options,
@@ -83,6 +89,7 @@ export function ImageActionsMenu({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSettingThumb, setIsSettingThumb] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [muteOpen, setMuteOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
 
   // ① その日のカレンダーサムネイルにこの写真を指定する。
@@ -297,6 +304,18 @@ export function ImageActionsMenu({
             </DropdownMenuItem>
           </>
         )}
+        {/* このユーザーをミュート（ログイン済み かつ 自分の画像でないとき）。解除は設定から。 */}
+        {canMute && (
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              setMuteOpen(true);
+            }}
+          >
+            <VolumeX className="mr-2 h-4 w-4" />
+            {isMuted ? "ミュートを変更・解除" : "このユーザーをミュート"}
+          </DropdownMenuItem>
+        )}
         {/* 通報は全ユーザー向け（自分の画像/未ログイン時は非表示）。 */}
         {canReport && (
           <DropdownMenuItem
@@ -316,6 +335,16 @@ export function ImageActionsMenu({
           imageId={imageId}
           open={reportOpen}
           onOpenChange={setReportOpen}
+        />
+      )}
+      {canMute && (
+        // username はこの画像ページのパスセグメント（`username` or `username@domain`）＝投稿者。
+        // API はこれをハンドルとして解決する。
+        <MuteDialog
+          handle={username}
+          alreadyMuted={isMuted}
+          open={muteOpen}
+          onOpenChange={setMuteOpen}
         />
       )}
       <Dialog open={optionsOpen} onOpenChange={setOptionsOpen}>

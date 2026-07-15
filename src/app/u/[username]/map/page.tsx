@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "@/components/Link";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
+import { isMutedByViewer } from "@/lib/mutes";
 import { getAvatarUrl } from "@/lib/avatar";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
@@ -56,6 +57,8 @@ export default async function UserMapPage({
   if (!user) notFound();
 
   const isOwner = currentUser?.id === user.id;
+  const isMuted = await isMutedByViewer(currentUser?.id, user.id);
+  const canMute = !!currentUser && !isOwner;
   const isOptedIn = user.showLocationMap;
   // /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）
   const seg = userPathSegment(cleanUsername, user.instance.domain);
@@ -74,6 +77,8 @@ export default async function UserMapPage({
       perfectAttendance={perfectAttendance}
       activeTab="map"
       isOwner={isOwner}
+      isMuted={isMuted}
+      canMute={canMute}
     />
   );
 

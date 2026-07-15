@@ -193,12 +193,29 @@ const favoriteSyncJob: PeriodicJob = {
 };
 
 /**
+ * 期限切れミュートの物理削除。
+ *
+ * ミュートの有効判定（expiresAt が null または未来）は参照側クエリで行うため、
+ * 期限切れ行が残っていても表示・除外は正しく動く。この掃除は肥大防止のためのもので、
+ * 遅れても実害は無い（次の30分周期で拾う）。無期（expiresAt=null）は削除しない。
+ */
+const muteCleanup: PeriodicJob = {
+  name: "mute-cleanup",
+  run: async () => {
+    const { count } = await prisma.mute.deleteMany({
+      where: { expiresAt: { not: null, lt: new Date() } },
+    });
+    if (count > 0) return `deleted=${count}`;
+  },
+};
+
+/**
  * 実行する定期ジョブ一覧。先頭から順に実行される。
  *
  * 今後ここに足す予定（実装は別途）:
  *   - 定期判定でしか付与できない実績の判定
  */
-const periodicJobs: PeriodicJob[] = [mentionPoll, tmpCleanup, favoriteSyncJob];
+const periodicJobs: PeriodicJob[] = [mentionPoll, tmpCleanup, favoriteSyncJob, muteCleanup];
 
 /** 登録済みの定期ジョブ名一覧（手動実行スクリプトのフィルタ指定用）。 */
 export const PERIODIC_JOB_NAMES = periodicJobs.map((j) => j.name);
