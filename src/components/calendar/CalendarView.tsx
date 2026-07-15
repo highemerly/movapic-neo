@@ -494,9 +494,6 @@ export function CalendarView({
               >
                 <Share2 className="h-4 w-4 shrink-0" />
                 <span className="text-sm font-medium">月次画像を作成</span>
-                <span className="rounded bg-amber-500/15 px-1 py-0.5 text-[9px] font-bold leading-none text-amber-600 dark:text-amber-400">
-                  ベータ
-                </span>
               </button>
             )}
           </div>
