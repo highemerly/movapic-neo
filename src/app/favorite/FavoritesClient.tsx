@@ -7,6 +7,7 @@ import {
 } from "@/components/gallery/TimelineImageCard";
 import { useInfiniteImages } from "@/hooks/useInfiniteImages";
 import { useRegisterPullToRefresh } from "@/components/PullToRefresh";
+import { NewItemsPill } from "@/components/gallery/NewItemsPill";
 
 type FavoriteImage = TimelineCardImage;
 
@@ -21,7 +22,7 @@ export function FavoritesClient({
   publicUrl,
   initialCursor,
 }: FavoritesClientProps) {
-  const { images, isLoading, nextCursor, loaderRef, refresh } = useInfiniteImages<FavoriteImage>({
+  const { images, isLoading, nextCursor, loaderRef, newCount, clearNewCount, refresh } = useInfiniteImages<FavoriteImage>({
     initialImages,
     initialCursor,
     fetchPage: async (cursor) => {
@@ -41,18 +42,27 @@ export function FavoritesClient({
   useRegisterPullToRefresh(refresh);
 
   return (
-    <GalleryGrid
-      images={images}
-      getKey={(image) => image.id}
-      aspect={(image) => image.width / image.height}
-      emptyMessage="まだお気に入りに登録した画像がありません"
-      endMessage="すべてのお気に入りを表示しました"
-      isLoading={isLoading}
-      nextCursor={nextCursor}
-      loaderRef={loaderRef}
-      renderItem={(image, fill) => (
-        <TimelineImageCard image={image} publicUrl={publicUrl} fill={fill} from="favorite" />
-      )}
-    />
+    <>
+      <NewItemsPill
+        count={newCount}
+        onTap={() => {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          clearNewCount();
+        }}
+      />
+      <GalleryGrid
+        images={images}
+        getKey={(image) => image.id}
+        aspect={(image) => image.width / image.height}
+        emptyMessage="まだお気に入りに登録した画像がありません"
+        endMessage="すべてのお気に入りを表示しました"
+        isLoading={isLoading}
+        nextCursor={nextCursor}
+        loaderRef={loaderRef}
+        renderItem={(image, fill) => (
+          <TimelineImageCard image={image} publicUrl={publicUrl} fill={fill} from="favorite" />
+        )}
+      />
+    </>
   );
 }

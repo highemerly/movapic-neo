@@ -333,8 +333,25 @@
   animation: tl-enter 0.45s ease both;
 }
 
+/* 「N件の新着」ピルの登場（上から降りてくる）。 */
+@keyframes pill-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pill-in {
+  animation: pill-in 0.25s ease both;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .tl-enter {
+  .tl-enter,
+  .pill-in {
     animation: none;
   }
 }

@@ -8,6 +8,7 @@ import { GalleryGrid } from "@/components/gallery/GalleryGrid";
 import { useInfiniteImages } from "@/hooks/useInfiniteImages";
 import { useTimelinePersistence } from "@/hooks/useTimelinePersistence";
 import { useRegisterPullToRefresh } from "@/components/PullToRefresh";
+import { NewItemsPill } from "@/components/gallery/NewItemsPill";
 
 interface GalleryImage {
   id: string;
@@ -44,7 +45,7 @@ export function UserGalleryClient({
   const { restore, onChange } = useTimelinePersistence<GalleryImage>(
     `tl:user:${username}`
   );
-  const { images, isLoading, nextCursor, loaderRef, newIds, refresh } = useInfiniteImages<GalleryImage>({
+  const { images, isLoading, nextCursor, loaderRef, newIds, newCount, clearNewCount, refresh } = useInfiniteImages<GalleryImage>({
     initialImages,
     initialCursor:
       initialImages.length >= 20
@@ -75,38 +76,47 @@ export function UserGalleryClient({
   useRegisterPullToRefresh(refresh);
 
   return (
-    <GalleryGrid
-      images={images}
-      getKey={(image) => image.id}
-      aspect={(image) => image.width / image.height}
-      emptyMessage="まだ画像がありません"
-      emptyAction={
-        isOwner ? (
-          <Link href="/create" className="inline-block">
-            <Button
-              size="lg"
-              className="h-12 px-8 bg-brand text-brand-foreground hover:bg-brand/90"
-            >
-              <ImagePlus className="mr-2 h-5 w-5" />
-              写真を投稿する
-            </Button>
-          </Link>
-        ) : undefined
-      }
-      endMessage="すべての画像を表示しました"
-      isLoading={isLoading}
-      nextCursor={nextCursor}
-      loaderRef={loaderRef}
-      newIds={newIds}
-      renderItem={(image, fill) => (
-        <ImageCard
-          image={image}
-          publicUrl={publicUrl}
-          username={username}
-          isPinned={pinnedImageIds.includes(image.id)}
-          fill={fill}
-        />
-      )}
-    />
+    <>
+      <NewItemsPill
+        count={newCount}
+        onTap={() => {
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          clearNewCount();
+        }}
+      />
+      <GalleryGrid
+        images={images}
+        getKey={(image) => image.id}
+        aspect={(image) => image.width / image.height}
+        emptyMessage="まだ画像がありません"
+        emptyAction={
+          isOwner ? (
+            <Link href="/create" className="inline-block">
+              <Button
+                size="lg"
+                className="h-12 px-8 bg-brand text-brand-foreground hover:bg-brand/90"
+              >
+                <ImagePlus className="mr-2 h-5 w-5" />
+                写真を投稿する
+              </Button>
+            </Link>
+          ) : undefined
+        }
+        endMessage="すべての画像を表示しました"
+        isLoading={isLoading}
+        nextCursor={nextCursor}
+        loaderRef={loaderRef}
+        newIds={newIds}
+        renderItem={(image, fill) => (
+          <ImageCard
+            image={image}
+            publicUrl={publicUrl}
+            username={username}
+            isPinned={pinnedImageIds.includes(image.id)}
+            fill={fill}
+          />
+        )}
+      />
+    </>
   );
 }

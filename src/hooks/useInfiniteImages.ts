@@ -63,12 +63,24 @@ interface UseInfiniteImagesResult<T> {
   /** 直近の更新で新しく先頭に加わった id 群（にゅるっと追加アニメ用）。数百ms後に空へ戻る。 */
   newIds: ReadonlySet<string>;
   /**
+   * 先頭から離れてスクロール中に、更新で先頭へ積まれた新着の累計件数。「N件の新着」ピル用。
+   * 先頭付近へ戻る（or clearNewCount）と 0 に戻る。先頭付近での更新（PTR等）では増えない
+   * （新着はその場で見えるため）。
+   */
+  newCount: number;
+  /** 新着ピルを消す（タップで先頭へ移動したとき等に呼ぶ）。 */
+  clearNewCount: () => void;
+  /**
    * 手動更新（自前 pull-to-refresh 用）。再前面化と同じ reconcile を走らせる。
    * ユーザー操作なので連打スロットルを飛ばす（force）。完了まで待てる Promise を返す。
    * fetchFirstPage 未指定なら何もしない。
    */
   refresh: () => Promise<void>;
 }
+
+// この位置より下（px）にスクロールしている時に来た新着だけ「N件の新着」ピルに積む
+// （先頭付近なら新着はその場で見えるのでピルは不要）。
+const NEW_PILL_MIN_SCROLL = 500;
 
 /**
  * カーソルベースの無限スクロール共通フック。
@@ -104,7 +116,20 @@ export function useInfiniteImages<T extends { id: string }>({
   const [nextCursor, setNextCursor] = useState<string | null>(initialCursor);
   // 更新で新しく先頭に加わった id 群。CSS の入場アニメを当てるためだけの一時状態。
   const [newIds, setNewIds] = useState<ReadonlySet<string>>(() => new Set());
+  // スクロール中に積まれた新着の累計（「N件の新着」ピル用）。
+  const [newCount, setNewCount] = useState(0);
+  const clearNewCount = useCallback(() => setNewCount(0), []);
   const loaderRef = useRef<HTMLDivElement>(null);
+
+  // 先頭付近へ戻ったら新着ピルを消す（スクロールで自然に見えたら不要になるため）。
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onScroll = () => {
+      if (window.scrollY < 120) setNewCount(0);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   // refresh() は非同期イベントハンドラから現在の images 先頭 id を読むため ref に同期する。
   const imagesRef = useRef(images);
@@ -249,6 +274,14 @@ export function useInfiniteImages<T extends { id: string }>({
       setImages(res.images);
       if (!res.keepCursor) setNextCursor(res.cursor);
       flashNewIds(res.newIds);
+      // 先頭から離れている時の新着は「N件の新着」ピルに積む（先頭付近ならその場で見える）。
+      if (
+        res.newIds.size > 0 &&
+        typeof window !== "undefined" &&
+        window.scrollY > NEW_PILL_MIN_SCROLL
+      ) {
+        setNewCount((c) => c + res.newIds.size);
+      }
     };
 
     // force=true は連打スロットルを飛ばす（ユーザー操作の pull-to-refresh 用）。
@@ -307,5 +340,14 @@ export function useInfiniteImages<T extends { id: string }>({
   // 手動更新の安定した公開ハンドル（自前 pull-to-refresh から呼ぶ）。
   const refresh = useCallback(() => refreshRef.current?.(true) ?? Promise.resolve(), []);
 
-  return { images, isLoading, nextCursor, loaderRef, newIds, refresh };
+  return {
+    images,
+    isLoading,
+    nextCursor,
+    loaderRef,
+    newIds,
+    newCount,
+    clearNewCount,
+    refresh,
+  };
 }

@@ -11,7 +11,7 @@ import {
   type MutableRefObject,
   type ReactNode,
 } from "react";
-import { RefreshCw } from "lucide-react";
+import { Check, RefreshCw } from "lucide-react";
 
 type RefreshHandler = () => Promise<void>;
 
@@ -70,10 +70,12 @@ export function PullToRefreshProvider({ children }: { children: ReactNode }) {
   );
 }
 
-const THRESHOLD = 90; // これ以上引いたら更新（px。大きいほど要・強く引く）
-const MAX_PULL = 130; // インジケータが進む最大距離（px）
-const PULL_FACTOR = 0.5; // 指の移動量→追従量の比（小さいほど重い）
-const BASE_OFFSET = 48; // 待機位置（画面外）への引き上げ量（px）
+// 発動に必要な指の実移動量 ≒ THRESHOLD / PULL_FACTOR（現状 約120px）。
+// 敏感すぎると通常のスクロール開始で誤発火するため、この辺りが下限の目安。
+const THRESHOLD = 72; // これ以上引いたら更新（インジケータ移動量 px）
+const MAX_PULL = 110; // インジケータが進む最大距離（px）
+const PULL_FACTOR = 0.6; // 指の移動量→追従量の比（大きいほど軽い＝少しの移動で反応）
+const BASE_OFFSET = 44; // 待機位置（画面外）への引き上げ量（px）
 
 function PullToRefresh({
   handlerRef,
@@ -87,12 +89,18 @@ function PullToRefresh({
   );
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  // 更新完了を一瞬チェックマークで見せる（reconcile が綺麗すぎて更新が分かりにくいため）。
+  const [done, setDone] = useState(false);
 
   // タッチハンドラ内から最新値を読むための ref（リスナーの貼り直しを避ける）。
   const pullRef = useRef(0);
   const refreshingRef = useRef(false);
   const startYRef = useRef<number | null>(null);
   const activeRef = useRef(false);
+  const doneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (doneTimer.current) clearTimeout(doneTimer.current);
+  }, []);
 
   const set = (v: number) => {
     pullRef.current = v;
@@ -160,7 +168,14 @@ function PullToRefresh({
         } finally {
           refreshingRef.current = false;
           setRefreshing(false);
-          set(0);
+          // 完了をチェックマークで一瞬見せてから引っ込める（しきい値位置で保持）。
+          setDone(true);
+          set(THRESHOLD);
+          if (doneTimer.current) clearTimeout(doneTimer.current);
+          doneTimer.current = setTimeout(() => {
+            setDone(false);
+            set(0);
+          }, 650);
         }
       } else {
         // それ以外: スピナーを一瞬見せてからリロード。
@@ -195,9 +210,10 @@ function PullToRefresh({
   if (!enabled) return null;
 
   const progress = Math.min(1, pull / THRESHOLD);
-  const offset = (refreshing ? THRESHOLD : pull) - BASE_OFFSET;
+  const held = refreshing || done; // しきい値位置で保持（回転中／完了チェック表示中）
+  const offset = (held ? THRESHOLD : pull) - BASE_OFFSET;
   // 指で引いている最中はアニメなし（追従）、離したら戻りをアニメーション。
-  const dragging = pull > 0 && !refreshing;
+  const dragging = pull > 0 && !held;
 
   return (
     <div
@@ -209,17 +225,21 @@ function PullToRefresh({
       }}
     >
       <div className="mt-[env(safe-area-inset-top)] flex h-9 w-9 items-center justify-center rounded-full border bg-background shadow-md">
-        <RefreshCw
-          className={`h-5 w-5 text-primary ${refreshing ? "animate-spin" : ""}`}
-          style={
-            refreshing
-              ? undefined
-              : {
-                  transform: `rotate(${progress * 270}deg)`,
-                  opacity: 0.35 + progress * 0.65,
-                }
-          }
-        />
+        {done ? (
+          <Check className="h-5 w-5 text-emerald-500" />
+        ) : (
+          <RefreshCw
+            className={`h-5 w-5 text-primary ${refreshing ? "animate-spin" : ""}`}
+            style={
+              refreshing
+                ? undefined
+                : {
+                    transform: `rotate(${progress * 270}deg)`,
+                    opacity: 0.35 + progress * 0.65,
+                  }
+            }
+          />
+        )}
       </div>
     </div>
   );
