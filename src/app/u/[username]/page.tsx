@@ -330,7 +330,7 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
               </Link>
               </div>
 
-              {/* 自己紹介・登録日・連続投稿 */}
+              {/* 自己紹介・登録日 */}
               <div className="space-y-1 text-xs">
                 {user.bio && (
                   <p className="whitespace-pre-wrap leading-relaxed">
@@ -342,12 +342,6 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
                   <span className="text-muted-foreground">登録日：</span>
                   {registeredAt}
                 </p>
-                {profileStats.streak > 0 && (
-                  <p>
-                    <span className="text-muted-foreground">連続投稿：</span>
-                    {profileStats.streak}日
-                  </p>
-                )}
               </div>
             </section>
 
