@@ -1,6 +1,7 @@
 import Link from "@/components/Link";
 import { CalendarDays, Camera, MapPin, Heart } from "lucide-react";
 import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
+import { PinOverlay } from "@/components/pin/PinOverlay";
 import { FavoriterAvatars } from "@/components/user/FavoriterAvatars";
 import { getAvatarUrl } from "@/lib/avatar";
 import type { CachedFavoriter } from "@/lib/fediverse/favorite";
@@ -39,10 +40,12 @@ export function ProfileFeedCard({
   image,
   seg,
   publicUrl,
+  isPinned = false,
 }: {
   image: ProfileFeedImage;
   seg: string;
   publicUrl: string;
+  isPinned?: boolean;
 }) {
   // from=user-home で、詳細ページの「戻る」をホーム（概要）へ向ける。
   const href = `/u/${seg}/status/${image.id}?from=user-home`;
@@ -74,6 +77,7 @@ export function ProfileFeedCard({
             blurDataUrl={image.blurDataUrl}
             containerClassName="h-full w-full overflow-hidden"
           />
+          <PinOverlay isPinned={isPinned} />
         </Link>
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-3 py-2">
           {/* 1行目: コメント本文（超過は右を「…」で省略） */}

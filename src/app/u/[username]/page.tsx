@@ -360,7 +360,13 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
               <section className="space-y-2">
                 <h2 className="text-sm font-semibold">注目の投稿</h2>
                 {featuredImages.map((img) => (
-                  <ProfileFeedCard key={img.id} image={img} seg={seg} publicUrl={publicUrl} />
+                  <ProfileFeedCard
+                    key={img.id}
+                    image={img}
+                    seg={seg}
+                    publicUrl={publicUrl}
+                    isPinned={pinnedIds.has(img.id)}
+                  />
                 ))}
               </section>
             )}
