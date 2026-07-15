@@ -4,9 +4,15 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/db";
 import { parseUserHandle } from "@/lib/userHandle";
-import { parsePageLimit, cursorPageArgs, slicePage } from "@/lib/pagination";
+import {
+  parsePageLimit,
+  cursorPageArgs,
+  slicePage,
+  sliceSincePage,
+} from "@/lib/pagination";
 import { CACHE_PUBLIC_SHORT } from "@/lib/http";
 
 export async function GET(
@@ -33,6 +39,8 @@ export async function GET(
 
     const searchParams = request.nextUrl.searchParams;
     const cursor = searchParams.get("cursor");
+    // since（先頭に表示中の最新 id）指定時は差分ロード＝それより新しい画像だけ返す。
+    const since = searchParams.get("since");
     const startDateParam = searchParams.get("startDate");
     const endDateParam = searchParams.get("endDate");
     const limit = parsePageLimit(searchParams.get("limit"));
@@ -52,6 +60,11 @@ export async function GET(
       }
     }
 
+    // since 指定時は「より新しい」を昇順カーソルで取り、sliceSincePage で新しい順へ戻す。
+    const orderBy: Prisma.ImageOrderByWithRelationInput[] = since
+      ? [{ createdAt: "asc" }, { id: "asc" }]
+      : [{ createdAt: "desc" }, { id: "desc" }];
+
     const images = await prisma.image.findMany({
       where: {
         userId: user.id,
@@ -59,8 +72,8 @@ export async function GET(
         isDisabled: false,
         ...(Object.keys(dateFilter).length > 0 && { createdAt: dateFilter }),
       },
-      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-      ...cursorPageArgs(cursor, limit),
+      orderBy,
+      ...cursorPageArgs(since ?? cursor, limit),
       select: {
         id: true,
         storageKey: true,
@@ -77,15 +90,25 @@ export async function GET(
       },
     });
 
+    const toDto = (img: (typeof images)[number]) => ({
+      ...img,
+      pinnedAt: img.pinnedAt?.toISOString() ?? null,
+      createdAt: img.createdAt.toISOString(),
+    });
+
+    if (since) {
+      const { result, gap } = sliceSincePage(images, limit);
+      return NextResponse.json(
+        { images: result.map(toDto), gap },
+        { headers: { "Cache-Control": CACHE_PUBLIC_SHORT } }
+      );
+    }
+
     const { result, hasMore, nextCursor } = slicePage(images, limit);
 
     return NextResponse.json(
       {
-        images: result.map((img: (typeof result)[number]) => ({
-          ...img,
-          pinnedAt: img.pinnedAt?.toISOString() ?? null,
-          createdAt: img.createdAt.toISOString(),
-        })),
+        images: result.map(toDto),
         nextCursor,
         hasMore,
       },

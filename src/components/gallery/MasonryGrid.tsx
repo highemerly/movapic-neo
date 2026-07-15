@@ -8,6 +8,8 @@ interface MasonryGridProps<T> {
   aspect: (item: T) => number;
   getKey: (item: T) => string;
   renderItem: (item: T) => ReactNode;
+  /** 各アイテムのラッパ div に付与する追加クラス（差分更新の入場アニメ等）。 */
+  itemClassName?: (item: T) => string | undefined;
   gap?: number;
 }
 
@@ -36,6 +38,7 @@ export function MasonryGrid<T>({
   aspect,
   getKey,
   renderItem,
+  itemClassName,
   gap = 4,
 }: MasonryGridProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -78,7 +81,11 @@ export function MasonryGrid<T>({
           style={{ gap }}
         >
           {col.map((item) => (
-            <div key={getKey(item)} style={{ aspectRatio: clampAspect(aspect(item)) }}>
+            <div
+              key={getKey(item)}
+              className={itemClassName?.(item)}
+              style={{ aspectRatio: clampAspect(aspect(item)) }}
+            >
               {renderItem(item)}
             </div>
           ))}

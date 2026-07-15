@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type ReactNode, type RefObject } from "react";
+import { type ReactNode, type RefObject } from "react";
 import { MasonryGrid } from "@/components/gallery/MasonryGrid";
 import { GalleryLayoutToggle } from "@/components/gallery/GalleryLayoutToggle";
 import { useGalleryLayout } from "@/hooks/useGalleryLayout";
@@ -22,6 +22,8 @@ interface GalleryGridProps<T> {
   isLoading: boolean;
   nextCursor: string | null;
   loaderRef: RefObject<HTMLDivElement | null>;
+  /** 差分更新で先頭に prepend された id 群。入場アニメ（にゅるっと追加）を当てる。 */
+  newIds?: ReadonlySet<string>;
 }
 
 /**
@@ -40,12 +42,17 @@ export function GalleryGrid<T>({
   isLoading,
   nextCursor,
   loaderRef,
+  newIds,
 }: GalleryGridProps<T>) {
   const [layout] = useGalleryLayout();
 
   if (images.length === 0) {
     return <EmptyState message={emptyMessage} action={emptyAction} />;
   }
+
+  // 差分更新で prepend された要素にだけ入場アニメ用クラスを付ける。
+  const enterClass = (item: T) =>
+    newIds?.has(getKey(item)) ? "tl-enter" : undefined;
 
   return (
     <div className="relative">
@@ -56,11 +63,14 @@ export function GalleryGrid<T>({
           aspect={aspect}
           getKey={getKey}
           renderItem={(image) => renderItem(image, true)}
+          itemClassName={enterClass}
         />
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1">
           {images.map((image) => (
-            <Fragment key={getKey(image)}>{renderItem(image, false)}</Fragment>
+            <div key={getKey(image)} className={enterClass(image)}>
+              {renderItem(image, false)}
+            </div>
           ))}
         </div>
       )}

@@ -316,3 +316,25 @@
     transform: translateX(350%);
   }
 }
+
+/* タイムライン差分更新で先頭に prepend された画像の入場（にゅるっと追加）。 */
+@keyframes tl-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.tl-enter {
+  animation: tl-enter 0.45s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tl-enter {
+    animation: none;
+  }
+}

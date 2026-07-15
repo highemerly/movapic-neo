@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ImageCard } from "@/components/gallery/ImageCard";
 import { GalleryGrid } from "@/components/gallery/GalleryGrid";
 import { useInfiniteImages } from "@/hooks/useInfiniteImages";
+import { useTimelinePersistence } from "@/hooks/useTimelinePersistence";
 
 interface GalleryImage {
   id: string;
@@ -38,18 +39,33 @@ export function UserGalleryClient({
   pinnedImageIds = [],
   isOwner = false,
 }: UserGalleryClientProps) {
-  const { images, isLoading, nextCursor, loaderRef } = useInfiniteImages<GalleryImage>({
+  // ユーザー単位でスクロール位置・一覧を永続化する（ハードリロードで復元）。
+  const { restore, onChange } = useTimelinePersistence<GalleryImage>(
+    `tl:user:${username}`
+  );
+  const { images, isLoading, nextCursor, loaderRef, newIds } = useInfiniteImages<GalleryImage>({
     initialImages,
     initialCursor:
       initialImages.length >= 20
         ? initialImages[initialImages.length - 1]?.id ?? null
         : null,
     dedupe: true,
+    restore,
+    onChange,
     fetchPage: async (cursor) => {
       const response = await fetch(
         `/api/v1/public/users/${username}/images?cursor=${cursor}&limit=20`
       );
       if (!response.ok) throw new Error("Failed to load more");
+      return response.json();
+    },
+    // 再前面化／bfcache 復元・永続化復元時に最新ページを取り直し、head を作り直す
+    // （reconcile）。新着追加・削除・非公開・編集を反映しつつ tail/スクロールは保つ。
+    fetchFirstPage: async () => {
+      const response = await fetch(
+        `/api/v1/public/users/${username}/images?limit=20`
+      );
+      if (!response.ok) throw new Error("Failed to refresh");
       return response.json();
     },
   });
@@ -77,6 +93,7 @@ export function UserGalleryClient({
       isLoading={isLoading}
       nextCursor={nextCursor}
       loaderRef={loaderRef}
+      newIds={newIds}
       renderItem={(image, fill) => (
         <ImageCard
           image={image}

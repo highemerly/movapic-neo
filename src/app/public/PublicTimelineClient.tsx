@@ -7,6 +7,7 @@ import {
   type TimelineCardImage,
 } from "@/components/gallery/TimelineImageCard";
 import { useInfiniteImages } from "@/hooks/useInfiniteImages";
+import { useTimelinePersistence } from "@/hooks/useTimelinePersistence";
 
 type TimelineImage = TimelineCardImage;
 
@@ -29,7 +30,11 @@ export function PublicTimelineClient({
   mutedAuthorKeys,
 }: PublicTimelineClientProps) {
   const mutedSet = useMemo(() => new Set(mutedAuthorKeys ?? []), [mutedAuthorKeys]);
-  const { images, isLoading, nextCursor, loaderRef } = useInfiniteImages<TimelineImage>({
+  // サーバー絞り込み単位でスクロール位置・一覧を永続化する（ハードリロードで復元）。
+  const { restore, onChange } = useTimelinePersistence<TimelineImage>(
+    `tl:public:${instancesParam ?? "all"}`
+  );
+  const { images, isLoading, nextCursor, loaderRef, newIds } = useInfiniteImages<TimelineImage>({
     initialImages,
     // カーソルは生の initialImages 基準（フィルタ前）で決める。除外で表示が減っても
     // ページングは壊れない（loaderRef が見え続ければ次ページを自動取得して埋める）。
@@ -41,6 +46,8 @@ export function PublicTimelineClient({
       mutedSet.size > 0
         ? (img) => !mutedSet.has(`${img.user.username}@${img.user.instance}`)
         : undefined,
+    restore,
+    onChange,
     fetchPage: async (cursor) => {
       const params = new URLSearchParams({ cursor, limit: "20" });
       if (instancesParam) params.set("instances", instancesParam);
@@ -48,7 +55,8 @@ export function PublicTimelineClient({
       if (!response.ok) throw new Error("Failed to load more");
       return response.json();
     },
-    // 再前面化／bfcache 復元時に先頭ページを取り直す（iOS PWA の古い表示対策）。
+    // 再前面化／bfcache 復元／永続化復元時に最新ページを取り直し、head を作り直す
+    // （reconcile）。新着は先頭へ足して「にゅるっと追加」、削除・非公開・編集も反映される。
     fetchFirstPage: async () => {
       const params = new URLSearchParams({ limit: "20" });
       if (instancesParam) params.set("instances", instancesParam);
@@ -68,6 +76,7 @@ export function PublicTimelineClient({
       isLoading={isLoading}
       nextCursor={nextCursor}
       loaderRef={loaderRef}
+      newIds={newIds}
       renderItem={(image, fill) => (
         <TimelineImageCard
           image={image}

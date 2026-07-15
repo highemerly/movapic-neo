@@ -3,6 +3,8 @@ import {
   parsePageLimit,
   cursorPageArgs,
   slicePage,
+  sliceSincePage,
+  reconcileTimeline,
   DEFAULT_PAGE_LIMIT,
   MAX_PAGE_LIMIT,
 } from "./pagination";
@@ -78,5 +80,84 @@ describe("slicePage", () => {
 
   it("空配列 → hasMore=false・nextCursor=null", () => {
     expect(slicePage([], 20)).toEqual({ result: [], hasMore: false, nextCursor: null });
+  });
+});
+
+describe("sliceSincePage", () => {
+  // 昇順（古い→新しい）で渡ってくる前提。表示順（新しい→古い）へ反転する。
+  const asc = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `id${i}` }));
+
+  it("limit以下 → gap=false・新しい順へ反転して全件返す", () => {
+    const { result, gap } = sliceSincePage(asc(3), 20);
+    expect(gap).toBe(false);
+    expect(result.map((r) => r.id)).toEqual(["id2", "id1", "id0"]);
+  });
+
+  it("limit+1件 → gap=true（穴あり＝呼び出し側は全差し替えにフォールバック）", () => {
+    const { gap } = sliceSincePage(asc(21), 20);
+    expect(gap).toBe(true);
+  });
+
+  it("空配列（新着なし）→ gap=false・空配列", () => {
+    expect(sliceSincePage([], 20)).toEqual({ result: [], gap: false });
+  });
+
+  it("入力配列を破壊しない（reverseの副作用を出さない）", () => {
+    const input = asc(3);
+    sliceSincePage(input, 20);
+    expect(input.map((r) => r.id)).toEqual(["id0", "id1", "id2"]);
+  });
+});
+
+describe("reconcileTimeline", () => {
+  const items = (...ids: string[]) => ids.map((id) => ({ id }));
+  const ids = (list: { id: string }[]) => list.map((i) => i.id);
+
+  it("重なりあり: head を最新ページで作り直し・古い tail は維持・cursor据え置き", () => {
+    // prev の a〜e に対し、最新ページ b,c,d（a が削除された想定）。重なり位置(=d)より古い e を残す。
+    const prev = items("a", "b", "c", "d", "e");
+    const res = reconcileTimeline(prev, items("b", "c", "d"), true, "cursorX");
+    expect(ids(res.images)).toEqual(["b", "c", "d", "e"]);
+    expect(res.keepCursor).toBe(true); // tail 末尾(e)不変 → cursor を触らない
+    expect([...res.newIds]).toEqual([]); // 新規なし
+  });
+
+  it("削除された既存要素は落ちる（追加専用では消えなかった不具合の回帰防止）", () => {
+    // prev に b があるが最新ページに b が無い（削除/非公開）→ 結果から消える。
+    const prev = items("a", "b", "c", "d");
+    const res = reconcileTimeline(prev, items("a", "c", "d"), true, null);
+    expect(ids(res.images)).toEqual(["a", "c", "d"]); // b が消え、tail も維持されない位置なので落ちる
+    expect([...res.newIds]).toEqual([]);
+  });
+
+  it("新着は先頭に加わり newIds に入る（にゅるっと追加）", () => {
+    const prev = items("b", "c", "d");
+    const res = reconcileTimeline(prev, items("x", "b", "c"), true, null);
+    expect(ids(res.images)).toEqual(["x", "b", "c", "d"]);
+    expect([...res.newIds]).toEqual(["x"]); // x のみ新規
+  });
+
+  it("重なり無し（新着が1ページ超で穴あき）: tail を捨て全差し替え・cursor更新", () => {
+    const prev = items("d", "e", "f");
+    const res = reconcileTimeline(prev, items("x", "y", "z"), true, "cursorNew");
+    expect(ids(res.images)).toEqual(["x", "y", "z"]);
+    expect(res.keepCursor).toBe(false);
+    expect(res.cursor).toBe("cursorNew");
+  });
+
+  it("prev が空: 最新ページで作り直し・cursor更新", () => {
+    const res = reconcileTimeline([], items("a", "b"), true, "c");
+    expect(ids(res.images)).toEqual(["a", "b"]);
+    expect(res.keepCursor).toBe(false);
+    expect(res.cursor).toBe("c");
+  });
+
+  it("ページが全件（!hasMore）: tail を残さず作り直す（古い削除の居座り防止）・cursorはnull", () => {
+    // prev に古い削除済み z が残っていても、全件ページなら落として真実に揃える。
+    const prev = items("a", "b", "z");
+    const res = reconcileTimeline(prev, items("a", "b"), false, "ignored");
+    expect(ids(res.images)).toEqual(["a", "b"]);
+    expect(res.keepCursor).toBe(false);
+    expect(res.cursor).toBeNull();
   });
 });
