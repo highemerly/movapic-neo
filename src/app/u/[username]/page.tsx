@@ -159,27 +159,29 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
   } as const;
 
   // 概要（ホーム）の表示データ。統計はユーザーページ各タブと共通の集計（getUserProfileStats）。
-  // 注目の投稿=ピン留め（最上位）＋人気（お気に入り数順）、および最近（新着）を取得。
-  // 人気・最近は後でピン留め・人気との重複を除いて絞るため、除外分を見込んで多めに取る。
+  // 注目の投稿=ピン留め（最上位）＋人気（お気に入り数順）で常に合計4件（ピン留め0→人気4…）、
+  // および最近（新着）を取得。人気・最近は後でピン留め・人気との重複を除いて絞るため、
+  // 除外分（ピン留め最大4＋人気最大4）を見込んで多めに取る。
+  const FEATURED_TARGET = 4;
   const [profileStats, pinnedRaw, popularRaw, recentPool, perfectAttendance] =
     await Promise.all([
       getUserProfileStats(user.id),
       prisma.image.findMany({
         where: { userId: user.id, isPublic: true, isDisabled: false, pinnedAt: { not: null } },
         orderBy: { pinnedAt: "desc" },
-        take: 4,
+        take: FEATURED_TARGET,
         select: feedSelect,
       }),
       prisma.image.findMany({
         where: { userId: user.id, isPublic: true, isDisabled: false, favoriteCount: { gt: 0 } },
         orderBy: [{ favoriteCount: "desc" }, { createdAt: "desc" }],
-        take: 2 + 4,
+        take: FEATURED_TARGET + 4,
         select: feedSelect,
       }),
       prisma.image.findMany({
         where: { userId: user.id, isPublic: true, isDisabled: false },
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        take: 2 + 4 + 2,
+        take: 2 + FEATURED_TARGET + 4,
         select: feedSelect,
       }),
       hasRecentPerfectAttendance(user.id),
@@ -219,9 +221,10 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
   const pinnedImages = pinnedRaw.map(toFeedImage);
   const pinnedIds = new Set(pinnedImages.map((img) => img.id));
 
-  // 注目の投稿はピン留めを最上位、続けてお気に入りの多い投稿を並べる。ピン留めが1件以上
-  // あればお気に入りは2件、ピン留めが無ければ3件まで拾い、注目枠の露出量を揃える。
-  const popularTake = pinnedImages.length > 0 ? 2 : 3;
+  // 注目の投稿はピン留めを最上位、続けてお気に入りの多い投稿を並べ、常に合計 FEATURED_TARGET 件に
+  // 揃える（ピン留め0→人気4／1→人気3…）。ピン留めが4件以上ある扱いは未定のため、その場合は
+  // 人気を足さない（Math.max で0止め）。
+  const popularTake = Math.max(0, FEATURED_TARGET - pinnedImages.length);
   const popularImages = popularRaw
     .filter((img) => !pinnedIds.has(img.id))
     .slice(0, popularTake)
