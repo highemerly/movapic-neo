@@ -60,6 +60,68 @@ export async function GET(
       }
     }
 
+    const imageSelect = {
+      id: true,
+      storageKey: true,
+      thumbnailKey: true,
+      width: true,
+      height: true,
+      overlayText: true,
+      position: true,
+      size: true,
+      blurDataUrl: true,
+      favoriteCount: true,
+      pinnedAt: true,
+      createdAt: true,
+    } as const;
+
+    type ImageRow = Prisma.ImageGetPayload<{ select: typeof imageSelect }>;
+    const toDto = (img: ImageRow) => ({
+      ...img,
+      pinnedAt: img.pinnedAt?.toISOString() ?? null,
+      createdAt: img.createdAt.toISOString(),
+    });
+
+    // タイムライン先頭（cursor/since/日付フィルタなし）はピン留めを先頭に集約して返す。
+    // SSR(photos/page.tsx)は先頭集約するが、クライアント再取得(reconcile)で使うこの API が
+    // createdAt 降順のみだと、最新 limit 件に入らない古いピン留めが reconcileTimeline の
+    // tail 切り捨てで脱落する（pitfall: 複数ピン留めしても1件しか残らない）。
+    const isTimelineHead =
+      !cursor && !since && Object.keys(dateFilter).length === 0;
+    if (isTimelineHead) {
+      const pinned = await prisma.image.findMany({
+        where: {
+          userId: user.id,
+          isPublic: true,
+          isDisabled: false,
+          pinnedAt: { not: null },
+        },
+        orderBy: { pinnedAt: "desc" },
+        select: imageSelect,
+      });
+      const pinnedIds = pinned.map((img) => img.id);
+      const recentRaw = await prisma.image.findMany({
+        where: {
+          userId: user.id,
+          isPublic: true,
+          isDisabled: false,
+          id: { notIn: pinnedIds },
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: limit + 1,
+        select: imageSelect,
+      });
+      const { result, hasMore, nextCursor } = slicePage(recentRaw, limit);
+      return NextResponse.json(
+        {
+          images: [...pinned, ...result].map(toDto),
+          nextCursor,
+          hasMore,
+        },
+        { headers: { "Cache-Control": CACHE_PUBLIC_SHORT } }
+      );
+    }
+
     // since 指定時は「より新しい」を昇順カーソルで取り、sliceSincePage で新しい順へ戻す。
     const orderBy: Prisma.ImageOrderByWithRelationInput[] = since
       ? [{ createdAt: "asc" }, { id: "asc" }]
@@ -74,26 +136,7 @@ export async function GET(
       },
       orderBy,
       ...cursorPageArgs(since ?? cursor, limit),
-      select: {
-        id: true,
-        storageKey: true,
-        thumbnailKey: true,
-        width: true,
-        height: true,
-        overlayText: true,
-        position: true,
-        size: true,
-        blurDataUrl: true,
-        favoriteCount: true,
-        pinnedAt: true,
-        createdAt: true,
-      },
-    });
-
-    const toDto = (img: (typeof images)[number]) => ({
-      ...img,
-      pinnedAt: img.pinnedAt?.toISOString() ?? null,
-      createdAt: img.createdAt.toISOString(),
+      select: imageSelect,
     });
 
     if (since) {

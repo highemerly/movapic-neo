@@ -30,7 +30,6 @@ interface UserGalleryClientProps {
   initialImages: GalleryImage[];
   publicUrl: string;
   username: string;
-  pinnedImageIds?: string[];
   /** 閲覧者がこのページのオーナー本人か（空状態のCTA表示に使用） */
   isOwner?: boolean;
 }
@@ -39,7 +38,6 @@ export function UserGalleryClient({
   initialImages,
   publicUrl,
   username,
-  pinnedImageIds = [],
   isOwner = false,
 }: UserGalleryClientProps) {
   // ユーザー単位でスクロール位置・一覧を永続化する（ハードリロードで復元）。
@@ -114,7 +112,7 @@ export function UserGalleryClient({
             image={image}
             publicUrl={publicUrl}
             username={username}
-            isPinned={pinnedImageIds.includes(image.id)}
+            isPinned={!!image.pinnedAt}
             fill={fill}
           />
         )}
