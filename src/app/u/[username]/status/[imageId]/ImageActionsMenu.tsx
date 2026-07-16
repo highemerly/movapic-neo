@@ -202,15 +202,17 @@ export function ImageActionsMenu({
         } | null;
       } = await response.json().catch(() => ({}));
 
+      // 連携先も削除できたか（遷移先トーストを出すか）。サーバー名は serverName を使う。
       let deletedRemote = false;
       const remoteStatus = data.remoteStatus;
       if (remoteStatus) {
         const platformName =
           remoteStatus.platform === "misskey" ? "Misskey" : "Mastodon";
+        // どのサーバーの投稿かを前面に出す（プラットフォーム名は補足として括弧書き）。
         const deleteRemote = await confirm({
-          title: `${platformName}の投稿も削除`,
-          description: `この画像は${platformName}にも投稿されています。${platformName}側の投稿も削除しますか？`,
-          confirmText: `${platformName}からも削除`,
+          title: `${serverName}の投稿も削除`,
+          description: `この画像は${serverName}（${platformName}）にも投稿されています。${serverName}の投稿も削除しますか？`,
+          confirmText: `${serverName}からも削除`,
           cancelText: "残しておく",
           destructive: true,
         });
@@ -244,9 +246,10 @@ export function ImageActionsMenu({
       }
 
       // 成功トーストは遷移先のユーザーページで表示する（投稿完了時と同じ方式）。
+      // deleted=1 は local のみ削除、deleted=remote は連携先も削除（server にサーバー名を載せる）。
       router.push(
         deletedRemote
-          ? `/u/${username}?deleted=remote`
+          ? `/u/${username}?deleted=remote&server=${encodeURIComponent(serverName)}`
           : `/u/${username}?deleted=1`
       );
       router.refresh();
@@ -254,7 +257,7 @@ export function ImageActionsMenu({
       toast.error(error instanceof Error ? error.message : "削除に失敗しました");
       setIsDeleting(false);
     }
-  }, [confirm, imageId, router, username]);
+  }, [confirm, imageId, router, username, serverName]);
 
   const handleRepost = useCallback(async () => {
     if (isReposting) return;

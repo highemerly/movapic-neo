@@ -17,12 +17,16 @@ import { userPageRobotsMetadata } from "@/lib/crawlers";
 import { buildOgImage, DEFAULT_OG_IMAGE } from "@/lib/ogImage";
 import { ProfileFeedCard, type ProfileFeedImage } from "@/components/user/ProfileFeedCard";
 import type { CachedFavoriter } from "@/lib/fediverse/favorite";
+import { ToastFlasher } from "@/components/ToastFlasher";
+import { buildDeleteFlash } from "./deleteFlash";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
 interface UserHomePageProps {
   params: Promise<{ username: string }>;
+  // 画像詳細からの削除後に遷移してくる際、完了トーストの文言を決めるクエリ。
+  searchParams: Promise<{ deleted?: string; server?: string }>;
 }
 
 export async function generateMetadata({
@@ -110,8 +114,10 @@ export async function generateMetadata({
   };
 }
 
-export default async function UserHomePage({ params }: UserHomePageProps) {
+export default async function UserHomePage({ params, searchParams }: UserHomePageProps) {
   const { username } = await params;
+  const { deleted, server } = await searchParams;
+  const deleteFlash = buildDeleteFlash(deleted, server);
   const currentUser = await getCurrentUser();
 
   // username@domain を分解（既定インスタンスは domain 省略可）
@@ -263,6 +269,9 @@ export default async function UserHomePage({ params }: UserHomePageProps) {
             : null
         }
       />
+      {deleteFlash && (
+        <ToastFlasher flash={deleteFlash} clearParams={["deleted"]} />
+      )}
       <div className="container mx-auto px-4 pt-4 pb-8 max-w-6xl overflow-x-clip">
         <UserProfileHeader
           user={{
