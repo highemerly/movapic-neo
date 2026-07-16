@@ -389,6 +389,8 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         <ToastFlasher
           flash={buildPostFlash({
             fediverseFailed,
+            // postId があれば連合投稿成功。local 成功は postId=null で汎用文言になる。
+            fediversePosted: !!image.postId,
             serverDomain: image.user.instance.domain,
             statusCode: fediverseErrorStatus,
           })}

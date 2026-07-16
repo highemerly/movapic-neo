@@ -38,6 +38,8 @@ import { useConfirm } from "@/components/providers/ConfirmProvider";
 type RepostVisibility = "public" | "unlisted";
 const REPOST_VISIBILITIES: RepostVisibility[] = ["public", "unlisted"];
 import { MuteDialog } from "@/components/mute/MuteDialog";
+import { showFlashToast } from "@/components/ToastFlasher";
+import { buildPostFlash } from "./postFlash";
 import { ReportDialog } from "./ReportDialog";
 import { useNativeShare, type NativeShareParams } from "./useNativeShare";
 
@@ -272,12 +274,26 @@ export function ImageActionsMenu({
 
       // 画像処理は成功したが連合投稿だけ失敗したケース。postId は未設定のままなので、
       // ダイアログを閉じずに再試行できる状態を保つ。
+      // 連合投稿だけ失敗（部分的成功）。postId は未設定のまま＝ダイアログを閉じず再試行可能に。
       if (data.fediverseError) {
-        toast.error(`${serverName}への投稿に失敗しました: ${data.fediverseError}`);
+        showFlashToast(
+          buildPostFlash({
+            fediverseFailed: true,
+            fediversePosted: false,
+            serverDomain: serverName,
+            statusCode: data.fediverseErrorStatus,
+          })
+        );
         return;
       }
 
-      toast.success(`${serverName}に投稿しました`);
+      showFlashToast(
+        buildPostFlash({
+          fediverseFailed: false,
+          fediversePosted: true,
+          serverDomain: serverName,
+        })
+      );
       setRepostOpen(false);
       // postId が付き、メニュー項目が消えて投稿リンクが出る状態へ更新する。
       router.refresh();

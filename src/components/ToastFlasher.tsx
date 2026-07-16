@@ -7,8 +7,19 @@ export interface FlashToast {
   variant: "success" | "warning" | "error" | "info";
   message: string;
   description?: string;
+  /** description に付けるクラス（改行を見せる whitespace-pre-line など）。 */
+  descriptionClassName?: string;
   /** ミリ秒。Infinity で自動消滅しない（ユーザーが閉じるまで残す）。省略時は sonner 既定。 */
   duration?: number;
+}
+
+/** FlashToast を sonner で発火する。遷移後フラッシュ・その場トーストの両方で共有する。 */
+export function showFlashToast(flash: FlashToast) {
+  toast[flash.variant](flash.message, {
+    description: flash.description,
+    descriptionClassName: flash.descriptionClassName,
+    duration: flash.duration,
+  });
 }
 
 /**
@@ -31,10 +42,7 @@ export function ToastFlasher({
     if (fired.current) return;
     fired.current = true;
 
-    toast[flash.variant](flash.message, {
-      description: flash.description,
-      duration: flash.duration,
-    });
+    showFlashToast(flash);
 
     if (clearParams.length > 0) {
       const url = new URL(window.location.href);
