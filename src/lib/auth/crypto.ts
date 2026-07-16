@@ -184,9 +184,9 @@ export function generateMiAuthSignature(
   }
 
   const data = `${server}:${sessionId}:${timestamp}`;
-  return createHash("sha256")
-    .update(secret + data)
-    .digest("hex");
+  // createHash("sha256").update(secret + data) は length-extension に弱いアンチパターン。
+  // 鍵付きMACである HMAC-SHA256 を使う（signStatePayload と同じ構成）。
+  return createHmac("sha256", secret).update(data).digest("hex");
 }
 
 /**
