@@ -157,6 +157,8 @@ export default async function UserHomePage({ params, searchParams }: UserHomePag
     size: true,
     blurDataUrl: true,
     createdAt: true,
+    // postId=Fediverse投稿済みの印。未投稿(local)はお気に入りが付きようがないため数を隠す。
+    postId: true,
     favoriteCount: true,
     favoritersCache: true,
     cameraModel: true,
@@ -203,6 +205,7 @@ export default async function UserHomePage({ params, searchParams }: UserHomePag
     size: string;
     blurDataUrl: string | null;
     createdAt: Date;
+    postId: string | null;
     favoriteCount: number;
     favoritersCache: unknown;
     cameraModel: string | null;
@@ -217,6 +220,7 @@ export default async function UserHomePage({ params, searchParams }: UserHomePag
     size: img.size,
     blurDataUrl: img.blurDataUrl,
     createdAt: img.createdAt.toISOString(),
+    postId: img.postId,
     favoriteCount: img.favoriteCount,
     favoriters: (img.favoritersCache as CachedFavoriter[] | null) ?? [],
     cameraModel: img.cameraModel,

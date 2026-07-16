@@ -16,6 +16,8 @@ export interface ProfileFeedImage {
   blurDataUrl: string | null;
   /** ISO 文字列 */
   createdAt: string;
+  /** Fediverse投稿済みの印（postId）。null=未投稿(local)でお気に入りが付かない。 */
+  postId: string | null;
   favoriteCount: number;
   favoriters: CachedFavoriter[];
   cameraModel: string | null;
@@ -107,13 +109,18 @@ export function ProfileFeedCard({
               </span>
             )}
           </p>
-          {/* 4行目: お気に入り数＋お気に入りした人（上位のみ・はみ出しは切り取り） */}
-          <div className="flex items-center gap-1.5">
-            <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-              <Heart className="h-3.5 w-3.5 fill-current text-red-500" />
-              <span className="font-medium tabular-nums">{image.favoriteCount}</span>
-            </span>
-            {favoriters.length > 0 && <FavoriterAvatars items={favoriters} />}
+          {/* 4行目: お気に入り数＋お気に入りした人（上位のみ・はみ出しは切り取り）。
+              未投稿(local)はお気に入りが付きようがないため数自体を出さない（min-h-5 で行高は確保）。 */}
+          <div className="flex min-h-5 items-center gap-1.5">
+            {image.postId && (
+              <>
+                <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                  <Heart className="h-3.5 w-3.5 fill-current text-red-500" />
+                  <span className="font-medium tabular-nums">{image.favoriteCount}</span>
+                </span>
+                {favoriters.length > 0 && <FavoriterAvatars items={favoriters} />}
+              </>
+            )}
           </div>
         </div>
       </div>
