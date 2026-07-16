@@ -70,7 +70,7 @@ export function EmailGuide({ emailPrefix, emailDomain }: EmailGuideProps) {
             <strong>公開範囲:</strong> public unlisted
           </li>
           <li>
-            <strong>カメラ機種:</strong> カメラ カメラなし
+            <strong>カメラのデータ:</strong> カメラなし カメラ カメラ詳細
           </li>
           <li>
             <strong>位置情報:</strong> 都道府県 市町村
