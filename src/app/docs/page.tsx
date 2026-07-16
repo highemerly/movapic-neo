@@ -256,6 +256,7 @@ export default async function SpecPage() {
                     <li>枚数: 1枚</li>
                     <li>フォーマット: JPEG, PNG, WebP, AVIF, HEIC, HEIF</li>
                     <li>最大ファイルサイズ: 20MB</li>
+                    <li>最大ピクセル数: 200MP</li>
                   </ul>
                 </div>
                 <div>
