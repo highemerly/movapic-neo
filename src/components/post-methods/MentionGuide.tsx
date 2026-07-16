@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
+import Link from "@/components/Link";
 
 /**
  * Bot（メンション）投稿の説明。ダッシュボード・/create/bot・/create のモーダルで共有する。
@@ -101,7 +102,7 @@ export function MentionGuide({
 
       <div className="text-sm space-y-3">
         <p className="font-medium">オプション:</p>
-        <p className="text-muted-foreground">本文の前に [上 赤 大] のように角括弧＋スペース区切りで指定することもできます（指定がない場合、初期設定に従います）。</p>
+        <p className="text-muted-foreground">本文の前に [上 赤 大] のように角括弧＋スペース区切りで指定することもできます（指定がない場合、<Link href="/settings#defaults" className="text-primary hover:underline">初期設定</Link>に従います）。</p>
         <ul className="list-disc list-inside space-y-2 ml-2">
           <li>
             <strong>位置:</strong> 上 下 左 右

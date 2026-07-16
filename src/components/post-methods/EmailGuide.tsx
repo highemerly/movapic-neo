@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "@/components/Link";
 import { EmailAddressDisplay } from "./EmailAddressDisplay";
 
 /**
@@ -48,7 +49,7 @@ export function EmailGuide({ emailPrefix, emailDomain }: EmailGuideProps) {
 
       <div className="text-sm space-y-3">
         <p className="font-medium">オプション:</p>
-        <p className="text-muted-foreground">件名にスペース区切りでオプションを指定することもできます（指定がない場合、初期設定に従います）。</p>
+        <p className="text-muted-foreground">件名にスペース区切りでオプションを指定することもできます（指定がない場合、<Link href="/settings#defaults" className="text-primary hover:underline">初期設定</Link>に従います）。</p>
         <ul className="list-disc list-inside space-y-2 ml-2">
           <li>
             <strong>位置:</strong> 上 下 左 右
