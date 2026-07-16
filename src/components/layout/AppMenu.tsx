@@ -603,8 +603,12 @@ function LogoutButton() {
     setIsLoading(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
-      // トップページ着地時に「ログアウトしました」トーストを出すためクエリで合図する（ToastFlasher が発火後に除去）。
-      window.location.href = "/?loggedout=1";
+      // トップ着地時に「ログアウトしました」トーストを出すため sessionStorage に合図を積む（SessionFlasher が読んで即削除）。
+      sessionStorage.setItem(
+        "flash:loggedOut",
+        JSON.stringify({ variant: "success", message: "ログアウトしました" }),
+      );
+      window.location.href = "/";
     } catch (error) {
       console.error("Logout error:", error);
       setIsLoading(false);
@@ -924,8 +928,12 @@ function RailLogout({ expanded }: { expanded: boolean }) {
     setIsLoading(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
-      // トップページ着地時に「ログアウトしました」トーストを出すためクエリで合図する（ToastFlasher が発火後に除去）。
-      window.location.href = "/?loggedout=1";
+      // トップ着地時に「ログアウトしました」トーストを出すため sessionStorage に合図を積む（SessionFlasher が読んで即削除）。
+      sessionStorage.setItem(
+        "flash:loggedOut",
+        JSON.stringify({ variant: "success", message: "ログアウトしました" }),
+      );
+      window.location.href = "/";
     } catch (error) {
       console.error("Logout error:", error);
       setIsLoading(false);

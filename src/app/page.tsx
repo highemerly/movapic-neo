@@ -12,7 +12,7 @@ import { LoginPrompt } from "@/components/auth/LoginPrompt";
 import { FeaturedMarquee } from "@/components/gallery/FeaturedMarquee";
 import { AboutShamezo } from "@/components/onboarding/AboutShamezo";
 import { Footer } from "@/components/Footer";
-import { ToastFlasher } from "@/components/ToastFlasher";
+import { SessionFlasher } from "@/components/SessionFlasher";
 import { getAllowedServers } from "@/lib/auth/allowedServers";
 import { userPathSegment } from "@/lib/userHandle";
 
@@ -82,12 +82,7 @@ const getFeaturedImages = unstable_cache(
   { revalidate: 300, tags: ["featured-images"] }
 );
 
-export default async function HomePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ loggedout?: string }>;
-}) {
-  const { loggedout } = await searchParams;
+export default async function HomePage() {
   const allowedServers = getAllowedServers();
   const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
 
@@ -123,12 +118,8 @@ export default async function HomePage({
 
   return (
     <div className="min-h-screen bg-background">
-      {loggedout === "1" && (
-        <ToastFlasher
-          flash={{ variant: "success", message: "ログアウトしました" }}
-          clearParams={["loggedout"]}
-        />
-      )}
+      {/* ログアウト（フルリロードで着地）時に sessionStorage 経由で一度だけトーストを出す。 */}
+      <SessionFlasher storageKey="flash:loggedOut" />
       <main className="py-6">
         {/* ロゴ */}
         <div className="container mx-auto max-w-2xl px-4">
