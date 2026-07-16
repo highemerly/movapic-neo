@@ -124,6 +124,7 @@ export async function proxy(request: NextRequest) {
     `img-src 'self' data: blob: ${mediaProxyOrigin} ${storagePublicOrigin}`, // 画像: アバターproxy・投稿画像
     "font-src 'self'",
     "connect-src 'self' https:", // Fediverseインスタンスは任意のため https: を維持
+    "object-src 'none'", // <object>/<embed>/<applet> 系プラグイン埋め込みを封じる（default-srcより厳格に明示）
     "frame-ancestors 'none'", // iframe埋め込み禁止
     "base-uri 'self'",
     "form-action 'self'",
