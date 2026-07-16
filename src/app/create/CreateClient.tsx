@@ -915,16 +915,19 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
               )}
             </div>
 
-            {/* 注意事項（画像直下に常に表示・公開範囲と撮影場所に応じて動的に変化） */}
-            <div className="space-y-2">
-              <PostVisibilityNotice
-                visibility={visibility}
-                instanceDomain={user.instance.domain}
-              />
-              {locationDisplayLabel && (
-                <PostLocationNotice locationLabel={locationDisplayLabel} />
-              )}
-            </div>
+            {/* 注意事項（公開範囲と撮影場所に応じて動的に変化）。写真アップロード前は
+                「みんなの写真に表示されます」等が空振りするため、アップロード後のみ表示。 */}
+            {formState.imageFile && (
+              <div className="space-y-2">
+                <PostVisibilityNotice
+                  visibility={visibility}
+                  instanceDomain={user.instance.domain}
+                />
+                {locationDisplayLabel && (
+                  <PostLocationNotice locationLabel={locationDisplayLabel} />
+                )}
+              </div>
+            )}
           </div>
 
           {/* 右列: ①コメント入力 → ②オプション → ③追加情報 → ④同時投稿先 → ⑤設定保存
