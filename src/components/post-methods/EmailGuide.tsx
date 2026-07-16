@@ -1,5 +1,6 @@
 "use client";
 
+import { Info } from "lucide-react";
 import Link from "@/components/Link";
 import { EmailAddressDisplay } from "./EmailAddressDisplay";
 
@@ -88,6 +89,11 @@ export function EmailGuide({ emailPrefix, emailDomain }: EmailGuideProps) {
           </a>
         </div>
       </div>
+
+      <p className="flex items-start gap-2 text-sm text-muted-foreground">
+        <Info className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+        <span>投稿が成功しても失敗しても、返信はありません。</span>
+      </p>
     </div>
   );
 }

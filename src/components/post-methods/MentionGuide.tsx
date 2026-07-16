@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Copy, Check } from "lucide-react";
+import { Copy, Check, Info } from "lucide-react";
 import Link from "@/components/Link";
 
 /**
@@ -138,6 +138,11 @@ export function MentionGuide({
           </a>
         </div>
       </div>
+
+      <p className="flex items-start gap-2 text-sm text-muted-foreground">
+        <Info className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
+        <span>メンションを送るときの公開範囲（公開・ホーム・DMなど）は何でも構いません。生成される投稿の公開範囲とは無関係です。</span>
+      </p>
     </div>
   );
 }
