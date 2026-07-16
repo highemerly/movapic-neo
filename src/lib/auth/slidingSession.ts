@@ -53,7 +53,11 @@ export async function maybeSlideSession(
 
   let payload;
   try {
-    ({ payload } = await jwtVerify(token, getJWTSecret()));
+    // 署名は常に HS256（SignJWT 側でピン）。検証側も明示ピンして、将来の鍵型変更や
+    // リファクタで alg 混同（非対称鍵の悪用・alg:none）が紛れ込む事故を防ぐ。
+    ({ payload } = await jwtVerify(token, getJWTSecret(), {
+      algorithms: ["HS256"],
+    }));
   } catch {
     // 署名不正 or 期限切れ → 延長しない（自然失効させる）
     return;
