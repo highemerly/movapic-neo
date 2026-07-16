@@ -10,7 +10,7 @@ import { TabTransition } from "@/components/user/TabTransition";
 import { AchievementsView } from "@/components/achievements/AchievementsView";
 import { perfectMonthKey, perfectMonthGrace } from "@/lib/achievements/perfectMonth";
 import { lastMonthYm, thisMonthYm } from "@/lib/achievements/lastMonthPerfect";
-import { collectLadderValues } from "@/lib/achievements/stats";
+import { collectLadderValues, collectCurrentMonthPerfect } from "@/lib/achievements/stats";
 import { parseUserHandle } from "@/lib/userHandle";
 import { userPageRobotsMetadata } from "@/lib/crawlers";
 import type { Metadata } from "next";
@@ -52,14 +52,17 @@ export default async function AchievementsPage({
 
   const isMuted = await isMutedByViewer(currentUser?.id, user.id);
   const canMute = !!currentUser && currentUser.id !== user.id;
+  const isOwner = currentUser?.id === user.id;
 
-  const [achievements, ladderValues] = await Promise.all([
+  // 「次のステップ」はこのページの主（プロフィールの持ち主）の進捗として全員に表示する。
+  const [achievements, ladderValues, currentMonthPerfect] = await Promise.all([
     prisma.achievement.findMany({
       where: { userId: user.id },
       select: { key: true, category: true, grantedAt: true },
       orderBy: { grantedAt: "desc" },
     }),
     collectLadderValues(user.id),
+    collectCurrentMonthPerfect(user.id, perfectMonthGrace(user.instance.domain)),
   ]);
 
   const granted = achievements.map((a) => ({
@@ -100,7 +103,7 @@ export default async function AchievementsPage({
           }}
           perfectAttendance={perfectAttendance}
           activeTab="achievements"
-          isOwner={currentUser?.id === user.id}
+          isOwner={isOwner}
           isMuted={isMuted}
           canMute={canMute}
         />
@@ -111,6 +114,7 @@ export default async function AchievementsPage({
             granted={granted}
             ladderValues={ladderValues}
             perfectMonthGrace={perfectMonthGrace(user.instance.domain)}
+            currentMonthPerfect={currentMonthPerfect}
           />
         </TabTransition>
 

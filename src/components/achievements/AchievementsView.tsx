@@ -12,6 +12,10 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { AchievementIcon } from "./AchievementIcon";
+import { CollectionMeter } from "./CollectionMeter";
+import { NextGoals } from "./NextGoals";
+import { SectionTitle } from "./SectionTitle";
+import type { CurrentMonthPerfect } from "@/lib/achievements/stats";
 import {
   CATALOG,
   CATALOG_BY_KEY,
@@ -467,11 +471,14 @@ export function AchievementsView({
   granted,
   ladderValues,
   perfectMonthGrace,
+  currentMonthPerfect,
 }: {
   granted: GrantedItem[];
   ladderValues: Record<string, number>;
   /** このユーザーの皆勤賞の未投稿許容日数（所属インスタンスで決まる。説明文の数字に使う）。 */
   perfectMonthGrace: number;
+  /** 「次のステップ」の当月皆勤カード用（本人・閲覧者を問わず、このページの主の進捗を表示）。 */
+  currentMonthPerfect: CurrentMonthPerfect;
 }) {
   const grantedMap = useMemo(
     () => new Map(granted.map((g) => [g.key, g.grantedAt])),
@@ -548,6 +555,16 @@ export function AchievementsView({
     setCelebrate(false);
   };
 
+  // 「もうすぐ獲れる」から実績キー／皆勤で該当エントリの詳細モーダルを開く。
+  const openByKey = (key: string) => {
+    const entry = sections.flatMap((s) => s.entries).find((e) => entryMatchesKey(e, key));
+    if (entry) openTile(entry);
+  };
+  const openPerfect = () => {
+    const entry = sections.flatMap((s) => s.entries).find((e) => e.kind === "perfectMonth");
+    if (entry) openTile(entry);
+  };
+
   const closeModal = () => {
     setSelected(null);
     setCelebrate(false);
@@ -556,21 +573,39 @@ export function AchievementsView({
   };
 
   return (
-    <div className="space-y-5">
-      {sections.map((section) => (
-        <section key={section.title}>
-          <h2 className="mb-2 text-sm font-bold">{section.title}</h2>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-            {section.entries.map((entry) => (
-              <Tile
-                key={entry.id}
-                model={tileModel(entry, grantedMap, perfectMonths, seasons)}
-                onClick={() => openTile(entry)}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
+    <div className="space-y-6">
+      <CollectionMeter granted={granted} perfectMonthGrace={perfectMonthGrace} />
+
+      <NextGoals
+        grantedKeys={new Set(grantedMap.keys())}
+        ladderValues={ladderValues}
+        currentMonthPerfect={currentMonthPerfect}
+        onOpen={openByKey}
+        onOpenPerfect={openPerfect}
+      />
+
+      <section>
+        <SectionTitle icon={Trophy} title="実績コレクション" />
+        <div className="space-y-5">
+          {sections.map((section) => (
+            <div key={section.title}>
+              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400/80" aria-hidden />
+                {section.title}
+              </h3>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                {section.entries.map((entry) => (
+                  <Tile
+                    key={entry.id}
+                    model={tileModel(entry, grantedMap, perfectMonths, seasons)}
+                    onClick={() => openTile(entry)}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <Dialog open={selected != null} onOpenChange={(o) => !o && closeModal()}>
         <DialogContent

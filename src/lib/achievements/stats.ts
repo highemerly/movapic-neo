@@ -6,7 +6,13 @@
 import prisma from "@/lib/db";
 import { calculateStreak, toJstDateString } from "@/lib/streak";
 import type { AchStats, PostFacts } from "./catalog";
-import { summarizeDayCounts } from "./perfectMonth";
+import {
+  summarizeDayCounts,
+  daysInMonthOf,
+  isPerfectMonth,
+  currentMonthMakeupStatus,
+  type CurrentMonthMakeupStatus,
+} from "./perfectMonth";
 
 export async function collectStats(userId: string, post: PostFacts): Promise<AchStats> {
   const postYm = toJstDateString(post.createdAt).slice(0, 7);
@@ -140,5 +146,60 @@ export async function collectLadderValues(userId: string): Promise<Record<string
     cameras: cameraGroups.length,
     prefectures: prefGroups.length,
     colors: colorGroups.length,
+  };
+}
+
+/** 「あと少しナビ」の当月皆勤カード用（本人分・永続割当ベース）。 */
+export interface CurrentMonthPerfect {
+  daysInMonth: number;
+  /** JST の今日の日(1-31)。 */
+  todayDayNum: number;
+  /** 当月に1枚以上投稿した distinct 日数。 */
+  distinctDays: number;
+  /** 当月の皆勤賞をすでに達成しているか（永続割当ベース）。 */
+  achieved: boolean;
+  status: CurrentMonthMakeupStatus;
+}
+
+/**
+ * 当月の皆勤賞の進捗を集める（あと少しナビの常時ピン留めカード用）。
+ * 判定・進捗は perfectMonth.ts に集約された純粋関数を呼ぶ（式を再実装しない）。
+ * grace は本人の所属インスタンスで決まる値を呼び出し側から渡す。
+ */
+export async function collectCurrentMonthPerfect(
+  userId: string,
+  grace: number
+): Promise<CurrentMonthPerfect> {
+  const todayStr = toJstDateString(new Date());
+  const ym = todayStr.slice(0, 7);
+  const year = Number(ym.slice(0, 4));
+  const month = Number(ym.slice(5, 7));
+  const daysInMonth = daysInMonthOf(year, month);
+  const todayDayNum = Number(todayStr.slice(8, 10));
+
+  const rows = await prisma.image.findMany({
+    where: { userId },
+    select: { createdAt: true, makeupTargetDay: true },
+  });
+
+  // 当月の日(1-31)→投稿数 と、当月の永続穴埋め割当が指す空き日。
+  const dayCounts: Record<number, number> = {};
+  const filledHoleDays: number[] = [];
+  for (const r of rows) {
+    const d = toJstDateString(r.createdAt);
+    if (!d.startsWith(ym)) continue;
+    dayCounts[Number(d.slice(8, 10))] = (dayCounts[Number(d.slice(8, 10))] ?? 0) + 1;
+    if (r.makeupTargetDay != null) filledHoleDays.push(r.makeupTargetDay);
+  }
+
+  let distinctDays = 0;
+  for (let d = 1; d <= daysInMonth; d++) if ((dayCounts[d] ?? 0) >= 1) distinctDays++;
+
+  return {
+    daysInMonth,
+    todayDayNum,
+    distinctDays,
+    achieved: isPerfectMonth({ daysInMonth, dayCounts, filledHoleDays, grace }),
+    status: currentMonthMakeupStatus({ daysInMonth, todayDayNum, dayCounts, filledHoleDays, grace }),
   };
 }
