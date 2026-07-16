@@ -287,10 +287,10 @@ export default async function UserHomePage({ params, searchParams }: UserHomePag
           canMute={canMute}
         />
 
-        {/* 概要（ホーム）本文。フィード（注目/最近）はPCで2列に広げるため外枠を広めに取り、
-            概要ボタンや空状態・CTAなど読み物系は内側で max-w-2xl に絞って幅を揃える。 */}
+        {/* 概要（ホーム）本文。フィード（注目/最近）はPCでタブ以下の幅いっぱい（実績ページと同様）を
+            使う。概要ボタンや空状態・CTAなど読み物系は内側で max-w-2xl に絞って幅を揃える。 */}
         <TabTransition tab="home">
-          <div className="mx-auto max-w-4xl space-y-4">
+          <div className="w-full space-y-4">
             {/* 概要: 見出し → 各タブへの4ボタン → 自己紹介・登録日・連続投稿。左揃えで幅のみ制限。 */}
             <section className="w-full max-w-2xl space-y-3">
               <h2 className="text-sm font-semibold">概要</h2>
