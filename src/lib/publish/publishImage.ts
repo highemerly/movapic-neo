@@ -243,21 +243,29 @@ async function postImageOnce(input: PostImageInput): Promise<PostResult | null> 
   return { success: false, error: "サポートされていないプラットフォームです" };
 }
 
+/** 再試行する価値がある一時的失敗か（5xx: 過負荷・障害 / 429: レート制限）。 */
+function isTransientPostFailure(result: PostResult): boolean {
+  if (!result.statusCode) return false;
+  return result.statusCode >= 500 || result.statusCode === 429;
+}
+
 /**
- * Fediverse へ投稿する。サーバーが 5xx（一時的な過負荷・障害）を返したときだけ、
- * 同期でもう一度だけ再試行する。
+ * Fediverse へ投稿する。サーバーが 5xx（一時的な過負荷・障害）または 429（レート制限）を
+ * 返したときだけ、同期でもう一度だけ再試行する。
  *
- * 5xx に限定する理由:
+ * 5xx / 429 に限定する理由:
  * - timeout/接続失敗（statusCode undefined）は1回で最大30秒待つため、再試行すると
- *   /api/v1/post の応答が長引き Ingress の504に達するリスクが高い。5xxは即座に返るので軽い。
- * - 4xx（権限不足・バリデーション等）は再試行しても結果が変わらない。
+ *   /api/v1/post の応答が長引き Ingress の504に達するリスクが高い。5xx/429は即座に返るので軽い。
+ * - 429 は瞬間的なレート超過なら短い待機で回復しうる（Retry-After は見ず一律 RETRY_BACKOFF_MS。
+ *   長い待機が必要なケースまで追随すると応答が長引くため、1回の軽い再試行に留める）。
+ * - 4xx（429を除く。権限不足・バリデーション等）は再試行しても結果が変わらない。
  */
 export async function postImageToFediverse(
   input: PostImageInput
 ): Promise<PostResult | null> {
   const first = await postImageOnce(input);
 
-  if (first && !first.success && first.statusCode && first.statusCode >= 500) {
+  if (first && !first.success && isTransientPostFailure(first)) {
     await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
     return postImageOnce(input);
   }
