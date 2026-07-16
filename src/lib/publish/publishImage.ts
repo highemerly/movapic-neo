@@ -183,8 +183,8 @@ interface PostImageInput {
   altText?: string | null;
 }
 
-/** 5xx 再試行前の軽いバックオフ */
-const RETRY_BACKOFF_MS = 500;
+/** 5xx/429 再試行前の軽いバックオフ */
+const RETRY_BACKOFF_MS = 1500;
 
 /**
  * サービスの visibility をプラットフォーム別 visibility に変換して1回だけ投稿する。
