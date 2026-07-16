@@ -603,7 +603,8 @@ function LogoutButton() {
     setIsLoading(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
-      window.location.href = "/";
+      // トップページ着地時に「ログアウトしました」トーストを出すためクエリで合図する（ToastFlasher が発火後に除去）。
+      window.location.href = "/?loggedout=1";
     } catch (error) {
       console.error("Logout error:", error);
       setIsLoading(false);
@@ -923,7 +924,8 @@ function RailLogout({ expanded }: { expanded: boolean }) {
     setIsLoading(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
-      window.location.href = "/";
+      // トップページ着地時に「ログアウトしました」トーストを出すためクエリで合図する（ToastFlasher が発火後に除去）。
+      window.location.href = "/?loggedout=1";
     } catch (error) {
       console.error("Logout error:", error);
       setIsLoading(false);
