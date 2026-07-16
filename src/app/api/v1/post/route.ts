@@ -35,6 +35,7 @@ import {
   isValidArrangement,
 } from "@/types";
 import { countGraphemes } from "@/lib/text/grapheme";
+import { sanitizeExifDetails, type ExifDetails } from "@/lib/exif/details";
 
 export async function POST(request: NextRequest) {
   try {
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     // EXIFメタデータ（クライアントが元画像から抽出したものを受け取る）
     // カメラ機種と撮影場所は独立。各オプションごとに保存対象を決める。
-    // - cameraOption:   "none" | "show"
+    // - cameraOption:   "none" | "show" | "detail"（detail は機種名＋撮影設定の上位集合）
     // - locationOption: "none" | "pref" | "city"
     // 注: 撮影日時はプライバシー保護のため現在は取得しない（DBカラム capturedAt は将来用に保持）
     const cameraOption = (formData.get("cameraOption") as string | null) ?? "none";
@@ -87,9 +88,23 @@ export async function POST(request: NextRequest) {
     let cameraMake: string | null = null;
     let cameraModel: string | null = null;
     const capturedAt: Date | null = null;
-    if (cameraOption === "show") {
+    let exifDetails: ExifDetails | null = null;
+    // show / detail はどちらも機種名・メーカーを保存する（detail はその上位集合）。
+    if (cameraOption === "show" || cameraOption === "detail") {
       cameraMake = (formData.get("cameraMake") as string | null)?.slice(0, 100) || null;
       cameraModel = (formData.get("cameraModel") as string | null)?.slice(0, 100) || null;
+    }
+    // detail のときだけ、クライアント抽出の詳細撮影情報 JSON を受け取り、
+    // 既存の cameraModel と同じ信頼モデル（ホワイトリスト＋文字数上限）でサニタイズする。
+    if (cameraOption === "detail") {
+      const rawDetails = formData.get("exifDetails") as string | null;
+      if (rawDetails) {
+        try {
+          exifDetails = sanitizeExifDetails(JSON.parse(rawDetails));
+        } catch {
+          exifDetails = null;
+        }
+      }
     }
 
     // シーズン（期間限定）: 指定時はスタイル系オプションをプリセットで上書きするため
@@ -292,7 +307,7 @@ export async function POST(request: NextRequest) {
         height: finalized.height,
         blurDataUrl: finalized.blurDataUrl,
       }),
-      extras: { cameraMake, cameraModel, capturedAt, locationPrefecture, locationCity },
+      extras: { cameraMake, cameraModel, capturedAt, exifDetails, locationPrefecture, locationCity },
     });
 
     // Fediverse投稿だけが失敗したケースは「部分的成功」。

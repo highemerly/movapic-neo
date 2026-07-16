@@ -66,8 +66,12 @@ export function PrivacyContent() {
             <p className="text-ms text-muted-foreground font-medium mb-2">ユーザーが投稿時に明示的に希望した場合に限り、画像のEXIF情報から収集する情報</p>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
               <li>カメラのメーカー名とモデル名</li>
+              <li>撮影情報（F値・シャッター速度・ISO感度・焦点距離・レンズ名・露出補正・フラッシュ有無）</li>
               <li>撮影場所（都道府県または都道府県+市区町村）</li>
             </ul>
+            <p className="text-xs text-muted-foreground mt-2">
+              それぞれ個別に収集を希望するかどうか選択できます。なお、撮影日時および撮影方向（GPS方位）は、いずれの選択肢でも収集しません。
+            </p>
           </div>
           <div>
             <p className="text-ms text-muted-foreground font-medium mb-2">ユーザーがメール投稿機能を利用した場合に限り、メールから収集する情報</p>
@@ -187,7 +191,7 @@ export function PrivacyContent() {
         <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
           <li>全ての通信はHTTPSで暗号化します</li>
           <li>アップロードされ生成された画像のEXIF情報（GPS位置情報、カメラ情報等）は常に削除し、出力画像にはメタデータが含まれないようにします</li>
-          <li>カメラ機種名・撮影場所は、投稿時にユーザーが明示的に選択した場合に限り、選択範囲のみをサービスのデータベースに保存し、初期値では保存しません（「オプトイン」方式）</li>
+          <li>カメラ機種名・詳細な撮影情報・撮影場所は、投稿時にユーザーが明示的に選択した場合に限り、選択範囲のみをサービスのデータベースに保存し、初期値では保存しません（「オプトイン」方式）</li>
           <li>Fediverse（Mastodon/Misskey）の認証トークンなど、特に機密性が高いと管理者が判断した情報は、暗号化したうえで保存します</li>
           <li>重要なデータ・アクセスログは原則バックアップを取得し、適切に保管します</li>
           <li>IPアドレスやUser-agentを含む「ログイン時にセッション履歴として収集する情報」および「HTTPアクセスによって収集する情報」は、保存期間を90日とし、保存期間を経過した情報は速やかに完全に消去します</li>
@@ -238,7 +242,7 @@ export function PrivacyContent() {
         </p>
       </div>
 
-      <p className="text-xs text-muted-foreground text-center">最終更新日：2026年6月19日</p>
+      <p className="text-xs text-muted-foreground text-center">最終更新日：2026年7月17日</p>
     </div>
   );
 }

@@ -39,6 +39,7 @@ import {
   Size,
   Arrangement,
   Visibility,
+  CameraOption,
   MAX_TEXT_LENGTH,
 } from "@/types";
 import {
@@ -47,6 +48,7 @@ import {
   type ParsedApiError,
 } from "@/lib/errors";
 import { extractExif, type ExtractedExif } from "@/lib/exif/parser";
+import { exifDetailValues } from "@/lib/exif/details";
 import { userPathSegment } from "@/lib/userHandle";
 import {
   uploadWithProgress,
@@ -106,7 +108,7 @@ export interface CreateClientProps {
     size: Size | null;
     arrangement: Arrangement | null;
     visibility: Visibility | null;
-    cameraOption: "none" | "show" | null;
+    cameraOption: CameraOption | null;
   };
   /** 現在アクティブなシーズン（期間限定）。null=シーズン中でない（トグル非表示） */
   activeSeason: {
@@ -243,7 +245,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [exif, setExif] = useState<ExtractedExif | null>(null);
   // 撮影情報は「機種名」「撮影場所」を独立して毎回明示的に選択する
-  type CameraOption = "none" | "show";
+  // CameraOption は @/types から import（none/show/detail）
   type LocationOption = "none" | "pref" | "city";
   const [cameraOption, setCameraOption] = useState<CameraOption>("none");
   const [locationOption, setLocationOption] = useState<LocationOption>("none");
@@ -341,10 +343,16 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
       setManualPref("");
       setManualCity(null);
       setPastLocations(null);
-      const extracted = await extractExif(file);
+      // 詳細撮影情報も常に抽出しておき（軽量）、ユーザーが detail を選んだ時に送れるようにする。
+      const extracted = await extractExif(file, { detail: true });
       setExif(extracted);
-      if (preferences.cameraOption === "show" && extracted?.cameraModel) {
-        setCameraOption("show");
+      // ユーザー初期値が show/detail のとき、機種情報があれば同じ値に復元する。
+      if (
+        (preferences.cameraOption === "show" ||
+          preferences.cameraOption === "detail") &&
+        extracted?.cameraModel
+      ) {
+        setCameraOption(preferences.cameraOption);
       }
       // GPSの無い画像だけ、手動選択用に過去の投稿地を1回取得する。
       // GPSがある画像は従来どおり座標から逆引きするので取得不要。
@@ -619,14 +627,18 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
       // EXIFメタデータ: 表示オプションに従って送る内容を決める
       // - none:         何も送らない
       // 撮影情報: カメラ機種と撮影場所を独立に送る
-      // - cameraOption:   "none" | "show"
+      // - cameraOption:   "none" | "show" | "detail"（detail は機種名＋撮影設定）
       // - locationOption: "none" | "pref" | "city"
       // 注: 撮影日時はプライバシー保護のため現在は送信しない（DBカラムは将来用に保持）
       formData.append("cameraOption", cameraOption);
       formData.append("locationOption", locationOption);
-      if (cameraOption === "show" && exif) {
+      if ((cameraOption === "show" || cameraOption === "detail") && exif) {
         if (exif.cameraMake) formData.append("cameraMake", exif.cameraMake);
         if (exif.cameraModel) formData.append("cameraModel", exif.cameraModel);
+      }
+      // detail 時のみ、抽出済みの詳細撮影情報 JSON を送る（サーバーでサニタイズ）。
+      if (cameraOption === "detail" && exif?.details) {
+        formData.append("exifDetails", JSON.stringify(exif.details));
       }
       if (locationOption === "pref" || locationOption === "city") {
         const hasGps =
@@ -1077,18 +1089,11 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                       );
                     }
 
-                    // セグメントボタンのラベル: 機種名は実値、撮影場所は解析後は実値、未解析時はプレースホルダ
-                    const cameraShowLabel = cameraText
-                      ? `📷 ${cameraText}`
-                      : "(機種情報なし)";
-                    const prefLabel = geocoded
-                      ? `📍 ${geocoded.prefecture}`
-                      : "📍 都道府県のみ";
-                    const cityLabel = geocoded
-                      ? `📍 ${geocoded.prefecture}${geocoded.city}`
-                      : "📍 都道府県+市町村";
-
-                    const cameraOptions: CameraOption[] = ["none", "show"];
+                    const cameraOptions: CameraOption[] = [
+                      "none",
+                      "show",
+                      "detail",
+                    ];
                     const locationOptions: LocationOption[] = [
                       "none",
                       "pref",
@@ -1101,7 +1106,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                             後付けはしない仕様なので、無い場合はセクションごと出さない） */}
                         {cameraText && (
                           <div className="space-y-2">
-                            <Label>カメラの機種名</Label>
+                            <Label>カメラのデータ</Label>
                             <SegmentControl
                               value={cameraOption}
                               options={cameraOptions}
@@ -1110,9 +1115,22 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                               size="xs"
                               truncate
                               renderOption={(opt) =>
-                                opt === "none" ? "表示しない" : cameraShowLabel
+                                opt === "none"
+                                  ? "表示しない"
+                                  : opt === "show"
+                                    ? "機種名のみ"
+                                    : "詳細"
                               }
                             />
+                            {/* 選択中は付与される内容を枠の下にプレビュー表示（絵文字・ラベルなし）。
+                                詳細は機種名に続けて全項目を値のみカンマ区切りで列挙。 */}
+                            {cameraOption !== "none" && (
+                              <p className="text-xs text-muted-foreground">
+                                {cameraOption === "detail"
+                                  ? [cameraText, ...exifDetailValues(exif?.details)].join("、")
+                                  : cameraText}
+                              </p>
+                            )}
                           </div>
                         )}
 
@@ -1134,10 +1152,19 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                               opt === "none"
                                 ? "表示しない"
                                 : opt === "pref"
-                                  ? prefLabel
-                                  : cityLabel
+                                  ? "都道府県"
+                                  : "市町村"
                             }
                           />
+
+                          {/* GPSあり・解析済み: 付与される地名を枠の下にプレビュー表示（絵文字なし）。 */}
+                          {hasGps && locationOption !== "none" && geocoded && (
+                            <p className="text-xs text-muted-foreground">
+                              {locationOption === "pref"
+                                ? geocoded.prefecture
+                                : `${geocoded.prefecture}${geocoded.city}`}
+                            </p>
+                          )}
 
                           {/* GPSなし: 状況に応じた案内 */}
                           {!hasGps &&

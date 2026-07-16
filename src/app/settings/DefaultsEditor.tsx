@@ -16,14 +16,13 @@ import {
   Size,
   Arrangement,
   Visibility,
+  CameraOption,
   DEFAULT_POSITION,
   DEFAULT_FONT,
   DEFAULT_COLOR,
   DEFAULT_SIZE,
   DEFAULT_ARRANGEMENT,
 } from "@/types";
-
-type CameraOption = "none" | "show";
 
 interface DefaultsEditorProps {
   initial: {
@@ -265,10 +264,23 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
               </Label>
               <SegmentControl
                 value={cameraOption}
-                options={["none", "show"] as CameraOption[]}
+                options={["none", "show", "detail"] as CameraOption[]}
                 onChange={setCameraOption}
-                renderOption={(opt) => (opt === "none" ? "表示しない" : "機種名を表示")}
+                size="xs"
+                truncate
+                renderOption={(opt) =>
+                  opt === "none"
+                    ? "表示しない"
+                    : opt === "show"
+                      ? "機種名のみ"
+                      : "詳細も表示"
+                }
               />
+              {cameraOption === "detail" && (
+                <p className="text-xs text-muted-foreground">
+                  機種名に加え、F値・シャッター速度・ISO・焦点距離・レンズ・露出補正・フラッシュを保存します（撮れている項目のみ）。
+                </p>
+              )}
             </div>
 
             <p className="text-xs text-muted-foreground">

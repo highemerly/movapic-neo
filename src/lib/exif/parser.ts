@@ -9,6 +9,7 @@
  */
 
 import exifr from "exifr";
+import { formatExifDetails, type ExifDetails } from "./details";
 
 export interface ExtractedExif {
   cameraMake: string | null;
@@ -16,6 +17,8 @@ export interface ExtractedExif {
   capturedAt: Date | null;
   gpsLatitude: number | null;
   gpsLongitude: number | null;
+  // 詳細撮影情報（F値・SS・ISO 等）。opts.detail 指定時のみ埋まる。
+  details: ExifDetails | null;
 }
 
 const EMPTY: ExtractedExif = {
@@ -24,18 +27,36 @@ const EMPTY: ExtractedExif = {
   capturedAt: null,
   gpsLatitude: null,
   gpsLongitude: null,
+  details: null,
 };
 
+// detail 抽出時に追加で読む EXIF タグ（露出設定・レンズ）。
+const DETAIL_PICK = [
+  "FNumber",
+  "ExposureTime",
+  "ISO",
+  "FocalLength",
+  "FocalLengthIn35mmFormat",
+  "LensModel",
+  "LensMake",
+  "ExposureBiasValue",
+  "Flash",
+];
+
 export async function extractExif(
-  input: File | Buffer | Uint8Array
+  input: File | Buffer | Uint8Array,
+  opts?: { detail?: boolean }
 ): Promise<ExtractedExif> {
+  const wantDetail = opts?.detail === true;
   try {
     // 撮影日時はプライバシー保護のため抽出しない（DBカラムは将来用に保持）。
     // pickに latitude/longitude を入れてもexifrがGPS IFDを自動で有効化しない事例が
     // あるため、必要なIFDを明示的に有効化する。
+    // detail 時のみ exif IFD の露出設定・レンズ名も読む（不要時は従来どおり読まない）。
     const parsed = await exifr.parse(input, {
       ifd0: { pick: ["Make", "Model"] },
       gps: true,
+      ...(wantDetail ? { exif: { pick: DETAIL_PICK } } : {}),
     });
 
     if (!parsed) return EMPTY;
@@ -47,12 +68,20 @@ export async function extractExif(
     const lat = Number.isFinite(parsed.latitude) ? (parsed.latitude as number) : null;
     const lng = Number.isFinite(parsed.longitude) ? (parsed.longitude as number) : null;
 
+    const details = wantDetail
+      ? (() => {
+          const d = formatExifDetails(parsed as Record<string, unknown>);
+          return Object.keys(d).length > 0 ? d : null;
+        })()
+      : null;
+
     return {
       cameraMake: typeof parsed.Make === "string" ? parsed.Make.trim() || null : null,
       cameraModel: typeof parsed.Model === "string" ? parsed.Model.trim() || null : null,
       capturedAt: null,
       gpsLatitude: lat,
       gpsLongitude: lng,
+      details,
     };
   } catch {
     return EMPTY;

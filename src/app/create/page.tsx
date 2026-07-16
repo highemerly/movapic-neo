@@ -12,6 +12,7 @@ import type {
   Size,
   Arrangement,
   Visibility,
+  CameraOption,
 } from "@/types";
 
 /**
@@ -81,7 +82,7 @@ export default async function CreatePage({
         size: user.preferences.size as Size | null,
         arrangement: user.preferences.arrangement as Arrangement | null,
         visibility: user.preferences.visibility as Visibility | null,
-        cameraOption: user.preferences.cameraOption as "none" | "show" | null,
+        cameraOption: user.preferences.cameraOption as CameraOption | null,
       }}
     />
   );

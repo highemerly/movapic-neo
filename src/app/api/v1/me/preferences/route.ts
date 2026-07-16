@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     if (visibility && !["public", "unlisted", "local"].includes(visibility)) {
       return errorResponse(ErrorCodes.VALIDATION_INVALID, "無効な公開範囲です", 400);
     }
-    if (cameraOption && !["none", "show"].includes(cameraOption)) {
+    if (cameraOption && !["none", "show", "detail"].includes(cameraOption)) {
       return errorResponse(ErrorCodes.VALIDATION_INVALID, "無効なカメラ機種設定です", 400);
     }
 

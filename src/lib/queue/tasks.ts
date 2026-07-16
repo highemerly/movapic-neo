@@ -11,6 +11,7 @@ import { renderImage, finalizeImage } from "@/lib/compute/client";
 import { publishImage, PublishVisibility } from "@/lib/publish/publishImage";
 import { getImage, deleteImage } from "@/lib/storage/storage";
 import { extractExif } from "@/lib/exif/parser";
+import type { ExifDetails } from "@/lib/exif/details";
 import { reverseGeocode } from "@/lib/geocode/gsi";
 import { decryptToken } from "@/lib/auth/tokens";
 import { processOneMention } from "@/lib/mention/processor";
@@ -26,6 +27,7 @@ import {
   type Size,
   type Arrangement,
   type OutputFormat,
+  type CameraOption,
 } from "@/types";
 import { getSeasonByKey } from "@/lib/seasons/catalog";
 
@@ -52,8 +54,8 @@ export interface ProcessEmailPayload {
     season: string | null;
     /** 公開範囲（件名コマンド > ユーザー設定 > public で解決済み） */
     visibility: PublishVisibility;
-    /** カメラ機種を保存するか（件名コマンド > ユーザー設定で解決済み） */
-    cameraOption: "none" | "show";
+    /** カメラ機種を保存するか（件名コマンド > ユーザー設定で解決済み）。detail=撮影設定も保存 */
+    cameraOption: CameraOption;
     /** 件名コマンドで指定された位置情報の保存範囲（none=保存しない） */
     locationOption: "none" | "pref" | "city";
   };
@@ -109,21 +111,27 @@ const processEmailTask: Task = async (payload) => {
 
   // 元画像からEXIFを抽出し、解決済みオプションに応じて撮影情報を保存する。
   // cameraOption / locationOption は parser で「件名コマンド > ユーザー設定」を解決済み。
-  // - カメラ機種: cameraOption が "show" のときだけ Make/Model を保存（Web投稿と同方針）
+  // - カメラ機種: cameraOption が "show"/"detail" のとき Make/Model を保存（Web投稿と同方針）
+  // - 撮影設定: cameraOption が "detail" のときだけ F値・SS 等の詳細も保存
   // - 撮影場所:   locationOption が pref/city のときだけ GPS から逆引きして保存
-  const wantCamera = p.options.cameraOption === "show";
+  const wantDetail = p.options.cameraOption === "detail";
+  const wantCamera = p.options.cameraOption === "show" || wantDetail;
   const wantLocation = p.options.locationOption !== "none";
 
   let cameraMake: string | null = null;
   let cameraModel: string | null = null;
+  let exifDetails: ExifDetails | null = null;
   let locationPrefecture: string | null = null;
   let locationCity: string | null = null;
 
   if (wantCamera || wantLocation) {
-    const exif = await extractExif(sourceBuffer);
+    const exif = await extractExif(sourceBuffer, { detail: wantDetail });
     if (wantCamera) {
       cameraMake = exif.cameraMake?.slice(0, 100) ?? null;
       cameraModel = exif.cameraModel?.slice(0, 100) ?? null;
+    }
+    if (wantDetail) {
+      exifDetails = exif.details;
     }
     if (wantLocation && exif.gpsLatitude != null && exif.gpsLongitude != null) {
       // GPS座標自体は保存せず、逆ジオコーディングした都道府県/市区町村のみ保存する（Web投稿と同方針）
@@ -194,7 +202,7 @@ const processEmailTask: Task = async (payload) => {
       const f = await finalizeImage(result.buffer, cropPosition);
       return { thumbnail: f.thumbnail, width: f.width, height: f.height, blurDataUrl: f.blurDataUrl };
     },
-    extras: { cameraMake, cameraModel, locationPrefecture, locationCity },
+    extras: { cameraMake, cameraModel, exifDetails, locationPrefecture, locationCity },
   });
 
   // 成功時のみ一時画像を削除（失敗時はリトライで再利用するため残す）

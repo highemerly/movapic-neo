@@ -4,7 +4,7 @@
  */
 
 import { simpleParser, ParsedMail, Attachment } from "mailparser";
-import { Position, FontFamily, Color, Size, Arrangement, Visibility, MAX_TEXT_LENGTH } from "@/types";
+import { Position, FontFamily, Color, Size, Arrangement, Visibility, CameraOption, MAX_TEXT_LENGTH } from "@/types";
 import { truncateGraphemes } from "@/lib/text/grapheme";
 import {
   POSITION_MAP,
@@ -23,8 +23,9 @@ const SEASON_KEYWORD = "シーズン";
 /** 位置情報コマンドの解析結果（メール投稿のみ。none=保存しない） */
 export type EmailLocationOption = "none" | "pref" | "city";
 
-/** カメラ機種の保存有無（none=保存しない / show=機種名を保存） */
-export type EmailCameraOption = "none" | "show";
+/** カメラ機種の保存有無（none=保存しない / show=機種名を保存 / detail=撮影設定も保存）。
+ *  値は共通の CameraOption と同一（メール投稿もWeb投稿と同じ3段階に対応）。 */
+export type EmailCameraOption = CameraOption;
 
 export interface ParsedEmailOptions {
   position: Position;
@@ -70,9 +71,11 @@ export interface ParsedEmail {
 // 共通のオプションマップ（POSITION/COLOR/SIZE/FONT/ARRANGEMENT/VISIBILITY）は
 // @/lib/options/maps から import。メール固有のカメラ・位置情報マップのみ以下に定義。
 
-// カメラ機種コマンド。「カメラ」で保存、「カメラなし」で保存しない（ユーザー設定を上書き）。
+// カメラ機種コマンド。「カメラ」で機種名、「カメラ詳細」で撮影設定も、「カメラなし」で保存しない
+// （いずれもユーザー設定を上書き）。
 const CAMERA_MAP: Record<string, EmailCameraOption> = {
   "カメラ": "show",
+  "カメラ詳細": "detail",
   "カメラなし": "none",
 };
 

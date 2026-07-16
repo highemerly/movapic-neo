@@ -219,6 +219,9 @@ model Image {
   cameraMake         String?   @map("camera_make") @db.VarChar(100)
   cameraModel        String?   @map("camera_model") @db.VarChar(100)
   capturedAt         DateTime? @map("captured_at")
+  // 詳細撮影情報（F値・SS・ISO・焦点距離・レンズ・露出補正・フラッシュ）。
+  // cameraOption="detail" のときのみ保存。表示済み文字列の JSON（ExifDetails 型）。
+  exifDetails        Json?     @map("exif_details")
   locationPrefecture String?   @map("location_prefecture") @db.VarChar(50)
   locationCity       String?   @map("location_city") @db.VarChar(100)
   createdAt     DateTime @default(now()) @map("created_at")

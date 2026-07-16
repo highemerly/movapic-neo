@@ -410,41 +410,56 @@ export default async function SpecPage() {
               <p className="font-medium mb-3">EXIFに関する追加処理</p>
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  出力画像からは、撮影位置情報・撮影日時・カメラ機種などのEXIFを<strong>常に削除</strong>してから投稿・アップロードします。
-                  しかし、ユーザーが希望した場合・範囲に限って、EXIFを解析し、カメラ機種・撮影場所（都道府県または市町村のみ）をデータベースに保存することもできます。
+                  位置情報・撮影日時・カメラ機種などが含まれるEXIF（Exchangeable image file format）情報は、個人情報が含まれる可能性があるため、常に削除してから投稿・アップロードします。
+                  また、受け取った画像のEXIFは通常解析しません。
                 </p>
-                <div className="overflow-x-auto">
+                <p>
+                  しかし、ユーザーが明示的に希望した場合に限って、EXIFを解析し、希望した範囲の情報を保存・投稿することもできます。
+                  この場合でも、撮影日時・撮影方向・GPS座標は保存しません。
+                </p>
+                <div>
                   <p className="text-xs font-medium mb-2">サーバーに保存される内容</p>
-                  <table className="min-w-full text-sm">
+                  <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm [&_th]:whitespace-nowrap [&_td]:whitespace-nowrap">
                     <thead>
                       <tr className="border-b border-border">
                         <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">投稿形式</th>
                         <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">カメラ機種</th>
+                        <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">カメラ撮影情報</th>
                         <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">位置情報</th>
                         <th className="text-left py-2 font-medium text-xs text-muted-foreground">EXIF全体</th>
                       </tr>
                     </thead>
                     <tbody className="text-sm text-muted-foreground">
                       <tr className="border-b border-border">
-                        <td className="py-2 pr-4">Web投稿</td>
+                        <td className="py-2 pr-4">Web</td>
+                        <td className="py-2 pr-4">希望時のみ</td>
                         <td className="py-2 pr-4">希望時のみ</td>
                         <td className="py-2 pr-4">希望時のみ</td>
                         <td className="py-2">×</td>
                       </tr>
                       <tr className="border-b border-border">
-                        <td className="py-2 pr-4">Bot投稿</td>
+                        <td className="py-2 pr-4">Bot</td>
+                        <td className="py-2 pr-4">×</td>
                         <td className="py-2 pr-4">×</td>
                         <td className="py-2 pr-4">×</td>
                         <td className="py-2">×</td>
                       </tr>
                       <tr>
-                        <td className="py-2 pr-4">メール投稿</td>
+                        <td className="py-2 pr-4">メール</td>
+                        <td className="py-2 pr-4">希望時のみ</td>
                         <td className="py-2 pr-4">希望時のみ</td>
                         <td className="py-2 pr-4">希望時のみ</td>
                         <td className="py-2">×</td>
                       </tr>
                     </tbody>
                   </table>
+                  </div>
+                  <ul className="list-disc list-inside space-y-1 mt-3">
+                    <li>カメラ機種: カメラの機種および製造元</li>
+                    <li>カメラ撮影情報: F値・シャッター速度・ISO感度・焦点距離・レンズ名・露出補正・フラッシュの有無</li>
+                    <li>位置情報: 国内の場合、都道府県または市町村レベル（GPS座標は含まない）</li>
+                  </ul>
                 </div>
                 <div>
                   <p className="text-xs font-medium mb-1">解析方法</p>

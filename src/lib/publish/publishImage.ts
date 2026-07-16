@@ -10,6 +10,7 @@
  */
 
 import { randomUUID } from "crypto";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/db";
 import {
   uploadImage,
@@ -40,6 +41,7 @@ import { assignMakeupForNewPost } from "@/lib/achievements/makeupAssign";
 import { perfectMonthGrace } from "@/lib/achievements/perfectMonth";
 import { userPathSegment } from "@/lib/userHandle";
 import type { PostFacts } from "@/lib/achievements/catalog";
+import type { ExifDetails } from "@/lib/exif/details";
 
 // PublishVisibility は @/lib/visibility に集約。後方互換のため再エクスポートする。
 export type { PublishVisibility } from "@/lib/visibility";
@@ -90,6 +92,8 @@ export interface PublishImageInput {
     cameraMake?: string | null;
     cameraModel?: string | null;
     capturedAt?: Date | null;
+    // 詳細撮影情報（cameraOption="detail" 時のみ）。ExifDetails の表示済み文字列 JSON。
+    exifDetails?: ExifDetails | null;
     locationPrefecture?: string | null;
     locationCity?: string | null;
   };
@@ -330,6 +334,11 @@ async function storeAndRecord(
       cameraMake: input.extras?.cameraMake ?? null,
       cameraModel: input.extras?.cameraModel ?? null,
       capturedAt: input.extras?.capturedAt ?? null,
+      // ExifDetails は固定キーの型のため Prisma の InputJsonValue（要 index signature）に
+      // 直接は代入できない。表示済み文字列の平坦なオブジェクトなのでキャストで通す。
+      exifDetails:
+        (input.extras?.exifDetails as Prisma.InputJsonValue | undefined) ??
+        undefined,
       locationPrefecture: input.extras?.locationPrefecture ?? null,
       locationCity: input.extras?.locationCity ?? null,
     },

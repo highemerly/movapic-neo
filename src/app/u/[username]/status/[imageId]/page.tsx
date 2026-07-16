@@ -41,7 +41,9 @@ import { AttendanceCrown } from "@/components/user/AttendanceCrown";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import { PostSourceBadge } from "./PostSourceBadge";
-import { Images, CalendarDays, Camera, MapPin, Reply, Repeat2, Bookmark, Share2 } from "lucide-react";
+import { ExifDetailModal } from "./ExifDetailModal";
+import { sanitizeExifDetails } from "@/lib/exif/details";
+import { Images, CalendarDays, MapPin, Reply, Repeat2, Bookmark, Share2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -431,10 +433,12 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         {(image.cameraModel || image.locationPrefecture) && (
           <p className="mb-[5px] flex flex-wrap items-center gap-x-2 text-[13px] text-muted-foreground">
             {image.cameraModel && (
-              <span className="inline-flex items-center gap-[3px]">
-                <Camera className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                {image.cameraModel}
-              </span>
+              // 機種名クリックでモーダル表示。詳細が無い投稿でもメーカー名を出せる。
+              <ExifDetailModal
+                cameraMake={image.cameraMake}
+                cameraModel={image.cameraModel}
+                details={sanitizeExifDetails(image.exifDetails)}
+              />
             )}
             {image.locationPrefecture && (
               <span className="inline-flex items-center gap-1">

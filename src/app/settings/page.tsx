@@ -27,6 +27,7 @@ import {
   Size,
   Arrangement,
   Visibility,
+  CameraOption,
 } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -147,7 +148,7 @@ export default async function SettingsPage() {
               size: preferences?.defaultSize as Size | null ?? null,
               arrangement: preferences?.defaultArrangement as Arrangement | null ?? null,
               visibility: preferences?.defaultVisibility as Visibility | null ?? null,
-              cameraOption: (preferences?.defaultCameraOption as "none" | "show" | null | undefined) ?? null,
+              cameraOption: (preferences?.defaultCameraOption as CameraOption | null | undefined) ?? null,
               mentionKeep: preferences?.mentionKeep ?? false,
             }}
             instanceDomain={user.instance.domain}

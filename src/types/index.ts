@@ -21,6 +21,11 @@ export type OutputFormat = "mastodon" | "misskey" | "none";
 
 export type Arrangement = "none" | "neon" | "stamp";
 
+// カメラ撮影情報の保存レベル。none=保存しない / show=機種名・メーカーのみ /
+// detail=機種名に加え撮影設定（F値・SS・ISO・焦点距離・レンズ・露出補正・フラッシュ）も保存。
+// 後方互換のため show を中間に据える（既存の保存値・投稿を壊さない）。
+export type CameraOption = "none" | "show" | "detail";
+
 // シーズン（期間限定）。値はシーズンキー（"tanabata-2026" 等）で、定義は
 // src/lib/seasons/catalog.ts のレジストリが持つ（型は文字列＝シーズンは随時追加されるため）。
 // null/未指定 = 通常投稿。セット時は他のスタイルオプションを完全に上書きする特殊モード。

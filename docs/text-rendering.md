@@ -19,6 +19,7 @@
 
 ## EXIF/メタデータ
 - Orientationに従い自動回転（スマホ画像対応）。GPS・カメラ情報等は出力時に削除（プライバシー保護）。
+- **撮影情報のオプトイン保存**（`cameraOption`: `none`/`show`/`detail`）。`show`=カメラのメーカー名・機種名のみ、`detail`=加えてF値・シャッター速度・ISO・焦点距離(+35mm換算)・レンズ名・露出補正・フラッシュを `Image.exifDetails`（JSON）へ保存。撮影日時・撮影方向（GPS方位）は取得しない。抽出は [parser.ts](../src/lib/exif/parser.ts)（`extractExif(input, {detail})`）、整形/サニタイズは [details.ts](../src/lib/exif/details.ts)。詳細ページでは機種名クリックでモーダル表示（`ExifDetailModal`）。
 
 ## 代替テキスト（ALT）
 画像の代替テキスト。`text` と同じ経路に `altText` を1本通す配管（`PublishImageInput.altText` → `PostImageInput` → [post.ts](../src/lib/fediverse/post.ts)）。DBは `Image.altText`（VarChar1500・null=未設定）。

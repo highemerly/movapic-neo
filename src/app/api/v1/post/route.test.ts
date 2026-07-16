@@ -226,3 +226,46 @@ describe("POST /api/v1/post: 位置情報（GPS→逆ジオコーディング）
     expect(extras?.locationCity).toBe("渋谷区");
   });
 });
+
+describe("POST /api/v1/post: カメラ撮影情報（cameraOption）", () => {
+  it("detail は機種名＋詳細撮影情報(exifDetails)を extras に載せる", async () => {
+    const res = await POST(
+      makeReq({
+        cameraOption: "detail",
+        cameraMake: "Canon",
+        cameraModel: "EOS R6",
+        exifDetails: JSON.stringify({ fNumber: "f/2.8", iso: "ISO 400", evil: "x" }),
+      })
+    );
+    expect(res.status).toBe(200);
+    const extras = mockPublish.mock.calls[0][0].extras;
+    expect(extras?.cameraModel).toBe("EOS R6");
+    // サニタイズで既知キーのみ残る
+    expect(extras?.exifDetails).toEqual({ fNumber: "f/2.8", iso: "ISO 400" });
+  });
+
+  it("show は機種名のみ保存し exifDetails は載せない", async () => {
+    const res = await POST(
+      makeReq({
+        cameraOption: "show",
+        cameraMake: "Canon",
+        cameraModel: "EOS R6",
+        exifDetails: JSON.stringify({ fNumber: "f/2.8" }),
+      })
+    );
+    expect(res.status).toBe(200);
+    const extras = mockPublish.mock.calls[0][0].extras;
+    expect(extras?.cameraModel).toBe("EOS R6");
+    expect(extras?.exifDetails).toBeNull();
+  });
+
+  it("none は機種名も詳細も保存しない", async () => {
+    const res = await POST(
+      makeReq({ cameraOption: "none", cameraMake: "Canon", cameraModel: "EOS R6" })
+    );
+    expect(res.status).toBe(200);
+    const extras = mockPublish.mock.calls[0][0].extras;
+    expect(extras?.cameraModel).toBeNull();
+    expect(extras?.exifDetails).toBeNull();
+  });
+});
