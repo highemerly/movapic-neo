@@ -114,10 +114,15 @@ function PullToRefresh({
 
     const onTouchStart = (e: TouchEvent) => {
       // ページ最上部・更新中でない・単一指のときだけ開始候補にする。
+      // モーダル/ハンバーガーメニュー（いずれも Radix Dialog=Sheet）が開いている間は始動しない。
+      // これらは body スクロールをロックする（＝背後のページは scrollY=0 のまま）ので、内側の
+      // スクロール領域を下へ送っただけで最上部判定を満たし PTR が誤爆していた。react-remove-scroll が
+      // ロック中だけ body[data-scroll-locked] を立てる（閉じると外れる）ので、それを検出して除外する。
       if (
         window.scrollY > 0 ||
         refreshingRef.current ||
-        e.touches.length !== 1
+        e.touches.length !== 1 ||
+        document.body.hasAttribute("data-scroll-locked")
       ) {
         startYRef.current = null;
         return;
