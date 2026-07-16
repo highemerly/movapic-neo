@@ -170,3 +170,50 @@ describe("publishImage の ALT 配管", () => {
     expect(imageCreate.mock.calls[0][0].data.altText).toBeNull();
   });
 });
+
+describe("publishImage の投稿再試行（一時的失敗のみ1回だけ）", () => {
+  it("5xx は1回だけ再試行する", async () => {
+    postToMastodon.mockResolvedValue({ success: false, error: "server error", statusCode: 503 });
+    await publishImage(baseInput({}));
+    expect(postToMastodon).toHaveBeenCalledTimes(2);
+  });
+
+  it("429（レート制限）も1回だけ再試行する", async () => {
+    postToMastodon.mockResolvedValue({ success: false, error: "rate limited", statusCode: 429 });
+    await publishImage(baseInput({}));
+    expect(postToMastodon).toHaveBeenCalledTimes(2);
+  });
+
+  it("429以外の4xxは再試行しない", async () => {
+    postToMastodon.mockResolvedValue({ success: false, error: "forbidden", statusCode: 403 });
+    await publishImage(baseInput({}));
+    expect(postToMastodon).toHaveBeenCalledTimes(1);
+  });
+
+  it("timeout/接続失敗（statusCode なし）は再試行しない", async () => {
+    postToMastodon.mockResolvedValue({ success: false, error: "timeout" });
+    await publishImage(baseInput({}));
+    expect(postToMastodon).toHaveBeenCalledTimes(1);
+  });
+
+  it("成功時は再試行しない", async () => {
+    await publishImage(baseInput({}));
+    expect(postToMastodon).toHaveBeenCalledTimes(1);
+  });
+
+  it("2回目で成功すれば postUrl/postId がDBに反映される", async () => {
+    postToMastodon
+      .mockResolvedValueOnce({ success: false, error: "server error", statusCode: 500 })
+      .mockResolvedValueOnce({
+        success: true,
+        postId: "s2",
+        postUrl: "https://mastodon.example/@alice/s2",
+      });
+    await publishImage(baseInput({}));
+    expect(postToMastodon).toHaveBeenCalledTimes(2);
+    expect(imageUpdate.mock.calls[0][0].data.postUrl).toBe(
+      "https://mastodon.example/@alice/s2"
+    );
+    expect(imageUpdate.mock.calls[0][0].data.postId).toBe("s2");
+  });
+});
