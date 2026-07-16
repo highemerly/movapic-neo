@@ -21,12 +21,9 @@ export function EmailGuide({ emailPrefix, emailDomain }: EmailGuideProps) {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        あなた専用に発行されたメールアドレスに画像を添付して送信するだけで、コメントを合成した写真が投稿されます。
-      </p>
 
       <div className="text-sm space-y-3">
-        <p className="font-medium">メールの形式:</p>
+        <p className="font-medium">メールの内容:</p>
         <ul className="list-disc list-inside space-y-2 ml-2">
           <EmailAddressDisplay emailPrefix={emailPrefix} emailDomain={emailDomain} />
           <li>

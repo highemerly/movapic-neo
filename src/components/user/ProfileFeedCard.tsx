@@ -70,7 +70,7 @@ export function ProfileFeedCard({
           幅は固定（w-24）にして高さ方向へ stretch。aspect-square だと幅が中身依存で
           0 に潰れて画像が消えるため、幅を確定させたうえで正方形に近い枠を作る。 */}
       <div className="flex items-stretch">
-        <Link href={href} className="relative w-24 shrink-0 self-stretch overflow-hidden">
+        <Link href={href} className="relative w-24 shrink-0 self-stretch overflow-hidden md:w-36">
           <ThumbnailImage
             src={`${publicUrl}/${image.storageKey}`}
             alt={image.altText || image.overlayText}
@@ -81,7 +81,7 @@ export function ProfileFeedCard({
           />
           <PinOverlay isPinned={isPinned} />
         </Link>
-        <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 px-3 py-2">
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-3 py-2 md:gap-1.5 md:px-4 md:py-3">
           {/* 1行目: コメント本文（超過は右を「…」で省略） */}
           <Link href={href} className="block">
             <p className="truncate text-sm leading-snug hover:underline">
@@ -89,7 +89,7 @@ export function ProfileFeedCard({
             </p>
           </Link>
           {/* 2行目: 投稿日 */}
-          <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+          <p className="flex items-center gap-0.5 truncate text-xs text-muted-foreground">
             <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
             {date}
           </p>

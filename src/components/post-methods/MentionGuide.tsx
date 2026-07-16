@@ -48,9 +48,6 @@ export function MentionGuide({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        指定のアカウントにメンションで画像を送信するだけで、コメントを合成した写真が投稿されます。
-      </p>
 
       <div className="text-sm space-y-3">
         <p className="font-medium">投稿の形式:</p>
