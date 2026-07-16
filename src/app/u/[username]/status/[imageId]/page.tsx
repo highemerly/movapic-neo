@@ -12,6 +12,7 @@ import { ImageNavigation } from "./ImageNavigation";
 import { FontLicenseBadge } from "./FontLicenseBadge";
 import { hasEmoji, hasNonEmojiText } from "@/lib/text/grapheme";
 import { ImageActionsMenu } from "./ImageActionsMenu";
+import { isImageRepostable } from "@/lib/publish/repostImage";
 import { MisskeyOpenButton } from "./MisskeyOpenButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
@@ -194,6 +195,13 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     (image.user.instance.type === "mastodon" ||
       image.user.instance.type === "misskey") &&
     !!image.postId;
+  // 再投稿可能 = Fediverse 未投稿（失敗/local 問わず）かつ保存から一定期間内。
+  // オーナー判定はメニュー側（isOwner）で合成する。期間制限は fav 同期の窓(createdAt基準)に
+  // 収めるため（詳細: repostImage.ts）。
+  const repostable = isImageRepostable({
+    postId: image.postId,
+    createdAt: image.createdAt,
+  });
   const cachedFavoriters =
     (image.favoritersCache as unknown as CachedFavoriter[] | null) ?? [];
   const viewerAcct = currentUser
@@ -574,6 +582,11 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               username={username}
               isOwner={isOwner}
               initialIsPinned={!!image.pinnedAt}
+              repostable={repostable}
+              instanceDomain={image.user.instance.domain}
+              defaultVisibility={
+                image.user.defaultVisibility === "unlisted" ? "unlisted" : "public"
+              }
               canReport={!isOwner}
               canMute={!isOwner}
               isMuted={isMutingAuthor}

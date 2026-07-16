@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pin, Trash2, Flag, Share, Image as ImageIcon, Settings2, VolumeX } from "lucide-react";
+import { MoreHorizontal, Pin, Trash2, Flag, Share, Image as ImageIcon, Settings2, VolumeX, Send } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -22,14 +22,21 @@ import {
   SIZE_LABELS,
   FONT_LABELS,
   ARRANGEMENT_LABELS,
+  VISIBILITY_LABELS,
   type Position,
   type Color,
   type Size,
   type FontFamily,
   type Arrangement,
 } from "@/types";
+import { SegmentControl } from "@/components/SegmentControl";
+import { Button } from "@/components/ui/button";
 import { seasonLabel } from "@/lib/seasons/catalog";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
+
+/** 再投稿ダイアログの公開範囲（local は連合しないので対象外）。 */
+type RepostVisibility = "public" | "unlisted";
+const REPOST_VISIBILITIES: RepostVisibility[] = ["public", "unlisted"];
 import { MuteDialog } from "@/components/mute/MuteDialog";
 import { ReportDialog } from "./ReportDialog";
 import { useNativeShare, type NativeShareParams } from "./useNativeShare";
@@ -39,6 +46,12 @@ interface ImageActionsMenuProps {
   username: string;
   isOwner: boolean;
   initialIsPinned: boolean;
+  /** 再投稿可能か（未投稿かつ保存から一定期間内）。表示は isOwner と AND する。 */
+  repostable: boolean;
+  /** 投稿先の連携サーバードメイン（ラベル・トースト・モーダルに表示）。 */
+  instanceDomain: string;
+  /** 再投稿ダイアログの公開範囲の初期値。 */
+  defaultVisibility: RepostVisibility;
   /** 通報可能か（ログイン済み かつ 自分の画像でない） */
   canReport: boolean;
   /** このユーザーをミュート可能か（ログイン済み かつ 自分の画像でない）。 */
@@ -71,6 +84,9 @@ export function ImageActionsMenu({
   username,
   isOwner,
   initialIsPinned,
+  repostable,
+  instanceDomain,
+  defaultVisibility,
   canReport,
   canMute,
   isMuted,
@@ -91,6 +107,12 @@ export function ImageActionsMenu({
   const [reportOpen, setReportOpen] = useState(false);
   const [muteOpen, setMuteOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [repostOpen, setRepostOpen] = useState(false);
+  const [repostVisibility, setRepostVisibility] =
+    useState<RepostVisibility>(defaultVisibility);
+  const [isReposting, setIsReposting] = useState(false);
+  // ラベル・トースト・モーダルに出す投稿先サーバー名（未取得時のみ汎称にフォールバック）。
+  const serverName = instanceDomain || "連携サーバー";
 
   // ① その日のカレンダーサムネイルにこの写真を指定する。
   const handleSetThumbnail = useCallback(async () => {
@@ -232,6 +254,41 @@ export function ImageActionsMenu({
     }
   }, [confirm, imageId, router, username]);
 
+  const handleRepost = useCallback(async () => {
+    if (isReposting) return;
+    setIsReposting(true);
+    try {
+      const response = await fetch(`/api/v1/images/${imageId}/repost`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visibility: repostVisibility }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        toast.error(data.error?.message ?? data.error ?? "投稿に失敗しました");
+        return;
+      }
+
+      // 画像処理は成功したが連合投稿だけ失敗したケース。postId は未設定のままなので、
+      // ダイアログを閉じずに再試行できる状態を保つ。
+      if (data.fediverseError) {
+        toast.error(`${serverName}への投稿に失敗しました: ${data.fediverseError}`);
+        return;
+      }
+
+      toast.success(`${serverName}に投稿しました`);
+      setRepostOpen(false);
+      // postId が付き、メニュー項目が消えて投稿リンクが出る状態へ更新する。
+      router.refresh();
+    } catch (error) {
+      console.error("Repost error:", error);
+      toast.error("投稿に失敗しました");
+    } finally {
+      setIsReposting(false);
+    }
+  }, [imageId, isReposting, repostVisibility, router, serverName]);
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -267,6 +324,19 @@ export function ImageActionsMenu({
         )}
         {isOwner && (
           <>
+            {/* まだ Fediverse 未投稿（失敗/local）かつ保存から一定期間内のときだけ再投稿を出す。 */}
+            {repostable && (
+              <DropdownMenuItem
+                disabled={isReposting}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setRepostOpen(true);
+                }}
+              >
+                <Send className="mr-2 h-4 w-4" />
+                {serverName}に投稿
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               disabled={isSettingThumb}
               onSelect={(e) => {
@@ -394,6 +464,35 @@ export function ImageActionsMenu({
               </>
             )}
           </dl>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={repostOpen} onOpenChange={setRepostOpen}>
+        <DialogContent className="sm:max-w-xs">
+          <DialogHeader className="text-left">
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5 shrink-0" />
+              {serverName}に投稿
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              この画像を {serverName} へ投稿します。公開範囲を選んでください。
+            </p>
+            <SegmentControl
+              value={repostVisibility}
+              options={REPOST_VISIBILITIES}
+              onChange={setRepostVisibility}
+              disabled={isReposting}
+              renderOption={(v) => VISIBILITY_LABELS[v]}
+            />
+            <Button
+              onClick={handleRepost}
+              disabled={isReposting}
+              className="w-full bg-brand text-brand-foreground hover:bg-brand/90"
+            >
+              {isReposting ? "投稿中..." : "投稿する"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </DropdownMenu>
