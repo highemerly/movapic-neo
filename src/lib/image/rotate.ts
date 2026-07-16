@@ -2,6 +2,12 @@ import sharp from "sharp";
 import * as jpeg from "jpeg-js";
 import { ImageProcessError } from "@/lib/errors";
 
+// sharp デコード時のピクセル数上限。unlimited:true でも limitInputPixels は独立に効く
+// （実測: sharp 0.34.5。unlimited は libheif の max_items 等フォーマット固有ガードだけを外し、
+// ピクセル数ガードは外さない）。既定268MPより絞り、200MP機(Samsung 200MP等)の実写真は
+// 許容しつつ、高圧縮な巨大寸法画像(decompression bomb)のデコード天井を ~600MB(RGB) 級に抑える。
+const MAX_DECODE_PIXELS = 200_000_000; // 200MP
+
 /**
  * EXIF Orientationに従って画像を自動回転
  * iOSのJPEGはMPF（Multi-Picture Format）やDisplay P3カラースペースを含む場合があり、
@@ -16,7 +22,12 @@ export async function rotateImage(
   try {
     // unlimited: HEIC/HEIF の libheif security limits(max_items=16等)を解除する
     // （環境変数では libvips に上書きされ効かない。詳細は CLAUDE.md「HEIC対応」）。
-    const pipeline = sharp(imageBuffer, { unlimited: true }).rotate();
+    // unlimited はピクセル数ガードは外さないため、巨大寸法のデコード爆弾対策として
+    // limitInputPixels を明示指定する。sharp はフルデコード前に「exceeds pixel limit」で弾く。
+    const pipeline = sharp(imageBuffer, {
+      unlimited: true,
+      limitInputPixels: MAX_DECODE_PIXELS,
+    }).rotate();
     const meta = await pipeline.metadata();
     // HEIC/HEIF(meta.format==="heif"・AVIF含む)はそのまま toBuffer すると HEIF で再エンコードされ
     // 重く(実測 約6倍)、後続でも HEIF 再デコードが必要になる。JPEG 化して後段へ渡す（最終出力は
@@ -46,7 +57,9 @@ export async function rotateImage(
     );
 
     try {
-      // jpeg-jsで純粋なJavaScriptデコード（MPFやICCプロファイルを無視）
+      // jpeg-jsで純粋なJavaScriptデコード（MPFやICCプロファイルを無視）。
+      // 巨大寸法はここでも jpeg-js 既定の maxResolutionInMP:100 / maxMemoryUsageInMB:512 が
+      // フレーム解析時にガードする（sharp 経路より保守的だが、この経路は壊れJPEG限定で実害なし）。
       const decodeStart = Date.now();
       const rawImageData = jpeg.decode(imageBuffer, {
         useTArray: true,
