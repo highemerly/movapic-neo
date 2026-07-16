@@ -106,11 +106,11 @@ export default async function UserMapPage({
                 <Link href="/settings#privacy" className="font-medium underline">
                   設定
                 </Link>
-                で「地図を有効にする」をONにすると、ここに地図が表示され、訪問者にも見せられるようになります。
+                で「地図を公開する」をONにすると、このページで地図形式で写真を閲覧できます（あなたも訪問者も見ることができます）。
               </div>
             ) : (
               <div className="rounded-lg border bg-muted/30 p-8 text-center text-sm text-muted-foreground">
-                このユーザーは地図機能を公開していません。
+                このユーザーは地図を公開していません。
               </div>
             )}
           </TabTransition>
