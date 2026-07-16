@@ -9,6 +9,7 @@ import {
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { useGalleryLayout, type GalleryLayout } from "@/hooks/useGalleryLayout";
+import { ScrollToTopButton } from "@/components/gallery/ScrollToTopButton";
 
 const OPTIONS: { value: GalleryLayout; label: string; Icon: typeof LayoutGrid }[] = [
   { value: "grid", label: "タイル", Icon: LayoutGrid },
@@ -30,7 +31,9 @@ export function GalleryLayoutToggle() {
   const CurrentIcon = current.Icon;
 
   return (
-    <div className="pointer-events-none sticky top-2 md:top-14 standalone:md:top-2 z-20 flex h-0 justify-end pr-1">
+    <div className="pointer-events-none sticky top-2 md:top-14 standalone:md:top-2 z-20 flex h-0 justify-end gap-2 pr-1">
+      {/* 最新へ移動は最上部でないときだけ出る。表示レイアウト切替の左に並べる。 */}
+      <ScrollToTopButton />
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label="表示レイアウトを変更"

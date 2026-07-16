@@ -349,6 +349,25 @@
   animation: pill-in 0.25s ease both;
 }
 
+/* 「最新へ移動」ボタンの登場。pill-in と同じく降りてくるが、休止状態の opacity 0.5 で
+   終わる。pill-in は fill-mode:both で opacity:1 を保持し base の opacity-50 を潰すため、
+   透明度が変わってしまう。fill-mode を持たせず終了フレームを base と揃えることで、
+   アニメ後もベースの opacity-50 と hover の opacity-100 が正しく効く。 */
+@keyframes control-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  100% {
+    opacity: 0.5;
+    transform: translateY(0);
+  }
+}
+
+.control-in {
+  animation: control-in 0.25s ease;
+}
+
 /* 「最新です」ピルの一発表示（降りてきて少し留まり、自分でフェードアウト）。
    reconcile が綺麗すぎて手動更新で無変化のとき「効いた？」となるのを補うため、
    結果が最新だったことを一瞬だけ伝える。表示時間はフックの自動クローズと揃える。 */
@@ -378,6 +397,7 @@
 @media (prefers-reduced-motion: reduce) {
   .tl-enter,
   .pill-in,
+  .control-in,
   .pill-flash {
     animation: none;
   }
