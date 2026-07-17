@@ -12,6 +12,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import prisma from "@/lib/db";
 import { ErrorCodes, errorResponse, handleUnknownError } from "@/lib/errors";
 import { parseUserHandle } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { durationToExpiresAt, isMuteDuration } from "@/lib/mutes";
 
 /**
@@ -29,9 +30,10 @@ async function resolveTarget(
     return user ?? "notFound";
   }
   if (typeof body.handle === "string" && body.handle.trim()) {
-    const { username, domain } = parseUserHandle(body.handle.trim());
+    const parsed = parseUserHandle(body.handle.trim(), getHomeServer());
+    if (!parsed) return "notFound";
     const user = await prisma.user.findFirst({
-      where: { username, instance: { domain } },
+      where: { username: parsed.username, instance: { domain: parsed.domain } },
       select: { id: true },
     });
     return user ?? "notFound";

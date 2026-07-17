@@ -11,12 +11,8 @@
 
 import prisma from "@/lib/db";
 import { toJstDateString } from "@/lib/streak";
-import {
-  currentMonthMakeupStatus,
-  daysInMonthOf,
-  isPerfectMonth,
-  perfectMonthGrace,
-} from "@/lib/achievements/perfectMonth";
+import { currentMonthMakeupStatus, daysInMonthOf, isPerfectMonth } from "@/lib/achievements/perfectMonth";
+import { perfectMonthGrace } from "@/lib/achievements/grace";
 
 /** カレンダーのサムネに使う画像参照。 */
 export interface DayImageRef {

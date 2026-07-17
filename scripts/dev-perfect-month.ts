@@ -42,10 +42,10 @@ import { toJstDateString } from "@/lib/streak";
 import {
   daysInMonthOf,
   isPerfectMonth,
-  perfectMonthGrace,
   perfectMonthKey,
   PERFECT_MONTH_CATEGORY,
 } from "@/lib/achievements/perfectMonth";
+import { perfectMonthGrace } from "@/lib/achievements/grace";
 
 const USERNAME = process.env.SEED_USER ?? "highemerly";
 // 同名ユーザーが複数インスタンスに存在するため、必ず domain で一意に絞る（ログイン中アカウントと一致させる）。

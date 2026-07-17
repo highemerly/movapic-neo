@@ -12,13 +12,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserWithValidation } from "@/lib/auth/session";
 import prisma from "@/lib/db";
 import { toJstDateString } from "@/lib/streak";
-import {
-  PERFECT_MONTH_CATEGORY,
-  daysInMonthOf,
-  isPerfectMonth,
-  perfectMonthGrace,
-  perfectMonthKey,
-} from "@/lib/achievements/perfectMonth";
+import { PERFECT_MONTH_CATEGORY, daysInMonthOf, isPerfectMonth, perfectMonthKey } from "@/lib/achievements/perfectMonth";
+import { perfectMonthGrace } from "@/lib/achievements/grace";
 
 /** その画像の JST 日(1-31)。 */
 function jstDay(createdAt: Date): number {

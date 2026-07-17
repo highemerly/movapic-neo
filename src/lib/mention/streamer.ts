@@ -27,7 +27,7 @@ const MAX_BACKOFF_MS = 60_000;
  */
 const PING_INTERVAL_MS = 30_000;
 
-const getBotInstanceUrl = () => process.env.MASTODON_BOT_INSTANCE_URL || "https://handon.club";
+const getBotInstanceUrl = () => process.env.MASTODON_BOT_INSTANCE_URL || "";
 const getBotAccessToken = () => process.env.MASTODON_BOT_ACCESS_TOKEN || "";
 
 let ws: WebSocket | null = null;
@@ -136,6 +136,10 @@ export function startMentionStream(): void {
   const accessToken = getBotAccessToken();
   if (!accessToken) {
     console.log("[mention-stream] MASTODON_BOT_ACCESS_TOKEN 未設定のため streaming を起動しません");
+    return;
+  }
+  if (!getBotInstanceUrl()) {
+    console.log("[mention-stream] MASTODON_BOT_INSTANCE_URL 未設定のため streaming を起動しません");
     return;
   }
 

@@ -8,6 +8,7 @@ import Link from "@/components/Link";
 
 import { getAvatarUrl } from "@/lib/avatar";
 import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { getAccounts, normalizeAccountSort } from "@/lib/admin/accounts";
 import { InstanceLogo } from "../_components/InstanceLogo";
 import { SortHeader } from "../_components/SortHeader";
@@ -78,7 +79,7 @@ export default async function AdminAccountsPage({
           </thead>
           <tbody className="tabular-nums">
             {rows.map((u) => {
-              const seg = userPathSegment(u.username, u.domain);
+              const seg = userPathSegment(u.username, u.domain, getHomeServer());
               const avatar = getAvatarUrl(u.avatarUrl);
               return (
                 <tr key={u.id} className="border-b border-border/50">

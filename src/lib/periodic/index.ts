@@ -51,12 +51,11 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const mentionPoll: PeriodicJob = {
   name: "mention-poll",
   run: async () => {
-    const instanceUrl =
-      process.env.MASTODON_BOT_INSTANCE_URL || "https://handon.club";
+    const instanceUrl = process.env.MASTODON_BOT_INSTANCE_URL || "";
     const accessToken = process.env.MASTODON_BOT_ACCESS_TOKEN || "";
-    if (!accessToken) {
+    if (!accessToken || !instanceUrl) {
       console.warn(
-        "[periodic] mention-poll skipped: MASTODON_BOT_ACCESS_TOKEN 未設定"
+        "[periodic] mention-poll skipped: MASTODON_BOT_INSTANCE_URL / MASTODON_BOT_ACCESS_TOKEN 未設定"
       );
       return;
     }

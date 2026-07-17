@@ -30,6 +30,7 @@ import {
   type MisskeyVisibility,
 } from "@/lib/fediverse/post";
 import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { MAX_FILE_SIZE } from "@/types";
 
 // 受け付ける画像形式（生成側は JPEG。将来 WebP 化しても許容）。
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
 
     // 本文末尾に該当カレンダーページのURLを付ける（postToXxx の imageUrl 引数＝本文に \n で連結）。
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "").replace(/\/+$/, "");
-    const calendarUrl = `${appUrl}/u/${userPathSegment(user.username, domain)}/calendar?year=${year}&month=${month}`;
+    const calendarUrl = `${appUrl}/u/${userPathSegment(user.username, domain, getHomeServer())}/calendar?year=${year}&month=${month}`;
 
     // 5xx のときだけ1回再試行。
     const postOnce = (): Promise<PostResult | null> => {

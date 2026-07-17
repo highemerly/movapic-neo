@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Mail } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getAvatarUrl } from "@/lib/avatar";
@@ -19,7 +19,9 @@ export default async function CreateMailPage() {
     redirect("/?reason=login_required&returnTo=%2Fcreate%2Fmail");
   }
 
+  // メール投稿が未提供（env 未設定）の環境ではこのページ自体を出さない
   const emailDomain = getEmailDomain();
+  if (!emailDomain) notFound();
 
   return (
     <>

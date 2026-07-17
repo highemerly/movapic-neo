@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getRecentNotifications } from "@/lib/achievements/notifications";
 import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
@@ -17,7 +18,7 @@ export default async function NotificationsPage() {
   }
 
   const items = await getRecentNotifications(currentUser.id);
-  const selfSeg = userPathSegment(currentUser.username, currentUser.instance.domain);
+  const selfSeg = userPathSegment(currentUser.username, currentUser.instance.domain, getHomeServer());
 
   return (
     <>

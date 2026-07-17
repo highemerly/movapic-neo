@@ -8,6 +8,7 @@ import { AttendanceCrown } from "@/components/user/AttendanceCrown";
 import { UserProfileActionsMenu } from "@/components/user/UserProfileActionsMenu";
 import { TabBar, type TabItem } from "@/components/TabBar";
 import { userPathSegment } from "@/lib/userHandle";
+import { useHomeServer } from "@/components/HomeServerProvider";
 
 interface UserProfileHeaderProps {
   user: {
@@ -44,8 +45,9 @@ export function UserProfileHeader({
   isMuted = false,
   canMute = false,
 }: UserProfileHeaderProps) {
-  // /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）
-  const seg = userPathSegment(user.username, user.instance.domain);
+  // /u/ パスセグメント（ホームインスタンスは素のusername、他は username@domain）
+  const homeServer = useHomeServer();
+  const seg = userPathSegment(user.username, user.instance.domain, homeServer);
 
   // インスタンス種別に応じたアイコン（Misskey/Mastodon）
   const InstanceIcon = user.instance.type === "misskey" ? MisskeyIcon : MastodonIcon;

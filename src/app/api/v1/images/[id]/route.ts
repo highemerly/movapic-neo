@@ -10,12 +10,8 @@ import { decryptToken } from "@/lib/auth/tokens";
 import { fediverseStatusExists } from "@/lib/fediverse/delete";
 import prisma from "@/lib/db";
 import { toJstDateString } from "@/lib/streak";
-import {
-  daysInMonthOf,
-  isPerfectMonth,
-  perfectMonthGrace,
-  perfectMonthKey,
-} from "@/lib/achievements/perfectMonth";
+import { daysInMonthOf, isPerfectMonth, perfectMonthKey } from "@/lib/achievements/perfectMonth";
+import { perfectMonthGrace } from "@/lib/achievements/grace";
 import { recomputeMonthMakeups } from "@/lib/achievements/makeupAssign";
 
 /** その画像の JST 日(1-31)。 */

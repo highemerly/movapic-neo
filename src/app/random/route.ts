@@ -11,6 +11,7 @@ import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getActiveMutedUserIds } from "@/lib/mutes";
 import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +72,6 @@ export async function GET() {
     return redirectTo("/public");
   }
 
-  const segment = userPathSegment(image.user.username, image.user.instance.domain);
+  const segment = userPathSegment(image.user.username, image.user.instance.domain, getHomeServer());
   return redirectTo(`/u/${segment}/status/${image.id}`);
 }

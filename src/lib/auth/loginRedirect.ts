@@ -1,4 +1,5 @@
 import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 
 /**
  * ログイン成功後の遷移先を決める。
@@ -20,5 +21,5 @@ export function resolveLoginRedirect(
   if (opts.isNewUser) {
     return "/create?welcome=1";
   }
-  return `/u/${userPathSegment(opts.username, opts.instanceDomain)}`;
+  return `/u/${userPathSegment(opts.username, opts.instanceDomain, getHomeServer())}`;
 }

@@ -13,7 +13,7 @@ import { FeaturedMarquee } from "@/components/gallery/FeaturedMarquee";
 import { AboutShamezo } from "@/components/onboarding/AboutShamezo";
 import { Footer } from "@/components/Footer";
 import { SessionFlasher } from "@/components/SessionFlasher";
-import { getAllowedServers } from "@/lib/auth/allowedServers";
+import { getAllowedServers, getHomeServer } from "@/lib/auth/serverPolicy";
 import { userPathSegment } from "@/lib/userHandle";
 
 // マーキーに流す枚数と、スコアリング元になる候補プールの上限。
@@ -102,7 +102,7 @@ export default async function HomePage() {
   const isLoggedIn = currentUser !== null;
   // ログイン済みユーザーがトップのログインフォームを押したときの戻り先（自分のユーザーページ）。
   const loggedInHref = currentUser
-    ? `/u/${userPathSegment(currentUser.username, currentUser.instance.domain)}`
+    ? `/u/${userPathSegment(currentUser.username, currentUser.instance.domain, getHomeServer())}`
     : undefined;
 
   // フィーチャー画像を取得（最新16件・5分キャッシュ）
@@ -113,7 +113,7 @@ export default async function HomePage() {
     overlayText: image.overlayText,
     altText: image.altText,
     position: image.position,
-    username: userPathSegment(image.user.username, image.user.instance.domain),
+    username: userPathSegment(image.user.username, image.user.instance.domain, getHomeServer()),
   }));
 
   return (

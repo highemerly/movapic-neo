@@ -9,8 +9,7 @@ import { CollageShareDialog } from "./CollageShareDialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { isJapaneseHoliday } from "@/lib/holidays";
-import { PERFECT_MONTH_GRACE_HOME, PERFECT_MONTH_GRACE_DEFAULT } from "@/lib/achievements/perfectMonth";
-import { DEFAULT_INSTANCE } from "@/lib/userHandle";
+import { PERFECT_MONTH_GRACE_DEFAULT } from "@/lib/achievements/perfectMonth";
 import { DayCell } from "./DayCell";
 
 interface DayData {
@@ -584,17 +583,18 @@ export function CalendarView({
         </p>
         <p>
           もし投稿を忘れてしまっても大丈夫。同じ月の後日に1日2枚以上投稿すれば、2枚目の投稿が投稿を忘れた日の投稿を&ldquo;穴埋め&rdquo;できます。ただし、穴埋めのための投稿は1日につき1回まで・月につき
-          {grace === PERFECT_MONTH_GRACE_HOME ? (
+          {grace > PERFECT_MONTH_GRACE_DEFAULT ? (
             <>
               <span className="mx-0.5 font-bold text-muted-foreground/70 line-through">
                 {PERFECT_MONTH_GRACE_DEFAULT}
               </span>
               <span className="mx-0.5 text-base font-extrabold text-foreground">
-                {PERFECT_MONTH_GRACE_HOME}
+                {grace}
               </span>
               回まで。
               <span className="font-semibold text-foreground">
-                ※{DEFAULT_INSTANCE} ユーザー限定特典で条件緩和中！
+                {/* 特典（FAVOR_SERVERS）が効いている＝持ち主の所属サーバーが特典対象 */}
+                ※{serverName} ユーザー限定特典で条件緩和中！
               </span>
             </>
           ) : (

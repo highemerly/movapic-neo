@@ -21,7 +21,8 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { toJstDateString } from "@/lib/streak";
-import { assignMonthMakeups, perfectMonthGrace } from "@/lib/achievements/perfectMonth";
+import { assignMonthMakeups } from "@/lib/achievements/perfectMonth";
+import { perfectMonthGrace } from "@/lib/achievements/grace";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {

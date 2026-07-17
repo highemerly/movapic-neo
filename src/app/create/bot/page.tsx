@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getAvatarUrl } from "@/lib/avatar";
 import { getBotAcct } from "@/lib/postMethods";
@@ -29,7 +29,9 @@ export default async function CreateBotPage() {
   const BrandIcon = isMisskey ? MisskeyIcon : MastodonIcon;
   const brandName = isMisskey ? "Misskey" : "Mastodon";
 
+  // Bot 投稿が未提供（env 未設定）の環境ではこのページ自体を出さない
   const botAcct = getBotAcct();
+  if (!botAcct) notFound();
   const status = await getBotStreamStatus();
 
   return (

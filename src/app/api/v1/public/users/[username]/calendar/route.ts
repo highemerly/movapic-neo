@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { parseUserHandle } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { getCurrentUser } from "@/lib/auth/session";
 import { toJstDateString } from "@/lib/streak";
 import { CACHE_PUBLIC_MEDIUM } from "@/lib/http";
@@ -82,10 +83,13 @@ export async function GET(
       return NextResponse.json({ error: "Invalid year or month" }, { status: 400 });
     }
 
-    // ユーザーを検索（username@domain で解決。domain 省略時は既定インスタンス）
-    const { username: cleanUsername, domain } = parseUserHandle(username);
+    // ユーザーを検索（username@domain で解決。domain 省略はホームインスタンスのみ）
+    const parsed = parseUserHandle(username, getHomeServer());
+    if (!parsed) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
     const user = await prisma.user.findFirst({
-      where: { username: cleanUsername, instance: { domain } },
+      where: { username: parsed.username, instance: { domain: parsed.domain } },
       select: { id: true },
     });
 
@@ -99,7 +103,13 @@ export async function GET(
 
     // 指定月の画像を取得（新しい順）→ 代表サムネ・穴埋め・皆勤賞を単一ソースで解決。
     const images = await fetchCalendarImages(user.id, year, month);
-    const resolved = resolveCalendarMonth({ images, year, month, domain, now: new Date() });
+    const resolved = resolveCalendarMonth({
+      images,
+      year,
+      month,
+      domain: parsed.domain,
+      now: new Date(),
+    });
 
     // owner編集用: 各日の全画像（chronological asc）。images は desc なので unshift で整列。
     let ownerEdit: OwnerEditData | undefined;

@@ -42,9 +42,10 @@ export function ServiceInfoContent() {
             がもらえます。
           </li>
           <li>
+            {/* Bot の宛先は環境依存（env）のため、紹介文では具体的な acct を出さない */}
             投稿方法は Web ブラウザのほか、
             <strong className="font-medium text-foreground">メール送信</strong>
-            や、Bot（<code className="rounded bg-muted px-1 py-0.5 text-xs">@pic@handon.club</code>）への
+            や、公式Botへの
             <strong className="font-medium text-foreground">メンション</strong>
             からでもOK。
           </li>

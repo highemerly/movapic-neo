@@ -70,9 +70,26 @@ describe("POST /api/v1/mutes", () => {
 
   it("自分自身はミュートできない（400）", async () => {
     mockUserFindFirst.mockResolvedValue({ id: "me" } as never);
-    const res = await POST(postReq({ handle: "me", duration: "7d" }));
+    const res = await POST(postReq({ handle: "me@handon.club", duration: "7d" }));
     expect(res.status).toBe(400);
     expect(mockMuteUpsert).not.toHaveBeenCalled();
+  });
+
+  it("HOME_SERVER 設定時は素の username でも解決できる", async () => {
+    vi.stubEnv("HOME_SERVER", "handon.club");
+    try {
+      mockUserFindFirst.mockResolvedValue({ id: "me" } as never);
+      const res = await POST(postReq({ handle: "me", duration: "7d" }));
+      expect(res.status).toBe(400); // 自分自身なので 400（解決自体は成功している）
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("HOME_SERVER 未設定で domain 省略の handle は404（解決不能）", async () => {
+    const res = await POST(postReq({ handle: "me", duration: "7d" }));
+    expect(res.status).toBe(404);
+    expect(mockUserFindFirst).not.toHaveBeenCalled();
   });
 
   it("有期ミュートを upsert し expiresAt を返す", async () => {

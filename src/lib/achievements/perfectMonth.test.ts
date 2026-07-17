@@ -12,7 +12,6 @@
 
 import { describe, it, expect } from "vitest";
 import {
-  perfectMonthGrace,
   perfectMonthKey,
   daysInMonthOf,
   summarizeDayCounts,
@@ -21,8 +20,6 @@ import {
   isPerfectMonth,
   currentMonthMakeupStatus,
   shouldRemindMakeup,
-  PERFECT_MONTH_GRACE_HOME,
-  PERFECT_MONTH_GRACE_DEFAULT,
   MAKEUP_REMINDER_MAX_SKIPPED,
 } from "./perfectMonth";
 
@@ -39,20 +36,6 @@ function dc(perDay: number[]): Record<number, number> {
 function assignedObj(posts: ReadonlyArray<{ id: string; day: number }>, grace = 31) {
   return Object.fromEntries(assignMonthMakeups(posts, grace));
 }
-
-describe("perfectMonthGrace - 所属インスタンスで穴埋め枠が変わる", () => {
-  it("ホーム(handon.club)は 4、その他は 3", () => {
-    expect(perfectMonthGrace("handon.club")).toBe(PERFECT_MONTH_GRACE_HOME);
-    expect(perfectMonthGrace("handon.club")).toBe(4);
-    expect(perfectMonthGrace("mstdn.example")).toBe(PERFECT_MONTH_GRACE_DEFAULT);
-    expect(perfectMonthGrace("mstdn.example")).toBe(3);
-  });
-
-  it("null / undefined はホーム扱いにせず 3（フォールバック）", () => {
-    expect(perfectMonthGrace(null)).toBe(3);
-    expect(perfectMonthGrace(undefined)).toBe(3);
-  });
-});
 
 describe("perfectMonthKey", () => {
   it("YYYY-MM に category を前置する", () => {

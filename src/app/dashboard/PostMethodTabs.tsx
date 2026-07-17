@@ -9,7 +9,9 @@ import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 
 interface PostMethodTabsProps {
   instanceType: string;
+  /** null はメンション投稿が未提供（env 未設定）＝タブごと非表示 */
   mentionSettingsContent: ReactNode;
+  /** null はメール投稿が未提供（env 未設定）＝タブごと非表示 */
   emailSettingsContent: ReactNode;
 }
 
@@ -26,16 +28,20 @@ export function PostMethodTabs({
 
   const tabs: { id: TabId; label: ReactElement | string }[] = [
     { id: "web", label: "Webから" },
-    {
-      id: "mention",
-      label: (
-        <span className="inline-flex items-center justify-center gap-1">
-          <InstanceIcon className="w-3.5 h-3.5" />
-          から
-        </span>
-      ),
-    },
-    { id: "email", label: "メールから" },
+    ...(mentionSettingsContent
+      ? [
+          {
+            id: "mention" as const,
+            label: (
+              <span className="inline-flex items-center justify-center gap-1">
+                <InstanceIcon className="w-3.5 h-3.5" />
+                から
+              </span>
+            ),
+          },
+        ]
+      : []),
+    ...(emailSettingsContent ? [{ id: "email" as const, label: "メールから" }] : []),
   ];
 
   return (

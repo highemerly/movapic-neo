@@ -17,6 +17,7 @@ import {
 } from "@/components/map/PrefectureHeatmap";
 import { PrefectureImageGrid } from "@/components/map/PrefectureImageGrid";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { userPageRobotsMetadata } from "@/lib/crawlers";
 import type { Metadata } from "next";
 
@@ -42,7 +43,9 @@ export default async function UserMapPage({
   const { prefecture: prefectureFilter } = await searchParams;
   const currentUser = await getCurrentUser();
 
-  const { username: cleanUsername, domain } = parseUserHandle(username);
+  const parsed = parseUserHandle(username, getHomeServer());
+  if (!parsed) notFound();
+  const { username: cleanUsername, domain } = parsed;
 
   const user = await prisma.user.findFirst({
     where: {
@@ -61,7 +64,7 @@ export default async function UserMapPage({
   const canMute = !!currentUser && !isOwner;
   const isOptedIn = user.showLocationMap;
   // /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）
-  const seg = userPathSegment(cleanUsername, user.instance.domain);
+  const seg = userPathSegment(cleanUsername, user.instance.domain, getHomeServer());
 
   // ヘッダーのアバター王冠用（皆勤賞判定）
   const perfectAttendance = await hasRecentPerfectAttendance(user.id);

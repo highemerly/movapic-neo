@@ -9,8 +9,7 @@ import { USER_AGENT } from "@/lib/userAgent";
 
 const REQUEST_TIMEOUT = 30000;
 
-const getBotInstanceUrl = () =>
-  process.env.MASTODON_BOT_INSTANCE_URL || "https://handon.club";
+const getBotInstanceUrl = () => process.env.MASTODON_BOT_INSTANCE_URL || "";
 const getBotAccessToken = () => process.env.MASTODON_BOT_ACCESS_TOKEN || "";
 
 /**
@@ -24,6 +23,10 @@ export async function sendBotDirectMessage(
   const accessToken = getBotAccessToken();
   if (!accessToken) {
     console.warn("[bot-notify] MASTODON_BOT_ACCESS_TOKEN 未設定のため通知をスキップ");
+    return;
+  }
+  if (!getBotInstanceUrl()) {
+    console.warn("[bot-notify] MASTODON_BOT_INSTANCE_URL 未設定のため通知をスキップ");
     return;
   }
   if (toAccts.length === 0) {

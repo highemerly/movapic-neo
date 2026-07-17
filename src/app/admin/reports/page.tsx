@@ -12,6 +12,7 @@ import Link from "@/components/Link";
 import prisma from "@/lib/db";
 import { getPublicUrl } from "@/lib/storage/storage";
 import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { ReportActions } from "./ReportActions";
 import { Pagination } from "../_components/Pagination";
 import { EmptyBox } from "../_components/ui";
@@ -114,7 +115,7 @@ export default async function AdminReportsPage({
             const seg = userPathSegment(
               g.image.user.username,
               g.image.user.instance.domain
-            );
+            , getHomeServer());
             const imagePath = `/u/${seg}/status/${g.image.id}`;
             const thumbUrl = getPublicUrl(
               g.image.thumbnailKey ?? g.image.storageKey
@@ -233,7 +234,7 @@ export default async function AdminReportsPage({
               const seg = userPathSegment(
                 img.user.username,
                 img.user.instance.domain
-              );
+              , getHomeServer());
               const imagePath = `/u/${seg}/status/${img.id}`;
               const thumbUrl = getPublicUrl(img.thumbnailKey ?? img.storageKey);
               const ownerAcct = `${img.user.username}@${img.user.instance.domain}`;

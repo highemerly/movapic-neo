@@ -14,6 +14,7 @@ import { getBotAcct, getEmailDomain } from "@/lib/postMethods";
 import prisma from "@/lib/db";
 import { getUserProfileStats } from "@/lib/userStats";
 import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
 
@@ -79,27 +80,27 @@ export default async function DashboardPage() {
   ]);
 
   // 自分の /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）
-  const selfSeg = userPathSegment(user.username, user.instance.domain);
+  const selfSeg = userPathSegment(user.username, user.instance.domain, getHomeServer());
   const totalFavorites = favoritesAgg._sum.favoriteCount ?? 0;
   // 直近20投稿からランダムに最大5枚（モバイル4列/PC5列。5枚目はモバイルでは非表示）
   const previewImages = pickRandomSample(recentPublicImages, 5);
   const publicUrl = (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
 
-  // Bot／メール投稿の設定値（env）は postMethods ヘルパーに集約。
+  // Bot／メール投稿の設定値（env）は postMethods ヘルパーに集約。null は未提供＝タブ非表示。
   const botAcct = getBotAcct();
   const emailDomain = getEmailDomain();
 
   // 投稿方法の説明はダッシュボード・個別ページ・createモーダルで共有（同じ表示）。
-  const mentionSettingsContent = (
+  const mentionSettingsContent = botAcct ? (
     <MentionGuide
       botAcct={botAcct}
       userInstanceDomain={user.instance.domain}
       userInstanceType={user.instance.type}
     />
-  );
-  const emailSettingsContent = (
+  ) : null;
+  const emailSettingsContent = emailDomain ? (
     <EmailGuide emailPrefix={user.emailPrefix} emailDomain={emailDomain} />
-  );
+  ) : null;
 
   return (
     <>
@@ -291,7 +292,7 @@ export default async function DashboardPage() {
                     {previewImages.map((img, index) => (
                       <Link
                         key={img.id}
-                        href={`/u/${userPathSegment(img.user.username, img.user.instance.domain)}/status/${img.id}`}
+                        href={`/u/${userPathSegment(img.user.username, img.user.instance.domain, getHomeServer())}/status/${img.id}`}
                         className={`overflow-hidden rounded-md border transition-opacity hover:opacity-80 ${
                           index === 4 ? "hidden sm:block" : "block"
                         }`}

@@ -13,6 +13,7 @@ import { TabTransition } from "@/components/user/TabTransition";
 import { getUserProfileStats } from "@/lib/userStats";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { userPageRobotsMetadata } from "@/lib/crawlers";
 import { buildOgImage, DEFAULT_OG_IMAGE } from "@/lib/ogImage";
 import { ProfileFeedCard, type ProfileFeedImage } from "@/components/user/ProfileFeedCard";
@@ -35,7 +36,10 @@ export async function generateMetadata({
   const { username } = await params;
   const robots = await userPageRobotsMetadata(username);
 
-  const { username: cleanUsername, domain } = parseUserHandle(username);
+  const parsed = parseUserHandle(username, getHomeServer());
+  // 解決不能（HOME_SERVER 未設定で domain 省略）は本文側で notFound。robots のみ返す。
+  if (!parsed) return robots;
+  const { username: cleanUsername, domain } = parsed;
   const user = await prisma.user.findFirst({
     where: { username: cleanUsername, instance: { domain } },
     select: {
@@ -116,8 +120,10 @@ export default async function UserHomePage({ params, searchParams }: UserHomePag
   const deleteFlash = buildDeleteFlash(deleted, server);
   const currentUser = await getCurrentUser();
 
-  // username@domain を分解（既定インスタンスは domain 省略可）
-  const { username: cleanUsername, domain } = parseUserHandle(username);
+  // username@domain を分解（ホームインスタンスのみ domain 省略可）
+  const parsed = parseUserHandle(username, getHomeServer());
+  if (!parsed) notFound();
+  const { username: cleanUsername, domain } = parsed;
 
   // ユーザーを取得（インスタンスドメインで絞り込み）
   const user = await prisma.user.findFirst({
@@ -136,7 +142,7 @@ export default async function UserHomePage({ params, searchParams }: UserHomePag
     notFound();
   }
 
-  const seg = userPathSegment(cleanUsername, user.instance.domain);
+  const seg = userPathSegment(cleanUsername, user.instance.domain, getHomeServer());
   const publicUrl = (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
 
   // フィードカードに必要な列（実画像＋タイルクロップ用の位置/サイズ・投稿日・カメラ/位置・お気に入り）。

@@ -10,6 +10,7 @@
 import Link from "@/components/Link";
 
 import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { getFavoritesData } from "@/lib/admin/favorites";
 import { normalizePeriod, periodRangeText, PERIOD_OPTIONS } from "@/lib/admin/periods";
 import { StatCard } from "../_components/StatCard";
@@ -248,7 +249,7 @@ export default async function AdminFavoritesPage({
         ) : (
           <ul className="flex flex-col gap-1.5">
             {errorSamples.map((e) => {
-              const seg = userPathSegment(e.username, e.domain);
+              const seg = userPathSegment(e.username, e.domain, getHomeServer());
               return (
                 <li key={e.id}>
                   <Link

@@ -1,5 +1,9 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { resolveLoginRedirect } from "./loginRedirect";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("resolveLoginRedirect", () => {
   it("既定センチネル(/dashboard)＋新規ユーザーは初回投稿へ送る", () => {
@@ -12,7 +16,8 @@ describe("resolveLoginRedirect", () => {
     ).toBe("/create?welcome=1");
   });
 
-  it("既定センチネル＋既存ユーザーは自分のユーザーページへ送る（既定インスタンスは素のusername）", () => {
+  it("既定センチネル＋既存ユーザーは自分のユーザーページへ送る（ホームインスタンスは素のusername）", () => {
+    vi.stubEnv("HOME_SERVER", "handon.club");
     expect(
       resolveLoginRedirect("/dashboard", {
         isNewUser: false,
@@ -22,7 +27,8 @@ describe("resolveLoginRedirect", () => {
     ).toBe("/u/alice");
   });
 
-  it("既定インスタンス以外は username@domain 形式のパスになる", () => {
+  it("ホームインスタンス以外は username@domain 形式のパスになる", () => {
+    vi.stubEnv("HOME_SERVER", "handon.club");
     expect(
       resolveLoginRedirect("/dashboard", {
         isNewUser: false,
@@ -30,6 +36,16 @@ describe("resolveLoginRedirect", () => {
         instanceDomain: "misskey.io",
       })
     ).toBe("/u/bob@misskey.io");
+  });
+
+  it("HOME_SERVER 未設定なら常に username@domain 形式のパスになる", () => {
+    expect(
+      resolveLoginRedirect("/dashboard", {
+        isNewUser: false,
+        username: "alice",
+        instanceDomain: "handon.club",
+      })
+    ).toBe("/u/alice@handon.club");
   });
 
   it("明示的な returnTo が渡っていれば新規/既存に関わらず尊重する", () => {

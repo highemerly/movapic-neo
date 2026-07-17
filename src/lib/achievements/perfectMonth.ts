@@ -12,28 +12,20 @@
  * React・サーバー専用 API を import しないこと（型・純粋関数のみ）。
  */
 
-import { DEFAULT_INSTANCE } from "@/lib/userHandle";
-
 /** 皆勤賞の系列キー（DBの category 列）。動的キーは "perfect-month:YYYY-MM"。 */
 export const PERFECT_MONTH_CATEGORY = "perfect-month";
 
 /**
  * 未投稿として許容する日数（穴埋め枠）。これを超える未投稿があるとその月の皆勤賞は不成立。
- * SHAMEZO はホームインスタンス（handon.club）発祥で、その利用促進も兼ねるため、
- * ホームインスタンス所属ユーザーのみ +1 日だけ優遇する（HOME=4 / その他=3）。
- * しきい値は所属インスタンスごとに `perfectMonthGrace(domain)` で解決し、
- * live/backfill/カレンダーAPI のいずれも「投稿者本人の所属インスタンス」基準で判定する。
+ * 特典サーバー（env FAVOR_SERVERS）所属ユーザーのみ +1 日だけ優遇する（FAVORED=4 / その他=3）。
+ * しきい値は所属インスタンスごとに `perfectMonthGrace(domain)`（サーバー専用の
+ * @/lib/achievements/grace）で解決し、live/backfill/カレンダーAPI のいずれも
+ * 「投稿者本人の所属インスタンス」基準で判定する。
+ * このモジュールはクライアントからも import されるため env は読まない（定数のみ）。
  */
-export const PERFECT_MONTH_GRACE_HOME = 4;
-/** ホーム以外のインスタンス所属ユーザーの未投稿許容日数。 */
+export const PERFECT_MONTH_GRACE_FAVORED = 4;
+/** 特典サーバー以外のインスタンス所属ユーザーの未投稿許容日数。 */
 export const PERFECT_MONTH_GRACE_DEFAULT = 3;
-
-/** インスタンスドメインに応じた未投稿許容日数（穴埋め枠）を返す。 */
-export function perfectMonthGrace(instanceDomain: string | null | undefined): number {
-  return instanceDomain === DEFAULT_INSTANCE
-    ? PERFECT_MONTH_GRACE_HOME
-    : PERFECT_MONTH_GRACE_DEFAULT;
-}
 
 /** 穴埋め推奨通知を送る／カレンダーで注意を促す「過ぎた未投稿日数」の上限。超えたら出さない。 */
 export const MAKEUP_REMINDER_MAX_SKIPPED = 5;

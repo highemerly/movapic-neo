@@ -24,15 +24,16 @@ import { USER_AGENT } from "@/lib/userAgent";
 import { assertSafeRemoteUrl } from "@/lib/security/ssrf";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 
 const REQUEST_TIMEOUT = 30000;
 const MAX_RETRY_COUNT = 2;
 
-// 環境変数
-const getBotInstanceUrl = () => process.env.MASTODON_BOT_INSTANCE_URL || "https://handon.club";
-const getBotInstanceDomain = () => process.env.MASTODON_BOT_INSTANCE_DOMAIN || "handon.club";
+// 環境変数（Bot 系はフォールバックなし。未設定時は processOneMention 冒頭で弾く）
+const getBotInstanceUrl = () => process.env.MASTODON_BOT_INSTANCE_URL || "";
+const getBotInstanceDomain = () => process.env.MASTODON_BOT_INSTANCE_DOMAIN || "";
 const getBotAccessToken = () => process.env.MASTODON_BOT_ACCESS_TOKEN || "";
-const getBotAcct = () => process.env.MASTODON_BOT_ACCT || "pic";
+const getBotAcct = () => process.env.MASTODON_BOT_ACCT || "";
 
 export interface ProcessResult {
   statusId: string;
@@ -216,6 +217,11 @@ export async function processOneMention(
 
   const botAcct = getBotAcct();
   const botInstanceDomain = getBotInstanceDomain();
+  // Bot 系 env が未設定＝メンション投稿は未提供。ここに来るのは設定不整合なのでスキップ扱い。
+  if (!botAcct || !botInstanceDomain || !getBotInstanceUrl()) {
+    console.warn("[mention] MASTODON_BOT_* env 未設定のためメンション処理をスキップ");
+    return { statusId, success: false, skipped: true, error: "bot env not configured" };
+  }
   const originalVisibility = notification.status!.visibility as MastodonVisibility;
   const replyToAcct = notification.account.acct; // リプライ先ユーザーのacct
 
@@ -507,7 +513,7 @@ export async function processOneMention(
   // STEP13: 実績獲得通知（この投稿で新規実績を獲得していればリプライでお知らせ）
   if (published.newAchievements && published.newAchievements.length > 0) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-    const seg = userPathSegment(user.username, user.instance.domain);
+    const seg = userPathSegment(user.username, user.instance.domain, getHomeServer());
     const lines = published.newAchievements.map((a) => {
       const { title } = resolveAchievement(a.key, a.category);
       // celebrate=1 は「今まさに獲得した」演出を出すための専用フラグ

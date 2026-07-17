@@ -38,8 +38,9 @@ import {
 } from "@/types";
 import { evaluateAndGrant, GrantedAchievement } from "@/lib/achievements/engine";
 import { assignMakeupForNewPost } from "@/lib/achievements/makeupAssign";
-import { perfectMonthGrace } from "@/lib/achievements/perfectMonth";
+import { perfectMonthGrace } from "@/lib/achievements/grace";
 import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import type { PostFacts } from "@/lib/achievements/catalog";
 import type { ExifDetails } from "@/lib/exif/details";
 
@@ -279,7 +280,7 @@ export async function postImageToFediverse(
 
 function buildImagePageUrl(username: string, domain: string, imageId: string): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-  return `${appUrl}/u/${userPathSegment(username, domain)}/status/${imageId}`;
+  return `${appUrl}/u/${userPathSegment(username, domain, getHomeServer())}/status/${imageId}`;
 }
 
 /**

@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import type { Metadata } from "next";
 import prisma from "@/lib/db";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 
 /**
  * クロール拒否（User.blockCrawlers）まわりの共通ロジック。
@@ -72,7 +73,7 @@ const fetchCrawlerBlockedPaths = async () => {
     select: { username: true, instance: { select: { domain: true } } },
   });
   return users.flatMap((u) => {
-    const seg = userPathSegment(u.username, u.instance.domain);
+    const seg = userPathSegment(u.username, u.instance.domain, getHomeServer());
     return [`/u/${seg}$`, `/u/${seg}/`];
   });
 };
@@ -89,9 +90,11 @@ export const getCrawlerBlockedPaths = process.env.ROBOTS_DISABLE_CACHE
  * React cache で同一リクエスト内の重複クエリを1回に畳む（generateMetadata 用の軽量クエリ）。
  */
 const isUserCrawlerBlocked = cache(async (handleSegment: string): Promise<boolean> => {
-  const { username, domain } = parseUserHandle(handleSegment);
+  const parsed = parseUserHandle(handleSegment, getHomeServer());
+  // 解決不能（HOME_SERVER 未設定で domain 省略）はページ自体が 404 になるので未ブロック扱い
+  if (!parsed) return false;
   const user = await prisma.user.findFirst({
-    where: { username, instance: { domain } },
+    where: { username: parsed.username, instance: { domain: parsed.domain } },
     select: { blockCrawlers: true },
   });
   return user?.blockCrawlers ?? false;

@@ -30,7 +30,8 @@ import {
   type AchStats,
   type PostFacts,
 } from "@/lib/achievements/catalog";
-import { perfectMonthGrace, summarizeDayCounts } from "@/lib/achievements/perfectMonth";
+import { summarizeDayCounts } from "@/lib/achievements/perfectMonth";
+import { perfectMonthGrace } from "@/lib/achievements/grace";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {

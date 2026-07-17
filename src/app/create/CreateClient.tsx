@@ -50,6 +50,7 @@ import {
 import { extractExif, type ExtractedExif } from "@/lib/exif/parser";
 import { exifDetailValues } from "@/lib/exif/details";
 import { userPathSegment } from "@/lib/userHandle";
+import { useHomeServer } from "@/components/HomeServerProvider";
 import {
   uploadWithProgress,
   UploadError,
@@ -124,11 +125,12 @@ export interface CreateClientProps {
   firstTime?: boolean;
   /** 初回ログイン直後（?welcome=1）＝歓迎バナーを表示する */
   showWelcome?: boolean;
-  /** 「他の投稿方法」モーダル用の設定（Bot宛先・メール宛先）。env/ユーザー由来でサーバー側から渡す */
+  /** 「他の投稿方法」モーダル用の設定（Bot宛先・メール宛先）。env/ユーザー由来でサーバー側から渡す。
+      null はその投稿方法が未提供（env 未設定）＝ボタン非表示。 */
   postMethods: {
-    botAcct: string;
+    botAcct: string | null;
     emailPrefix: string;
-    emailDomain: string;
+    emailDomain: string | null;
   };
 }
 
@@ -200,6 +202,7 @@ const UPLOAD_ERROR_MESSAGES: Record<
 
 export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn, firstTime = false, showWelcome = false, postMethods }: CreateClientProps) {
   const router = useRouter();
+  const homeServer = useHomeServer();
   // 初回投稿者は③以降（色・位置などの詳細オプション）を折りたたんで最初は隠す。
   // 既定はデフォルト値で投稿できるので、写真→コメント→投稿の最短動線を邪魔しない。
   // 2回目以降のユーザーは従来どおり最初から開いておく。
@@ -711,7 +714,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
       } else {
         // imagePageUrl が返らなかった稀なケースのフォールバック。投稿は保存済みなので、
         // 自分のユーザーページへ送って保存物を確認できるようにする。
-        router.push(`/u/${userPathSegment(user.username, user.instance.domain)}`);
+        router.push(`/u/${userPathSegment(user.username, user.instance.domain, homeServer)}`);
       }
     } catch (err) {
       if (err instanceof UploadError) {

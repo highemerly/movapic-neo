@@ -11,7 +11,8 @@ import { TabTransition } from "@/components/user/TabTransition";
 import { toJstDateString } from "@/lib/streak";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
-import { perfectMonthGrace } from "@/lib/achievements/perfectMonth";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
+import { perfectMonthGrace } from "@/lib/achievements/grace";
 import { userPageRobotsMetadata } from "@/lib/crawlers";
 import type { Metadata } from "next";
 
@@ -37,8 +38,10 @@ export default async function CalendarPage({
   const query = await searchParams;
   const currentUser = await getCurrentUser();
 
-  // username@domain を分解（既定インスタンスは domain 省略可）
-  const { username: cleanUsername, domain } = parseUserHandle(username);
+  // username@domain を分解（ホームインスタンスのみ domain 省略可）
+  const parsed = parseUserHandle(username, getHomeServer());
+  if (!parsed) notFound();
+  const { username: cleanUsername, domain } = parsed;
 
   // ユーザーを取得（インスタンスドメインで絞り込み）
   const user = await prisma.user.findFirst({
@@ -115,7 +118,7 @@ export default async function CalendarPage({
         {/* カレンダー（タブ切替時に横スライドで表示） */}
         <TabTransition tab="calendar">
           <CalendarView
-            username={userPathSegment(cleanUsername, user.instance.domain)}
+            username={userPathSegment(cleanUsername, user.instance.domain, getHomeServer())}
             publicUrl={publicUrl}
             initialYear={initialYear}
             initialMonth={initialMonth}

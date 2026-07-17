@@ -10,6 +10,7 @@ import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { userPageRobotsMetadata } from "@/lib/crawlers";
 import { ToastFlasher } from "@/components/ToastFlasher";
 import type { Metadata } from "next";
@@ -38,8 +39,10 @@ export default async function UserGalleryPage({
   const { deleted } = await searchParams;
   const currentUser = await getCurrentUser();
 
-  // username@domain を分解（既定インスタンスは domain 省略可）
-  const { username: cleanUsername, domain } = parseUserHandle(username);
+  // username@domain を分解（ホームインスタンスのみ domain 省略可）
+  const parsed = parseUserHandle(username, getHomeServer());
+  if (!parsed) notFound();
+  const { username: cleanUsername, domain } = parsed;
 
   // ユーザーを取得（インスタンスドメインで絞り込み）
   const user = await prisma.user.findFirst({
@@ -173,7 +176,7 @@ export default async function UserGalleryPage({
               })),
             ]}
             publicUrl={publicUrl}
-            username={userPathSegment(cleanUsername, user.instance.domain)}
+            username={userPathSegment(cleanUsername, user.instance.domain, getHomeServer())}
             isOwner={currentUser?.id === user.id}
           />
         </TabTransition>

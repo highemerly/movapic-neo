@@ -9,6 +9,7 @@ import Link from "@/components/Link";
 import { RetryImg } from "@/components/RetryImg";
 import { Button } from "@/components/ui/button";
 import { userPathSegment } from "@/lib/userHandle";
+import { useHomeServer } from "@/components/HomeServerProvider";
 
 export type MuteEntryDto = {
   id: string;
@@ -44,6 +45,7 @@ function expiryLabel(expiresAt: string | null): string {
  */
 export function MutesManager({ mutes }: { mutes: MuteEntryDto[] }) {
   const router = useRouter();
+  const homeServer = useHomeServer();
   const [removingId, setRemovingId] = useState<string | null>(null);
 
   const handleRemove = async (mutedUserId: string) => {
@@ -79,7 +81,7 @@ export function MutesManager({ mutes }: { mutes: MuteEntryDto[] }) {
   return (
     <ul className="space-y-3">
       {mutes.map((mute) => {
-        const seg = userPathSegment(mute.mutedUser.username, mute.mutedUser.domain);
+        const seg = userPathSegment(mute.mutedUser.username, mute.mutedUser.domain, homeServer);
         const removing = removingId === mute.mutedUser.id;
         return (
           <li key={mute.id} className="bg-muted rounded-lg p-3 flex items-center gap-3">

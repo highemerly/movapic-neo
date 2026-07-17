@@ -27,8 +27,9 @@ import {
 } from "@/lib/fediverse/favorite";
 import { Footer } from "@/components/Footer";
 import { parseUserHandle } from "@/lib/userHandle";
+import { getBotAcct } from "@/lib/postMethods";
 import { NewUserGuide } from "@/components/onboarding/NewUserGuide";
-import { getAllowedServers } from "@/lib/auth/allowedServers";
+import { getAllowedServers, getHomeServer } from "@/lib/auth/serverPolicy";
 import { ToastFlasher } from "@/components/ToastFlasher";
 import { buildPostFlash } from "./postFlash";
 import { AchievementCelebration } from "./AchievementCelebration";
@@ -65,14 +66,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     },
   });
 
-  // 非公開・取り下げ・不存在・ハンドル（username@domain）不一致はデフォルト（noindex扱い）
-  const { username: cleanUsername, domain } = parseUserHandle(username);
+  // 非公開・取り下げ・不存在・ハンドル（username@domain）不一致・解決不能はデフォルト（noindex扱い）
+  const parsed = parseUserHandle(username, getHomeServer());
   if (
     !image ||
     !image.isPublic ||
     image.isDisabled ||
-    image.user.username !== cleanUsername ||
-    image.user.instance.domain !== domain
+    !parsed ||
+    image.user.username !== parsed.username ||
+    image.user.instance.domain !== parsed.domain
   ) {
     return { title: "画像が見つかりません", robots: { index: false } };
   }
@@ -177,19 +179,17 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     notFound();
   }
 
-  // ハンドル（username@domain）が一致しない場合
-  const { username: cleanUsername, domain } = parseUserHandle(username);
-  if (image.user.username !== cleanUsername || image.user.instance.domain !== domain) {
+  // ハンドル（username@domain）が一致しない・解決不能な場合
+  const parsed = parseUserHandle(username, getHomeServer());
+  if (!parsed || image.user.username !== parsed.username || image.user.instance.domain !== parsed.domain) {
     notFound();
   }
 
   // 投稿者が直近（先月/今月）の皆勤賞を取っていればアバターに王冠を表示
   const posterPerfectAttendance = await hasRecentPerfectAttendance(image.user.id);
 
-  // Bot投稿の表示・説明に使う Bot アカウント（例: dev01@handon.club）
-  const botAcct = `${process.env.MASTODON_BOT_ACCT || "pic"}@${
-    process.env.MASTODON_BOT_INSTANCE_DOMAIN || "handon.club"
-  }`;
+  // Bot投稿の表示・説明に使う Bot アカウント（env 未設定なら null＝説明では省略される）
+  const botAcct = getBotAcct();
 
   // お気に入りキャッシュから初期表示データを算出
   // お気に入り可能 = Fediverseに投稿済み（postIdがある）投稿のみ（local投稿は対象外）
@@ -492,7 +492,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             <PostSourceBadge
               source="mention"
               instanceType={image.user.instance.type}
-              botAcct={botAcct}
+              botAcct={botAcct ?? undefined}
               position={image.position}
               color={image.color}
               size={image.size}

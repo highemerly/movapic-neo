@@ -28,12 +28,12 @@ import { EmailGuide } from "@/components/post-methods/EmailGuide";
  */
 
 interface OtherPostMethodsProps {
-  /** Botのメンション宛先（例 "pic@handon.club"） */
-  botAcct: string;
+  /** Botのメンション宛先（例 "pic@handon.club"）。null は未提供（env 未設定）＝ボタン非表示 */
+  botAcct: string | null;
   /** ユーザー固有のメール prefix */
   emailPrefix: string;
-  /** メール投稿用ドメイン */
-  emailDomain: string;
+  /** メール投稿用ドメイン。null は未提供（env 未設定）＝ボタン非表示 */
+  emailDomain: string | null;
   /** ログインユーザーの所属サーバードメイン */
   instanceDomain: string;
   /** ログインユーザーのサーバー種別（"misskey" | "mastodon"） */
@@ -56,14 +56,18 @@ export function OtherPostMethods({
   const BrandIcon = isMisskey ? MisskeyIcon : MastodonIcon;
   const brandName = isMisskey ? "Misskey" : "Mastodon";
 
+  // どちらも未提供（env 未設定）なら区切りごと出さない
+  if (!botAcct && !emailDomain) return null;
+
   return (
     <div className="space-y-2">
       <OrDivider />
 
       {/* 画面幅によらず横2列。DialogContent はポータルされるので、grid の直接の子は
-          2つのトリガーボタンになり左右に並ぶ。 */}
-      <div className="grid grid-cols-2 gap-2">
+          2つのトリガーボタンになり左右に並ぶ（片方未提供なら1列に伸びる）。 */}
+      <div className={`grid gap-2 ${botAcct && emailDomain ? "grid-cols-2" : "grid-cols-1"}`}>
       {/* Fediverse（メンション）投稿 */}
+      {botAcct && (
       <Dialog>
         <DialogTrigger asChild>
           <button type="button" className={triggerClass}>
@@ -96,8 +100,10 @@ export function OtherPostMethods({
           </DialogClose>
         </DialogContent>
       </Dialog>
+      )}
 
       {/* メール投稿 */}
+      {emailDomain && (
       <Dialog>
         <DialogTrigger asChild>
           <button type="button" className={triggerClass}>
@@ -125,6 +131,7 @@ export function OtherPostMethods({
           </DialogClose>
         </DialogContent>
       </Dialog>
+      )}
       </div>
     </div>
   );

@@ -4,6 +4,12 @@
 - 対応: Mastodon（OAuth 2.0）/ Misskey（MiAuth）。インスタンス検出はnodeinfoで自動判定。セッションはJWT（7日・httpOnly Cookie）。
 - **API**: `POST /api/auth/fediverse/register`（サーバー名から種別判定し認可URL返却）/ `GET .../callback/mastodon` / `GET .../callback/misskey` / `POST /api/auth/logout`。
 - **フロー**: サーバー名入力 → register（Mastodonは動的クライアント登録、Misskeyは MiAuthセッション生成）→ 認可画面 → コールバックでトークン取得 → ユーザー作成/更新 → JWT発行。
+- **サーバーポリシー**（env 読み取りは [serverPolicy.ts](../src/lib/auth/serverPolicy.ts) に集約・すべて任意）:
+  - `LOGIN_PLATFORM`: ログイン可能なプラットフォーム（カンマ区切り: mastodon/misskey）。未設定=両方許可。
+  - `ALLOWED_SERVERS`: 許可サーバー（カンマ区切り）。未設定=全許可。
+  - `DENIED_SERVERS`: 拒否サーバー（カンマ区切り）。ログイン開始のみ弾き、既存アカウント・セッションには影響しない。将来 admin GUI からの追加（DB とのマージ）を予定しており、`getDeniedServers()` が差し替えの単一チョークポイント。
+  - `HOME_SERVER`: ホームインスタンス（**単一値**）。所属ユーザーのプロフィールURLが素の `username` になる（他は `username@domain`）。未設定なら短縮なし・素の `/u/username` は 404。クライアント側のリンク生成へは root layout から [HomeServerProvider](../src/components/HomeServerProvider.tsx)（React Context）で配る。
+  - `FAVOR_SERVERS`: 特典サーバー（カンマ区切り）。所属ユーザーは皆勤賞の未投稿許容日数が 4 日（他は 3 日）。解決は [grace.ts](../src/lib/achievements/grace.ts)。
 
 ## カレンダー機能
 - 月別カレンダー表示（投稿日にサムネイル）。日付クリックでその日の全画像をモーダル表示。**皆勤賞**: その月毎日投稿で👑（過去月のみ判定）。

@@ -317,10 +317,13 @@ export function LoginButton({ allowedServers, callbackUrl, loggedInHref, initial
           >
             <div className="space-y-3 text-sm leading-relaxed text-muted-foreground">
               <p>
-                新規登録は不要です。お持ちの分散型SNS（MastodonまたはMisskey）のサーバー名を入力すればログインできます。
+                SHAMEZOは、Mastodon・Misskeyのアカウントでログインします。
               </p>
               <p>
-                まだ分散型SNSのアカウントを持っていない方は、SHAMEZO管理者の運営する{" "}
+                Mastodon・Misskeyのサーバーはそれぞれ1つではなく、非常に多くのサーバーが独自に運営されています。どのサーバーでもログインに使えます。まずここであなたのサーバー名を入力してログインボタンを押してください。その後、あなたのサーバーに移動しますので、ログイン後にアクセスを許可してください。
+              </p>
+              <p>
+                まだアカウントを持っていない方は、SHAMEZO開発者の運営する{" "}
                 <a
                   href="https://handon.club"
                   target="_blank"
@@ -329,7 +332,7 @@ export function LoginButton({ allowedServers, callbackUrl, loggedInHref, initial
                 >
                   <MastodonIcon className="size-3.5" />handon.club
                 </a>{" "}
-                または{" "}
+                や{" "}
                 <a
                   href="https://mi.hiyoko.club"
                   target="_blank"
@@ -338,7 +341,8 @@ export function LoginButton({ allowedServers, callbackUrl, loggedInHref, initial
                 >
                   <MisskeyIcon className="size-3.5" />mi.hiyoko.club
                 </a>{" "}
-                などがおすすめです。一度新規登録してから、改めてSHAMEZOにログインしてください。
+                に登録してみてはいかがでしょうか？
+                先にこれらのサーバーでアカウントを登録してから、改めてSHAMEZOにログインしてください。
               </p>
             </div>
           </LegalInfoDialog>

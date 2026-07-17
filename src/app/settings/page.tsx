@@ -10,6 +10,7 @@ import { RetryImg } from "@/components/RetryImg";
 import Link from "@/components/Link";
 import { SettingLinkRow } from "@/components/SettingRow";
 import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { getEmailDomain } from "@/lib/postMethods";
 import prisma from "@/lib/db";
 import { BioEditForm } from "./BioEditForm";
@@ -86,7 +87,7 @@ export default async function SettingsPage() {
   });
 
   // 自分の /u/ パスセグメント（LocationMapToggle の「自分の地図」リンク用）
-  const selfSeg = userPathSegment(user.username, user.instance.domain);
+  const selfSeg = userPathSegment(user.username, user.instance.domain, getHomeServer());
   const emailDomain = getEmailDomain();
   const avatarUrl = getAvatarUrl(user.avatarUrl);
 
@@ -157,8 +158,11 @@ export default async function SettingsPage() {
           <AutoMakeupToggle
             initialEnabled={preferences?.autoMakeup ?? true}
           />
-          {/* 投稿用メールアドレス（確認＋再生成）。メール投稿の設定なので投稿設定に置く */}
-          <EmailPrefixRegenerate emailPrefix={user.emailPrefix} emailDomain={emailDomain} />
+          {/* 投稿用メールアドレス（確認＋再生成）。メール投稿の設定なので投稿設定に置く。
+              メール投稿が未提供（EMAIL_DOMAIN 未設定）の環境では出さない */}
+          {emailDomain && (
+            <EmailPrefixRegenerate emailPrefix={user.emailPrefix} emailDomain={emailDomain} />
+          )}
         </SettingsSection>
 
         {/* プライバシー（公開範囲のオプトイン設定） */}

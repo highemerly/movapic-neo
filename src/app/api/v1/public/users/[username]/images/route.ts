@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/db";
 import { parseUserHandle } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import {
   parsePageLimit,
   cursorPageArgs,
@@ -22,16 +23,16 @@ export async function GET(
   try {
     const { username } = await params;
 
-    // ユーザーを取得（username@domain で解決。domain 省略時は既定インスタンス）
-    const { username: cleanUsername, domain } = parseUserHandle(username);
-    const user = await prisma.user.findFirst({
-      where: {
-        username: cleanUsername,
-        instance: {
-          domain,
-        },
-      },
-    });
+    // ユーザーを取得（username@domain で解決。domain 省略はホームインスタンスのみ）
+    const parsed = parseUserHandle(username, getHomeServer());
+    const user = parsed
+      ? await prisma.user.findFirst({
+          where: {
+            username: parsed.username,
+            instance: { domain: parsed.domain },
+          },
+        })
+      : null;
 
     if (!user) {
       return NextResponse.json({ error: "ユーザーが見つかりません" }, { status: 404 });

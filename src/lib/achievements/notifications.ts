@@ -5,6 +5,7 @@
 
 import prisma from "@/lib/db";
 import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { getAvatarUrl } from "@/lib/avatar";
 import type { FavoriteNotificationData } from "@/lib/notifications/favoriteNotifications";
 
@@ -77,11 +78,11 @@ export async function getRecentNotifications(
     type: r.type,
     achievementKey: r.achievementKey,
     createdAt: r.createdAt,
-    recipientUsername: userPathSegment(r.user.username, r.user.instance.domain),
+    recipientUsername: userPathSegment(r.user.username, r.user.instance.domain, getHomeServer()),
     image: r.image
       ? {
           id: r.image.id,
-          pageUrl: `/u/${userPathSegment(r.image.user.username, r.image.user.instance.domain)}/status/${r.image.id}`,
+          pageUrl: `/u/${userPathSegment(r.image.user.username, r.image.user.instance.domain, getHomeServer())}/status/${r.image.id}`,
           thumbnailUrl: `${base}/${r.image.thumbnailKey || r.image.storageKey}`,
         }
       : null,

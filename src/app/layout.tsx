@@ -11,7 +11,9 @@ import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { PullToRefreshProvider } from "@/components/PullToRefresh";
 import { getSessionClaims } from "@/lib/auth/session";
 import { isAdmin } from "@/lib/auth/admin";
-import { userPathSegment, DEFAULT_INSTANCE } from "@/lib/userHandle";
+import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
+import { HomeServerProvider } from "@/components/HomeServerProvider";
 import { getAvatarUrl } from "@/lib/avatar";
 import { DEFAULT_OG_IMAGE } from "@/lib/ogImage";
 import "./globals.css";
@@ -88,9 +90,12 @@ export default async function RootLayout({
 }>) {
   // PWA下部ナビ用のログイン情報（DBアクセスなし・表示専用）。
   const claims = await getSessionClaims();
-  const selfSegment = claims?.username
-    ? userPathSegment(claims.username, claims.instanceDomain || DEFAULT_INSTANCE)
-    : null;
+  // ホームインスタンス（HOME_SERVER）。クライアント側のリンク生成でも使うため Context で配る。
+  const homeServer = getHomeServer();
+  const selfSegment =
+    claims?.username && claims.instanceDomain
+      ? userPathSegment(claims.username, claims.instanceDomain, homeServer)
+      : null;
   // 管理者（ADMIN_ACCTS）判定。メニューに /admin/stats 導線を出すためだけの表示用。
   // 実際のアクセス制御は admin/layout.tsx のガードが担う（ここは env 照合のみでDBアクセスなし）。
   const isAdminUser = isAdmin(
@@ -113,6 +118,7 @@ export default async function RootLayout({
           id="standalone-detect"
           dangerouslySetInnerHTML={{ __html: STANDALONE_DETECT_SCRIPT }}
         />
+        <HomeServerProvider value={homeServer}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -165,6 +171,7 @@ export default async function RootLayout({
           </PullToRefreshProvider>
           <ServiceWorkerRegister />
         </ThemeProvider>
+        </HomeServerProvider>
       </body>
     </html>
   );

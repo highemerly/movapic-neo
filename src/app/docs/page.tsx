@@ -2,6 +2,11 @@ import type { Metadata } from "next";
 import Link from "@/components/Link";
 import { History, ChevronRight, Type, ChartColumn } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
+import { getFavorServers } from "@/lib/auth/serverPolicy";
+import {
+  PERFECT_MONTH_GRACE_DEFAULT,
+  PERFECT_MONTH_GRACE_FAVORED,
+} from "@/lib/achievements/perfectMonth";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
@@ -571,7 +576,12 @@ export default async function SpecPage() {
                 <ul className="mt-4 list-disc list-inside text-sm text-muted-foreground space-y-1">
                   <li>その月に毎日投稿することで獲得できます</li>
                   <li>1日の基準は日本標準時間の0:00~23:59です</li>
-                  <li>投稿できなかった日が月3日以下（handon.club のユーザーは月4日以下）であれば救済措置があり、同月中の後日2枚以上投稿すると、投稿できなかった日の穴埋めとして処理されます</li>
+                  <li>
+                    投稿できなかった日が月{PERFECT_MONTH_GRACE_DEFAULT}日以下
+                    {getFavorServers().length > 0 &&
+                      `（${getFavorServers().join("・")} のユーザーは月${PERFECT_MONTH_GRACE_FAVORED}日以下）`}
+                    であれば救済措置があり、同月中の後日2枚以上投稿すると、投稿できなかった日の穴埋めとして処理されます
+                  </li>
                   <li>穴埋めは古い未投稿日から1日につき1回（1日のダブル投稿で1日分）で、未来の日付や月末以降に残った未投稿日は埋められません</li>
                   <li>皆勤賞はユーザー画面のカレンダータブ・実績タブで公開され、誰でも確認できます</li>
                   <li>皆勤賞は月ごとに計算されるため、毎月獲得することができます</li>

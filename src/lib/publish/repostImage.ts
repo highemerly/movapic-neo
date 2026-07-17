@@ -16,6 +16,7 @@
 import prisma from "@/lib/db";
 import { getImage } from "@/lib/storage/storage";
 import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import {
   postImageToFediverse,
   type PublishUser,
@@ -65,7 +66,7 @@ export interface RepostResult {
 
 function buildImagePageUrl(username: string, domain: string, imageId: string): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-  return `${appUrl}/u/${userPathSegment(username, domain)}/status/${imageId}`;
+  return `${appUrl}/u/${userPathSegment(username, domain, getHomeServer())}/status/${imageId}`;
 }
 
 /**

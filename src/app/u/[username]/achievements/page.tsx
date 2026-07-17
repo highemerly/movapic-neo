@@ -8,10 +8,12 @@ import { Footer } from "@/components/Footer";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
 import { AchievementsView } from "@/components/achievements/AchievementsView";
-import { perfectMonthKey, perfectMonthGrace } from "@/lib/achievements/perfectMonth";
+import { perfectMonthKey } from "@/lib/achievements/perfectMonth";
+import { perfectMonthGrace } from "@/lib/achievements/grace";
 import { lastMonthYm, thisMonthYm } from "@/lib/achievements/lastMonthPerfect";
 import { collectLadderValues, collectCurrentMonthPerfect } from "@/lib/achievements/stats";
 import { parseUserHandle } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { userPageRobotsMetadata } from "@/lib/crawlers";
 import type { Metadata } from "next";
 
@@ -34,7 +36,9 @@ export default async function AchievementsPage({
   const { username } = await params;
   const currentUser = await getCurrentUser();
 
-  const { username: cleanUsername, domain } = parseUserHandle(username);
+  const parsed = parseUserHandle(username, getHomeServer());
+  if (!parsed) notFound();
+  const { username: cleanUsername, domain } = parsed;
 
   const user = await prisma.user.findFirst({
     where: {

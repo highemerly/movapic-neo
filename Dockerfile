@@ -36,8 +36,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 # ビルド時にダミーの環境変数を設定（ISRページのプリレンダリングをスキップするため）
 # 実際のDB接続は必要なく、Prismaクライアントの初期化だけ行われる
+# サーバーポリシー系（ALLOWED_SERVERS 等）は全ページが動的レンダリングのためビルド時には不要
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
-ENV ALLOWED_SERVERS="handon.club"
 
 RUN --mount=type=cache,target=/app/.next/cache \
     npm run build

@@ -145,29 +145,34 @@ export function PostSourceBadge({
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3 text-left text-sm">
-                <p className="text-muted-foreground">
-                  <span className="font-mono">
-                    @{botAcct}
-                    {(() => {
-                      const cmd = buildCommandOptions({
-                        position,
-                        color,
-                        size,
-                        font,
-                        arrangement,
-                      });
-                      return cmd ? ` [${cmd}]` : "";
-                    })()}
-                    {text ? ` ${text}` : ""}
-                  </span>
-                </p>
-                <p>
-                  お使いの Mastodon / Misskey アカウントから、
-                  <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-                    @{botAcct}
-                  </span>{" "}
-                  （SHAMEZO公式Bot）宛に画像・コメントを送ると、合成して再投稿できます。
-                </p>
+                {/* Bot 宛先（env）が未設定の環境ではコマンド例・宛先の再現表示を省略する */}
+                {botAcct && (
+                  <p className="text-muted-foreground">
+                    <span className="font-mono">
+                      @{botAcct}
+                      {(() => {
+                        const cmd = buildCommandOptions({
+                          position,
+                          color,
+                          size,
+                          font,
+                          arrangement,
+                        });
+                        return cmd ? ` [${cmd}]` : "";
+                      })()}
+                      {text ? ` ${text}` : ""}
+                    </span>
+                  </p>
+                )}
+                {botAcct && (
+                  <p>
+                    お使いの Mastodon / Misskey アカウントから、
+                    <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                      @{botAcct}
+                    </span>{" "}
+                    （SHAMEZO公式Bot）宛に画像・コメントを送ると、合成して再投稿できます。
+                  </p>
+                )}
               </div>
             </>
           ) : (

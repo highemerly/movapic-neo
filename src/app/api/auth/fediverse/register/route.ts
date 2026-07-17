@@ -24,20 +24,16 @@ import {
 } from "@/lib/auth/crypto";
 import { ErrorCodes, errorResponse, handleAppError, handleUnknownError } from "@/lib/errors";
 import { AppError } from "@/lib/errors/AppError";
+import {
+  getAllowedServers,
+  getDeniedServers,
+  getLoginPlatforms,
+} from "@/lib/auth/serverPolicy";
 
 const OAUTH_SESSION_COOKIE = "oauth_session";
 const OAUTH_STATE_COOKIE = "oauth_state";
 const MIAUTH_STATE_COOKIE = "miauth_state";
 const COOKIE_MAX_AGE = 10 * 60; // 10分
-
-// 許可されたサーバーリスト（カンマ区切り、空の場合は全て許可）
-function getAllowedServers(): string[] | null {
-  const allowed = process.env.ALLOWED_SERVERS;
-  if (!allowed || allowed.trim() === "") {
-    return null; // 制限なし
-  }
-  return allowed.split(",").map((s) => s.trim().toLowerCase());
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -65,8 +61,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 拒否サーバーチェック（ログイン開始のみ弾く。既存アカウントには影響しない）。
+    // インスタンス検出＝外部フェッチの前にドメインだけで判定する。
+    if (getDeniedServers().includes(normalizedServer)) {
+      return errorResponse(
+        ErrorCodes.SERVER_NOT_ALLOWED,
+        "このサーバーは現在サポートされていません",
+        403
+      );
+    }
+
     // インスタンスの種類を検出
     const instanceInfo = await detectInstanceType(normalizedServer);
+
+    // プラットフォーム許可チェック（LOGIN_PLATFORM。未設定は mastodon/misskey 両方許可）
+    if (
+      (instanceInfo.type === "mastodon" || instanceInfo.type === "misskey") &&
+      !getLoginPlatforms().has(instanceInfo.type)
+    ) {
+      const label = instanceInfo.type === "mastodon" ? "Mastodon" : "Misskey";
+      const other = instanceInfo.type === "mastodon" ? "Misskey" : "Mastodon";
+      return errorResponse(
+        ErrorCodes.SERVER_NOT_ALLOWED,
+        `${label}は現在サポートされていません`,
+        403,
+        { suggestion: `${other}のサーバーでログインしてください` }
+      );
+    }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
     if (!baseUrl) {
@@ -125,17 +146,6 @@ export async function POST(request: NextRequest) {
         server: normalizedServer,
       });
     } else if (instanceInfo.type === "misskey") {
-      // Misskey: 動作未検証のため当面ログインを無効化。
-      // 検証完了後に MISSKEY_LOGIN_ENABLED=true で再開できる。
-      if (process.env.MISSKEY_LOGIN_ENABLED !== "true") {
-        return errorResponse(
-          ErrorCodes.SERVER_NOT_ALLOWED,
-          "Misskeyは現在サポートされていません",
-          403,
-          { suggestion: "Mastodonのサーバーでログインしてください" }
-        );
-      }
-
       // Misskey: MiAuth
       const sessionId = generateMiAuthSessionId();
       const timestamp = Date.now();

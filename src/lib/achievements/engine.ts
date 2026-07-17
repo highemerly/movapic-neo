@@ -22,10 +22,10 @@ import {
 import {
   currentMonthMakeupStatus,
   daysInMonthOf,
-  perfectMonthGrace,
   perfectMonthKey,
   shouldRemindMakeup,
 } from "./perfectMonth";
+import { perfectMonthGrace } from "./grace";
 import { collectStats } from "./stats";
 
 export interface GrantCandidate {

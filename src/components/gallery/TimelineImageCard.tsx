@@ -5,6 +5,7 @@ import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
 import { RetryImg } from "@/components/RetryImg";
 import { FavoriteOverlay } from "@/components/favorite/FavoriteOverlay";
 import { userPathSegment } from "@/lib/userHandle";
+import { useHomeServer } from "@/components/HomeServerProvider";
 
 export interface TimelineCardImage {
   id: string;
@@ -45,8 +46,9 @@ export function TimelineImageCard({
   /** 画像ページへ付与する from クエリ（例: "public"）。未指定なら付けない */
   from?: string;
 }) {
+  const homeServer = useHomeServer();
   const imageUrl = `${publicUrl}/${image.storageKey}`;
-  const base = `/u/${userPathSegment(image.user.username, image.user.instance)}/status/${image.id}`;
+  const base = `/u/${userPathSegment(image.user.username, image.user.instance, homeServer)}/status/${image.id}`;
   // from は "public:<instances>" のように状態を含みうるのでエンコードする（ImageNavigation と同様）。
   const detailUrl = from ? `${base}?from=${encodeURIComponent(from)}` : base;
 

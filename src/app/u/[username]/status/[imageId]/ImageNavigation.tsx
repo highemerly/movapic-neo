@@ -1,5 +1,6 @@
 import Link from "@/components/Link";
 import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 
 interface NavImage {
   id: string;
@@ -49,7 +50,7 @@ export function ImageNavigation({
       <div className="flex-1 min-w-0">
         {prevImage ? (
           <Link
-            href={`/u/${userPathSegment(prevImage.user.username, prevImage.user.instance.domain)}/status/${prevImage.id}${queryString}`}
+            href={`/u/${userPathSegment(prevImage.user.username, prevImage.user.instance.domain, getHomeServer())}/status/${prevImage.id}${queryString}`}
             className="flex flex-col items-start gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors group"
           >
             <div className="flex items-center gap-2">
@@ -74,7 +75,7 @@ export function ImageNavigation({
       <div className="flex-1 min-w-0">
         {nextImage ? (
           <Link
-            href={`/u/${userPathSegment(nextImage.user.username, nextImage.user.instance.domain)}/status/${nextImage.id}${queryString}`}
+            href={`/u/${userPathSegment(nextImage.user.username, nextImage.user.instance.domain, getHomeServer())}/status/${nextImage.id}${queryString}`}
             className="flex flex-col items-end gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors group"
           >
             <div className="flex items-center gap-2">
