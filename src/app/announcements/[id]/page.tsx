@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import Link from "@/components/Link";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
@@ -9,49 +8,7 @@ import { getAnnouncementForDetail } from "@/lib/announcements.server";
 import { AnnouncementTypeIcon } from "@/components/announcements/AnnouncementTypeIcon";
 import { BackLink } from "@/components/BackLink";
 import { PageContainer } from "@/components/PageContainer";
-
-// [テキスト](URL) 形式のリンクをパースして React ノードに変換する
-function renderDetail(detail: string) {
-  const linkPattern = /\[([^\]]+)\]\(([^)]+)\)/g;
-  const nodes: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  let key = 0;
-
-  while ((match = linkPattern.exec(detail)) !== null) {
-    if (match.index > lastIndex) {
-      nodes.push(detail.slice(lastIndex, match.index));
-    }
-    const [, label, href] = match;
-    const isExternal = /^https?:\/\//.test(href);
-    nodes.push(
-      isExternal ? (
-        <a
-          key={key++}
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-primary underline hover:no-underline"
-        >
-          {label}
-        </a>
-      ) : (
-        <Link
-          key={key++}
-          href={href}
-          className="text-primary underline hover:no-underline"
-        >
-          {label}
-        </Link>
-      )
-    );
-    lastIndex = match.index + match[0].length;
-  }
-  if (lastIndex < detail.length) {
-    nodes.push(detail.slice(lastIndex));
-  }
-  return nodes;
-}
+import { renderInlineLinks } from "@/lib/markdownLinks";
 
 export default async function AnnouncementDetailPage({
   params,
@@ -90,7 +47,7 @@ export default async function AnnouncementDetailPage({
           </header>
 
           <div className="text-sm whitespace-pre-wrap leading-relaxed">
-            {renderDetail(announcement.detail)}
+            {renderInlineLinks(announcement.detail)}
           </div>
         </article>
 
