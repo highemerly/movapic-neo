@@ -657,7 +657,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
       }
 
       // 投稿は生成済み画像を再アップロード＝通信負荷が大きい。generate 同様にフェーズ表示。
-      // 処理側は R2→DB→Fediverse を直列実行し正当に長時間かかり得る（かつ中断は部分保存の危険が
+      // 処理側は S3→DB→Fediverse を直列実行し正当に長時間かかり得る（かつ中断は部分保存の危険が
       // あるため不可）ので processTimeout は設けず、stall(20s) のみで送信の詰まりを検知する。
       setUploadPhase("uploading");
       setUploadPct(0);

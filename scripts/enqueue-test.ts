@@ -13,7 +13,7 @@
  *     --acct alice --image https://example.com/photo.jpg \
  *     --text "やあ" --options "上 赤 大"
  *
- *   # mail 経路: ローカル画像を R2 一時領域へアップロードしてから積む
+ *   # mail 経路: ローカル画像を S3 一時領域へアップロードしてから積む
  *   npx tsx scripts/enqueue-test.ts email \
  *     --user <userId> --file ./sample.jpg \
  *     --text "やあ" --position top --color red --size large
@@ -22,7 +22,7 @@
  *   - --acct / --user はローカルDBに存在する登録ユーザーを指す必要がある。
  *   - 実投稿を避けたい場合は、対象ユーザーの defaultVisibility を "local" にしておく
  *     （local は Fediverse 投稿をスキップする）。それ以外は実際に投稿される。
- *   - 必要な env: DATABASE_URL（mention/email 共通）, S3/R2 一式（publishImage の保存と email の元画像）。
+ *   - 必要な env: DATABASE_URL（mention/email 共通）, S3 一式（publishImage の保存と email の元画像）。
  *     .env.local → .env の順で読み込む。
  */
 
@@ -127,7 +127,7 @@ async function runEmail(): Promise<void> {
           ? "image/heic"
           : "image/jpeg";
 
-  // producer と同じく R2 一時領域へ元画像を置く
+  // producer と同じく S3 一時領域へ元画像を置く
   const sourceStorageKey = `tmp/email/test-${randomUUID()}.${ext}`;
   await uploadImage(buf, sourceStorageKey, contentType);
 

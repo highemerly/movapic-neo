@@ -1,8 +1,7 @@
 /**
  * S3互換ストレージクライアント
  *
- * S3_* 環境変数を優先し、未設定の場合は従来の R2_* / CF_ACCOUNT_ID にフォールバックする。
- * 対応: Cloudflare R2 / AWS S3 / その他のS3互換ストレージ。
+ * S3_* 環境変数で設定する（AWS S3 / MinIO などのS3互換ストレージ）。
  */
 
 import {
@@ -20,16 +19,11 @@ function resolveEndpoint(): string {
   if (endpoint) {
     return endpoint;
   }
-  // R2 フォールバック: CF_ACCOUNT_ID からエンドポイントを構築
-  const accountId = process.env.CF_ACCOUNT_ID;
-  if (accountId) {
-    return `https://${accountId}.r2.cloudflarestorage.com`;
-  }
-  throw new Error("S3_ENDPOINT (or CF_ACCOUNT_ID for R2) is not configured");
+  throw new Error("S3_ENDPOINT is not configured");
 }
 
 function resolveBucketName(): string {
-  const bucketName = process.env.S3_BUCKET_NAME ?? process.env.R2_BUCKET_NAME;
+  const bucketName = process.env.S3_BUCKET_NAME;
   if (!bucketName) {
     throw new Error("S3_BUCKET_NAME is not configured");
   }
@@ -41,10 +35,8 @@ function getS3Client(): S3Client {
     return s3Client;
   }
 
-  const accessKeyId =
-    process.env.S3_ACCESS_KEY_ID ?? process.env.R2_ACCESS_KEY_ID;
-  const secretAccessKey =
-    process.env.S3_SECRET_ACCESS_KEY ?? process.env.R2_SECRET_ACCESS_KEY;
+  const accessKeyId = process.env.S3_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
   const region = process.env.S3_REGION ?? "auto";
 
   if (!accessKeyId || !secretAccessKey) {
@@ -92,7 +84,7 @@ export function generateThumbnailKey(storageKey: string): string {
  * 末尾スラッシュを正規化した公開URLのベース部分を取得
  */
 export function getPublicUrlBase(): string {
-  const publicUrl = process.env.S3_PUBLIC_URL ?? process.env.R2_PUBLIC_URL;
+  const publicUrl = process.env.S3_PUBLIC_URL;
   if (!publicUrl) {
     throw new Error("S3_PUBLIC_URL is not configured");
   }

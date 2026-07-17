@@ -2,7 +2,7 @@
  * メール取り込みエンドポイント（producer）
  * POST /api/v1/ingest/email
  *
- * Cloudflare Workerから転送されたraw emailを受け取り、元画像をR2一時領域へ置いて
+ * Cloudflare Workerから転送されたraw emailを受け取り、元画像をS3一時領域へ置いて
  * Graphile Worker に enqueue するだけ。文字入れ〜投稿は worker(consumer) 側で実行。
  */
 
@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 元画像を R2 一時領域へ保存し、文字入れ〜投稿は worker に委譲する（producer は受付のみ）。
+    // 元画像を S3 一時領域へ保存し、文字入れ〜投稿は worker に委譲する（producer は受付のみ）。
     const ext = contentType.split("/")[1]?.replace(/[^a-z0-9]/gi, "") || "bin";
     const sourceStorageKey = `tmp/email/${randomUUID()}.${ext}`;
     await uploadImage(parsed.image.buffer, sourceStorageKey, parsed.image.contentType);

@@ -4,7 +4,7 @@
  *
  * body: { action: "disable" | "delete" | "dismiss" }
  * - disable: 画像を非表示（isDisabled=true）にし、未対応通報を resolved にする
- * - delete:  画像を完全削除（R2 + DB）。通報は cascade で消える
+ * - delete:  画像を完全削除（S3 + DB）。通報は cascade で消える
  * - dismiss: 未対応通報を dismissed にする（画像は不変）
  *
  * 管理者以外には存在を隠すため 404 を返す。
@@ -61,14 +61,14 @@ export async function POST(
     }
 
     if (action === "delete") {
-      // R2から削除（元画像とサムネイル）。失敗してもDB削除は続行（既存の削除フローと同方針）
+      // S3から削除（元画像とサムネイル）。失敗してもDB削除は続行（既存の削除フローと同方針）
       try {
         await deleteImage(image.storageKey);
         if (image.thumbnailKey) {
           await deleteImage(image.thumbnailKey);
         }
       } catch (error) {
-        console.error("[moderate] R2削除に失敗:", error);
+        console.error("[moderate] S3削除に失敗:", error);
       }
       // 通報は onDelete: Cascade で消える
       await prisma.image.delete({ where: { id: imageId } });

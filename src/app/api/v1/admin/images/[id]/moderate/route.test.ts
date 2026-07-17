@@ -110,7 +110,7 @@ describe("POST moderate: 管理者の操作", () => {
     );
   });
 
-  it("delete は R2（本画像＋サムネ）とDBレコードを削除", async () => {
+  it("delete は S3（本画像＋サムネ）とDBレコードを削除", async () => {
     const res = await POST(req("delete"), ctx);
     expect(res.status).toBe(200);
     expect(mockDeleteImage).toHaveBeenCalledWith("2026/1/1/key");

@@ -51,10 +51,7 @@ next-env.d.ts
 /workers/**/node_modules/
 /workers/**/package-lock.json
 
-# OpenNext
-.open-next
-
-# wrangler files
+# wrangler files (workers/email-forwarder)
 .wrangler
 .dev.vars*
 !.dev.vars.example

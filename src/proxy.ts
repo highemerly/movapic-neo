@@ -115,7 +115,7 @@ export async function proxy(request: NextRequest) {
 
   // Content-Security-Policy
   const mediaProxyOrigin = process.env.MEDIA_PROXY_BASE_URL ?? "";
-  const storagePublicOrigin = (process.env.S3_PUBLIC_URL ?? process.env.R2_PUBLIC_URL ?? "").replace(/\/$/, "");
+  const storagePublicOrigin = (process.env.S3_PUBLIC_URL ?? "").replace(/\/$/, "");
   const isDev = process.env.NODE_ENV === "development";
   const csp = [
     "default-src 'self'",

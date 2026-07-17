@@ -157,11 +157,7 @@ export default async function UserMapPage({
     total++;
   }
 
-  const publicUrl = (
-    process.env.S3_PUBLIC_URL ||
-    process.env.R2_PUBLIC_URL ||
-    ""
-  ).replace(/\/+$/, "");
+  const publicUrl = (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
 
   // ?prefecture=○○ が指定されていればその都道府県の画像一覧を取得
   const selectedPrefecture =

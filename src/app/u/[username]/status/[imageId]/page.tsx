@@ -77,7 +77,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: "画像が見つかりません", robots: { index: false } };
   }
 
-  const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
+  const publicUrl = (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
   const imageUrl = `${publicUrl}/${image.storageKey}`;
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
   const pageUrl = `${appUrl}/u/${username}/status/${imageId}`;
@@ -295,7 +295,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     resolveAchievement(a.key, a.category)
   );
 
-  const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
+  const publicUrl = (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
   const imageUrl = `${publicUrl}/${image.storageKey}`;
 
   // 自分の画像かどうか

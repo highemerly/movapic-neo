@@ -84,7 +84,7 @@ const getFeaturedImages = unstable_cache(
 
 export default async function HomePage() {
   const allowedServers = getAllowedServers();
-  const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
+  const publicUrl = (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
 
   // ログイン状態は DB照合（getCurrentUser）で判定する。
   // トップページはログイン導線の着地点なので、ここだけは JWT を信用せず

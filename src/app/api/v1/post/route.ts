@@ -1,5 +1,5 @@
 /**
- * 画像をR2に保存してFediverseに投稿するAPI
+ * 画像をS3に保存してFediverseに投稿するAPI
  * POST /api/v1/post
  */
 
@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
     const imageBuffer = Buffer.from(await imageBlob.arrayBuffer());
 
     // compute で実フォーマット検出＋寸法＋サムネを取得（クライアント送信の mimeType は信任しない）。
-    // R2 が任意の Content-Type で任意コンテンツを配信することを防ぐため、
+    // S3 が任意の Content-Type で任意コンテンツを配信することを防ぐため、
     // /api/v1/generate の出力形式 (JPEG/AVIF) のみ許可する。
     let finalized;
     try {

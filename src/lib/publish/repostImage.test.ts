@@ -132,7 +132,7 @@ describe("repostImage", () => {
     expect(postImageToFediverse).not.toHaveBeenCalled();
   });
 
-  it("R2に画像本体が無ければ no_image_data", async () => {
+  it("S3に画像本体が無ければ no_image_data", async () => {
     findUnique.mockResolvedValue(baseImage());
     getImage.mockResolvedValue(null);
     expect(await call()).toEqual({ ok: false, failure: "no_image_data" });

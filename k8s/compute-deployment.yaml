@@ -8,7 +8,7 @@
 #   - 全 pod「同一イメージ」。COMPONENT_ROLE=compute で起動時に役割を確定。
 #     middleware が /api/internal/* と /api/health 以外を 404 にする（多層防御）。
 #   - 外部 Ingress を持たない（ClusterIP のみ）。worker-front からのみ NetworkPolicy で許可。
-#   - 秘密情報を一切持たない: DB/R2/Fediverse/JWT の env は渡さず、COMPUTE_API_KEY のみ。
+#   - 秘密情報を一切持たない: DB/S3/Fediverse/JWT の env は渡さず、COMPUTE_API_KEY のみ。
 #   - 画像処理（libvips/skia）のため CPU/メモリは厚め。負荷に応じて replicas を増やす。
 # =============================================================================
 apiVersion: apps/v1

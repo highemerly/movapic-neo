@@ -35,7 +35,7 @@ export type PrefectureMapData = Record<string, PrefectureEntry>;
 
 interface PrefectureHeatmapProps {
   data: PrefectureMapData;
-  /** R2/S3 public bucket のベースURL。サムネイル参照に使う */
+  /** S3 public bucket のベースURL。サムネイル参照に使う */
   publicUrl: string;
   /** 投稿者のusername（クリック時の遷移先URLに使う） */
   username: string;

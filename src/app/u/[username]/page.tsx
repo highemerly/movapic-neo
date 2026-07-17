@@ -65,11 +65,7 @@ export async function generateMetadata({
   if (!user) return robots;
 
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
-  const publicUrl = (
-    process.env.S3_PUBLIC_URL ||
-    process.env.R2_PUBLIC_URL ||
-    ""
-  ).replace(/\/+$/, "");
+  const publicUrl = (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
   const name = user.displayName || user.username;
   const handle = `${user.username}@${user.instance.domain}`;
   const cardTitle = `${name} | SHAMEZO`;
@@ -141,11 +137,7 @@ export default async function UserHomePage({ params, searchParams }: UserHomePag
   }
 
   const seg = userPathSegment(cleanUsername, user.instance.domain);
-  const publicUrl = (
-    process.env.S3_PUBLIC_URL ||
-    process.env.R2_PUBLIC_URL ||
-    ""
-  ).replace(/\/+$/, "");
+  const publicUrl = (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
 
   // フィードカードに必要な列（実画像＋タイルクロップ用の位置/サイズ・投稿日・カメラ/位置・お気に入り）。
   const feedSelect = {

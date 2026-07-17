@@ -83,7 +83,7 @@ export default async function DashboardPage() {
   const totalFavorites = favoritesAgg._sum.favoriteCount ?? 0;
   // 直近20投稿からランダムに最大5枚（モバイル4列/PC5列。5枚目はモバイルでは非表示）
   const previewImages = pickRandomSample(recentPublicImages, 5);
-  const publicUrl = (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
+  const publicUrl = (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
 
   // Bot／メール投稿の設定値（env）は postMethods ヘルパーに集約。
   const botAcct = getBotAcct();

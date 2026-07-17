@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
  * 注意事項は専用ページ（/settings/delete）側に常時表示し、
  * このコンポーネントは「削除に進む」ボタンと、操作ミス防止の
  * type to delete（アカウント名@サーバー名の完全一致）モーダルを担う。
- * 削除は即時にDB側が反映されログアウトされる（R2画像の削除のみ裏で続行）。
+ * 削除は即時にDB側が反映されログアウトされる（S3画像の削除のみ裏で続行）。
  */
 export function DeleteAccountConfirm({
   username,

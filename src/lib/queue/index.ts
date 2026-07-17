@@ -94,7 +94,7 @@ export async function enqueueReportNotification(
   });
 }
 
-/** アカウント削除に伴う R2 後始末ジョブを enqueue。userId で dedup（二重投入を防ぐ）。 */
+/** アカウント削除に伴う S3 後始末ジョブを enqueue。userId で dedup（二重投入を防ぐ）。 */
 export async function enqueueDeleteAccount(
   payload: DeleteAccountPayload
 ): Promise<void> {

@@ -283,7 +283,7 @@ function buildImagePageUrl(username: string, domain: string, imageId: string): s
 }
 
 /**
- * 画像をR2へ保存し、サムネイルを生成し、DBにImageレコードを作成する。
+ * 画像をS3へ保存し、サムネイルを生成し、DBにImageレコードを作成する。
  * Fediverse投稿は行わない（postUrl/postId は引数で受け取り保存する）。
  */
 async function storeAndRecord(
@@ -296,10 +296,10 @@ async function storeAndRecord(
   const storageKey = generateStorageKey(imageId, extension);
   const filename = `movapic-${imageId}.${extension}`;
 
-  // 本体をR2へ
+  // 本体をS3へ
   await uploadImage(input.buffer, storageKey, input.contentType);
 
-  // サムネ＋寸法は compute から取得（保存直前にだけ呼ぶ）→ R2へ
+  // サムネ＋寸法は compute から取得（保存直前にだけ呼ぶ）→ S3へ
   const thumbnailKey = generateThumbnailKey(storageKey);
   const { thumbnail, width, height, blurDataUrl } =
     await input.getThumbnailAndDimensions();

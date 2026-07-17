@@ -6,7 +6,7 @@
  * postId=null で区別がつかないため、postId の有無だけを対象条件にする。
  *
  * publishImage（新規レコード作成前提）とは責務が違うので流用しない。ここは
- * 「R2 の保存済み最終画像を取得 → 投稿 → 既存レコードの postUrl/postId を更新」に特化する。
+ * 「S3 の保存済み最終画像を取得 → 投稿 → 既存レコードの postUrl/postId を更新」に特化する。
  * 投稿部分（リトライ込み）だけ postImageToFediverse を共有する。
  *
  * 実績は初回保存時に付与済み（web/email は投稿成否に関係なく付与）なので再評価しない。
@@ -103,7 +103,7 @@ export async function repostImage(params: {
     return { ok: false, failure: "too_old" };
   }
 
-  // 保存済みの最終画像（文字入れ済み）を R2 から取得。再レンダリングは不要。
+  // 保存済みの最終画像（文字入れ済み）を S3 から取得。再レンダリングは不要。
   const buffer = await getImage(image.storageKey);
   if (!buffer) return { ok: false, failure: "no_image_data" };
 

@@ -3,7 +3,7 @@
  *
  * worker-front 側のコード（generate/post route, queue tasks, mention processor）は
  * sharp/skia を直接呼ばず、本クライアント経由で compute に処理を委譲する。
- * compute はステートレス（バイト入出力のみ・R2/DBに触れない）。
+ * compute はステートレス（バイト入出力のみ・S3/DBに触れない）。
  */
 
 import type { ProcessImageResult } from "@/lib/image";

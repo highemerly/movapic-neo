@@ -22,7 +22,7 @@ type ImageMeta = {
 };
 
 /**
- * 画像メタデータから、R2 に保存して良い Content-Type を返す。
+ * 画像メタデータから、S3 に保存して良い Content-Type を返す。
  * /api/v1/generate の出力（JPEG / AVIF）のみ許可。
  * sharp 0.30+ は AVIF を format='heif', compression='av1' として返す（libheif 経由）。
  */

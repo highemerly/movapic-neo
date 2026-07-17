@@ -5,7 +5,7 @@
  * 「即ログアウト＋裏で削除」方式:
  *  - DB のユーザー削除は同期的に行う（カスケードで Image/Notification/Achievement/
  *    LoginSession/Report も即消える＝全一覧・プロフィールから即時消滅、全セッション無効化）。
- *  - 遅い R2 オブジェクト削除だけをバックグラウンドジョブに逃がす。
+ *  - 遅い S3 オブジェクト削除だけをバックグラウンドジョブに逃がす。
  *  - 操作ミス防止のため、確認入力（アカウント名 = username）の完全一致を必須にする（type to delete）。
  */
 
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ユーザー削除後はカスケードで Image も消えてキーを取得できなくなるため、
-    // 先に R2 から削除すべき全オブジェクトキー（出力画像＋サムネイル）を集める。
+    // 先に S3 から削除すべき全オブジェクトキー（出力画像＋サムネイル）を集める。
     const images = await prisma.image.findMany({
       where: { userId: user.id },
       select: { storageKey: true, thumbnailKey: true },
@@ -52,13 +52,13 @@ export async function POST(request: NextRequest) {
     // 現在のセッション Cookie も破棄（即ログアウト）
     await deleteSessionCookie();
 
-    // 遅い R2 削除はバックグラウンドへ。enqueue が失敗しても
+    // 遅い S3 削除はバックグラウンドへ。enqueue が失敗しても
     // アカウント削除自体は成立済み（孤立オブジェクトが残るだけ）なので致命的ではない。
     try {
       await enqueueDeleteAccount({ userId: user.id, storageKeys });
     } catch (e) {
       console.error(
-        "[delete-account] R2削除ジョブの enqueue に失敗（孤立オブジェクトが残る可能性）:",
+        "[delete-account] S3削除ジョブの enqueue に失敗（孤立オブジェクトが残る可能性）:",
         e
       );
     }

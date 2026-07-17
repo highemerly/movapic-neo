@@ -46,7 +46,7 @@ spec:
             # compute サービスへの内部呼び出し先（ClusterIP）。
             - name: COMPUTE_SERVICE_URL
               value: "http://movapic-neo-compute"
-          # DATABASE_URL / R2(S3) 資格情報 / 暗号化キー / NEXT_PUBLIC_APP_URL /
+          # DATABASE_URL / S3 資格情報 / 暗号化キー / NEXT_PUBLIC_APP_URL /
           # MASTODON_BOT_*（botリプライ用）/ COMPUTE_API_KEY など、web と同じ env を共有する。
           envFrom:
             - secretRef:

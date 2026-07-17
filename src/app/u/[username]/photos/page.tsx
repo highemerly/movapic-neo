@@ -112,11 +112,7 @@ export default async function UserGalleryPage({
     },
   });
 
-  const publicUrl = (
-    process.env.S3_PUBLIC_URL ||
-    process.env.R2_PUBLIC_URL ||
-    ""
-  ).replace(/\/+$/, "");
+  const publicUrl = (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
 
   // ヘッダーのアバター王冠用（皆勤賞判定）
   const perfectAttendance = await hasRecentPerfectAttendance(user.id);

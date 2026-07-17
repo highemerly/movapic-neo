@@ -69,7 +69,7 @@ export async function getSystemInfo(): Promise<SystemInfo> {
     { name: "Prisma", version: declared("@prisma/client") },
     { name: "sharp（画像処理）", version: declared("sharp") },
     { name: "pg（DBドライバ）", version: declared("pg") },
-    { name: "AWS SDK（S3/R2）", version: declared("@aws-sdk/client-s3") },
+    { name: "AWS SDK（S3）", version: declared("@aws-sdk/client-s3") },
   ];
 
   return {

@@ -38,7 +38,7 @@ export interface NotificationFeedItem {
 }
 
 function publicBase(): string {
-  return (process.env.S3_PUBLIC_URL || process.env.R2_PUBLIC_URL || "").replace(/\/+$/, "");
+  return (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
 }
 
 /**

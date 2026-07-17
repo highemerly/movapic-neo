@@ -59,7 +59,7 @@ export interface ProcessEmailPayload {
     /** 件名コマンドで指定された位置情報の保存範囲（none=保存しない） */
     locationOption: "none" | "pref" | "city";
   };
-  /** producer が R2 一時領域にアップロードした元画像のキー */
+  /** producer が S3 一時領域にアップロードした元画像のキー */
   sourceStorageKey: string;
   sourceContentType: string;
 }
@@ -71,7 +71,7 @@ export interface NotifyReportPayload {
 export interface DeleteAccountPayload {
   /** 削除済みユーザーのID（ログ用。enqueue 時点で DB からは既に削除済み） */
   userId: string;
-  /** R2 から削除する全オブジェクトキー（出力画像＋サムネイル） */
+  /** S3 から削除する全オブジェクトキー（出力画像＋サムネイル） */
   storageKeys: string[];
 }
 
@@ -88,7 +88,7 @@ const processMentionTask: Task = async (payload) => {
 
 /**
  * mail 投稿処理。
- * producer が R2 一時領域に保存した元画像を取得し、文字入れ→保存→投稿する。
+ * producer が S3 一時領域に保存した元画像を取得し、文字入れ→保存→投稿する。
  */
 const processEmailTask: Task = async (payload) => {
   const p = payload as ProcessEmailPayload;
@@ -246,10 +246,10 @@ const notifyReportTask: Task = async (payload) => {
 };
 
 /**
- * アカウント削除に伴う Object Storage（R2）の後始末。
+ * アカウント削除に伴う Object Storage（S3）の後始末。
  * DB のユーザー削除は API リクエスト側で同期的に完了済み（カスケードで関連行も消える）。
- * 遅いのは R2 オブジェクトの逐次削除なので、その部分だけをこのジョブに逃がす。
- * 既に存在しないキーや R2 一時障害は致命的ではないため、キー単位で握りつぶして続行する
+ * 遅いのは S3 オブジェクトの逐次削除なので、その部分だけをこのジョブに逃がす。
+ * 既に存在しないキーや S3 一時障害は致命的ではないため、キー単位で握りつぶして続行する
  * （孤立オブジェクトが多少残ってもアカウント削除自体は成立済み）。
  */
 const deleteAccountTask: Task = async (payload) => {
@@ -261,12 +261,12 @@ const deleteAccountTask: Task = async (payload) => {
       await deleteImage(key);
       deleted++;
     } catch (e) {
-      console.error(`[delete-account] R2削除に失敗: ${key}`, e);
+      console.error(`[delete-account] S3削除に失敗: ${key}`, e);
     }
   }
 
   console.log(
-    `[delete-account] user=${p.userId} R2オブジェクト ${deleted}/${p.storageKeys.length} 件を削除`
+    `[delete-account] user=${p.userId} S3オブジェクト ${deleted}/${p.storageKeys.length} 件を削除`
   );
 };
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-// 境界を全てモック（DB / R2 / Fediverse / compute / 逆ジオコーディングを読ませない）。
+// 境界を全てモック（DB / S3 / Fediverse / compute / 逆ジオコーディングを読ませない）。
 vi.mock("@/lib/auth/session", () => ({ getCurrentUserWithValidation: vi.fn() }));
 vi.mock("@/lib/postRateLimit", () => ({ checkPostRateLimit: vi.fn() }));
 vi.mock("@/lib/auth/tokens", () => ({ decryptToken: vi.fn((t: string) => `dec:${t}`) }));

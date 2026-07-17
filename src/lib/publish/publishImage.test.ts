@@ -7,7 +7,7 @@
  * かつて後者の分岐にだけ altText を渡し忘れ、「DBには入るが投稿には反映されない」
  * という不具合が出た。両分岐とも postToMastodon/postToMisskey に altText を渡すことを検証する。
  *
- * ネットワーク（fediverse/post）・R2（storage）・prisma・実績評価はすべてモックする。
+ * ネットワーク（fediverse/post）・S3（storage）・prisma・実績評価はすべてモックする。
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";

@@ -7,7 +7,7 @@ import { useCallback, useSyncExternalStore } from "react";
 export const FORCE_SHOW_NATIVE_SHARE = false;
 
 export interface NativeShareParams {
-  /** 共有する生成画像のURL（R2公開URL） */
+  /** 共有する生成画像のURL（S3公開URL） */
   imageUrl: string;
   /** 画像のMIME（拡張子推定とFile生成に使用） */
   mimeType: string;

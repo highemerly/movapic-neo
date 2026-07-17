@@ -57,11 +57,7 @@ export default async function CalendarPage({
     notFound();
   }
 
-  const publicUrl = (
-    process.env.S3_PUBLIC_URL ||
-    process.env.R2_PUBLIC_URL ||
-    ""
-  ).replace(/\/+$/, "");
+  const publicUrl = (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
 
   // クエリパラメータまたは現在の年月を使用
   // 初期表示月は必ず JST 基準。サーバーローカルTZ（本番=UTC）だと JST 00:00〜09:00 に
