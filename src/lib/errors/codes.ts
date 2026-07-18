@@ -35,6 +35,10 @@ export const ErrorCodes = {
   // 内部エラー
   INTERNAL_ERROR: "INTERNAL_ERROR",
   IMAGE_PROCESS_FAILED: "IMAGE_PROCESS_FAILED",
+
+  // 連合投稿（ユーザーのアクセストークンでの投稿）が 401/403 で拒否された。
+  // ユーザーが再ログインしない限り再試行しても直らない恒久的エラー。
+  FEDIVERSE_AUTH_FAILED: "FEDIVERSE_AUTH_FAILED",
 } as const;
 
 export type ErrorCode = (typeof ErrorCodes)[keyof typeof ErrorCodes];

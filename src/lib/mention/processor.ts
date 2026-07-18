@@ -20,6 +20,7 @@ import {
 import { countGraphemes } from "@/lib/text/grapheme";
 import { getSeasonByKey } from "@/lib/seasons/catalog";
 import { ErrorCodes } from "@/lib/errors";
+import { failureAdvice } from "@/lib/fediverse/failureAdvice";
 import { USER_AGENT } from "@/lib/userAgent";
 import { assertSafeRemoteUrl } from "@/lib/security/ssrf";
 import { resolveAchievement } from "@/lib/achievements/catalog";
@@ -287,13 +288,21 @@ export async function processOneMention(
   const options: ParsedMentionOptions = parsed.options;
   const text = parsed.text;
 
-  // エラーハンドリング用のヘルパー（ユーザー検索後のエラー用）
-  const handleError = async (errorCode: string, errorMessage: string, withRequestId: boolean = false) => {
+  // エラーハンドリング用のヘルパー（ユーザー検索後のエラー用）。
+  // permanent=true は「再試行しても直らない恒久的エラー（連携失効など）」。即時 failed にして
+  // mention-poll の自動リトライ対象から外す（リトライしても同じ失敗リプライが重複するだけのため）。
+  const handleError = async (
+    errorCode: string,
+    errorMessage: string,
+    withRequestId: boolean = false,
+    opts: { permanent?: boolean } = {}
+  ) => {
     await prisma.processedMention.update({
       where: { statusId },
       data: {
         retryCount: { increment: 1 },
         errorCode,
+        ...(opts.permanent ? { status: "failed" as const } : {}),
       },
     });
     const message = withRequestId && requestId
@@ -463,7 +472,19 @@ export async function processOneMention(
 
   if (published.postError) {
     console.error(`[mention] 再投稿失敗: ${published.postError}`);
-    return handleError(ErrorCodes.INTERNAL_ERROR, "投稿に失敗しました。再投稿してみてください。", true);
+    // HTTPステータスから原因と対処を推定してリプライする（Webのトーストと共通ロジック）。
+    // 連携失効（401/403）は再ログインしないと直らないため、リトライせず打ち切る。
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+    const advice = failureAdvice(user.instance.domain, published.postErrorStatus, {
+      retry: "しばらく待ってから、もう一度メンションしてください。",
+      relogin: `SHAMEZO${appUrl ? `（${appUrl}）` : ""}に再ログインしてから、もう一度メンションしてください。`,
+    });
+    return handleError(
+      advice.authFailure ? ErrorCodes.FEDIVERSE_AUTH_FAILED : ErrorCodes.INTERNAL_ERROR,
+      `投稿できませんでした。${advice.explanation}。\n${advice.suggestion}`,
+      true,
+      { permanent: advice.authFailure }
+    );
   }
 
   const imageId = published.imageId;
