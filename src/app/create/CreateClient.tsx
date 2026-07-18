@@ -697,6 +697,12 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
         }
       }
 
+      // 投稿は fetch(API) 経由のミューテーションなので、このままだとクライアントの
+      // Router Cache が無効化されず、プリフェッチ済み（tab prefetch=static 5分寿命）の
+      // 実績/プロフィールページを開くと投稿前の古いRSCが表示される（「次のステップ」等がstale）。
+      // 遷移前に refresh してキャッシュ全体を無効化し、遷移先で最新を取り直す。
+      router.refresh();
+
       // 投稿後、詳細ページにリダイレクト（直後の完了メッセージ用に posted=1 を付与）。
       // SHAMEZOへの保存は成功しているので、Fediverse投稿だけ失敗した場合も遷移する
       // （＝保存物を見せて重複投稿を防ぐ）。連合投稿の失敗は federr=1 で警告表示させる。
