@@ -10,10 +10,15 @@ export interface FavoriterAvatarItem {
   profileUrl: string | null;
 }
 
-// アイコン w-5(20px) ＋ gap-1(4px)。末尾の「…」は概ね12px想定で確保する。
-const AVATAR = 20;
+// gap-1(4px)。末尾の「…」は概ね12px想定で確保する。アイコンはサイズにより 20/24px。
 const GAP = 4;
 const ELLIPSIS_W = 12;
+
+// 実測用の px 値と Tailwind クラスは同じ値を指す必要があるため対で持つ。
+const SIZE = {
+  sm: { px: 20, className: "h-5 w-5" },
+  md: { px: 24, className: "h-6 w-6" },
+} as const;
 
 /**
  * お気に入りした人のアイコンを、コンテナ幅に「丸ごと入る数」だけ表示する。
@@ -22,10 +27,17 @@ const ELLIPSIS_W = 12;
  * マウント後に実幅を測り、はみ出す分は描かず末尾に「…」を出す。幅はカードのレイアウトで
  * 変わりうるので ResizeObserver で追従する。総数は左のハート数字が示すのでここでは出さない。
  */
-export function FavoriterAvatars({ items }: { items: FavoriterAvatarItem[] }) {
+export function FavoriterAvatars({
+  items,
+  size = "sm",
+}: {
+  items: FavoriterAvatarItem[];
+  size?: keyof typeof SIZE;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   // SSR とクライアント初回描画を一致させるため初期値は全件（マウント後に実測で絞る）。
   const [visible, setVisible] = useState(items.length);
+  const { px: AVATAR, className: avatarClass } = SIZE[size];
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -46,7 +58,7 @@ export function FavoriterAvatars({ items }: { items: FavoriterAvatarItem[] }) {
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [items.length]);
+  }, [items.length, AVATAR]);
 
   const shown = items.slice(0, visible);
   const truncated = visible < items.length;
@@ -61,10 +73,10 @@ export function FavoriterAvatars({ items }: { items: FavoriterAvatarItem[] }) {
           <RetryImg
             src={f.avatarUrl}
             alt={f.label}
-            className="h-5 w-5 rounded-full hover:opacity-80 transition-opacity"
+            className={`${avatarClass} rounded-full hover:opacity-80 transition-opacity`}
           />
         ) : (
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-muted-foreground/20 text-[10px] text-muted-foreground hover:opacity-80 transition-opacity">
+          <div className={`flex ${avatarClass} items-center justify-center rounded-full bg-muted-foreground/20 text-[10px] text-muted-foreground hover:opacity-80 transition-opacity`}>
             {f.label.charAt(0)}
           </div>
         );
