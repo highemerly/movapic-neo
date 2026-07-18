@@ -37,6 +37,8 @@ function getErrorMessage(code: string): string {
       return "認証セッションが無効です。もう一度お試しください";
     case "auth_failed":
       return "認証に失敗しました。もう一度お試しください";
+    case "app_invalid":
+      return "サーバーとの連携情報が無効になっていました。もう一度ログインをお試しください";
     default:
       return "ログイン中にエラーが発生しました。もう一度お試しください";
   }

@@ -17,6 +17,7 @@ import {
 } from "@/lib/auth/crypto";
 import { resolveLoginRedirect } from "@/lib/auth/loginRedirect";
 import { encryptToken } from "@/lib/auth/tokens";
+import { clearMastodonAppCredentials } from "@/lib/auth/mastodonApp";
 import { createSession, getCurrentUser } from "@/lib/auth/session";
 import { extractLoginRequestInfo } from "@/lib/auth/requestInfo";
 import prisma from "@/lib/db";
@@ -98,13 +99,25 @@ export async function GET(request: NextRequest) {
     const redirectUri = `${baseUrl}/api/auth/fediverse/callback/mastodon`;
 
     // トークン取得
-    const tokenResponse = await exchangeMastodonCode(
-      server,
-      clientId,
-      clientSecret,
-      code,
-      redirectUri
-    );
+    let tokenResponse;
+    try {
+      tokenResponse = await exchangeMastodonCode(
+        server,
+        clientId,
+        clientSecret,
+        code,
+        redirectUri
+      );
+    } catch (e) {
+      // 保存済みアプリ（Instance に再利用のため保存）がインスタンス側で削除・失効していると
+      // invalid_client になる。保存値を破棄し、次回ログインで再登録させる。
+      if (e instanceof Error && e.message.includes("invalid_client")) {
+        console.warn(`[oauth] ${server} のアプリ資格情報が invalid_client のため破棄して再登録を促す`);
+        await clearMastodonAppCredentials(server);
+        return NextResponse.redirect(new URL("/?error=app_invalid", baseUrl));
+      }
+      throw e;
+    }
 
     // ユーザー情報取得
     const account = await getMastodonAccount(server, tokenResponse.accessToken);

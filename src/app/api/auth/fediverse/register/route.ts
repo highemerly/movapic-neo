@@ -11,10 +11,10 @@ import { cookies } from "next/headers";
 import {
   detectInstanceType,
   normalizeServer,
-  registerMastodonApp,
   getMastodonAuthorizationUrl,
   getMisskeyAuthorizationUrl,
 } from "@/lib/auth/fediverse";
+import { getOrRegisterMastodonApp } from "@/lib/auth/mastodonApp";
 import {
   encryptOAuthSession,
   generateOAuthState,
@@ -97,9 +97,10 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies();
 
     if (instanceInfo.type === "mastodon") {
-      // Mastodon: 動的クライアント登録
+      // Mastodon: インスタンス単位で登録済みアプリを再利用（無ければ動的クライアント登録して保存）。
+      // 毎回新規登録すると「認証済みアプリ」一覧に SHAMEZO が量産されるため。
       const redirectUri = `${baseUrl}/api/auth/fediverse/callback/mastodon`;
-      const appCredentials = await registerMastodonApp(normalizedServer, redirectUri);
+      const appCredentials = await getOrRegisterMastodonApp(normalizedServer, redirectUri);
 
       // OAuthセッションデータを暗号化してクッキーに保存
       const sessionData: OAuthSessionData = {

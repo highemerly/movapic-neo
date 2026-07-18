@@ -10,13 +10,21 @@ datasource db {
 }
 
 // インスタンス（Mastodon/Misskeyサーバー）
-// 動的クライアント登録のため、client_id/secretはDBに保存しない
 model Instance {
   id        String   @id @default(uuid())
   domain    String   @unique @db.VarChar(511)
   type      String   @db.VarChar(20) // "mastodon" | "misskey"
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Mastodon 動的クライアント登録の資格情報（encryptToken で AES-256-GCM 暗号化して保存）。
+  // ログインのたびに新規アプリを登録すると、ユーザーの「認証済みアプリ」一覧に
+  // SHAMEZO が量産されるため、インスタンス単位で登録済みアプリを再利用する。
+  // appRedirectUri は登録時の redirect_uri（平文）。NEXT_PUBLIC_APP_URL の変更で
+  // 不一致になると認可が通らなくなるため、検知して再登録するのに使う。Misskey(MiAuth)では未使用。
+  clientId       String? @map("client_id")
+  clientSecret   String? @map("client_secret")
+  appRedirectUri String? @map("app_redirect_uri") @db.VarChar(1024)
 
   users User[]
 
