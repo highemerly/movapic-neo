@@ -80,19 +80,20 @@ export async function createTextOverlay(
     // tanzaku は上部に「穴＋紐」のための余白が要る。obake は不要（0）。
     const topInset = seasonDef.decoration === "tanzaku" ? fontSize * 1.7 : 0;
     drawSeasonBackground(ctx, seasonDef.decoration, text, width, height, fontSize, margin, topInset);
-    if (seasonDef.decoration === "tanzaku") {
-      // マジックで書いたような、ほんの少しのにじみ（同色・オフセット0の弱い影）。
-      ctx.shadowColor = "rgba(25, 25, 25, 0.5)";
-      ctx.shadowBlur = Math.max(1.5, fontSize * 0.05);
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-    } else {
+    if (seasonDef.decoration === "obake") {
       // 肝試し: 暗転した写真の上で骨白の文字をぼうっと浮かせる、暗く柔らかい影。
       ctx.shadowColor = "rgba(8, 8, 14, 0.85)";
       ctx.shadowBlur = Math.max(2, fontSize * 0.3);
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = Math.max(1, fontSize * 0.06);
+    } else if (seasonDef.decoration === "tanzaku") {
+      // 七夕: 短冊にマジックで書いたような、ほんの少しのにじみ（同色・オフセット0の弱い影）。
+      ctx.shadowColor = "rgba(25, 25, 25, 0.5)";
+      ctx.shadowBlur = Math.max(1.5, fontSize * 0.05);
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
     }
+    // 残暑見舞い(hagaki): 影の上書きなし＝通常どおり白文字＋黒縁取りで写真の上に直接描く。
     drawVerticalText(
       ctx,
       text,

@@ -16,7 +16,7 @@
 import type { Position, Color, Size, FontFamily } from "@/types";
 
 /** compute のレンダラ分岐キー（装飾の種類） */
-export type SeasonDecoration = "tanzaku" | "obake";
+export type SeasonDecoration = "tanzaku" | "obake" | "hagaki";
 
 export interface SeasonDef {
   /** 永続キー。例: "tanabata-2026"（実績キーになるためリネーム禁止） */
@@ -86,6 +86,21 @@ export const SEASONS: SeasonDef[] = [
     },
     decoration: "obake", // 暗転＋ヴィネット＋おばけ＋人魂
     description: "縦書き・肝試し風の夏休み限定デコレーション",
+  },
+  {
+    key: "zansho-2026",
+    label: "残暑見舞い",
+    // 立秋（2026年は8/7）以降〜8月末が残暑見舞いの時期。
+    start: "2026-08-12T00:00:00+09:00",
+    end: "2026-08-23T23:59:59+09:00",
+    preset: {
+      position: "right", // 縦書き（右）
+      color: "white", // 通常どおり白文字＋黒縁取り（写真の上に直接・専用背景なし）
+      size: "medium",
+      font: "hui-font", // ふい字（手書きの便り風）
+    },
+    decoration: "hagaki", // 絵はがき風（白フチ＋切手＋消印。文字背景は無し）
+    description: "縦書き・絵はがき風の残暑見舞い限定デコレーション",
   },
 ];
 
