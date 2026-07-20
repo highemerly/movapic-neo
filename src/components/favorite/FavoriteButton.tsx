@@ -107,8 +107,12 @@ export function FavoriteButton({
     }
   }, [imageId, canFavorite, isLoading, isFavorited, count, favoriters]);
 
+  // 親（status ページ）の flex 行の唯一の子。className 無しだと flex:0 1 auto で
+  // 中身の幅に縮み、内側の FavoriterAvatars(flex-1) に空き幅が渡らず「収まる数」を
+  // 測れない（cw==コンテンツ幅の境界に貼り付き、わずかな揺らぎで誤って「…」が出る）。
+  // 行幅まで伸ばして FavoriterAvatars に実測用の余白を与える。
   return (
-    <div>
+    <div className="min-w-0 flex-1">
       <div className="flex items-center gap-2">
         <div className="relative shrink-0">
           <button
