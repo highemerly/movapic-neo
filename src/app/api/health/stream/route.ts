@@ -11,6 +11,7 @@
 
 import { NextResponse } from "next/server";
 import { summarizeMentionStream } from "@/lib/mention/streamer";
+import { getWorkerRunnerStatus } from "@/lib/queue/runnerStatus";
 import { runtimeVersions } from "@/lib/version";
 
 export const dynamic = "force-dynamic";
@@ -20,12 +21,17 @@ export function GET() {
   const streamingExpected = role === "worker-front" || role === "all-in-one";
 
   const h = summarizeMentionStream();
+  // ランナー（キュー consumer）も worker-front / all-in-one でのみ起動する。
+  // admin のヘルスカードが runner の死活を判定するために body に載せる。
+  // ※ 503 の判定には加えない（streaming の生死のみを HTTP ステータスで表す）。
+  const runner = streamingExpected ? getWorkerRunnerStatus() : null;
 
   const body = {
     ok: streamingExpected ? h.connected : true,
     role,
     streamingExpected,
     versions: runtimeVersions(),
+    runner,
     ...h,
   };
 

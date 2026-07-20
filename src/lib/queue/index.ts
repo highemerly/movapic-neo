@@ -26,6 +26,7 @@ import {
   type NotifyReportPayload,
   type DeleteAccountPayload,
 } from "./tasks";
+import { workerRunnerStatus } from "./runnerStatus";
 
 const MAX_ATTEMPTS = 3;
 
@@ -106,32 +107,81 @@ export async function enqueueDeleteAccount(
 }
 
 let runner: Runner | null = null;
+let supervising = false;
+
+// ランナー再起動のバックオフ。worker-front は必ず1Pod なので thundering herd 対策の
+// ジッタは不要。DB 復帰待ちの間、無駄なリトライを抑えるため上限で頭打ちする。
+const RUNNER_INITIAL_BACKOFF_MS = 2_000;
+const RUNNER_MAX_BACKOFF_MS = 60_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
- * worker ランナーを起動する。COMPONENT_ROLE=worker-front の pod でのみ呼ばれる。
+ * worker ランナーを起動し、以後の停止（初回起動失敗・起動後クラッシュ）を
+ * in-process の bounded backoff で自動再起動する監督ループを開始する。
+ * COMPONENT_ROLE=worker-front の pod でのみ呼ばれる。
  * 重い画像処理は compute へ委譲するが、bot/email ジョブの compute への同時負荷を
  * 律速するため concurrency は控えめ（既定 3）。
+ *
+ * pitfall: 以前は run() を1回呼ぶだけで、起動時に DB が一時的に届かないと
+ * （instrumentation 側が例外を握りつぶすため）ランナーが永久に不在のままになり、
+ * メンション/メールジョブが enqueue されても処理されず 16時間気付かれなかった。
+ * そのため常駐監督＋自動再試行にする。
+ *
+ * k8s の再起動（CrashLoopBackOff）に委ねないのは、worker-front が同一プロセスで
+ * メンション streaming と /api/health（k8s プローブ）も兼ねており、DB 一時断で
+ * Pod ごと殺すと streaming 取り込みまで巻き込むため。ランナーだけを静かに復帰させる。
  */
 export async function runWorker(): Promise<void> {
-  if (runner) return;
+  // 監督ループは1本のみ（instrumentation から1回呼ばれる想定だが多重起動をガード）。
+  if (supervising) return;
+  supervising = true;
+  // ループは常駐するため await しない（instrumentation の起動を止めない）。
+  void superviseRunner();
+}
 
+async function superviseRunner(): Promise<void> {
   const concurrency = parseInt(process.env.WORKER_CONCURRENCY || "3", 10);
+  const st = workerRunnerStatus();
+  let backoff = RUNNER_INITIAL_BACKOFF_MS;
 
-  runner = await run({
-    connectionString: getConnectionString(),
-    concurrency,
-    // LISTEN/NOTIFY で即時起床。取りこぼし対策に短いポーリングも併用される。
-    pollInterval: 2000,
-    taskList,
-    // 定期ジョブのスケジューラ（30分ごとに periodic タスクを enqueue）。
-    crontab: CRONTAB,
-  });
+  for (;;) {
+    try {
+      st.state = "starting";
+      runner = await run({
+        connectionString: getConnectionString(),
+        concurrency,
+        // LISTEN/NOTIFY で即時起床。取りこぼし対策に短いポーリングも併用される。
+        pollInterval: 2000,
+        taskList,
+        // 定期ジョブのスケジューラ（30分ごとに periodic タスクを enqueue）。
+        crontab: CRONTAB,
+      });
+      backoff = RUNNER_INITIAL_BACKOFF_MS; // 起動成功でバックオフをリセット
+      st.state = "running";
+      st.runningSince = Date.now();
+      st.lastError = null;
+      console.log(
+        `[worker] Graphile Worker started (concurrency=${concurrency}, crontab="${CRONTAB}")`
+      );
+      // run() 後、ランナーが停止するまで待つ。我々は stop() しないため、
+      // ここを抜ける＝クラッシュ（reject）または予期せぬ終了（resolve）＝異常。
+      await runner.promise;
+      st.lastError = "runner stopped unexpectedly";
+    } catch (err) {
+      st.lastError = err instanceof Error ? err.message : String(err);
+    }
 
-  console.log(
-    `[worker] Graphile Worker started (concurrency=${concurrency}, crontab="${CRONTAB}")`
-  );
-
-  runner.promise.catch((err) => {
-    console.error("[worker] runner crashed:", err);
-  });
+    runner = null;
+    // 一度でも running になっていれば crash、そうでなければ初回起動失敗。
+    st.state = st.runningSince != null ? "crashed" : "failed-to-start";
+    st.restarts++;
+    console.error(
+      `[worker] runner is not running (${st.state}); restarting in ${backoff}ms: ${st.lastError}`
+    );
+    await sleep(backoff);
+    backoff = Math.min(backoff * 2, RUNNER_MAX_BACKOFF_MS);
+  }
 }

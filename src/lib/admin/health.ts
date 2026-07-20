@@ -22,6 +22,11 @@ import prisma from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { USER_AGENT } from "@/lib/userAgent";
 import { getMentionStreamHealth, STREAM_STALE_MS } from "@/lib/mention/streamStatus";
+import {
+  getWorkerRunnerStatus,
+  pickWorkerRunner,
+  type WorkerRunnerStatus,
+} from "@/lib/queue/runnerStatus";
 import { runtimeVersions } from "@/lib/version";
 
 /** ok=正常 / warn=稼働だが注意 / down=異常 / unknown=確認不可（未設定・非対象） */
@@ -278,15 +283,19 @@ async function getQueueStats(): Promise<{
 }
 
 /**
- * worker-front（キュー consumer＋Bot受信）と Bot Streaming を確認して2枚のカードを返す。
- * 1回の取得（in-process or /api/health/stream）から両方を導く。
+ * worker-front プロセスの生死・worker（キュー consumer）の死活・Bot Streaming を
+ * 確認して3枚のカードを返す。すべて1回の取得（in-process or /api/health/stream）から導く。
+ *
+ * この3つは同じ endpoint から読むため、worker-front に到達できなければ
+ * worker と Bot Streaming は unknown（確認不可）にカスケードする。
  */
 async function checkWorkerAndStream(): Promise<ComponentHealth[]> {
+  const now = Date.now();
   // キュー状況は DB 直読みなので worker への到達性と独立に取れる（並行実行）
   const queuePromise = getQueueStats();
 
-  // streaming の取得（in-process / HTTP）は streamStatus に集約。ここでは取得結果から
-  // worker-front と Bot Streaming の2カードを組み立てる。
+  // streaming/runner の取得（in-process / HTTP）は streamStatus に集約。ここでは取得結果から
+  // worker-front / worker / Bot Streaming の3カードを組み立てる。
   // reachable: true=応答あり / false=到達不可 / null=確認不可（URL未設定）
   const acq = await getMentionStreamHealth();
   const { health, reachable, note } = acq;
@@ -295,10 +304,8 @@ async function checkWorkerAndStream(): Promise<ComponentHealth[]> {
     ? localAppVersionMeta()
     : appVersionMetaFrom(acq.body);
 
-  // --- worker-front プロセス自体の生死 ---
-  // 待ちジョブは worker 停止中でも意味がある（積み上がりの検知）ので到達性と無関係に表示
-  const queue = await queuePromise;
-  const worker: ComponentHealth = {
+  // --- worker-front プロセス自体の生死（HTTP 応答＝プロセス起動）---
+  const workerFront: ComponentHealth = {
     key: "worker-front",
     label: "worker-front",
     state: reachable === true ? "ok" : reachable === false ? "down" : "unknown",
@@ -307,22 +314,88 @@ async function checkWorkerAndStream(): Promise<ComponentHealth[]> {
         ? isAllInOne
           ? "all-in-one（同一プロセス）"
           : "稼働中"
-        : reachable === false
-          ? note
-          : note,
-    meta: [
-      ...versionMeta,
-      ...(queue
-        ? [
-            { label: "待ちジョブ", value: String(queue.ready) },
-            { label: "実行中", value: String(queue.running) },
-            ...(queue.failed > 0
-              ? [{ label: "失敗(リトライ待ち)", value: String(queue.failed) }]
-              : []),
-          ]
-        : []),
-    ],
+        : note,
+    meta: [...versionMeta],
   };
+
+  // --- worker（Graphile Worker ランナー＝キュー consumer）の死活 ---
+  // runner 状態は worker-front と同じ経路から取る（all-in-one は in-process、分離構成は body）。
+  // worker-front に到達できなければ runner も判断できない（unknown にカスケード）。
+  const runner: WorkerRunnerStatus | null = acq.inProcess
+    ? getWorkerRunnerStatus()
+    : reachable === true
+      ? pickWorkerRunner(acq.body)
+      : null;
+
+  // 待ちジョブは runner 停止中でも意味がある（積み上がりの検知）ので、判定には使わず
+  // 情報として worker カードに常に表示する。
+  const queue = await queuePromise;
+  const queueMeta: HealthMeta[] = queue
+    ? [
+        { label: "待ちジョブ", value: String(queue.ready) },
+        { label: "実行中", value: String(queue.running) },
+        ...(queue.failed > 0
+          ? [{ label: "失敗(リトライ待ち)", value: String(queue.failed) }]
+          : []),
+      ]
+    : [];
+
+  const worker: ComponentHealth = ((): ComponentHealth => {
+    // worker-front に届かない/未設定なら runner は確認できない
+    if (reachable !== true || !runner) {
+      return {
+        key: "worker",
+        label: "worker（キュー処理）",
+        state: "unknown",
+        summary:
+          reachable === false
+            ? "worker-front に到達できず確認できません"
+            : reachable == null
+              ? note
+              : "ランナー状態を取得できません",
+        meta: queueMeta,
+      };
+    }
+    let state: HealthState;
+    let summary: string;
+    switch (runner.state) {
+      case "running":
+        state = "ok";
+        summary = "稼働中";
+        break;
+      case "starting":
+        state = "warn";
+        summary = "起動中";
+        break;
+      case "crashed":
+        state = "down";
+        summary = "クラッシュ（再起動を試行中）";
+        break;
+      default: // failed-to-start
+        state = "down";
+        summary = "起動に失敗（再起動を試行中）";
+        break;
+    }
+    return {
+      key: "worker",
+      label: "worker（キュー処理）",
+      state,
+      summary,
+      meta: [
+        {
+          label: "稼働時間",
+          value: fmtAge(runner.runningSince != null ? now - runner.runningSince : null),
+        },
+        ...(runner.restarts > 0
+          ? [{ label: "再起動回数", value: String(runner.restarts) }]
+          : []),
+        ...(runner.state !== "running" && runner.lastError
+          ? [{ label: "直近エラー", value: runner.lastError }]
+          : []),
+        ...queueMeta,
+      ],
+    };
+  })();
 
   // --- Bot Streaming（メンション受信 WebSocket） ---
   let stream: ComponentHealth;
@@ -367,7 +440,7 @@ async function checkWorkerAndStream(): Promise<ComponentHealth[]> {
     };
   }
 
-  return [worker, stream];
+  return [workerFront, worker, stream];
 }
 
 /** 全コンポーネントのヘルスを並列取得して返す（表示順）。 */
