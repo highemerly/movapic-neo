@@ -20,11 +20,14 @@ import {
   TASK_PROCESS_EMAIL,
   TASK_NOTIFY_REPORT,
   TASK_DELETE_ACCOUNT,
+  TASK_SYNC_FAVORITE,
   TASK_PERIODIC,
+  FAVORITE_SYNC_DELAYS_SEC,
   type ProcessMentionPayload,
   type ProcessEmailPayload,
   type NotifyReportPayload,
   type DeleteAccountPayload,
+  type SyncFavoritePayload,
 } from "./tasks";
 import { workerRunnerStatus } from "./runnerStatus";
 
@@ -91,6 +94,24 @@ export async function enqueueReportNotification(
   const utils = await getWorkerUtils();
   await utils.addJob(TASK_NOTIFY_REPORT, payload, {
     jobKey: `report:${payload.reportId}`,
+    maxAttempts: MAX_ATTEMPTS,
+  });
+}
+
+/**
+ * お気に入り操作後の遅延 sync チェーンを開始する。federation 遅延でオーナー側に viewer が
+ * 載るまで数秒かかるため、最初の試行を FAVORITE_SYNC_DELAYS_SEC[0] 秒後に積む（以降は
+ * タスク内で反映を確認しつつ段階的に再スケジュール・反映済みで早期終了）。
+ * 同一画像への連続操作は jobKey で1本に畳む。
+ */
+export async function enqueueFavoriteSync(
+  payload: Omit<SyncFavoritePayload, "attempt">
+): Promise<void> {
+  const utils = await getWorkerUtils();
+  const full: SyncFavoritePayload = { ...payload, attempt: 0 };
+  await utils.addJob(TASK_SYNC_FAVORITE, full, {
+    runAt: new Date(Date.now() + FAVORITE_SYNC_DELAYS_SEC[0] * 1000),
+    jobKey: `fav-sync:${payload.imageId}`,
     maxAttempts: MAX_ATTEMPTS,
   });
 }

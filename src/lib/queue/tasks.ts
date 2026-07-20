@@ -15,6 +15,7 @@ import type { ExifDetails } from "@/lib/exif/details";
 import { reverseGeocode } from "@/lib/geocode/gsi";
 import { decryptToken } from "@/lib/auth/tokens";
 import { processOneMention } from "@/lib/mention/processor";
+import { syncFavoriteCache } from "@/lib/fediverse/favoriteSync";
 import { runPeriodicJobs } from "@/lib/periodic";
 import { getAdminAccts } from "@/lib/auth/admin";
 import { sendBotDirectMessage } from "@/lib/bot/notify";
@@ -35,7 +36,29 @@ export const TASK_PROCESS_MENTION = "process-mention";
 export const TASK_PROCESS_EMAIL = "process-email";
 export const TASK_NOTIFY_REPORT = "notify-report";
 export const TASK_DELETE_ACCOUNT = "delete-account";
+export const TASK_SYNC_FAVORITE = "sync-favorite";
 export const TASK_PERIODIC = "periodic";
+
+/**
+ * お気に入り操作後の遅延 sync の各遅延（秒。「前回からの追加秒数」）。
+ *
+ * オーナー側 Fediverse の favourited_by に viewer 自身が載るのは federation 遅延で数秒後。
+ * POST/DELETE 時の即時 sync で反映しきれなかったとき（連合が遅い別インスタンス等）だけ、この
+ * ジョブを段階的な遅延で走らせ、反映が確認できたら早期終了する。即時→5s→30s（遅延は最大2回・
+ * 操作から最長 ~35秒）で打ち切り、以降は通常の TTL / 定期 sync に委ねる。sleep で待たず runAt に
+ * 逃がすので、待機中はワーカーの同時実行スロットを占有しない。
+ */
+export const FAVORITE_SYNC_DELAYS_SEC = [5, 30];
+
+export interface SyncFavoritePayload {
+  imageId: string;
+  /** 操作した viewer の acct（username@domain）。反映確認に使う。 */
+  viewerAcct: string;
+  /** true=お気に入り（viewer が現れるまで）／false=解除（viewer が消えるまで）待つ */
+  favourited: boolean;
+  /** 0起点の試行回数（FAVORITE_SYNC_DELAYS_SEC のインデックス）。 */
+  attempt: number;
+}
 
 export interface ProcessMentionPayload {
   notification: MastodonNotification;
@@ -271,6 +294,39 @@ const deleteAccountTask: Task = async (payload) => {
 };
 
 /**
+ * お気に入り操作後の遅延 sync（federation 遅延を吸収する早期終了つきチェーン）。
+ * オーナー側キャッシュ・通知を正しく更新し、viewer の操作が反映されたら打ち切る。
+ * 詳細な意図は FAVORITE_SYNC_DELAYS_SEC の doc 参照。
+ */
+const syncFavoriteTask: Task = async (payload, helpers) => {
+  const p = payload as SyncFavoritePayload;
+
+  const image = await prisma.image.findUnique({
+    where: { id: p.imageId },
+    include: { user: { include: { instance: true } } },
+  });
+  // 画像が消えた/非公開化/未投稿(local)になった等はもう追わない
+  if (!image || !image.isPublic || image.isDisabled || !image.postId) return;
+
+  const synced = await syncFavoriteCache(image);
+
+  // viewer の操作がオーナー側に反映されたか（fav→出現／unfav→消滅）。反映済みなら打ち切り。
+  const present = synced.favoriters.some((f) => f.acct === p.viewerAcct);
+  const reflected = p.favourited ? present : !present;
+  if (reflected) return;
+
+  // 未反映。次の試行があれば段階遅延で積み直す（await sleep で待つとワーカースロットを
+  // 占有してしまうため、必ず runAt に逃がして即 return する）。
+  const next = p.attempt + 1;
+  if (next >= FAVORITE_SYNC_DELAYS_SEC.length) return; // 打ち切り（TTL/定期syncに委ねる）
+  const nextPayload: SyncFavoritePayload = { ...p, attempt: next };
+  await helpers.addJob(TASK_SYNC_FAVORITE, nextPayload, {
+    runAt: new Date(Date.now() + FAVORITE_SYNC_DELAYS_SEC[next] * 1000),
+    jobKey: `fav-sync:${p.imageId}`,
+  });
+};
+
+/**
  * 定期メンテナンス（crontab で 30分ごとに enqueue される単一ディスパッチャ）。
  * メンション取りこぼし回収などの複数サブジョブを順に回す。各サブジョブの失敗は
  * runPeriodicJobs 内部で隔離されるため、ここで throw されるのは想定外障害のみ。
@@ -284,5 +340,6 @@ export const taskList: TaskList = {
   [TASK_PROCESS_EMAIL]: processEmailTask,
   [TASK_NOTIFY_REPORT]: notifyReportTask,
   [TASK_DELETE_ACCOUNT]: deleteAccountTask,
+  [TASK_SYNC_FAVORITE]: syncFavoriteTask,
   [TASK_PERIODIC]: periodicTask,
 };

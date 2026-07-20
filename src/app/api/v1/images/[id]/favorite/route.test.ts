@@ -14,6 +14,7 @@ vi.mock("@/lib/fediverse/favoriteSync", () => ({
   syncFavoriteCache: vi.fn(),
 }));
 vi.mock("@/lib/fediverse/favoritePolicy", () => ({ shouldSyncOnGet: vi.fn(() => false) }));
+vi.mock("@/lib/queue", () => ({ enqueueFavoriteSync: vi.fn() }));
 vi.mock("@/lib/fediverse/favorite", async (orig) => {
   const actual = await orig<typeof import("@/lib/fediverse/favorite")>();
   return { ...actual, favoriteStatus: vi.fn(), unfavoriteStatus: vi.fn() };
@@ -25,6 +26,7 @@ import prisma from "@/lib/db";
 import { readCache, syncFavoriteCache } from "@/lib/fediverse/favoriteSync";
 import { shouldSyncOnGet } from "@/lib/fediverse/favoritePolicy";
 import { favoriteStatus, unfavoriteStatus, FavoriteError } from "@/lib/fediverse/favorite";
+import { enqueueFavoriteSync } from "@/lib/queue";
 import { ErrorCodes } from "@/lib/errors";
 
 const mockGetUser = vi.mocked(getCurrentUser);
@@ -35,6 +37,7 @@ const mockSync = vi.mocked(syncFavoriteCache);
 const mockShouldSync = vi.mocked(shouldSyncOnGet);
 const mockFavorite = vi.mocked(favoriteStatus);
 const mockUnfavorite = vi.mocked(unfavoriteStatus);
+const mockEnqueueSync = vi.mocked(enqueueFavoriteSync);
 
 type ImageRow = Awaited<ReturnType<typeof prisma.image.findUnique>>;
 const mockImage = (over: Record<string, unknown> = {}) =>
@@ -169,10 +172,11 @@ describe("POST/DELETE（お気に入りトグル）", () => {
     expect(res.status).toBe(400);
   });
 
-  it("POST 成功: favoriteStatus を復号トークン付きで呼び 200 を返す", async () => {
+  it("POST 成功: favoriteStatus を復号トークン付きで呼び 200 を返す。即時syncし、未反映なら遅延syncを積む", async () => {
     mockGetViewer.mockResolvedValue(VIEWER);
     mockFindUnique.mockResolvedValue(mockImage());
     mockFavorite.mockResolvedValue({ favourited: true, count: 5 });
+    // 即時syncでは viewer がまだオーナー側に載っていない（連合前）
     mockSync.mockResolvedValue({ count: 5, favoriters: [], errorReason: null });
 
     const res = await POST(req("POST"), ctx);
@@ -187,13 +191,50 @@ describe("POST/DELETE（お気に入りトグル）", () => {
       ownerDomain: "owner.example",
       postId: "123",
     });
+    // 即時sync（同一インスタンス/速い連合の即時反映のため）は必ず呼ぶ
+    expect(mockSync).toHaveBeenCalledTimes(1);
+    // 未反映なので反映確認つき遅延 sync を viewer の acct・favourited=true で積む
+    expect(mockEnqueueSync).toHaveBeenCalledWith({
+      imageId: "img1",
+      viewerAcct: "bob@viewer.example",
+      favourited: true,
+    });
   });
 
-  it("DELETE 成功: unfavoriteStatus を呼び isFavorited=false", async () => {
+  it("POST 成功: 即時syncで既に反映済みなら遅延syncは積まない", async () => {
+    mockGetViewer.mockResolvedValue(VIEWER);
+    mockFindUnique.mockResolvedValue(mockImage());
+    mockFavorite.mockResolvedValue({ favourited: true, count: 3 });
+    // 即時syncで viewer が既にオーナー側 favourited_by に載っている（同一インスタンス等）
+    mockSync.mockResolvedValue({
+      count: 3,
+      favoriters: [
+        { acct: "bob@viewer.example", displayName: "Bob", avatarUrl: null, profileUrl: "https://viewer.example/@bob" },
+      ],
+      errorReason: null,
+    });
+
+    const res = await POST(req("POST"), ctx);
+    expect(res.status).toBe(200);
+    expect(mockSync).toHaveBeenCalledTimes(1);
+    expect(mockEnqueueSync).not.toHaveBeenCalled();
+    // 応答一覧は即時syncの結果（viewer 込み）
+    const favoriters = (await json(res)).favoriters as Array<{ acct: string }>;
+    expect(favoriters.map((f) => f.acct)).toEqual(["bob@viewer.example"]);
+  });
+
+  it("DELETE 成功: unfavoriteStatus を呼び isFavorited=false。未反映（まだ載っている）なら遅延syncを積む", async () => {
     mockGetViewer.mockResolvedValue(VIEWER);
     mockFindUnique.mockResolvedValue(mockImage());
     mockUnfavorite.mockResolvedValue({ favourited: false, count: 4 });
-    mockSync.mockResolvedValue({ count: 4, favoriters: [], errorReason: null });
+    // 即時syncでは viewer がまだオーナー側に残っている（連合前）→ unfav 未反映
+    mockSync.mockResolvedValue({
+      count: 5,
+      favoriters: [
+        { acct: "bob@viewer.example", displayName: "Bob", avatarUrl: null, profileUrl: "https://viewer.example/@bob" },
+      ],
+      errorReason: null,
+    });
 
     const res = await DELETE(req("DELETE"), ctx);
     expect(res.status).toBe(200);
@@ -201,6 +242,39 @@ describe("POST/DELETE（お気に入りトグル）", () => {
     expect(b.isFavorited).toBe(false);
     expect(b.favoriteCount).toBe(4);
     expect(mockUnfavorite).toHaveBeenCalledTimes(1);
+    expect(mockSync).toHaveBeenCalledTimes(1);
+    expect(mockEnqueueSync).toHaveBeenCalledWith({
+      imageId: "img1",
+      viewerAcct: "bob@viewer.example",
+      favourited: false,
+    });
+    // 応答一覧では viewer を取り除いて返す（即時反映）
+    const favoriters = b.favoriters as Array<{ acct: string }>;
+    expect(favoriters.map((f) => f.acct)).toEqual([]);
+  });
+
+  it("DELETE 成功: 即時syncで既に消えていれば遅延syncは積まない", async () => {
+    mockGetViewer.mockResolvedValue(VIEWER);
+    mockFindUnique.mockResolvedValue(mockImage());
+    mockUnfavorite.mockResolvedValue({ favourited: false, count: 2 });
+    // 即時syncで viewer が既に居ない（同一インスタンス等）→ unfav 反映済み
+    mockSync.mockResolvedValue({ count: 2, favoriters: [], errorReason: null });
+
+    const res = await DELETE(req("DELETE"), ctx);
+    expect(res.status).toBe(200);
+    expect(mockEnqueueSync).not.toHaveBeenCalled();
+  });
+
+  it("enqueue 失敗でも操作は成功として 200 を返す（Fediverse 操作は成功済み・二重トグル回避）", async () => {
+    mockGetViewer.mockResolvedValue(VIEWER);
+    mockFindUnique.mockResolvedValue(mockImage());
+    mockFavorite.mockResolvedValue({ favourited: true, count: 5 });
+    mockSync.mockResolvedValue({ count: 5, favoriters: [], errorReason: null });
+    mockEnqueueSync.mockRejectedValueOnce(new Error("db down"));
+
+    const res = await POST(req("POST"), ctx);
+    expect(res.status).toBe(200);
+    expect((await json(res)).isFavorited).toBe(true);
   });
 
   it("FavoriteError(deleted) は 404、(forbidden) は 403、想定外は 502", async () => {

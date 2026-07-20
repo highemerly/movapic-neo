@@ -27,6 +27,7 @@ import {
   type ImageForFavorite,
 } from "@/lib/fediverse/favoriteSync";
 import { shouldSyncOnGet } from "@/lib/fediverse/favoritePolicy";
+import { enqueueFavoriteSync } from "@/lib/queue";
 
 // この投稿がお気に入り可能か（Fediverseに投稿済み＝postIdがある投稿のみ。local投稿は対象外）
 function isFavoritable(image: ImageForFavorite): boolean {
@@ -241,16 +242,32 @@ async function handleToggle(
     );
   }
 
-  // オーナー側のキャッシュを更新（avatar一覧・count）。federation遅延があるため
-  // 操作者への即時応答にはviewer側の結果を使う。
-  // syncFavoriteCache は throw しない契約（DB 障害等も内部で握り errorReason を返す）。
-  // これにより「Fediverse 操作は成功したのに sync 失敗で 500 → 再操作で二重トグル」を防ぐ。
+  // オーナー側キャッシュを即時同期する。同一インスタンスや連合が速いケースはこれで即座に反映され、
+  // 操作直後のリロード（SSR は DB キャッシュを読む）でも正しく見える。
+  // syncFavoriteCache は throw しない契約（取得失敗も DB 障害も errorReason で返す）。これにより
+  // 「Fediverse 操作は成功したのに sync 失敗で 500 → 再操作で二重トグル」を防ぐ。
   const synced = await syncFavoriteCache(image);
 
-  // federation遅延でオーナー側のfavourited_byにviewerがまだ載らないため、
-  // 「お気に入りした人」一覧にはviewer自身を仮追加して即時表示する（DBキャッシュ
-  // には保存しない＝次回以降のオーナー側syncが本物の反映を持ってくるまでの暫定表示）。
-  // 解除時は逆にviewerを一覧から取り除く。
+  // 連合遅延で「今の同期」に viewer の操作（fav=出現／unfav=消滅）がまだ載っていない場合だけ、
+  // 反映確認つきの遅延 sync（5s→30s・早期終了）を開始して数十秒以内に追従させる。
+  // 既に載っていれば不要（オーナー鯖へ余計な再取得をしない）。enqueue 失敗は操作を失敗させない。
+  const viewerAcct = `${viewer.username}@${viewer.instance.domain}`;
+  const present = synced.favoriters.some((f) => f.acct === viewerAcct);
+  const reflected = action === "favourite" ? present : !present;
+  if (!reflected) {
+    try {
+      await enqueueFavoriteSync({
+        imageId,
+        viewerAcct,
+        favourited: action === "favourite",
+      });
+    } catch (error) {
+      console.error(`[favorite] sync ジョブの投入に失敗: imageId=${imageId}`, error);
+    }
+  }
+
+  // 連合遅延でオーナー側 favourited_by に viewer がまだ載らない/消えない過渡は、応答一覧に
+  // viewer 自身を仮反映して即時表示する（DB には保存しない＝暫定表示）。解除時は取り除く。
   const responseFavoriters = mergeViewerFavoriter(
     synced.favoriters,
     viewer,
