@@ -56,6 +56,7 @@ import {
   UploadError,
   type UploadErrorPhase,
 } from "@/lib/uploadWithProgress";
+import { reportUploadFailure } from "@/lib/uploadTelemetry";
 import { Label } from "@/components/ui/label";
 
 // 出力形式の表示名
@@ -177,6 +178,10 @@ const initialState: GenerateFormState = {
   imageFile: null,
   imagePreview: null,
 };
+
+// network フェーズ（応答前の接続断）の生成リトライ回数。生成は冪等なので一過性の切断を吸収する。
+// 過大にすると詰まった compute への再送で悪化するため 2 回（計3試行）に留める。
+const MAX_NETWORK_RETRIES = 2;
 
 // アップロード/処理フェーズ別のエラー文言。「画像を小さく」等の的外れな案内を避ける。
 const UPLOAD_ERROR_MESSAGES: Record<
@@ -462,55 +467,87 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
     setUploadPhase("uploading");
     setUploadPct(0);
     try {
-      const response = await uploadWithProgress("/api/v1/generate", formData, {
-        onProgress: (loaded, total) =>
-          setUploadPct(total > 0 ? Math.round((loaded / total) * 100) : 0),
-        onUploadComplete: () => {
-          setLoadingTime(0);
-          setUploadPhase("processing");
-        },
-        stallMs: 20000,
-        processTimeoutMs: 25000,
-      });
+      // network フェーズ（XHR error＝応答が返る前に接続が切れた）は一過性の切断が主因
+      // （モバイル瞬断 / LB のアイドル切断 / pod 再起動）。生成は冪等なので、この層だけ
+      // 短いバックオフで自動リトライし体感エラーを吸収する。stall/process-timeout/aborted は
+      // 再送しても悪化するだけ（回線・処理が本当に重い、または明示キャンセル）なので対象外。
+      for (let attempt = 0; ; attempt++) {
+        const startedAt = Date.now();
+        let uploadCompleted = false;
+        let lastPct = 0;
+        try {
+          const response = await uploadWithProgress("/api/v1/generate", formData, {
+            onProgress: (loaded, total) => {
+              lastPct = total > 0 ? Math.round((loaded / total) * 100) : 0;
+              setUploadPct(lastPct);
+            },
+            onUploadComplete: () => {
+              uploadCompleted = true;
+              setLoadingTime(0);
+              setUploadPhase("processing");
+            },
+            stallMs: 20000,
+            processTimeoutMs: 25000,
+          });
 
-      if (!response.ok) {
-        const parsedError = await parseApiError(response);
-        showError(parsedError);
-        return null;
+          if (!response.ok) {
+            const parsedError = await parseApiError(response);
+            showError(parsedError);
+            return null;
+          }
+
+          const config = OUTPUT_CONFIG[formState.output];
+          const mimeType = config?.format === "avif" ? "image/avif" : "image/jpeg";
+
+          return {
+            blob: await response.blob(),
+            mimeType,
+            requestId: response.headers.get("X-Request-Id") || "",
+            processingTime: parseInt(
+              response.headers.get("X-Processing-Time") || "0",
+              10,
+            ),
+            originalFileSize: parseInt(
+              response.headers.get("X-Original-File-Size") || "0",
+              10,
+            ),
+            originalFormat: response.headers.get("X-Original-Format") || "",
+            originalWidth: parseInt(
+              response.headers.get("X-Original-Width") || "0",
+              10,
+            ),
+            originalHeight: parseInt(
+              response.headers.get("X-Original-Height") || "0",
+              10,
+            ),
+          };
+        } catch (err) {
+          if (err instanceof UploadError) {
+            // 計測: フェーズ・送信完了後か否か・回線・画像サイズを投げ切り、原因層を特定する。
+            reportUploadFailure({
+              endpoint: "generate",
+              phase: err.phase,
+              uploadCompleted,
+              uploadPct: lastPct,
+              fileSize: formState.imageFile?.size ?? 0,
+              output: formState.output,
+              elapsedMs: Date.now() - startedAt,
+              retryCount: attempt,
+            });
+            if (err.phase === "network" && attempt < MAX_NETWORK_RETRIES) {
+              // 再送前に短いバックオフ（pod 再起動なら復帰を待つ）。表示は送信中に戻す。
+              setUploadPhase("uploading");
+              setUploadPct(0);
+              await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+              continue;
+            }
+            showError(UPLOAD_ERROR_MESSAGES[err.phase]);
+          } else {
+            showError({ message: "エラーが発生しました" });
+          }
+          return null;
+        }
       }
-
-      const config = OUTPUT_CONFIG[formState.output];
-      const mimeType = config?.format === "avif" ? "image/avif" : "image/jpeg";
-
-      return {
-        blob: await response.blob(),
-        mimeType,
-        requestId: response.headers.get("X-Request-Id") || "",
-        processingTime: parseInt(
-          response.headers.get("X-Processing-Time") || "0",
-          10,
-        ),
-        originalFileSize: parseInt(
-          response.headers.get("X-Original-File-Size") || "0",
-          10,
-        ),
-        originalFormat: response.headers.get("X-Original-Format") || "",
-        originalWidth: parseInt(
-          response.headers.get("X-Original-Width") || "0",
-          10,
-        ),
-        originalHeight: parseInt(
-          response.headers.get("X-Original-Height") || "0",
-          10,
-        ),
-      };
-    } catch (err) {
-      if (err instanceof UploadError) {
-        showError(UPLOAD_ERROR_MESSAGES[err.phase]);
-      } else {
-        showError({ message: "エラーが発生しました" });
-      }
-      return null;
     } finally {
       setUploadPhase(null);
     }
@@ -589,6 +626,11 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
     setIsPosting(true);
     toast.dismiss();
 
+    // 投稿失敗の計測用（catch から参照するため try の外で保持）。post の送信直前に確定させる。
+    let postStartedAt = 0;
+    let postUploadCompleted = false;
+    let postLastPct = 0;
+
     try {
       let blob: Blob;
       let mimeType: string;
@@ -664,10 +706,14 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
       // あるため不可）ので processTimeout は設けず、stall(20s) のみで送信の詰まりを検知する。
       setUploadPhase("uploading");
       setUploadPct(0);
+      postStartedAt = Date.now();
       const response = await uploadWithProgress("/api/v1/post", formData, {
-        onProgress: (loaded, total) =>
-          setUploadPct(total > 0 ? Math.round((loaded / total) * 100) : 0),
+        onProgress: (loaded, total) => {
+          postLastPct = total > 0 ? Math.round((loaded / total) * 100) : 0;
+          setUploadPct(postLastPct);
+        },
         onUploadComplete: () => {
+          postUploadCompleted = true;
           setLoadingTime(0);
           setUploadPhase("processing");
         },
@@ -724,6 +770,17 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
       }
     } catch (err) {
       if (err instanceof UploadError) {
+        // 投稿は自動リトライしない（二重投稿の恐れ）が、原因層の特定用に計測だけは行う。
+        reportUploadFailure({
+          endpoint: "post",
+          phase: err.phase,
+          uploadCompleted: postUploadCompleted,
+          uploadPct: postLastPct,
+          fileSize: formState.imageFile?.size ?? 0,
+          output: formState.output,
+          elapsedMs: postStartedAt > 0 ? Date.now() - postStartedAt : 0,
+          retryCount: 0,
+        });
         showError(UPLOAD_ERROR_MESSAGES[err.phase]);
       } else {
         showError({ message: "投稿に失敗しました" });
