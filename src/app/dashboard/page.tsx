@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "@/components/Link";
 import { getAvatarUrl } from "@/lib/avatar";
-import { Globe, Server, Heart, ChevronRight, Settings, Trophy, Images, Calendar, Map as MapIcon, Sparkles, ImagePlus } from "lucide-react";
+import { Globe, Server, Heart, ChevronRight, Settings, Sparkles, ImagePlus } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { Button } from "@/components/ui/button";
 import { LogoutButton } from "@/components/auth/LogoutButton";
@@ -17,6 +17,7 @@ import { userPathSegment } from "@/lib/userHandle";
 import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
+import { ProfileStatCards } from "@/components/user/ProfileStatCards";
 
 export const dynamic = "force-dynamic";
 
@@ -172,47 +173,8 @@ export default async function DashboardPage() {
                 アイコンが表示されていない場合は、ログインし直すと反映されます。
               </p>
             )}
-            <div className="mt-3 grid grid-cols-4 gap-2">
-              <Link href={`/u/${selfSeg}/photos`} prefetch>
-                <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="一覧" title="投稿数">
-                  <Images className="h-5 w-5" />
-                  <span className="leading-none whitespace-nowrap">
-                    <span className="text-sm font-semibold tabular-nums">{profileStats.imageCount}</span>
-                    <span className="text-[10px]">枚</span>
-                  </span>
-                </Button>
-              </Link>
-              <Link href={`/u/${selfSeg}/calendar`} prefetch>
-                <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="カレンダー" title="連続投稿日数">
-                  <Calendar className="h-5 w-5" />
-                  <span className="leading-none whitespace-nowrap">
-                    <span className="text-[10px]">連続</span>
-                    <span className="text-sm font-semibold tabular-nums">{profileStats.streak}</span>
-                    <span className="text-[10px]">日</span>
-                  </span>
-                </Button>
-              </Link>
-              <Link href={`/u/${selfSeg}/map`} prefetch>
-                <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="地図" title="都道府県数">
-                  <MapIcon className="h-5 w-5" />
-                  <span className="leading-none whitespace-nowrap">
-                    <span className="text-sm font-semibold tabular-nums">{profileStats.prefectureCount}</span>
-                    <span className="text-[10px]">カ所</span>
-                  </span>
-                </Button>
-              </Link>
-              <Link href={`/u/${selfSeg}/achievements`} prefetch>
-                <Button variant="outline" className="w-full h-14 flex flex-col gap-1 justify-center" aria-label="実績" title="獲得実績（金・銀）">
-                  <span className="flex items-center gap-1 leading-none whitespace-nowrap">
-                    <Trophy className="h-3.5 w-3.5 fill-amber-400 text-amber-600" />
-                    <span className="text-sm font-semibold tabular-nums">{profileStats.goldCount}</span>
-                  </span>
-                  <span className="flex items-center gap-1 leading-none whitespace-nowrap">
-                    <Trophy className="h-3.5 w-3.5 fill-slate-300 text-slate-500" />
-                    <span className="text-sm font-semibold tabular-nums">{profileStats.silverCount}</span>
-                  </span>
-                </Button>
-              </Link>
+            <div className="mt-3">
+              <ProfileStatCards seg={selfSeg} stats={profileStats} showMap prefetch />
             </div>
             {topFavoriteImage && (
               <Link

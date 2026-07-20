@@ -4,13 +4,13 @@ import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { isMutedByViewer } from "@/lib/mutes";
 import { getAvatarUrl } from "@/lib/avatar";
-import { Button } from "@/components/ui/button";
-import { Images, Calendar, Map as MapIcon, Trophy, ChevronRight, ImagePlus } from "lucide-react";
+import { ChevronRight, ImagePlus } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
 import { getUserProfileStats } from "@/lib/userStats";
+import { ProfileStatCards } from "@/components/user/ProfileStatCards";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
 import { getHomeServer } from "@/lib/auth/serverPolicy";
@@ -298,62 +298,11 @@ export default async function UserHomePage({ params, searchParams }: UserHomePag
               <h2 className="text-sm font-semibold">概要</h2>
 
               {/* 統計ボタン（各タブへの入口）。ダッシュボードの「あなたの情報」と同じ4指標。 */}
-              <div className="grid grid-cols-4 gap-2">
-              <Link href={`/u/${seg}/photos`}>
-                <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="一覧" title="投稿数">
-                  <Images className="h-5 w-5" />
-                  <span className="leading-none whitespace-nowrap">
-                    <span className="text-sm font-semibold tabular-nums">{profileStats.imageCount}</span>
-                    <span className="text-[10px]">枚</span>
-                  </span>
-                </Button>
-              </Link>
-              <Link href={`/u/${seg}/calendar`}>
-                <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="カレンダー" title="連続投稿日数">
-                  <Calendar className="h-5 w-5" />
-                  <span className="leading-none whitespace-nowrap">
-                    <span className="text-[10px]">連続</span>
-                    <span className="text-sm font-semibold tabular-nums">{profileStats.streak}</span>
-                    <span className="text-[10px]">日</span>
-                  </span>
-                </Button>
-              </Link>
-              {/* 地図が非公開のユーザーは非アクティブ表示（都道府県数も出さない） */}
-              {user.showLocationMap ? (
-                <Link href={`/u/${seg}/map`}>
-                  <Button variant="outline" className="w-full h-14 flex flex-col gap-0.5" aria-label="地図" title="都道府県数">
-                    <MapIcon className="h-5 w-5" />
-                    <span className="leading-none whitespace-nowrap">
-                      <span className="text-sm font-semibold tabular-nums">{profileStats.prefectureCount}</span>
-                      <span className="text-[10px]">カ所</span>
-                    </span>
-                  </Button>
-                </Link>
-              ) : (
-                <Button
-                  variant="outline"
-                  disabled
-                  className="w-full h-14 flex flex-col gap-0.5"
-                  aria-label="地図（非公開）"
-                  title="地図は非公開です"
-                >
-                  <MapIcon className="h-5 w-5" />
-                  <span className="text-[10px] leading-none">地図</span>
-                </Button>
-              )}
-              <Link href={`/u/${seg}/achievements`}>
-                <Button variant="outline" className="w-full h-14 flex flex-col gap-1 justify-center" aria-label="実績" title="獲得実績（金・銀）">
-                  <span className="flex items-center gap-1 leading-none whitespace-nowrap">
-                    <Trophy className="h-3.5 w-3.5 fill-amber-400 text-amber-600" />
-                    <span className="text-sm font-semibold tabular-nums">{profileStats.goldCount}</span>
-                  </span>
-                  <span className="flex items-center gap-1 leading-none whitespace-nowrap">
-                    <Trophy className="h-3.5 w-3.5 fill-slate-300 text-slate-500" />
-                    <span className="text-sm font-semibold tabular-nums">{profileStats.silverCount}</span>
-                  </span>
-                </Button>
-              </Link>
-              </div>
+              <ProfileStatCards
+                seg={seg}
+                stats={profileStats}
+                showMap={user.showLocationMap}
+              />
 
               {/* 自己紹介・登録日 */}
               <div className="space-y-1 text-xs">
