@@ -218,6 +218,14 @@ function useMenuSections(nav: MenuNav): MenuSectionData[] {
       title: "あなたの情報",
       items: [
         {
+          key: "profile",
+          href: userBase,
+          label: "ユーザーページ",
+          Icon: User,
+          active: pathname === userBase,
+          primary: true,
+        },
+        {
           key: "notifications",
           href: "/notifications",
           label: "通知",
