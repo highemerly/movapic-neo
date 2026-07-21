@@ -15,6 +15,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   POSITION_LABELS,
@@ -443,6 +444,9 @@ export function ImageActionsMenu({
               <Settings2 className="h-5 w-5 shrink-0" />
               コメント設定
             </DialogTitle>
+            <DialogDescription className="text-left">
+              この画像にコメントを合成した際の設定内容です。
+            </DialogDescription>
           </DialogHeader>
           <dl className="space-y-2 text-sm">
             {options.season ? (
@@ -492,11 +496,11 @@ export function ImageActionsMenu({
               <Send className="h-5 w-5 shrink-0" />
               {serverName}に投稿
             </DialogTitle>
+            <DialogDescription className="text-left">
+              この画像を {serverName} へ投稿します。公開範囲を選んでください。
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              この画像を {serverName} へ投稿します。公開範囲を選んでください。
-            </p>
             <SegmentControl
               value={repostVisibility}
               options={REPOST_VISIBILITIES}
