@@ -61,7 +61,7 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="absolute top-2 right-2 flex size-11 items-center justify-center rounded-full text-muted-foreground opacity-70 ring-offset-background transition-colors transition-opacity hover:bg-muted hover:text-foreground hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+            className="absolute top-2 right-2 flex size-11 items-center justify-center rounded-md text-muted-foreground opacity-70 ring-offset-background transition-colors transition-opacity hover:bg-muted hover:text-foreground hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none"
           >
             <X className="size-6" />
             <span className="sr-only">閉じる</span>
