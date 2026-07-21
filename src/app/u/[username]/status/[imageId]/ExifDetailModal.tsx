@@ -28,9 +28,10 @@ type Props = {
 export function ExifDetailModal({ cameraMake, cameraModel, details }: Props) {
   const [open, setOpen] = useState(false);
 
-  // メーカー名を先頭に、続けて定義順（レンズ→焦点距離→…）で値のある項目だけ行にする。
+  // メーカー名・機種名を先頭に、続けて定義順（レンズ→焦点距離→…）で値のある項目だけ行にする。
   const rows: { label: string; value: string }[] = [
     ...(cameraMake ? [{ label: "メーカー", value: cameraMake }] : []),
+    { label: "機種名", value: cameraModel },
     ...(Object.keys(EXIF_DETAIL_LABELS) as (keyof ExifDetails)[])
       .map((key) => ({ label: EXIF_DETAIL_LABELS[key], value: details?.[key] }))
       .filter((r): r is { label: string; value: string } => !!r.value),
@@ -53,10 +54,10 @@ export function ExifDetailModal({ cameraMake, cameraModel, details }: Props) {
           <DialogHeader className="text-left">
             <DialogTitle className="flex items-center gap-2">
               <Camera className="h-5 w-5 shrink-0" aria-hidden />
-              {cameraModel}
+              写真の詳細情報
             </DialogTitle>
             <DialogDescription className="text-left">
-              この写真の撮影情報（EXIF）です。
+              詳細情報（EXIF）のうち、ユーザーが記録を希望した情報のみ表示しています。
             </DialogDescription>
           </DialogHeader>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
