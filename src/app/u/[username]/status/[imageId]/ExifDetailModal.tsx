@@ -33,7 +33,15 @@ export function ExifDetailModal({ cameraMake, cameraModel, details }: Props) {
     ...(cameraMake ? [{ label: "メーカー", value: cameraMake }] : []),
     { label: "機種名", value: cameraModel },
     ...(Object.keys(EXIF_DETAIL_LABELS) as (keyof ExifDetails)[])
-      .map((key) => ({ label: EXIF_DETAIL_LABELS[key], value: details?.[key] }))
+      .map((key) => {
+        const label = EXIF_DETAIL_LABELS[key];
+        const raw = details?.[key];
+        // 値にラベルが前置されている場合（例 "35mm換算 25mm"）は重複を除く。
+        // 値は ALT テキスト用にラベル無しでも意味が通るよう前置付きで保存されるため
+        // （exifDetailValues）、除去はラベル付きで並べるこのモーダル表示側で行う。
+        const value = raw?.startsWith(`${label} `) ? raw.slice(label.length + 1) : raw;
+        return { label, value };
+      })
       .filter((r): r is { label: string; value: string } => !!r.value),
   ];
 
