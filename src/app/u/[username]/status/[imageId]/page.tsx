@@ -26,7 +26,7 @@ import {
   type CachedFavoriter,
 } from "@/lib/fediverse/favorite";
 import { Footer } from "@/components/Footer";
-import { parseUserHandle } from "@/lib/userHandle";
+import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
 import { getBotAcct } from "@/lib/postMethods";
 import { NewUserGuide } from "@/components/onboarding/NewUserGuide";
 import { getAllowedServers, getHomeServer } from "@/lib/auth/serverPolicy";
@@ -152,12 +152,13 @@ interface PageProps {
     posted?: string;
     federr?: string;
     fedstatus?: string;
+    zoom?: string;
   }>;
 }
 
 export default async function ImageDetailPage({ params, searchParams }: PageProps) {
   const { username, imageId } = await params;
-  const { from, posted, federr, fedstatus } = await searchParams;
+  const { from, posted, federr, fedstatus, zoom } = await searchParams;
   // from は遷移元タブを表す。カレンダー/地図からの遷移では "種別:状態" 形式で
   // 元の月・都道府県を載せ、戻る導線で復元する（例 "user-calendar:2026-5" / "user-map:東京都"）。
   // 最初の ":" のみで分割（都道府県名に ":" は含まれない）。
@@ -416,6 +417,22 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     backLabel = `${galleryName} のホームに戻る`;
   }
 
+  // 全画面モーダル内の前後ナビ。遷移先でもモーダルを開いたままにするため zoom=1 を付け、from
+  // （遷移元スコープ）も保持して前後の対象範囲を維持する。前後の画像URLはモーダルで先読みに使う。
+  const homeServer = getHomeServer();
+  const buildModalNav = (img: typeof prevImage) => {
+    if (!img) return null;
+    const params = new URLSearchParams();
+    if (from) params.set("from", from);
+    params.set("zoom", "1");
+    return {
+      href: `/u/${userPathSegment(img.user.username, img.user.instance.domain, homeServer)}/status/${img.id}?${params.toString()}`,
+      imageUrl: `${publicUrl}/${img.storageKey}`,
+    };
+  };
+  const modalPrev = buildModalNav(prevImage);
+  const modalNext = buildModalNav(nextImage);
+
   // 返信・シェア・その他メニュー。PC（インライン）とモバイル（下部フローティングバー）で
   // 同じ操作を出すが、見た目・出し分けが異なる（floating）ので1箇所にまとめてフラグで切り替える。
   // - PC: 行幅いっぱいに伸ばす（flex-auto/flex-1）。従来どおり全ボタンを表示。
@@ -578,6 +595,9 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             aspectRatio={image.width / image.height}
             blurDataUrl={image.blurDataUrl}
             maxVh={IMAGE_MAX_VH}
+            prev={modalPrev}
+            next={modalNext}
+            initialOpen={zoom === "1"}
           />
         </div>
 
