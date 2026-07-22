@@ -1,10 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
-import { toast } from "sonner";
-import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { useDeleteLocation } from "./useDeleteLocation";
 
 interface DeleteLocationButtonProps {
   imageId: string;
@@ -13,42 +10,12 @@ interface DeleteLocationButtonProps {
 }
 
 export function DeleteLocationButton({ imageId, locationLabel }: DeleteLocationButtonProps) {
-  const router = useRouter();
-  const confirm = useConfirm();
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleDelete = async () => {
-    if (
-      !(await confirm({
-        title: "撮影場所を削除",
-        description: `写真から撮影場所「${locationLabel}」を削除します。元には戻せませんが、削除してよろしいですか？`,
-        confirmText: "削除する",
-        destructive: true,
-      }))
-    ) {
-      return;
-    }
-
-    setIsDeleting(true);
-    try {
-      const response = await fetch(`/api/v1/images/${imageId}/location`, {
-        method: "DELETE",
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data?.error?.message || data?.error || "削除に失敗しました");
-      }
-      router.refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "削除に失敗しました");
-      setIsDeleting(false);
-    }
-  };
+  const { deleting, remove } = useDeleteLocation(imageId, locationLabel);
 
   return (
     <button
-      onClick={handleDelete}
-      disabled={isDeleting}
+      onClick={remove}
+      disabled={deleting}
       className="relative inline-flex items-center rounded p-1 text-muted-foreground transition-colors hover:text-red-600 disabled:opacity-50 before:absolute before:-inset-y-[11px] before:-left-1 before:-right-3 before:content-['']"
       title="撮影場所を削除"
       aria-label="撮影場所を削除"

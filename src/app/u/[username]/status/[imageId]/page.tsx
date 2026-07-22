@@ -44,7 +44,7 @@ import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import { PostSourceBadge } from "./PostSourceBadge";
 import { ExifDetailModal } from "./ExifDetailModal";
 import { sanitizeExifDetails } from "@/lib/exif/details";
-import { Images, CalendarDays, MapPin, Reply, Repeat2, Bookmark, Share2 } from "lucide-react";
+import { Images, CalendarDays, MapPin, Reply, Repeat2, Bookmark, Link2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -303,6 +303,20 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   // 閲覧者が投稿者を既にミュート中か（メニューの文言・解除導線の出し分け用）
   const isMutingAuthor = await isMutedByViewer(currentUser?.id, image.userId);
 
+  // ミートボールの「詳細情報（EXIF）を表示」用。機種名があるときだけ項目を出す
+  // （インラインの機種名ボタンと同じ内容・同じダイアログを共有）。
+  const exif = image.cameraModel
+    ? {
+        cameraMake: image.cameraMake,
+        cameraModel: image.cameraModel,
+        details: sanitizeExifDetails(image.exifDetails),
+      }
+    : null;
+  // ミートボールの「位置情報を取り除く」用（オーナー時のみメニュー側で出す）。
+  const locationLabel = image.locationPrefecture
+    ? `${image.locationPrefecture}${image.locationCity ?? ""}`
+    : null;
+
   // 「あなたのサーバーで開く」動線。閲覧者自身のサーバーで元投稿を解決して開き、
   // 返信・リノート・お気に入り等ができるようにする。条件は閲覧者がそのサーバーWebに
   // ログイン中であること。postUrl が無い local 投稿は非表示。
@@ -529,12 +543,12 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           </div>
         ) : null}
 
-        {/* 返信・シェア・その他メニュー（ピン留め・削除・共有、将来の通報）。
-            いずれもログインユーザー向けの操作なので、未ログイン時は行ごと描画しない。 */}
+        {/* 返信・シェア・その他メニュー。いずれもログインユーザー向けの操作（ミートボール内の
+            閲覧系も含め）なので、未ログイン時は行ごと描画しない。 */}
         {currentUser && (
           <div className="mt-[10px] flex items-center gap-1">
-          {/* 返信ボタンが出るケースは横が窮屈になるので、両ボタンを2行＋小さめ文字にして
-              320px 幅でも収める（高さは h-[40px] 固定のまま変えない）。 */}
+            {/* 返信ボタンが出るケースは横が窮屈になるので、両ボタンを2行＋小さめ文字にして
+                320px 幅でも収める（高さは h-[40px] 固定のまま変えない）。 */}
             {mastodonReplyUrl && (
               <a
                 href={mastodonReplyUrl}
@@ -563,7 +577,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
                 className={`flex items-center justify-center gap-1.5 h-[40px] border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border ${hasInteractButton ? "flex-auto px-1.5" : "flex-1 px-2.5"}`}
                 title="あなたのサーバーで、このURLを投稿します"
               >
-                <Share2 className="h-4 w-4 shrink-0" />
+                <Link2 className="h-4 w-4 shrink-0" />
                 {hasInteractButton ? (
                   <span className="flex flex-col items-start leading-tight text-[10px] font-medium">
                     <span>リンクを</span>
@@ -596,6 +610,13 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               canReport={!isOwner}
               canMute={!isOwner}
               isMuted={isMutingAuthor}
+              exif={exif}
+              postUrl={image.postUrl}
+              viewerServerName={currentUser.instance.domain}
+              mastodonOpenUrl={mastodonReplyUrl}
+              misskeyOpenPostUrl={misskeyOpenPostUrl}
+              shareLinkUrl={shareUrl}
+              locationLabel={isOwner ? locationLabel : null}
               options={{
                 position: image.position,
                 color: image.color,

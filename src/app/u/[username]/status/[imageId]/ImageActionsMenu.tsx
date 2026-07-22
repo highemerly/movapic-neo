@@ -2,12 +2,30 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pin, Trash2, Flag, Share, Image as ImageIcon, Settings2, VolumeX, Send } from "lucide-react";
+import {
+  MoreHorizontal,
+  Pin,
+  Trash2,
+  Flag,
+  Share,
+  Link2,
+  ExternalLink,
+  Reply,
+  Repeat2,
+  Bookmark,
+  Camera,
+  MapPinOff,
+  Image as ImageIcon,
+  Settings2,
+  VolumeX,
+  Send,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -43,6 +61,9 @@ import { showFlashToast } from "@/components/ToastFlasher";
 import { buildPostFlash } from "./postFlash";
 import { ReportDialog } from "./ReportDialog";
 import { useNativeShare, type NativeShareParams } from "./useNativeShare";
+import { ExifDetailDialog, type ExifDetailData } from "./ExifDetailDialog";
+import { useMisskeyOpen } from "./useMisskeyOpen";
+import { useDeleteLocation } from "./useDeleteLocation";
 
 interface ImageActionsMenuProps {
   imageId: string;
@@ -63,8 +84,22 @@ interface ImageActionsMenuProps {
   isMuted: boolean;
   /** トリガー（ミートボール）に足すクラス（非ログイン時に狭い画面のみ表示する等） */
   triggerClassName?: string;
-  /** 狭い画面でメニュー内に出すネイティブ共有（広い画面では行内のボタンが担当） */
+  /** ネイティブ共有（Web Share API 対応時のみメニューに出す）。行内ボタンとは別に常に出す。 */
   nativeShare?: NativeShareParams;
+  /** 撮影情報（EXIF）。値があるときだけ「詳細情報を表示」を出す。 */
+  exif?: ExifDetailData | null;
+  /** 投稿主のサーバー上の元投稿URL（未投稿の local ではなし）。「投稿主のサーバーで開く」用。 */
+  postUrl?: string | null;
+  /** 「[あなたのサーバー名]で開く/にリンクを投稿」のラベルに出す閲覧者サーバー名。 */
+  viewerServerName?: string | null;
+  /** Mastodon 閲覧者向け authorize_interaction URL（あなたのサーバーで開く）。 */
+  mastodonOpenUrl?: string | null;
+  /** Misskey 閲覧者向け元投稿URL（クリック時に ap/show 解決して開く）。 */
+  misskeyOpenPostUrl?: string | null;
+  /** 閲覧者サーバーの /share 作文画面URL（あなたのサーバーにリンクを投稿）。 */
+  shareLinkUrl?: string | null;
+  /** 撮影場所の表示名（例: 千葉県流山市）。isOwner かつ位置情報ありのとき「位置情報を取り除く」を出す。 */
+  locationLabel?: string | null;
   /** コメント合成オプション（メニュー→モーダルで確認）。 */
   options: {
     position: string;
@@ -78,9 +113,37 @@ interface ImageActionsMenuProps {
 }
 
 /**
- * 画像詳細ページの「その他」操作メニュー（ミートボール）。
- * 投稿者向けの「ピン留め」「削除」と、将来追加予定の「通報」を格納する。
- * 通報は全ユーザー向けの機能になるため、メニュー自体は誰にでも表示する。
+ * 「あなたのサーバーで開く」の先頭アイコン。返信だけでなくリノート・お気に入りもできる導線
+ * なので、行内ボタンと同じ3アイコン（返信/リノート/ブックマーク）で誤解を防ぐ。
+ */
+function InteractIcons() {
+  // 1アイコン分の枠（size-4）に3アイコンを絶対配置で重ね、順番に1つずつ表示する。
+  // こうすると幅は単一アイコンと同じになり、他の項目とラベル左端が揃う。動きで「返信だけでなく
+  // リノート・ブックマークもできる」導線であることを示す。負のディレイ差で常に1枚だけ見える状態から始める。
+  // 動きを抑える設定では先頭（返信）のみ静止表示（枠幅は同じなので揃いは保たれる）。
+  const cycle =
+    "absolute inset-0 size-4 animate-[interact-icon-cycle_3s_infinite] motion-reduce:animate-none";
+  return (
+    <span className="relative mr-2 inline-flex size-4 shrink-0">
+      <Reply className={cycle} />
+      <Repeat2
+        className={`${cycle} [animation-delay:-1s] motion-reduce:opacity-0`}
+      />
+      <Bookmark
+        className={`${cycle} [animation-delay:-2s] motion-reduce:opacity-0`}
+      />
+    </span>
+  );
+}
+
+/**
+ * 画像詳細ページの「その他」操作メニュー（ミートボール）。誰にでも表示する。
+ * 項目は3グループに分ける（区切り線で分割）:
+ *   1. 閲覧・共有系（コメント設定/EXIF/各サーバーで開く/リンク投稿/共有）— 誰でも
+ *   2. 対他者（ミュート/通報）— ログイン済み かつ 非オーナー
+ *   3. オーナー操作（再投稿/サムネ/位置削除/ピン/削除）— オーナーのみ
+ * 2と3は互いに排他（!isOwner / isOwner）なので区切り線は1本で足りる。
+ * 画面に専用ボタンがある項目（各サーバーで開く・リンク投稿・共有）も、メニューにも重複して出す。
  */
 export function ImageActionsMenu({
   imageId,
@@ -95,6 +158,13 @@ export function ImageActionsMenu({
   isMuted,
   triggerClassName,
   nativeShare,
+  exif,
+  postUrl,
+  viewerServerName,
+  mastodonOpenUrl,
+  misskeyOpenPostUrl,
+  shareLinkUrl,
+  locationLabel,
   options,
 }: ImageActionsMenuProps) {
   const router = useRouter();
@@ -103,6 +173,10 @@ export function ImageActionsMenu({
   const native = useNativeShare(
     nativeShare ?? { imageUrl: "", mimeType: "", fileBaseName: "", text: "", url: "" }
   );
+  // Misskey の「あなたのサーバーで開く」解決（該当しないときは呼ばれない）。
+  const misskey = useMisskeyOpen(misskeyOpenPostUrl ?? "");
+  // 位置情報の削除（オーナー かつ 位置情報ありのときのみ項目を出す）。
+  const locationDelete = useDeleteLocation(imageId, locationLabel ?? "");
   const [isPinned, setIsPinned] = useState(initialIsPinned);
   const [isPinning, setIsPinning] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -110,12 +184,24 @@ export function ImageActionsMenu({
   const [reportOpen, setReportOpen] = useState(false);
   const [muteOpen, setMuteOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [exifOpen, setExifOpen] = useState(false);
   const [repostOpen, setRepostOpen] = useState(false);
   const [repostVisibility, setRepostVisibility] =
     useState<RepostVisibility>(defaultVisibility);
   const [isReposting, setIsReposting] = useState(false);
   // ラベル・トースト・モーダルに出す投稿先サーバー名（未取得時のみ汎称にフォールバック）。
   const serverName = instanceDomain || "連携サーバー";
+  // 「あなたのサーバー」ラベル（未取得時のみ汎称）。
+  const yourServer = viewerServerName || "あなたのサーバー";
+
+  // グループ1（閲覧・共有系）の表示可否。コメント設定は無条件なので常に非空。
+  const showExif = !!exif;
+  const showAuthorOpen = !!postUrl;
+  const showShareLink = !!shareLinkUrl;
+  const showNativeShare = !!nativeShare && native.visible;
+  // グループ2（対他者）とグループ3（オーナー）は排他。どちらか出るなら区切り線を1本引く。
+  const showModGroup = canMute || canReport;
+  const showSeparator = showModGroup || isOwner;
 
   // ① その日のカレンダーサムネイルにこの写真を指定する。
   const handleSetThumbnail = useCallback(async () => {
@@ -319,7 +405,8 @@ export function ImageActionsMenu({
           <MoreHorizontal className="h-4 w-4" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-[160px]">
+      <DropdownMenuContent align="end" className="min-w-[180px]">
+        {/* --- グループ1: 閲覧・共有系（誰でも） --- */}
         <DropdownMenuItem
           onSelect={() => {
             // preventDefault しない＝選択でミートボールを閉じ、モーダルだけを開く。
@@ -329,19 +416,96 @@ export function ImageActionsMenu({
           <Settings2 className="mr-2 h-4 w-4" />
           コメント設定を表示
         </DropdownMenuItem>
-        {/* ネイティブ共有は狭い画面だけメニュー内に出す（広い画面は行内のボタンが担当） */}
-        {nativeShare && native.visible && (
+        {showExif && (
           <DropdownMenuItem
-            className="min-[380px]:hidden"
+            onSelect={() => {
+              setExifOpen(true);
+            }}
+          >
+            <Camera className="mr-2 h-4 w-4" />
+            詳細情報（EXIF）を表示
+          </DropdownMenuItem>
+        )}
+        {/* 投稿主のサーバー上の元投稿を開く（外部リンク）。 */}
+        {showAuthorOpen && (
+          <DropdownMenuItem asChild>
+            <a href={postUrl!} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              投稿主のサーバーで開く
+            </a>
+          </DropdownMenuItem>
+        )}
+        {/* あなたのサーバーで開く（Mastodon=リンク / Misskey=クリック時に解決）。 */}
+        {mastodonOpenUrl && (
+          <DropdownMenuItem asChild>
+            <a href={mastodonOpenUrl} rel="noopener noreferrer">
+              <InteractIcons />
+              {yourServer}で開く
+            </a>
+          </DropdownMenuItem>
+        )}
+        {misskeyOpenPostUrl && (
+          <DropdownMenuItem
+            disabled={misskey.loading}
+            onSelect={(e) => {
+              e.preventDefault();
+              misskey.open();
+            }}
+          >
+            <InteractIcons />
+            {yourServer}で開く
+          </DropdownMenuItem>
+        )}
+        {/* あなたのサーバーにこのページのリンクを投稿（作文画面を開く）。 */}
+        {showShareLink && (
+          <DropdownMenuItem asChild>
+            <a href={shareLinkUrl!} target="_blank" rel="noopener noreferrer">
+              <Link2 className="mr-2 h-4 w-4" />
+              リンクを投稿
+            </a>
+          </DropdownMenuItem>
+        )}
+        {/* ネイティブ共有（Web Share API 対応時のみ。行内ボタンとは別に常に出す）。 */}
+        {showNativeShare && (
+          <DropdownMenuItem
             onSelect={(e) => {
               e.preventDefault();
               native.share();
             }}
           >
             <Share className="mr-2 h-4 w-4" />
-            他のアプリで共有
+            共有
           </DropdownMenuItem>
         )}
+
+        {showSeparator && <DropdownMenuSeparator />}
+
+        {/* --- グループ2: 対他者（ログイン済み かつ 非オーナー） --- */}
+        {canMute && (
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault();
+              setMuteOpen(true);
+            }}
+          >
+            <VolumeX className="mr-2 h-4 w-4" />
+            {isMuted ? "ミュートを変更・解除" : "このユーザーをミュート"}
+          </DropdownMenuItem>
+        )}
+        {canReport && (
+          <DropdownMenuItem
+            className="text-red-600 focus:text-red-600"
+            onSelect={(e) => {
+              e.preventDefault();
+              setReportOpen(true);
+            }}
+          >
+            <Flag className="mr-2 h-4 w-4" />
+            通報
+          </DropdownMenuItem>
+        )}
+
+        {/* --- グループ3: オーナー操作 --- */}
         {isOwner && (
           <>
             {/* まだ Fediverse 未投稿（失敗/local）かつ保存から一定期間内のときだけ再投稿を出す。 */}
@@ -367,6 +531,19 @@ export function ImageActionsMenu({
               <ImageIcon className="mr-2 h-4 w-4" />
               この日のサムネイルにする
             </DropdownMenuItem>
+            {/* 撮影場所（位置情報）を持つときだけ削除を出す。 */}
+            {locationLabel && (
+              <DropdownMenuItem
+                disabled={locationDelete.deleting}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  locationDelete.remove();
+                }}
+              >
+                <MapPinOff className="mr-2 h-4 w-4" />
+                位置情報を取り除く
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem
               disabled={isPinning}
               onSelect={(e) => {
@@ -394,31 +571,6 @@ export function ImageActionsMenu({
             </DropdownMenuItem>
           </>
         )}
-        {/* このユーザーをミュート（ログイン済み かつ 自分の画像でないとき）。解除は設定から。 */}
-        {canMute && (
-          <DropdownMenuItem
-            onSelect={(e) => {
-              e.preventDefault();
-              setMuteOpen(true);
-            }}
-          >
-            <VolumeX className="mr-2 h-4 w-4" />
-            {isMuted ? "ミュートを変更・解除" : "このユーザーをミュート"}
-          </DropdownMenuItem>
-        )}
-        {/* 通報は全ユーザー向け（自分の画像/未ログイン時は非表示）。 */}
-        {canReport && (
-          <DropdownMenuItem
-            className="text-red-600 focus:text-red-600"
-            onSelect={(e) => {
-              e.preventDefault();
-              setReportOpen(true);
-            }}
-          >
-            <Flag className="mr-2 h-4 w-4" />
-            通報
-          </DropdownMenuItem>
-        )}
       </DropdownMenuContent>
       {canReport && (
         <ReportDialog
@@ -435,6 +587,15 @@ export function ImageActionsMenu({
           alreadyMuted={isMuted}
           open={muteOpen}
           onOpenChange={setMuteOpen}
+        />
+      )}
+      {exif && (
+        <ExifDetailDialog
+          cameraMake={exif.cameraMake}
+          cameraModel={exif.cameraModel}
+          details={exif.details}
+          open={exifOpen}
+          onOpenChange={setExifOpen}
         />
       )}
       <Dialog open={optionsOpen} onOpenChange={setOptionsOpen}>

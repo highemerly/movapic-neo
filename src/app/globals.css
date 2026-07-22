@@ -272,6 +272,29 @@
   }
 }
 
+/* 画像詳細ページのミートボール「あなたのサーバーで開く」用。1アイコン分の枠に3アイコンを重ね、
+   順番に1つずつ表示してラベルの左揃えを保ちつつ「返信/リノート/ブックマークができる」を示す。
+   3枚を同じアニメで負のディレイ差（0 / -1/3 / -2/3 周期）を付けて回し、常に1枚だけ見える。 */
+@keyframes interact-icon-cycle {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  6% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  27% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  33%,
+  100% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+}
+
 @keyframes banner-shine {
   0% {
     transform: translateX(-150%) skewX(-12deg);
