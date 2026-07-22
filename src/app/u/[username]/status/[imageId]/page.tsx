@@ -625,6 +625,8 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
                 arrangement: image.arrangement,
                 season: image.season,
               }}
+              hasEmoji={hasEmoji(image.overlayText)}
+              hasNonEmojiText={hasNonEmojiText(image.overlayText)}
               nativeShare={{
                 imageUrl,
                 mimeType: image.mimeType,

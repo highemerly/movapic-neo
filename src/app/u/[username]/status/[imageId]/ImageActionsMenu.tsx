@@ -39,19 +39,18 @@ import {
   POSITION_LABELS,
   COLOR_LABELS,
   SIZE_LABELS,
-  FONT_LABELS,
   ARRANGEMENT_LABELS,
   VISIBILITY_LABELS,
   type Position,
   type Color,
   type Size,
-  type FontFamily,
   type Arrangement,
 } from "@/types";
 import { SegmentControl } from "@/components/SegmentControl";
 import { Button } from "@/components/ui/button";
 import { seasonLabel } from "@/lib/seasons/catalog";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { FontLicenseBadge } from "./FontLicenseBadge";
 
 /** 再投稿ダイアログの公開範囲（local は連合しないので対象外）。 */
 type RepostVisibility = "public" | "unlisted";
@@ -110,6 +109,16 @@ interface ImageActionsMenuProps {
     /** シーズン（期間限定）キー。セット時は個別オプションの代わりにシーズン名のみ表示 */
     season?: string | null;
   };
+  /**
+   * 本文に絵文字を含むか。true のときコメント設定モーダルのフォント欄に絵文字フォント
+   * （Noto Emoji）のライセンスバッジも並べ、詳細ページのメタ行と同じ導線を提供する。
+   */
+  hasEmoji?: boolean;
+  /**
+   * 本文に絵文字以外の文字を含むか。false（絵文字のみ）のときは本文フォントが描画に
+   * 使われないため、フォント欄に本文フォントのバッジを出さない。
+   */
+  hasNonEmojiText?: boolean;
 }
 
 /**
@@ -166,6 +175,8 @@ export function ImageActionsMenu({
   shareLinkUrl,
   locationLabel,
   options,
+  hasEmoji = false,
+  hasNonEmojiText = true,
 }: ImageActionsMenuProps) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -193,6 +204,17 @@ export function ImageActionsMenu({
   const serverName = instanceDomain || "連携サーバー";
   // 「あなたのサーバー」ラベル（未取得時のみ汎称）。
   const yourServer = viewerServerName || "あなたのサーバー";
+  // 本文フォントか絵文字フォントの少なくとも一方が描画に使われるとき、コメント設定モーダルに
+  // フォント欄（ライセンスバッジ）を出す。どちらも無い（＝本文なし）なら空行を避けて省く。
+  const showFontRow = hasNonEmojiText || hasEmoji;
+  // 詳細ページのメタ行と同じライセンス導線を、モーダルのフォント欄でも共有する。
+  const fontBadges = (
+    <FontLicenseBadge
+      font={options.font}
+      hasEmoji={hasEmoji}
+      hasNonEmojiText={hasNonEmojiText}
+    />
+  );
 
   // グループ1（閲覧・共有系）の表示可否。コメント設定は無条件なので常に非空。
   const showExif = !!exif;
@@ -606,16 +628,28 @@ export function ImageActionsMenu({
               コメント設定
             </DialogTitle>
             <DialogDescription className="text-left">
-              この画像にコメントを合成した際の設定内容です。
+              コメント合成のオプションです。
             </DialogDescription>
           </DialogHeader>
           <dl className="space-y-2 text-sm">
             {options.season ? (
-              // シーズン（期間限定）投稿: スタイル列は中立デフォルトなので、シーズン名だけ示す。
-              <div className="flex items-center justify-between gap-2">
-                <dt className="text-muted-foreground">シーズン</dt>
-                <dd>{seasonLabel(options.season)}</dd>
-              </div>
+              // シーズン（期間限定）投稿: スタイル列は中立デフォルトなので、シーズン名を示す。
+              // 生成時のプリセットフォント（image.font）は保存されているため、期間限定アレンジで
+              // 使われているフォントとしてバッジで表示し、ライセンスモーダルへ導線を通す。
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-muted-foreground">シーズン</dt>
+                  <dd>{seasonLabel(options.season)}</dd>
+                </div>
+                {showFontRow && (
+                  <div className="flex items-center justify-between gap-2">
+                    <dt className="text-muted-foreground">フォント</dt>
+                    <dd className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-right">
+                      {fontBadges}
+                    </dd>
+                  </div>
+                )}
+              </>
             ) : (
               <>
                 <div className="flex items-center justify-between gap-2">
@@ -632,10 +666,14 @@ export function ImageActionsMenu({
                   <dt className="text-muted-foreground">サイズ</dt>
                   <dd>{SIZE_LABELS[options.size as Size] || options.size}</dd>
                 </div>
-                <div className="flex items-center justify-between gap-2">
-                  <dt className="text-muted-foreground">フォント</dt>
-                  <dd>{FONT_LABELS[options.font as FontFamily] || options.font}</dd>
-                </div>
+                {showFontRow && (
+                  <div className="flex items-center justify-between gap-2">
+                    <dt className="text-muted-foreground">フォント</dt>
+                    <dd className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-right">
+                      {fontBadges}
+                    </dd>
+                  </div>
+                )}
                 {options.arrangement !== "none" && (
                   <div className="flex items-center justify-between gap-2">
                     <dt className="text-muted-foreground">アレンジ</dt>
