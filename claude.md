@@ -51,7 +51,7 @@
 - **レスポンシブ**: PC/モバイルは同一ページで別レイアウト。境界は `md`（768px）、判定は原則CSSのみ。PCは右レール（`md:pr-[60px]`＝`RAIL_COLLAPSED`と一致）・モバイル/standaloneは下部ナビ。ページ幅は `container mx-auto px-4 max-w-6xl`。
 - **ボタンカラー**: `primary`（neutral黒/白＝一般ボタン。shadcn既定）と `brand`（ピンク＝主役CTAのみ）を区別。迷ったら primary。
 - **共通セレクター**: 選択トグルは必ず [SegmentControl.tsx](src/components/SegmentControl.tsx) を使う（手書き複製禁止）。ドロップダウン `ui/select` は基本使わない。
-- **画像表示**: 原本表示は [RetryImage](src/components/gallery/RetryImage.tsx)、アバター等の小画像は [RetryImg](src/components/RetryImg.tsx)（iOS一過性失敗を同一URLで最大2回リトライ・バスター禁止・失敗時は灰プレースホルダ）。サムネは不要。
+- **画像表示**: 原本表示は [RetryImage](src/components/gallery/RetryImage.tsx)、アバター等の小画像は [RetryImg](src/components/RetryImg.tsx)（iOS一過性失敗を同一URLで最大2回リトライ・バスター禁止・失敗時は灰プレースホルダ）。サムネ（`Image.thumbnailKey`＝128px WebP・投稿時 [thumbnail.ts](src/lib/thumbnail.ts) で生成。通知/地図/前後ナビの小プレビューで使用）は縮小表示でデコードが軽く**リトライ不要**＝原本を出す箇所だけがリトライ対象。なお一覧グリッドの [ThumbnailImage](src/components/gallery/ThumbnailImage.tsx) は名前に反し原本をCSS縮小表示（保存サムネは使わない）。
 
 ### 文字配置・生成（詳細: [docs/text-rendering.md](docs/text-rendering.md)）
 - 位置 上/下＝横書き左揃え・幅超過で改行。左/右＝縦書き上揃え・高さ超過で次列（右→左）。縦書きは句読点/括弧の回転あり。
