@@ -24,7 +24,7 @@ const MISSKEY_HEADERS = {
  * - 404/410 など → false（削除済み）
  * - ネットワーク/権限エラー等 → false（確証が持てないため尋ねない）
  */
-export async function mastodonStatusExists(
+async function mastodonStatusExists(
   domain: string,
   accessToken: string,
   statusId: string
@@ -53,7 +53,7 @@ export async function mastodonStatusExists(
  * すでに存在しない（404/410）場合も成功として扱う。
  * @returns 削除できた/もともと無い場合は true、失敗した場合は false
  */
-export async function deleteMastodonStatus(
+async function deleteMastodonStatus(
   domain: string,
   accessToken: string,
   statusId: string
@@ -87,7 +87,7 @@ export async function deleteMastodonStatus(
  * Misskeyのノートがまだ存在するか確認する（notes/show が 200 なら存在）。
  * home/followers 投稿も確認できるよう、トークン付きで叩く。
  */
-export async function misskeyNoteExists(
+async function misskeyNoteExists(
   domain: string,
   accessToken: string,
   noteId: string
@@ -111,7 +111,7 @@ export async function misskeyNoteExists(
  * すでに存在しない（NO_SUCH_NOTE / 404）場合も成功として扱う。
  * @returns 削除できた/もともと無い場合は true、失敗した場合は false
  */
-export async function deleteMisskeyNote(
+async function deleteMisskeyNote(
   domain: string,
   accessToken: string,
   noteId: string

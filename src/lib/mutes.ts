@@ -128,7 +128,7 @@ export async function getActiveMutes(
  * muter が mutedUser を現在ミュートしているか（有効な期限のもの）を返す。
  * ユーザーページの「ミュート中」バッジと解除期限表示に使う。
  */
-export async function getActiveMute(
+async function getActiveMute(
   muterId: string,
   mutedUserId: string,
   now: Date = new Date()

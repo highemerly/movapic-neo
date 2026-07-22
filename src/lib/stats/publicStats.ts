@@ -97,7 +97,7 @@ function buildBreakdown(
 }
 
 /** 投稿オプションの利用傾向（サービス全体・公開投稿）。 */
-export async function getOptionStats(): Promise<OptionBreakdown[]> {
+async function getOptionStats(): Promise<OptionBreakdown[]> {
   // スタイル系はシーズンのプリセットを除外（ユーザーが自分で選んだ傾向を見る）
   const styleWhere = { ...PUBLIC_WHERE, season: null } satisfies Prisma.ImageWhereInput;
   const count = { _all: true } as const;
@@ -120,7 +120,7 @@ export async function getOptionStats(): Promise<OptionBreakdown[]> {
 }
 
 /** 投稿ソース（Web/Bot/メール）と Fediverse への投稿有無。 */
-export async function getPostingStats(): Promise<OptionBreakdown[]> {
+async function getPostingStats(): Promise<OptionBreakdown[]> {
   const count = { _all: true } as const;
   const [src, federated, localOnly] = await Promise.all([
     prisma.image.groupBy({ by: ["source"], where: PUBLIC_WHERE, _count: count }),
@@ -177,7 +177,7 @@ const SECTION_ORDER = [
 ] as const;
 
 /** 実績の取得状況（サービス全体・key ごとの保有ユーザー数）。 */
-export async function getAchievementStats(): Promise<AchievementStats> {
+async function getAchievementStats(): Promise<AchievementStats> {
   const [totalUsers, grouped] = await Promise.all([
     prisma.user.count(),
     prisma.achievement.groupBy({ by: ["key"], _count: { _all: true } }),
@@ -286,7 +286,7 @@ const JST_DATE = Prisma.sql`(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/To
  * ラダー系指標の「実際の数値」によるユーザー分布（ヒストグラム）。
  * スタイル由来（色・ネオン等）はシーズン投稿を除外（ユーザーが選んだ分だけ）。
  */
-export async function getDistributionStats(): Promise<DistributionBreakdown[]> {
+async function getDistributionStats(): Promise<DistributionBreakdown[]> {
   const [instanceRows, main, dailyRows, streakRows] = await Promise.all([
     // サーバー種別（Mastodon/Misskey）ごとのユーザー数
     prisma.instance.findMany({
