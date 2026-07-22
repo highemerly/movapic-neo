@@ -4,22 +4,31 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { Heart } from "lucide-react";
 import { FavoriterAvatars } from "@/components/user/FavoriterAvatars";
 import { formatFavoriteCount } from "@/lib/utils";
-
-interface Favoriter {
-  acct: string;
-  displayName: string | null;
-  avatarUrl: string | null;
-  profileUrl: string | null;
-}
+import {
+  emitFavorite,
+  subscribeFavorite,
+  type FavoriterInfo,
+} from "./favoriteSync";
 
 interface FavoriteButtonProps {
   imageId: string;
   initialCount: number;
   initialIsFavorited: boolean;
-  initialFavoriters: Favoriter[];
+  initialFavoriters: FavoriterInfo[];
   canFavorite: boolean;
   initialSyncError?: string | null;
   disabledReason?: string;
+  /**
+   * コンパクト表示。トグル（ハート＋件数）だけを描画し、お気に入り者のアバター列・エラー文言行は
+   * 出さない。画像詳細ページのアクションバー（PCインライン行／モバイルのフローティング）用。
+   * アバターは別途インラインに常時表示する。エラーは title に載せる。
+   */
+  compact?: boolean;
+  /**
+   * compact のとき、フローティング（透過コンテナ上）で使うか。true なら自前の背景＋影＋
+   * pointer-events-auto を付けて浮いて見せる。false（PCインライン行）は他ボタンと同じ素の枠。
+   */
+  floating?: boolean;
 }
 
 export function FavoriteButton({
@@ -30,10 +39,12 @@ export function FavoriteButton({
   canFavorite,
   initialSyncError,
   disabledReason,
+  compact = false,
+  floating = false,
 }: FavoriteButtonProps) {
   const [isFavorited, setIsFavorited] = useState(initialIsFavorited);
   const [count, setCount] = useState(initialCount);
-  const [favoriters, setFavoriters] = useState<Favoriter[]>(initialFavoriters);
+  const [favoriters, setFavoriters] = useState<FavoriterInfo[]>(initialFavoriters);
   const [statusMessage, setStatusMessage] = useState<string | null>(initialSyncError ?? null);
   const [isLoading, setIsLoading] = useState(false);
   const [showAnimation, setShowAnimation] = useState(false);
@@ -52,12 +63,31 @@ export function FavoriteButton({
         setIsFavorited(data.isFavorited);
         setFavoriters(data.favoriters ?? []);
         setStatusMessage(data.syncError ?? null);
+        // 同ページの他インスタンス（トグルの片割れ・アイコン列）へ同期結果を配信
+        emitFavorite(imageId, {
+          count: data.favoriteCount,
+          isFavorited: data.isFavorited,
+          favoriters: data.favoriters ?? [],
+          statusMessage: data.syncError ?? null,
+        });
       } catch {
         // ネットワーク等で同期API自体に到達できない場合
         setStatusMessage("お気に入り情報の同期に失敗しました");
       }
     })();
   }, [imageId]);
+
+  // 同ページの他インスタンスの変更を受信して自分の表示を更新する（受信側は emit しない＝echo防止）。
+  useEffect(
+    () =>
+      subscribeFavorite(imageId, (snap) => {
+        setCount(snap.count);
+        setIsFavorited(snap.isFavorited);
+        setFavoriters(snap.favoriters);
+        setStatusMessage(snap.statusMessage);
+      }),
+    [imageId],
+  );
 
   const handleFavorite = useCallback(async () => {
     if (!canFavorite || isLoading) return;
@@ -93,10 +123,18 @@ export function FavoriteButton({
       }
 
       const data = await response.json();
+      const nextFavoriters = data.favoriters ?? previousFavoriters;
       setCount(data.favoriteCount);
       setIsFavorited(data.isFavorited);
-      setFavoriters(data.favoriters ?? previousFavoriters);
+      setFavoriters(nextFavoriters);
       setStatusMessage(data.syncError ?? null);
+      // 成功時のみ配信（楽観更新・失敗リバートは自インスタンス内で完結し、他インスタンスは元々未変更）。
+      emitFavorite(imageId, {
+        count: data.favoriteCount,
+        isFavorited: data.isFavorited,
+        favoriters: nextFavoriters,
+        statusMessage: data.syncError ?? null,
+      });
     } catch {
       setIsFavorited(wasFavorited);
       setCount(previousCount);
@@ -106,6 +144,38 @@ export function FavoriteButton({
       setIsLoading(false);
     }
   }, [imageId, canFavorite, isLoading, isFavorited, count, favoriters]);
+
+  // コンパクト（アクションバー）: トグルのピルだけを描く。floating（透過コンテナ上）のときだけ
+  // 自前の背景＋影を付けて浮いて見せ、クリック透過コンテナの中で押せるよう pointer-events-auto を持つ。
+  if (compact) {
+    return (
+      <div className="relative shrink-0 pointer-events-auto">
+        <button
+          onClick={handleFavorite}
+          disabled={!canFavorite || isLoading}
+          className={`flex items-center gap-1.5 px-3 h-[44px] border rounded-md transition-colors ${
+            floating ? "bg-background/60 backdrop-blur-xl shadow-md " : ""
+          }${
+            isFavorited
+              ? "text-red-500 hover:text-red-600 border-red-200"
+              : "text-muted-foreground hover:text-red-500 border-border"
+          } ${!canFavorite ? "cursor-not-allowed opacity-50" : ""}`}
+          title={statusMessage ?? (!canFavorite ? disabledReason : undefined)}
+          aria-label="お気に入り"
+        >
+          <Heart
+            className={`h-4 w-4 transition-all ${isFavorited ? "fill-current" : ""}`}
+          />
+          <span className="text-sm font-medium">{formatFavoriteCount(count)}</span>
+        </button>
+        {showAnimation && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <Heart className="h-4 w-4 fill-red-500 text-red-500 animate-float-up" />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   // 親（status ページ）の flex 行の唯一の子。className 無しだと flex:0 1 auto で
   // 中身の幅に縮み、内側の FavoriterAvatars(flex-1) に空き幅が渡らず「収まる数」を
@@ -118,7 +188,7 @@ export function FavoriteButton({
           <button
             onClick={handleFavorite}
             disabled={!canFavorite || isLoading}
-            className={`flex items-center gap-1.5 px-4 h-[40px] border rounded-md transition-colors ${
+            className={`flex items-center gap-1.5 px-4 h-[44px] border rounded-md transition-colors ${
               isFavorited
                 ? "text-red-500 hover:text-red-600 border-red-200"
                 : "text-muted-foreground hover:text-red-500 border-border"

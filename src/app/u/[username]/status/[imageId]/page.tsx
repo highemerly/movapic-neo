@@ -16,8 +16,8 @@ import { isImageRepostable } from "@/lib/publish/repostImage";
 import { MisskeyOpenButton } from "./MisskeyOpenButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { FavoriteButton } from "@/components/favorite/FavoriteButton";
-import { RetryImage } from "@/components/gallery/RetryImage";
-import { AltTextReveal } from "@/components/AltTextReveal";
+import { FavoriteAvatarsLive } from "@/components/favorite/FavoriteAvatarsLive";
+import { ExpandableDetailImage } from "./ExpandableDetailImage";
 import { BackLink } from "@/components/BackLink";
 import { PageContainer } from "@/components/PageContainer";
 import {
@@ -47,6 +47,24 @@ import { sanitizeExifDetails } from "@/lib/exif/details";
 import { Images, CalendarDays, MapPin, Reply, Repeat2, Bookmark, Link2 } from "lucide-react";
 
 export const dynamic = "force-dynamic";
+
+// 画像本体の高さ上限（動的ビューポート高 dvh 比）。縦長画像が画面を占有して見かけの拡大率が
+// バラつく／下のUI位置がずれるのを防ぐため、この高さに収まるよう画像幅を絞る（page内で参照）。
+const IMAGE_MAX_VH = 72;
+
+// モバイル限定フローティングバーがログイン時に下部ナビの真上へ乗るための bottom オフセット。
+// 下部ナビ（BottomNav）はログイン時のみ・モバイル(<768px)で表示され、globals.css が body に
+// `3.5rem + safe-area` の余白を確保する。バーはナビ高さぶん持ち上げる。未ログイン(favoritableのみ)は
+// ナビが無いので呼び出し側で bottom-0＋自前 safe-area にフォールバックする。
+// ナビ高さ（3.5rem+safe-area）に加えて 0.5rem だけ隙間を空け、バーがナビにくっつき過ぎないようにする。
+const NAV_OFFSET = "bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.5rem)]";
+
+// モバイルのフローティングバーで各ボタンに共通で付ける「浮いて見える」ピル装飾。帯を敷かず各ボタン
+// だけ背景を持たせ、ボタン間の隙間から下の画面が透けるようにする（コンテナは pointer-events-none で
+// クリックも透過し、各ボタンだけ pointer-events-auto で操作できる）。背景は若干透過＋強めのブラーで
+// すりガラス風にし「浮いている」印象を出す（数値はここと各ボタン側を合わせて調整）。
+const PILL =
+  "pointer-events-auto shrink-0 bg-background/60 backdrop-blur-xl shadow-md";
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { username, imageId } = await params;
@@ -398,6 +416,133 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     backLabel = `${galleryName} のホームに戻る`;
   }
 
+  // 返信・シェア・その他メニュー。PC（インライン）とモバイル（下部フローティングバー）で
+  // 同じ操作を出すが、見た目・出し分けが異なる（floating）ので1箇所にまとめてフラグで切り替える。
+  // - PC: 行幅いっぱいに伸ばす（flex-auto/flex-1）。従来どおり全ボタンを表示。
+  // - モバイル: 各ボタンを実寸ピル化し背景＋影を付与（PILL）。並びは お気に入り／サーバーで開く／
+  //   共有（ネイティブ・≥380px のみ）／メニュー。「リンクを投稿」はバーには出さず（横幅節約）
+  //   ミートボール内に残す。狭い画面(<380px)は共有も隠して3つに収める。
+  const actionButtons = (floating: boolean) => (
+    <>
+      {/* お気に入りトグル（ハート＋数）。アイコン列は別途インラインに常時表示する。 */}
+      {favoritable && (
+        <FavoriteButton
+          imageId={imageId}
+          initialCount={image.favoriteCount}
+          initialIsFavorited={isFavorited}
+          initialFavoriters={[]}
+          canFavorite={canFavorite}
+          initialSyncError={initialSyncError}
+          disabledReason={
+            persistedReason === "deleted"
+              ? "この投稿は削除されているため操作できません"
+              : "お気に入りはMastodon・Misskeyアカウントで利用できます"
+          }
+          compact
+          floating={floating}
+        />
+      )}
+      {/* 返信ボタンが出るケースは横が窮屈になるので、両ボタンを2行＋小さめ文字にして
+          320px 幅でも収める（高さは h-[44px] 固定）。 */}
+      {mastodonReplyUrl && (
+        <a
+          href={mastodonReplyUrl}
+          className={
+            floating
+              ? `${PILL} flex items-center justify-center gap-1 h-[44px] px-2 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border`
+              : "flex flex-auto items-center justify-center gap-1 h-[44px] px-1 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
+          }
+          title="あなたのサーバーでこの投稿を開きます（返信・ブースト・ブックマーク・お気に入りができます）"
+        >
+          <span className="flex shrink-0 items-center gap-0.5">
+            <Reply className="h-4 w-4" />
+            <Repeat2 className="h-4 w-4" />
+            <Bookmark className="h-4 w-4" />
+          </span>
+          <span className="flex flex-col items-start leading-tight text-[10px] font-medium">
+            <span>あなたの</span>
+            <span>サーバーで開く</span>
+          </span>
+        </a>
+      )}
+      {misskeyOpenPostUrl && (
+        <MisskeyOpenButton postUrl={misskeyOpenPostUrl} floating={floating} />
+      )}
+      {/* 「リンクを投稿」はモバイルのフローティングバーには出さない（横幅節約・ミートボールに残す）。
+          PC（インライン）は従来どおり表示。 */}
+      {!floating && shareUrl && (
+        <a
+          href={shareUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex items-center justify-center gap-1.5 h-[44px] border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border ${hasInteractButton ? "flex-auto px-1.5" : "flex-1 px-2.5"}`}
+          title="あなたのサーバーで、このURLを投稿します"
+        >
+          <Link2 className="h-4 w-4 shrink-0" />
+          {hasInteractButton ? (
+            <span className="flex flex-col items-start leading-tight text-[10px] font-medium">
+              <span>リンクを</span>
+              <span>投稿</span>
+            </span>
+          ) : (
+            <span className="flex flex-col items-start leading-none">
+              <span className="text-xs font-medium whitespace-nowrap mt-0.5">リンクを投稿</span>
+            </span>
+          )}
+        </a>
+      )}
+      <NativeShareButton
+        imageUrl={imageUrl}
+        mimeType={image.mimeType}
+        fileBaseName={`shamezo-${imageId}`}
+        text={image.overlayText}
+        url={pageUrl}
+        floating={floating}
+      />
+      <ImageActionsMenu
+        imageId={imageId}
+        username={username}
+        isOwner={isOwner}
+        initialIsPinned={!!image.pinnedAt}
+        repostable={repostable}
+        instanceDomain={image.user.instance.domain}
+        defaultVisibility={
+          image.user.defaultVisibility === "unlisted" ? "unlisted" : "public"
+        }
+        canReport={!isOwner}
+        canMute={!isOwner}
+        isMuted={isMutingAuthor}
+        exif={exif}
+        postUrl={image.postUrl}
+        viewerServerName={currentUser?.instance.domain ?? ""}
+        mastodonOpenUrl={mastodonReplyUrl}
+        misskeyOpenPostUrl={misskeyOpenPostUrl}
+        shareLinkUrl={shareUrl}
+        locationLabel={isOwner ? locationLabel : null}
+        options={{
+          position: image.position,
+          color: image.color,
+          size: image.size,
+          font: image.font,
+          arrangement: image.arrangement,
+          season: image.season,
+        }}
+        hasEmoji={hasEmoji(image.overlayText)}
+        hasNonEmojiText={hasNonEmojiText(image.overlayText)}
+        nativeShare={{
+          imageUrl,
+          mimeType: image.mimeType,
+          fileBaseName: `shamezo-${imageId}`,
+          text: image.overlayText,
+          url: pageUrl,
+        }}
+        // フローティングではミートボールを常に右端へ寄せる（左の余白を ml-auto で吸わせる。
+        // 他ボタンの有無に依らず右寄せになる）。PC インラインは他ボタンが伸びるので不要。
+        triggerClassName={floating ? `${PILL} ml-auto` : undefined}
+      />
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader user={currentUser ? { username: currentUser.username, instanceDomain: currentUser.instance.domain, avatarUrl: getAvatarUrl(currentUser.avatarUrl) } : null} />
@@ -418,21 +563,22 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         {/* ヘッダー */}
         <BackLink href={backUrl}>{backLabel}</BackLink>
 
-        {/* 画像。ALTがある場合は右下に「ALT」バッジを重ね、押すと画像下にALTテキストを展開。 */}
+        {/* 画像。ALTがある場合は右下に「ALT」バッジを重ね、押すと画像下にALTテキストを展開。
+            アスペクト比で幅から高さが決まる（RetryImage の aspectRatio）ため、縦長画像だと
+            高さが青天井になり画面を占有し、見かけの拡大率も画像ごとにバラつく。そこで高さ上限
+            IMAGE_MAX_VH を「幅の上限 = 上限高さ × アスペクト比」に読み替えて mx-auto でラッパー幅を
+            絞ることで、レターボックスを出さずに高さだけを一定内に収める（横長は従来どおり幅いっぱい）。
+            この抑制はモバイル（max-md）だけに掛け、PC は従来どおり幅いっぱいに表示する。
+            大きく見たいときは画像タップでフル幅↔上限をトグルできる（ExpandableDetailImage）。 */}
         <div className="mb-2">
-          <AltTextReveal altText={image.altText}>
-            <div className="rounded-lg overflow-hidden bg-muted">
-              <RetryImage
-                src={imageUrl}
-                alt={image.altText || image.overlayText}
-                loading="eager"
-                aspectRatio={image.width / image.height}
-                blurDataUrl={image.blurDataUrl}
-                containerClassName="w-full"
-                imgClassName="absolute inset-0 h-full w-full object-contain"
-              />
-            </div>
-          </AltTextReveal>
+          <ExpandableDetailImage
+            src={imageUrl}
+            alt={image.altText || image.overlayText}
+            altText={image.altText}
+            aspectRatio={image.width / image.height}
+            blurDataUrl={image.blurDataUrl}
+            maxVh={IMAGE_MAX_VH}
+          />
         </div>
 
         {/* テキスト */}
@@ -517,124 +663,27 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           ) : null}
         </div>
 
-        {/* お気に入り（Fediverse連携：Mastodon=favourite / Misskey=リアクション） */}
-        {favoritable ? (
-          <div className="mt-[10px] flex items-center gap-2">
-            <FavoriteButton
-              imageId={imageId}
-              initialCount={image.favoriteCount}
-              initialIsFavorited={isFavorited}
-              initialFavoriters={cachedFavoriters.map((f) => ({
-                acct: f.acct,
-                displayName: f.displayName,
-                avatarUrl: getAvatarUrl(f.avatarUrl),
-                profileUrl: f.profileUrl,
-              }))}
-              canFavorite={canFavorite}
-              initialSyncError={initialSyncError}
-              disabledReason={
-                persistedReason === "deleted"
-                  ? "この投稿は削除されているため操作できません"
-                  : !currentUser
-                    ? "ログインするとお気に入りできます"
-                    : "お気に入りはMastodon・Misskeyアカウントで利用できます"
-              }
-            />
-          </div>
-        ) : null}
+        {/* お気に入り者アイコン（インライン・読み取り専用）。先頭に ♡ アイコンを付けて誰が
+            お気に入りしたかを並べる。ログイン/未ログイン共通の表示で、操作トグルは持たない
+            （ログイン時のトグルはアクションバー内。バーでお気に入りすると favoriteSync 経由で
+            このアイコン列も即時更新される）。0件のときは行ごと非表示。 */}
+        {favoritable && (
+          <FavoriteAvatarsLive
+            imageId={imageId}
+            initialFavoriters={cachedFavoriters.map((f) => ({
+              acct: f.acct,
+              displayName: f.displayName,
+              avatarUrl: getAvatarUrl(f.avatarUrl),
+              profileUrl: f.profileUrl,
+            }))}
+          />
+        )}
 
-        {/* 返信・シェア・その他メニュー。いずれもログインユーザー向けの操作（ミートボール内の
-            閲覧系も含め）なので、未ログイン時は行ごと描画しない。 */}
+        {/* 返信・シェア・その他メニュー＋お気に入りトグル（インライン）。ログイン時かつ PC のみ描画
+            （モバイルのログイン時はフローティングバーへ）。 */}
         {currentUser && (
-          <div className="mt-[10px] flex items-center gap-1">
-            {/* 返信ボタンが出るケースは横が窮屈になるので、両ボタンを2行＋小さめ文字にして
-                320px 幅でも収める（高さは h-[40px] 固定のまま変えない）。 */}
-            {mastodonReplyUrl && (
-              <a
-                href={mastodonReplyUrl}
-                className="flex flex-auto items-center justify-center gap-1 h-[40px] px-1 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
-                title="あなたのサーバーでこの投稿を開きます（返信・ブースト・ブックマーク・お気に入りができます）"
-              >
-                <span className="flex shrink-0 items-center gap-0.5">
-                  <Reply className="h-4 w-4" />
-                  <Repeat2 className="h-4 w-4" />
-                  <Bookmark className="h-4 w-4" />
-                </span>
-                <span className="flex flex-col items-start leading-tight text-[10px] font-medium">
-                  <span>あなたの</span>
-                  <span>サーバーで開く</span>
-                </span>
-              </a>
-            )}
-            {misskeyOpenPostUrl && (
-              <MisskeyOpenButton postUrl={misskeyOpenPostUrl} />
-            )}
-            {shareUrl && (
-              <a
-                href={shareUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`flex items-center justify-center gap-1.5 h-[40px] border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border ${hasInteractButton ? "flex-auto px-1.5" : "flex-1 px-2.5"}`}
-                title="あなたのサーバーで、このURLを投稿します"
-              >
-                <Link2 className="h-4 w-4 shrink-0" />
-                {hasInteractButton ? (
-                  <span className="flex flex-col items-start leading-tight text-[10px] font-medium">
-                    <span>リンクを</span>
-                    <span>投稿</span>
-                  </span>
-                ) : (
-                  <span className="flex flex-col items-start leading-none">
-                    <span className="text-xs font-medium whitespace-nowrap mt-0.5">リンクを投稿</span>
-                  </span>
-                )}
-              </a>
-            )}
-            <NativeShareButton
-              imageUrl={imageUrl}
-              mimeType={image.mimeType}
-              fileBaseName={`shamezo-${imageId}`}
-              text={image.overlayText}
-              url={pageUrl}
-            />
-            <ImageActionsMenu
-              imageId={imageId}
-              username={username}
-              isOwner={isOwner}
-              initialIsPinned={!!image.pinnedAt}
-              repostable={repostable}
-              instanceDomain={image.user.instance.domain}
-              defaultVisibility={
-                image.user.defaultVisibility === "unlisted" ? "unlisted" : "public"
-              }
-              canReport={!isOwner}
-              canMute={!isOwner}
-              isMuted={isMutingAuthor}
-              exif={exif}
-              postUrl={image.postUrl}
-              viewerServerName={currentUser.instance.domain}
-              mastodonOpenUrl={mastodonReplyUrl}
-              misskeyOpenPostUrl={misskeyOpenPostUrl}
-              shareLinkUrl={shareUrl}
-              locationLabel={isOwner ? locationLabel : null}
-              options={{
-                position: image.position,
-                color: image.color,
-                size: image.size,
-                font: image.font,
-                arrangement: image.arrangement,
-                season: image.season,
-              }}
-              hasEmoji={hasEmoji(image.overlayText)}
-              hasNonEmojiText={hasNonEmojiText(image.overlayText)}
-              nativeShare={{
-                imageUrl,
-                mimeType: image.mimeType,
-                fileBaseName: `shamezo-${imageId}`,
-                text: image.overlayText,
-                url: pageUrl,
-              }}
-            />
+          <div className="mt-[10px] hidden md:flex items-center gap-1">
+            {actionButtons(false)}
           </div>
         )}
 
@@ -710,8 +759,26 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         />
 
         <Footer />
+
+        {/* モバイルのフローティングバーぶんの余白（md:hidden）。固定バーが最後の本文（フッター等）に
+            かぶらないよう末尾に高さを確保する。バーはログイン時のみ描画する。 */}
+        {currentUser && <div aria-hidden className="md:hidden h-[104px]" />}
       </PageContainer>
-      {/* 非ログインユーザーには投稿FABを出さない（ガイドのログイン導線へ誘導） */}
+
+      {/* モバイル(<md)かつログイン時だけの、お気に入り・返信・シェア・その他メニューのフローティング
+          バー。中身（お気に入りトグル含む）は actionButtons に集約。画像のアスペクト比で本文位置が
+          上下しても操作系を画面下部の同じ位置に固定する。帯は敷かず各ボタンだけ背景を持たせ、コンテナは
+          pointer-events-none で隙間から下の画面が見え・クリックも透過する（各ボタンは pointer-events-auto）。
+          1行に収まるよう狭い画面は一部ボタンを隠す。お気に入り者アイコンは本文内インライン表示。 */}
+      {currentUser && (
+        <div
+          className={`md:hidden pointer-events-none fixed inset-x-0 z-30 ${NAV_OFFSET}`}
+        >
+          <div className="mx-auto flex max-w-2xl flex-wrap items-center justify-start gap-3 px-4 py-2">
+            {actionButtons(true)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

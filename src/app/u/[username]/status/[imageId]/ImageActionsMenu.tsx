@@ -421,7 +421,7 @@ export function ImageActionsMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className={`flex shrink-0 items-center justify-center h-[40px] w-[40px] border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border ${triggerClassName ?? ""}`}
+          className={`flex shrink-0 items-center justify-center h-[44px] w-[44px] border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border ${triggerClassName ?? ""}`}
           title="その他"
         >
           <MoreHorizontal className="h-4 w-4" />
