@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toastSaved, toastSettingsError } from "./settingsToast";
 import { SettingToggleRow } from "@/components/SettingRow";
+import { parseApiError, formatErrorMessage } from "@/lib/errors";
 
 interface AutoMakeupToggleProps {
   /** 自動穴埋めが有効か（＝ User.autoMakeup。既定 true）。 */
@@ -34,8 +35,7 @@ export function AutoMakeupToggle({ initialEnabled }: AutoMakeupToggleProps) {
       });
       if (!res.ok) {
         setEnabled(!next); // ロールバック
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error || "保存に失敗しました");
+        throw new Error(formatErrorMessage(await parseApiError(res)));
       }
       toastSaved("settings-automakeup");
       router.refresh();

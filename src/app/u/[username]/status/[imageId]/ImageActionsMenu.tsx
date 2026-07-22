@@ -28,6 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { parseApiError, formatErrorMessage } from "@/lib/errors";
 import {
   Dialog,
   DialogContent,
@@ -236,8 +237,7 @@ export function ImageActionsMenu({
         body: JSON.stringify({ calendarPicked: true }),
       });
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        toast.error(data.error ?? "サムネイルの設定に失敗しました");
+        toast.error(formatErrorMessage(await parseApiError(response)));
         return;
       }
       toast.success("この日のカレンダーサムネイルにしました");
@@ -263,8 +263,7 @@ export function ImageActionsMenu({
 
       if (!response.ok) {
         setIsPinned(wasPinned);
-        const data = await response.json().catch(() => ({}));
-        toast.error(data.error?.message ?? "ピン留めの操作に失敗しました");
+        toast.error(formatErrorMessage(await parseApiError(response)));
         return;
       }
 
@@ -297,8 +296,7 @@ export function ImageActionsMenu({
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "削除に失敗しました");
+        throw new Error(formatErrorMessage(await parseApiError(response)));
       }
 
       // サービスからの削除は完了。連携先（Mastodon/Misskey）に投稿が残っている場合は、
@@ -337,9 +335,8 @@ export function ImageActionsMenu({
               }
             );
             if (!remoteResponse.ok) {
-              const remoteData = await remoteResponse.json().catch(() => ({}));
               throw new Error(
-                remoteData.error || `${platformName}投稿の削除に失敗しました`
+                formatErrorMessage(await parseApiError(remoteResponse))
               );
             }
             deletedRemote = true;
@@ -377,12 +374,11 @@ export function ImageActionsMenu({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ visibility: repostVisibility }),
       });
-      const data = await response.json().catch(() => ({}));
-
       if (!response.ok) {
-        toast.error(data.error?.message ?? data.error ?? "投稿に失敗しました");
+        toast.error(formatErrorMessage(await parseApiError(response)));
         return;
       }
+      const data = await response.json().catch(() => ({}));
 
       // 画像処理は成功したが連合投稿だけ失敗したケース。postId は未設定のままなので、
       // ダイアログを閉じずに再試行できる状態を保つ。

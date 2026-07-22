@@ -8,6 +8,7 @@ import { StackedSquaresIcon } from "./StackedSquaresIcon";
 import { CollageShareDialog } from "./CollageShareDialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { parseApiError, formatErrorMessage } from "@/lib/errors";
 import { isJapaneseHoliday } from "@/lib/holidays";
 import { PERFECT_MONTH_GRACE_DEFAULT } from "@/lib/achievements/perfectMonth";
 import { DayCell } from "./DayCell";
@@ -190,8 +191,7 @@ export function CalendarView({
           body: JSON.stringify(body),
         });
         if (!res.ok) {
-          const d = await res.json().catch(() => ({}));
-          toast.error(d.error ?? "更新に失敗しました");
+          toast.error(formatErrorMessage(await parseApiError(res)));
           return false;
         }
         return true;

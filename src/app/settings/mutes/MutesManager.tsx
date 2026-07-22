@@ -10,6 +10,7 @@ import { RetryImg } from "@/components/RetryImg";
 import { Button } from "@/components/ui/button";
 import { userPathSegment } from "@/lib/userHandle";
 import { useHomeServer } from "@/components/HomeServerProvider";
+import { parseApiError, formatErrorMessage } from "@/lib/errors";
 
 export type MuteEntryDto = {
   id: string;
@@ -58,8 +59,7 @@ export function MutesManager({ mutes }: { mutes: MuteEntryDto[] }) {
         body: JSON.stringify({ mutedUserId }),
       });
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        toast.error(data.error?.message ?? "ミュート解除に失敗しました");
+        toast.error(formatErrorMessage(await parseApiError(response)));
         return;
       }
       toast.success("ミュートを解除しました");

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toastSaved, toastSettingsError } from "./settingsToast";
 import { SettingToggleRow } from "@/components/SettingRow";
+import { parseApiError, formatErrorMessage } from "@/lib/errors";
 
 interface LocationMapToggleProps {
   initialEnabled: boolean;
@@ -32,8 +33,7 @@ export function LocationMapToggle({ initialEnabled, username }: LocationMapToggl
       });
       if (!res.ok) {
         setEnabled(!next); // ロールバック
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data?.error || "保存に失敗しました");
+        throw new Error(formatErrorMessage(await parseApiError(res)));
       }
       toastSaved("settings-locationmap");
       router.refresh();

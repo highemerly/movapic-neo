@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { parseApiError, formatErrorMessage } from "@/lib/errors";
 
 type ModerateAction = "disable" | "restore" | "delete" | "dismiss";
 
@@ -36,8 +37,7 @@ export function ReportActions({ imageId, isDisabled, mode }: ReportActionsProps)
         }
       );
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        toast.error(data.error?.message ?? "操作に失敗しました");
+        toast.error(formatErrorMessage(await parseApiError(response)));
         return;
       }
       toast.success(

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { parseApiError, formatErrorMessage } from "@/lib/errors";
 import { SegmentControl } from "@/components/SegmentControl";
 import { AnnouncementTypeIcon } from "@/components/announcements/AnnouncementTypeIcon";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
@@ -132,8 +133,7 @@ export function AnnouncementsManager({
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        toast.error(data.error?.message ?? "保存に失敗しました");
+        toast.error(formatErrorMessage(await parseApiError(res)));
         return;
       }
       toast.success(editingId === "new" ? "作成しました" : "更新しました");

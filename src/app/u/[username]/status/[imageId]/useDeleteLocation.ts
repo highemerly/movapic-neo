@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { parseApiError, formatErrorMessage } from "@/lib/errors";
 
 /**
  * 写真から撮影場所（位置情報）を削除する共通ロジック。
@@ -34,8 +35,7 @@ export function useDeleteLocation(imageId: string, locationLabel: string) {
         method: "DELETE",
       });
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data?.error?.message || data?.error || "削除に失敗しました");
+        throw new Error(formatErrorMessage(await parseApiError(response)));
       }
       router.refresh();
     } catch (error) {

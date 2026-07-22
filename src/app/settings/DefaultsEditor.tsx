@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toastSaved, toastSettingsError } from "./settingsToast";
+import { parseApiError, formatErrorMessage } from "@/lib/errors";
 import { Label } from "@/components/ui/label";
 import { SettingToggleRow } from "@/components/SettingRow";
 import { SegmentControl } from "@/components/SegmentControl";
@@ -109,8 +110,7 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
           }),
         });
         if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error?.message || "保存に失敗しました");
+          throw new Error(formatErrorMessage(await parseApiError(response)));
         }
         lastSavedRef.current = snapshot;
         router.refresh();
@@ -138,8 +138,7 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
       });
       if (!response.ok) {
         setMentionKeep(!next);
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data?.error || "保存に失敗しました");
+        throw new Error(formatErrorMessage(await parseApiError(response)));
       }
       router.refresh();
       toastSaved("settings-mentionkeep");
@@ -183,8 +182,7 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
           }),
         });
         if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error?.message || "保存に失敗しました");
+          throw new Error(formatErrorMessage(await parseApiError(response)));
         }
         // 保存済みスナップショットを現在値に更新（直後の自動保存 effect を発火させない）
         lastSavedRef.current = JSON.stringify({ position, font, color, size, arrangement, visibility, cameraOption });
@@ -192,8 +190,7 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
         // OFF: 全てクリアしてシステム標準に戻す
         const response = await fetch("/api/v1/me/preferences", { method: "DELETE" });
         if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error?.message || "保存解除に失敗しました");
+          throw new Error(formatErrorMessage(await parseApiError(response)));
         }
         // 表示値もシステム標準に戻す（再度ONにしたとき素の状態から始められるように）
         setPosition(DEFAULT_POSITION);

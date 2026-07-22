@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { VolumeX, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
+import { parseApiError, formatErrorMessage } from "@/lib/errors";
 
 import {
   Dialog,
@@ -67,8 +68,7 @@ export function MuteDialog({
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        toast.error(data.error?.message ?? "ミュートに失敗しました");
+        toast.error(formatErrorMessage(await parseApiError(response)));
         return;
       }
 
@@ -98,8 +98,7 @@ export function MuteDialog({
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        toast.error(data.error?.message ?? "ミュート解除に失敗しました");
+        toast.error(formatErrorMessage(await parseApiError(response)));
         return;
       }
 

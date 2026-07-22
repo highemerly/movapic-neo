@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Flag } from "lucide-react";
 import { toast } from "sonner";
+import { parseApiError, formatErrorMessage } from "@/lib/errors";
 
 import {
   Dialog,
@@ -52,8 +53,7 @@ export function ReportDialog({ imageId, open, onOpenChange }: ReportDialogProps)
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        toast.error(data.error?.message ?? "通報に失敗しました");
+        toast.error(formatErrorMessage(await parseApiError(response)));
         return;
       }
 

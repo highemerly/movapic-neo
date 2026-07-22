@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
+import { parseApiError, formatErrorMessage } from "@/lib/errors";
 
 /**
  * Misskey viewer 向け「あなたのサーバーで開く」の共通ロジック。
@@ -23,9 +24,12 @@ export function useMisskeyOpen(postUrl: string) {
       const res = await fetch(
         `/api/v1/misskey/resolve-note?url=${encodeURIComponent(postUrl)}`
       );
+      if (!res.ok) {
+        throw new Error(formatErrorMessage(await parseApiError(res)));
+      }
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.url) {
-        throw new Error(data.error || "投稿を開けませんでした");
+      if (!data.url) {
+        throw new Error("投稿を開けませんでした");
       }
       // 解決完了。同じタブで viewer サーバーのノートへ遷移（このまま離脱する）。
       window.location.href = data.url;

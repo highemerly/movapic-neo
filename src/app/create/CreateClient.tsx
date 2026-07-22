@@ -849,8 +849,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
         const data = (await res.json()) as { prefecture: string; city: string };
         setGeocoded(data);
       } else {
-        const data = await res.json().catch(() => ({}));
-        setGeocodeError(data?.error || "撮影場所を取得できませんでした");
+        setGeocodeError(formatErrorMessage(await parseApiError(res)));
       }
     } catch {
       setGeocodeError("撮影場所の取得に失敗しました");

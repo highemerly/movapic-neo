@@ -12,6 +12,7 @@ import {
   Moon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { parseApiError, formatErrorMessage } from "@/lib/errors";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import { Button } from "@/components/ui/button";
@@ -137,8 +138,7 @@ export function CollageShareDialog({
         body: JSON.stringify({ year, month, theme }),
       });
       if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        toast.error(d.error ?? "画像の生成に失敗しました");
+        toast.error(formatErrorMessage(await parseApiError(res)));
         return;
       }
       const blob = await res.blob();
@@ -182,9 +182,13 @@ export function CollageShareDialog({
         method: "POST",
         body: form,
       });
+      if (!res.ok) {
+        toast.error(formatErrorMessage(await parseApiError(res)));
+        return;
+      }
       const d = await res.json().catch(() => ({}));
-      if (!res.ok || !d.success) {
-        toast.error(d.error ?? "投稿に失敗しました");
+      if (!d.success) {
+        toast.error("投稿に失敗しました");
         return;
       }
       toast.success("投稿しました");
