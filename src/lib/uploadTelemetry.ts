@@ -33,6 +33,47 @@ export interface UploadFailureReport {
   elapsedMs: number;
   /** それまでに行った自動リトライ回数。 */
   retryCount: number;
+  /** 選択画像のMIME種別（Android の Google フォト/Motion Photo 等の切り分け用）。 */
+  fileType?: string;
+  /** 選択画像の拡張子（ファイル名は送らずプライバシー配慮で拡張子のみ）。 */
+  fileExt?: string;
+  /**
+   * 失敗時点で画像ファイルの中身を実際に読めたか。
+   * Android では Google フォト等のクラウドのみ画像/content:// 権限失効で「送信時にファイル本体を
+   * 読めず即失敗（pct=0）」が起きる。readable=false なら network フェーズの正体がこれだと確定できる。
+   */
+  fileReadable?: boolean;
+  /** 上記読み取りにかかった時間ms。 */
+  fileReadMs?: number;
+  /** 読み取り失敗時の例外名（NotReadableError 等）。 */
+  fileReadError?: string;
+}
+
+/**
+ * 失敗時に画像ファイルが実際に読めるかを実測する。
+ * network フェーズ（送信前に即失敗）の正体が「ファイル本体を読めない（Android のクラウド画像等）」か
+ * どうかを確定させるための計測。エラーパスでのみ呼ぶので全読み込みのコストは許容する。
+ */
+export async function probeFileReadable(
+  file: File | null,
+): Promise<Pick<UploadFailureReport, "fileType" | "fileExt" | "fileReadable" | "fileReadMs" | "fileReadError">> {
+  if (!file) return {};
+  const dot = file.name.lastIndexOf(".");
+  const fileExt = dot >= 0 ? file.name.slice(dot + 1).toLowerCase().slice(0, 8) : "";
+  const started = Date.now();
+  try {
+    // slice(...).arrayBuffer() で本体の読み取りを強制（クラウドのみ画像はここで NotReadableError）。
+    await file.slice(0, file.size).arrayBuffer();
+    return { fileType: file.type, fileExt, fileReadable: true, fileReadMs: Date.now() - started };
+  } catch (e) {
+    return {
+      fileType: file.type,
+      fileExt,
+      fileReadable: false,
+      fileReadMs: Date.now() - started,
+      fileReadError: e instanceof Error ? e.name : "unknown",
+    };
+  }
 }
 
 // navigator.connection（Network Information API）は実験的で型定義が無いため最小限で受ける。

@@ -56,7 +56,7 @@ import {
   UploadError,
   type UploadErrorPhase,
 } from "@/lib/uploadWithProgress";
-import { reportUploadFailure } from "@/lib/uploadTelemetry";
+import { reportUploadFailure, probeFileReadable } from "@/lib/uploadTelemetry";
 import { Label } from "@/components/ui/label";
 
 // 出力形式の表示名
@@ -203,6 +203,14 @@ const UPLOAD_ERROR_MESSAGES: Record<
   aborted: {
     message: "キャンセルしました",
   },
+};
+
+// 画像ファイルの中身を読み取れなかった場合の文言。Android で Google フォト等のクラウドのみ画像や、
+// 選択後に content:// の権限が失効したケースでは、送信時に本体を読めず即失敗する（＝network 扱い）。
+// 「通信エラー」だと的外れなので、端末保存＋選び直しを促す原因即応の案内にする。
+const UNREADABLE_FILE_ERROR = {
+  message: "画像を読み込めませんでした",
+  suggestion: "クラウド上の写真は、端末に保存してから選び直してください",
 };
 
 export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn, firstTime = false, showWelcome = false, postMethods }: CreateClientProps) {
@@ -523,7 +531,12 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
           };
         } catch (err) {
           if (err instanceof UploadError) {
-            // 計測: フェーズ・送信完了後か否か・回線・画像サイズを投げ切り、原因層を特定する。
+            // 計測: フェーズ・送信完了後か否か・回線・画像サイズに加え、失敗時にファイル本体を
+            // 実際に読めるか（Android のクラウド画像で送信前に即失敗＝pct=0 の正体か）を確定する。
+            const fileProbe =
+              err.phase === "network" && !uploadCompleted
+                ? await probeFileReadable(formState.imageFile)
+                : {};
             reportUploadFailure({
               endpoint: "generate",
               phase: err.phase,
@@ -533,7 +546,14 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
               output: formState.output,
               elapsedMs: Date.now() - startedAt,
               retryCount: attempt,
+              ...fileProbe,
             });
+            // 画像本体を読めないと確定した場合は「通信エラー」ではなく原因即応の文言を出す。
+            // 再送しても読めないままなので、ここでリトライを打ち切って即座に案内する。
+            if (fileProbe.fileReadable === false) {
+              showError(UNREADABLE_FILE_ERROR);
+              return null;
+            }
             if (err.phase === "network" && attempt < MAX_NETWORK_RETRIES) {
               // 再送前に短いバックオフ（pod 再起動なら復帰を待つ）。表示は送信中に戻す。
               setUploadPhase("uploading");
