@@ -87,11 +87,21 @@ export function RetryImage({
         blurDataUrl ? (
           // LQIP（原本を32pxに縮小したWebP）のぼかしプレビュー。object-cover で枠を埋め、
           // 拡大＋CSSぼかしで低解像度のドットを馴染ませる（scale はぼかしの透明な縁を隠す）。
-          <div
-            className="absolute inset-0 bg-cover bg-center scale-110"
-            style={{ backgroundImage: `url(${blurDataUrl})`, filter: "blur(12px)" }}
-            aria-hidden
-          />
+          <>
+            <div
+              className="absolute inset-0 bg-cover bg-center scale-110"
+              style={{ backgroundImage: `url(${blurDataUrl})`, filter: "blur(12px)" }}
+              aria-hidden
+            />
+            {/* 読み込み中であることを示す光沢走査。blur の filter を継がないよう別レイヤーに置き、
+                走査帯を枠内でクリップする（帯自体は枠外から差し込む）。 */}
+            <div
+              className="pointer-events-none absolute inset-0 overflow-hidden"
+              aria-hidden
+            >
+              <div className="animate-shimmer absolute inset-y-0 -left-full w-full bg-gradient-to-r from-transparent via-white/3 to-transparent" />
+            </div>
+          </>
         ) : (
           <div
             className={`absolute inset-0 bg-muted ${status === "failed" ? "" : "animate-pulse"}`}

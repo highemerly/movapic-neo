@@ -219,6 +219,10 @@
   .animate-banner-shine {
     animation: banner-shine 2.8s ease-in-out infinite;
   }
+  /* 画像読み込み中のblurプレースホルダに重ねる光沢走査（読み込み中であることを示す） */
+  .animate-shimmer {
+    animation: shimmer 3.5s ease-in-out infinite;
+  }
   /* 皆勤賞の王冠バッジ（金色のグロー＋ゆらぎ） */
   .animate-crown-glow {
     animation: crown-glow 2s ease-in-out infinite;
@@ -302,6 +306,17 @@
   55%,
   100% {
     transform: translateX(420%) skewX(-12deg);
+  }
+}
+
+/* 光の帯を左→右へ走らせる。60%地点で右端に抜けたあと 100% まで留めて、走査と走査の間に小休止を作る。 */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-120%) skewX(-45deg);
+  }
+  85%,
+  100% {
+    transform: translateX(320%) skewX(-45deg);
   }
 }
 
@@ -423,5 +438,9 @@
   .control-in,
   .pill-flash {
     animation: none;
+  }
+  /* 走査を止めると光の帯が中央に居座るため、動きを止める代わりに丸ごと隠す */
+  .animate-shimmer {
+    display: none;
   }
 }
