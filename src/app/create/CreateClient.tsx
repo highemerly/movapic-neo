@@ -337,9 +337,24 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
 
   const handleImageSelect = useCallback(
     async (file: File, preview: string) => {
+      // Android の Google フォト等クラウドのみ画像 / content:// 権限失効対策:
+      // 選択直後（権限が生きている今）にファイル本体をメモリへ実体化し、以後の EXIF 抽出も
+      // アップロードもこのメモリ上コピーを使う。あとで content:// が失効しても送信は成功する。
+      // ここで読めない＝端末に実体が無い真のクラウドのみ画像なので、generate まで進ませず即案内する。
+      let materialized: File;
+      try {
+        const buf = await file.arrayBuffer();
+        materialized = new File([buf], file.name, {
+          type: file.type,
+          lastModified: file.lastModified,
+        });
+      } catch {
+        showError(UNREADABLE_FILE_ERROR);
+        return;
+      }
       setFormState((prev) => ({
         ...prev,
-        imageFile: file,
+        imageFile: materialized,
         imagePreview: preview,
       }));
       // 新しい画像がアップロードされたら生成結果をクリア
@@ -360,7 +375,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
       setManualCity(null);
       setPastLocations(null);
       // 詳細撮影情報も常に抽出しておき（軽量）、ユーザーが detail を選んだ時に送れるようにする。
-      const extracted = await extractExif(file, { detail: true });
+      const extracted = await extractExif(materialized, { detail: true });
       setExif(extracted);
       // ユーザー初期値が show/detail のとき、機種情報があれば同じ値に復元する。
       if (
@@ -393,7 +408,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
         }
       }
     },
-    [preferences.cameraOption],
+    [preferences.cameraOption, showError],
   );
 
   // PWA の Web Share Target 経由で共有された画像を受け取る。
