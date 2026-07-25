@@ -31,6 +31,14 @@ interface PaletteSection {
 const RECENT_ID = "recent";
 const SEARCH_DEBOUNCE_MS = 250;
 
+// セクション遅延マウントの見積り。ダイアログは狭い（sm:max-w-sm＝24rem）ので実測に近い概算で、
+// マウント前プレースホルダの高さを絵文字数から算出する。多少ずれても jumpToの着地が
+// 少し甘くなるだけで実害はない（スクロールバーの高さを安定させ、ジャンプ精度を保つのが目的）。
+const EMOJI_BTN_ROW_H = 46; // h-11(44px)+gap-0.5(2px)
+const EMOJI_PER_ROW = 6;
+// 開いた瞬間に確実に中身を見せるため、先頭からこの数のセクションは IO を待たず即マウントする。
+const EAGER_SECTIONS = 2;
+
 export function ReactionPickerModal({
   open,
   onOpenChange,
@@ -235,29 +243,21 @@ function PickerBody({
               <p className="pt-2 text-sm text-muted-foreground">読み込み中…</p>
             ) : (
               <>
-                {allSections.map((section) => (
-                  <section
+                {allSections.map((section, index) => (
+                  <LazyEmojiSection
                     key={section.id}
-                    ref={(el) => {
+                    section={section}
+                    currentEmoji={currentEmoji}
+                    onPick={pick}
+                    scrollRef={scrollRef}
+                    // 一括マウントによる開いた瞬間のフリーズを避けるため、画面に来たセクションだけ
+                    // 中身を描画する。先頭数セクションは IO のコールバック待ちの空白を避けて即マウント。
+                    eager={index < EAGER_SECTIONS}
+                    registerRef={(el) => {
                       if (el) sectionRefs.current.set(section.id, el);
                       else sectionRefs.current.delete(section.id);
                     }}
-                    className="mb-2"
-                  >
-                    <h3 className="sticky top-0 z-10 bg-background/95 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
-                      {section.label}
-                    </h3>
-                    <EmojiGrid>
-                      {section.emojis.map((item) => (
-                        <EmojiButton
-                          key={item.key}
-                          item={item}
-                          selected={item.key === currentEmoji}
-                          onClick={() => pick(item.key, item.imageUrl)}
-                        />
-                      ))}
-                    </EmojiGrid>
-                  </section>
+                  />
                 ))}
                 {truncated && (
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -270,6 +270,80 @@ function PickerBody({
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * セクション1つ。見出しは常に描画し、絵文字ボタン群はビューポート付近に来たときだけマウントする
+ * （数千個の EmojiButton を一括マウントするとメインスレッドが固まり「開くのが遅い」体感になるため）。
+ * 一度マウントしたら保持し続ける（スクロールを戻したときの再マウント/ちらつきを避ける）。
+ */
+function LazyEmojiSection({
+  section,
+  currentEmoji,
+  onPick,
+  scrollRef,
+  registerRef,
+  eager,
+}: {
+  section: PaletteSection;
+  currentEmoji: string | null;
+  onPick: (emoji: string, imageUrl: string | null) => void;
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  registerRef: (el: HTMLElement | null) => void;
+  eager: boolean;
+}) {
+  const [shown, setShown] = useState(eager);
+  const ref = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (shown) return;
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShown(true);
+          observer.disconnect();
+        }
+      },
+      // スクロール前に先読みでマウントして、到達時に空白が見えないようにする
+      { root: scrollRef.current, rootMargin: "300px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [shown, scrollRef]);
+
+  // マウント前のプレースホルダ高さ＝絵文字数から概算。スクロールバー高とジャンプ着地を安定させる。
+  const placeholderHeight =
+    Math.ceil(section.emojis.length / EMOJI_PER_ROW) * EMOJI_BTN_ROW_H;
+
+  return (
+    <section
+      ref={(el) => {
+        ref.current = el;
+        registerRef(el);
+      }}
+      className="mb-2"
+    >
+      <h3 className="sticky top-0 z-10 bg-background/95 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
+        {section.label}
+      </h3>
+      {shown ? (
+        <EmojiGrid>
+          {section.emojis.map((item) => (
+            <EmojiButton
+              key={item.key}
+              item={item}
+              selected={item.key === currentEmoji}
+              onClick={() => onPick(item.key, item.imageUrl)}
+            />
+          ))}
+        </EmojiGrid>
+      ) : (
+        <div aria-hidden style={{ height: placeholderHeight }} />
+      )}
+    </section>
   );
 }
 
