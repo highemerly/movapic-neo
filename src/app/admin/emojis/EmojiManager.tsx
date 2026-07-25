@@ -34,6 +34,12 @@ function emptyForm(): FormState {
   return { name: "", category: "", aliases: "", file: null };
 }
 
+// ファイル名から名前欄の許可文字（英数字・_ + -）だけを残した候補を作る
+function nameFromFileName(fileName: string): string {
+  const base = fileName.replace(/\.[^.]+$/, "");
+  return base.replace(/[^A-Za-z0-9_+-]/g, "_").replace(/^_+|_+$/g, "");
+}
+
 export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -43,7 +49,12 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const onPickFile = (file: File | null) => {
-    setForm((f) => ({ ...f, file }));
+    setForm((f) => ({
+      ...f,
+      file,
+      // 名前が未入力のときだけファイル名から補完（入力済みは尊重）
+      name: f.name.trim() || !file ? f.name : nameFromFileName(file.name),
+    }));
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(file ? URL.createObjectURL(file) : null);
   };
