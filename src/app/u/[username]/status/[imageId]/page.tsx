@@ -238,6 +238,12 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     (currentUser.instance.type === "mastodon" ||
       currentUser.instance.type === "misskey") &&
     persistedReason !== "deleted";
+  // チップから「同じリアクション」を送れるかの厳密判定（サーバー違い・カスタム絵文字）に使う。
+  const viewerType =
+    currentUser?.instance.type === "mastodon" || currentUser?.instance.type === "misskey"
+      ? currentUser.instance.type
+      : null;
+  const viewerDomain = currentUser?.instance.domain ?? null;
 
   // 連合キャッシュと SHAMEZO 上のリアクションをマージして初期表示を作る。
   // マウント後にクライアントが同じ内容を API から取り直す（TTL切れならその時に同期される）。
@@ -634,6 +640,8 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           imageId={imageId}
           initialSnapshot={initialReactionSnapshot}
           canReact={canReact}
+          viewerType={viewerType}
+          viewerDomain={viewerDomain}
         />
 
         {/* この投稿で獲得した実績（チップをクリックするとお祝いモーダルを開く） */}

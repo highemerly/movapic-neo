@@ -20,10 +20,15 @@ export function ReactionChips({
   imageId,
   initialSnapshot,
   canReact,
+  viewerType,
+  viewerDomain,
 }: {
   imageId: string;
   initialSnapshot: ReactionSnapshot;
   canReact: boolean;
+  /** 閲覧者のインスタンス種別／ドメイン。チップと同じ絵文字を送れるかの厳密判定に使う（未ログインは null） */
+  viewerType: "mastodon" | "misskey" | null;
+  viewerDomain: string | null;
 }) {
   const { snapshot, setSnapshot, viewerEmoji, handlePick, removeWithConfirm } =
     useReactionActions(imageId, initialSnapshot);
@@ -67,7 +72,9 @@ export function ReactionChips({
             users={snapshot.usersByEmoji[chip.emoji] ?? []}
             canReact={canReact}
             hasReacted={!!viewerEmoji}
-            onReact={() => setPickerOpen(true)}
+            viewerType={viewerType}
+            viewerDomain={viewerDomain}
+            onReactSame={() => handlePick(chip.emoji)}
             onRemove={() => void removeWithConfirm()}
           />
         ))}

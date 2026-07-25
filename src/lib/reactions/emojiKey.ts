@@ -114,3 +114,28 @@ export function isSelectableUnicodeEmoji(value: string): boolean {
   if (countGraphemes(value) !== 1) return false;
   return isEmojiGrapheme(value);
 }
+
+/**
+ * 閲覧者がこの絵文字で「同じリアクション」を送れるかの厳密判定。
+ *
+ * サーバーの resolveRequestedEmoji（route.ts）のゲートを、クライアントで確認できる範囲でミラーする
+ * （＝チップから同じリアクションを付け直せる導線の出し分け用）。サーバー側のカスタム絵文字カタログ
+ * 照合だけは client では行えないため、そこは省く（自サーバーの絵文字なら実在するのが通常で、
+ * 万一消えていてもサーバーがエラーで弾く）。
+ *  - Mastodon: Unicode絵文字のみ（リアクションが無く favourite しか送れないため、他サーバーの
+ *    カスタム絵文字は選べない）。
+ *  - Misskey: Unicode絵文字、またはカスタム絵文字が自分のサーバーのもの（他サーバーの絵文字は押せない）。
+ */
+export function canViewerReactWith(
+  emoji: string,
+  viewerType: "mastodon" | "misskey",
+  viewerDomain: string
+): boolean {
+  const custom = parseCustomEmojiKey(emoji);
+  if (viewerType === "mastodon") {
+    return !custom && isSelectableUnicodeEmoji(emoji);
+  }
+  // Misskey
+  if (!custom) return isSelectableUnicodeEmoji(emoji);
+  return custom.host === viewerDomain.toLowerCase();
+}

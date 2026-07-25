@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  canViewerReactWith,
   FAVOURITE_KEY,
   isCustomEmojiKey,
   isSelectableUnicodeEmoji,
@@ -142,6 +143,37 @@ describe("isSelectableUnicodeEmoji", () => {
 
   it("Fediverseお気に入りキー(❤)は選択できる（普通の絵文字）", () => {
     expect(isSelectableUnicodeEmoji(FAVOURITE_KEY)).toBe(true);
+  });
+});
+
+describe("canViewerReactWith", () => {
+  it("MastodonはUnicode絵文字なら送れる（favourite/❤含む）", () => {
+    expect(canViewerReactWith("👍", "mastodon", "mstdn.example")).toBe(true);
+    expect(canViewerReactWith(FAVOURITE_KEY, "mastodon", "mstdn.example")).toBe(true);
+  });
+
+  it("Mastodonはカスタム絵文字を送れない（自サーバーのものでも）", () => {
+    expect(canViewerReactWith(":ai@mstdn.example:", "mastodon", "mstdn.example")).toBe(false);
+    expect(canViewerReactWith(":ai@misskey.io:", "mastodon", "mstdn.example")).toBe(false);
+  });
+
+  it("MisskeyはUnicode絵文字を送れる", () => {
+    expect(canViewerReactWith("🎉", "misskey", "misskey.io")).toBe(true);
+  });
+
+  it("Misskeyは自分のサーバーのカスタム絵文字だけ送れる", () => {
+    expect(canViewerReactWith(":ai@misskey.io:", "misskey", "misskey.io")).toBe(true);
+    // ホストの大小は問わない（内部キーは小文字化済みだが呼び出し側ドメインが大文字でも一致）
+    expect(canViewerReactWith(":ai@misskey.io:", "misskey", "Misskey.IO")).toBe(true);
+  });
+
+  it("Misskeyでも他サーバーのカスタム絵文字は送れない", () => {
+    expect(canViewerReactWith(":ai@misskey.io:", "misskey", "example.com")).toBe(false);
+  });
+
+  it("絵文字として不正な文字列は送れない", () => {
+    expect(canViewerReactWith("あ", "mastodon", "mstdn.example")).toBe(false);
+    expect(canViewerReactWith("あ", "misskey", "misskey.io")).toBe(false);
   });
 });
 
