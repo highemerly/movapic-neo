@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Eye, EyeOff } from "lucide-react";
+import { Plus, Trash2, Eye, EyeOff, Pencil, Check, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,11 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
   const [pending, setPending] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 一覧行のカテゴリ・ライセンス後編集。編集中の行 id と入力値を保持する
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ category: "", license: "" });
+  const [editPending, setEditPending] = useState(false);
 
   // 既存カテゴリ（プルダウン候補）。手入力も許すため datalist で提示する
   const categoryOptions = Array.from(
@@ -148,6 +153,41 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
     }
   };
 
+  const startEdit = (e: AdminEmoji) => {
+    setEditingId(e.id);
+    setEditForm({ category: e.category ?? "", license: e.license ?? "" });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+  };
+
+  const saveEdit = async (e: AdminEmoji) => {
+    if (editPending) return;
+    setEditPending(true);
+    try {
+      const res = await fetch(`/api/v1/admin/emojis/${e.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: editForm.category.trim(),
+          license: editForm.license.trim(),
+        }),
+      });
+      if (!res.ok) {
+        toast.error(formatErrorMessage(await parseApiError(res)));
+        return;
+      }
+      toast.success("更新しました");
+      setEditingId(null);
+      router.refresh();
+    } catch {
+      toast.error("更新に失敗しました");
+    } finally {
+      setEditPending(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* 登録フォーム */}
@@ -240,53 +280,108 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
       ) : (
         <ul className="divide-y border-t border-b">
           {initial.map((e) => (
-            <li key={e.id} className="flex items-center gap-3 py-3">
-              <div className="flex h-8 w-12 shrink-0 items-center justify-center">
-                <RetryImg
-                  src={e.imageUrl}
-                  alt={`:${e.name}:`}
-                  className="max-h-8 w-auto object-contain"
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm">
-                  :{e.name}:
-                  {!e.enabled && (
-                    <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
-                      無効
-                    </span>
-                  )}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {e.category ?? "その他"}
-                  {e.aliases.length > 0 ? ` ・ ${e.aliases.join(", ")}` : ""}
-                </p>
-                {e.license && (
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    ライセンス: {e.license}
+            <li key={e.id} className="py-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-12 shrink-0 items-center justify-center">
+                  <RetryImg
+                    src={e.imageUrl}
+                    alt={`:${e.name}:`}
+                    className="max-h-8 w-auto object-contain"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm">
+                    :{e.name}:
+                    {!e.enabled && (
+                      <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                        無効
+                      </span>
+                    )}
                   </p>
-                )}
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {e.category ?? "その他"}
+                    {e.aliases.length > 0 ? ` ・ ${e.aliases.join(", ")}` : ""}
+                  </p>
+                  {e.license && (
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      ライセンス: {e.license}
+                    </p>
+                  )}
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => (editingId === e.id ? cancelEdit() : startEdit(e))}
+                    aria-label={editingId === e.id ? "編集をやめる" : "カテゴリ・ライセンスを編集"}
+                  >
+                    {editingId === e.id ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => toggleEnabled(e)}
+                    aria-label={e.enabled ? "無効化" : "有効化"}
+                  >
+                    {e.enabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => remove(e)}
+                    aria-label="削除"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <div className="flex shrink-0 gap-1">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => toggleEnabled(e)}
-                  aria-label={e.enabled ? "無効化" : "有効化"}
-                >
-                  {e.enabled ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => remove(e)}
-                  aria-label="削除"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+
+              {editingId === e.id && (
+                <div className="mt-3 space-y-3 rounded-md border border-border bg-muted/30 p-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`edit-category-${e.id}`}>カテゴリ</Label>
+                      <Input
+                        id={`edit-category-${e.id}`}
+                        list="emoji-category-options"
+                        value={editForm.category}
+                        onChange={(ev) =>
+                          setEditForm((f) => ({ ...f, category: ev.target.value }))
+                        }
+                        placeholder="表情"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor={`edit-license-${e.id}`}>ライセンス</Label>
+                      <Input
+                        id={`edit-license-${e.id}`}
+                        value={editForm.license}
+                        onChange={(ev) =>
+                          setEditForm((f) => ({ ...f, license: ev.target.value }))
+                        }
+                        placeholder="出典・利用条件など"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" size="sm" variant="ghost" onClick={cancelEdit}>
+                      キャンセル
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => saveEdit(e)}
+                      disabled={editPending}
+                    >
+                      <Check className="mr-1.5 h-4 w-4" />
+                      保存
+                    </Button>
+                  </div>
+                </div>
+              )}
             </li>
           ))}
         </ul>

@@ -1,6 +1,6 @@
 /**
  * 管理者用: SHAMEZO 独自カスタム絵文字の更新・削除
- * PATCH  /api/v1/admin/emojis/:id   … enabled の切り替え（soft-disable）
+ * PATCH  /api/v1/admin/emojis/:id   … enabled の切り替え（soft-disable）／category・license の後編集
  * DELETE /api/v1/admin/emojis/:id   … 未使用なら実体ごと削除
  *
  * 使用済み（Reaction テーブルにそのキーが残っている）絵文字を消すとチップの画像が壊れるため、
@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/db";
 import { ErrorCodes, errorResponse, handleUnknownError } from "@/lib/errors";
 import { deleteImage } from "@/lib/storage/storage";
@@ -16,7 +17,7 @@ import {
   invalidateShamezoEmojiCatalog,
 } from "@/lib/reactions/customEmoji";
 import { shamezoEmojiKey } from "@/lib/reactions/emojiKey";
-import { isRequestAdmin } from "../shared";
+import { isRequestAdmin, parseCategory, parseLicense } from "../shared";
 
 export async function PATCH(
   request: NextRequest,
@@ -27,13 +28,33 @@ export async function PATCH(
       return errorResponse(ErrorCodes.NOT_FOUND, "見つかりません", 404);
     }
     const { id } = await params;
-    const body = (await request.json().catch(() => null)) as { enabled?: unknown } | null;
-    if (typeof body?.enabled !== "boolean") {
-      return errorResponse(ErrorCodes.VALIDATION_INVALID, "enabled を指定してください", 400);
+    const body = (await request.json().catch(() => null)) as
+      | { enabled?: unknown; category?: unknown; license?: unknown }
+      | null;
+    if (!body || typeof body !== "object") {
+      return errorResponse(ErrorCodes.VALIDATION_INVALID, "リクエストが不正です", 400);
+    }
+
+    // 送られたキーだけを部分更新する（enabled 切替と category/license 編集を1本で扱う）
+    const data: Prisma.CustomEmojiUpdateInput = {};
+    if ("enabled" in body) {
+      if (typeof body.enabled !== "boolean") {
+        return errorResponse(ErrorCodes.VALIDATION_INVALID, "enabled が不正です", 400);
+      }
+      data.enabled = body.enabled;
+    }
+    if ("category" in body) {
+      data.category = parseCategory(body.category);
+    }
+    if ("license" in body) {
+      data.license = parseLicense(body.license);
+    }
+    if (Object.keys(data).length === 0) {
+      return errorResponse(ErrorCodes.VALIDATION_INVALID, "更新する項目がありません", 400);
     }
 
     const updated = await prisma.customEmoji
-      .update({ where: { id }, data: { enabled: body.enabled }, select: { id: true } })
+      .update({ where: { id }, data, select: { id: true } })
       .catch(() => null);
     if (!updated) {
       return errorResponse(ErrorCodes.NOT_FOUND, "絵文字が見つかりません", 404);
