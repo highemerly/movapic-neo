@@ -6,12 +6,12 @@
 import prisma from "@/lib/db";
 import { userPathSegment } from "@/lib/userHandle";
 import { getHomeServer } from "@/lib/auth/serverPolicy";
-import { getAvatarUrl } from "@/lib/avatar";
+import { getAvatarUrl, getEmojiImageUrl } from "@/lib/avatar";
 import type { FavoriteNotificationData } from "@/lib/notifications/favoriteNotifications";
 
 export const NOTIFICATION_WINDOW_DAYS = 90;
 
-/** type="favorite" の表示用データ（相手のavatarはプロキシ経由に変換済み）。 */
+/** type="favorite" の表示用データ（avatar・絵文字画像はプロキシ経由に変換済み）。 */
 export interface FavoriteFeedData {
   count: number;
   favoriters: {
@@ -19,6 +19,9 @@ export interface FavoriteFeedData {
     displayName: string | null;
     avatarUrl: string | null;
     profileUrl: string | null;
+    /** 押されたリアクション。リアクション導入前の通知には無いので null */
+    emoji: string | null;
+    emojiImageUrl: string | null;
   }[];
 }
 
@@ -90,7 +93,7 @@ export async function getRecentNotifications(
   }));
 }
 
-// Notification.data（type="favorite"）を表示用に整形。avatarはプロキシ経由に変換。
+// Notification.data（type="favorite"）を表示用に整形。画像URLはプロキシ経由に変換。
 function toFavoriteFeedData(data: unknown): FavoriteFeedData | null {
   const d = data as FavoriteNotificationData | null;
   if (!d || !Array.isArray(d.favoriters)) return null;
@@ -101,6 +104,8 @@ function toFavoriteFeedData(data: unknown): FavoriteFeedData | null {
       displayName: f.displayName,
       avatarUrl: getAvatarUrl(f.avatarUrl),
       profileUrl: f.profileUrl,
+      emoji: f.emoji ?? null,
+      emojiImageUrl: getEmojiImageUrl(f.emojiImageUrl),
     })),
   };
 }

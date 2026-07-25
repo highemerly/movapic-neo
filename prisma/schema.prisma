@@ -26,6 +26,15 @@ model Instance {
   clientSecret   String? @map("client_secret")
   appRedirectUri String? @map("app_redirect_uri") @db.VarChar(1024)
 
+  // Misskeyカスタム絵文字一覧（/api/emojis のレスポンス）のキャッシュ。
+  // 用途は3つ: リアクションピッカーの候補・PUT時の実在検証・リアクション同期時の
+  // ローカル絵文字URL解決（notes/show の reactionEmojis はリモート絵文字しか載せないため、
+  // :name@.: のURLはオーナーインスタンスのこの一覧からしか引けない）。
+  // 大規模インスタンスでは数MBになるため、読み出しはプロセス内メモ化を挟むこと。
+  // Mastodonインスタンスでは常にnull。
+  emojisCache    Json?     @map("emojis_cache")
+  emojisSyncedAt DateTime? @map("emojis_synced_at")
+
   users User[]
 
   @@map("instances")
@@ -33,45 +42,45 @@ model Instance {
 
 // ユーザー
 model User {
-  id           String    @id @default(uuid())
-  instanceId   String    @map("instance_id")
-  remoteId     String    @map("remote_id") @db.VarChar(255)
-  username     String    @db.VarChar(255)
-  displayName  String?   @map("display_name") @db.VarChar(255)
-  avatarUrl    String?   @map("avatar_url") @db.Text
-  emailPrefix  String    @unique @map("email_prefix") @db.VarChar(32)
-  accessToken  String    @map("access_token") @db.Text
-  refreshToken String?   @map("refresh_token") @db.Text
-  bio          String?   @db.VarChar(40)
+  id           String  @id @default(uuid())
+  instanceId   String  @map("instance_id")
+  remoteId     String  @map("remote_id") @db.VarChar(255)
+  username     String  @db.VarChar(255)
+  displayName  String? @map("display_name") @db.VarChar(255)
+  avatarUrl    String? @map("avatar_url") @db.Text
+  emailPrefix  String  @unique @map("email_prefix") @db.VarChar(32)
+  accessToken  String  @map("access_token") @db.Text
+  refreshToken String? @map("refresh_token") @db.Text
+  bio          String? @db.VarChar(40)
 
   // 投稿のデフォルト設定
-  defaultPosition    String?   @map("default_position") @db.VarChar(20)
-  defaultFont        String?   @map("default_font") @db.VarChar(50)
-  defaultColor       String?   @map("default_color") @db.VarChar(20)
-  defaultSize        String?   @map("default_size") @db.VarChar(20)
-  defaultOutput      String?   @map("default_output") @db.VarChar(20)
-  defaultArrangement String?   @map("default_arrangement") @db.VarChar(20)
-  defaultVisibility  String?   @map("default_visibility") @db.VarChar(20)
+  defaultPosition     String? @map("default_position") @db.VarChar(20)
+  defaultFont         String? @map("default_font") @db.VarChar(50)
+  defaultColor        String? @map("default_color") @db.VarChar(20)
+  defaultSize         String? @map("default_size") @db.VarChar(20)
+  defaultOutput       String? @map("default_output") @db.VarChar(20)
+  defaultArrangement  String? @map("default_arrangement") @db.VarChar(20)
+  defaultVisibility   String? @map("default_visibility") @db.VarChar(20)
   // 投稿時の追加情報のデフォルト: カメラ機種名の表示 ("none" | "show")
-  defaultCameraOption String?  @map("default_camera_option") @db.VarChar(20)
-  mentionKeep        Boolean   @default(false) @map("mention_keep")
+  defaultCameraOption String? @map("default_camera_option") @db.VarChar(20)
+  mentionKeep         Boolean @default(false) @map("mention_keep")
   // 地図機能（ベータ）の公開オプトイン。デフォルトoff、自分の画像投稿の都道府県集計を地図で公開する
-  showLocationMap    Boolean   @default(false) @map("show_location_map")
+  showLocationMap     Boolean @default(false) @map("show_location_map")
   // 検索エンジン/AI Botのクロール拒否オプトイン。デフォルトoff（=従来どおり許可）。
   // ON → /u/[username] 配下を検索エンジンに noindex（generateMetadata）し、AI BotをrobotsでDisallow。
-  blockCrawlers      Boolean   @default(false) @map("block_crawlers")
+  blockCrawlers       Boolean @default(false) @map("block_crawlers")
   // カレンダーの自動穴埋め。true(既定)=投稿の瞬間にダブル投稿を過去の穴へ自動割当（従来挙動）。
   // false=自動割当せず、カレンダー編集モードで明示指定した穴だけ埋める。過去の割当・皆勤賞には影響しない
   // （未来の投稿の自動判定のみを切り替える）。詳細は docs/穴埋め設計は achievements/README.md 参照。
-  autoMakeup         Boolean   @default(true) @map("auto_makeup")
+  autoMakeup          Boolean @default(true) @map("auto_makeup")
 
   // 利用規約・プライバシーポリシーへの同意日時。null=未同意。
   // 初回ログイン直後に /welcome で同意を取り記録する（以降は再提示しない）。
   termsAgreedAt DateTime? @map("terms_agreed_at")
 
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  lastLoginAt DateTime? @map("last_login_at")
 
   instance      Instance       @relation(fields: [instanceId], references: [id])
   images        Image[]
@@ -81,6 +90,7 @@ model User {
   reports       Report[]
   mutesCreated  Mute[]         @relation("Muter")
   mutedBy       Mute[]         @relation("Muted")
+  reactions     Reaction[]
 
   @@unique([instanceId, remoteId])
   @@unique([instanceId, username])
@@ -130,18 +140,18 @@ model Achievement {
 // 現状は実績獲得("achievement")のみだが、将来「お気に入りされた通知」など別種別をここにマージする。
 // 90日で読み捨て（読み取り時に createdAt でフィルタ）。既読状態は持たない。
 model Notification {
-  id   String @id @default(uuid())
+  id             String   @id @default(uuid())
   // 通知の受信者
-  userId String @map("user_id")
+  userId         String   @map("user_id")
   // 種別 / 情報ソース。"achievement" | （将来）"favorite" 等
-  type String @db.VarChar(40)
+  type           String   @db.VarChar(40)
   // type="achievement" のとき、獲得した実績のキー（表示文言は CATALOG から解決）
-  achievementKey String? @map("achievement_key") @db.VarChar(64)
+  achievementKey String?  @map("achievement_key") @db.VarChar(64)
   // 関連画像（実績のきっかけ写真 / 将来: お気に入りされた写真）。画像削除時は null。
-  imageId String? @map("image_id")
+  imageId        String?  @map("image_id")
   // 種別ごとの追加情報（将来用: お気に入りした相手の表示名・acct 等）
-  data Json?
-  createdAt DateTime @default(now()) @map("created_at")
+  data           Json?
+  createdAt      DateTime @default(now()) @map("created_at")
 
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   image Image? @relation(fields: [imageId], references: [id], onDelete: SetNull)
@@ -153,16 +163,16 @@ model Notification {
 // ログイン履歴（セッション単位の記録、本人の自己検出用）
 // プライバシーポリシーに従い、作成から90日経過した行はログイン時に自動削除
 model LoginSession {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  jti       String   @unique
-  ipAddress String   @map("ip_address") @db.VarChar(45)
-  userAgent String?  @map("user_agent") @db.VarChar(500)
-  country   String?  @db.VarChar(2)
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  jti       String    @unique
+  ipAddress String    @map("ip_address") @db.VarChar(45)
+  userAgent String?   @map("user_agent") @db.VarChar(500)
+  country   String?   @db.VarChar(2)
   // Cloudflareの「Add visitor location headers」によるIP推定の地域。精度は低くズレる前提
-  region    String?  @db.VarChar(100)
-  city      String?  @db.VarChar(100)
-  createdAt DateTime @default(now()) @map("created_at")
+  region    String?   @db.VarChar(100)
+  city      String?   @db.VarChar(100)
+  createdAt DateTime  @default(now()) @map("created_at")
   // 失効日時。nullなら有効。本人がセッションを失効させると設定される
   revokedAt DateTime? @map("revoked_at")
 
@@ -174,74 +184,111 @@ model LoginSession {
 
 // 画像
 model Image {
-  id            String   @id @default(uuid())
-  userId        String   @map("user_id")
-  storageKey    String   @unique @map("storage_key") @db.VarChar(500)
-  filename      String   @db.VarChar(255)
-  mimeType      String   @map("mime_type") @db.VarChar(100)
-  fileSize      Int      @map("file_size")
-  width         Int
-  height        Int
-  overlayText   String   @map("overlay_text") @db.Text
+  id                  String    @id @default(uuid())
+  userId              String    @map("user_id")
+  storageKey          String    @unique @map("storage_key") @db.VarChar(500)
+  filename            String    @db.VarChar(255)
+  mimeType            String    @map("mime_type") @db.VarChar(100)
+  fileSize            Int       @map("file_size")
+  width               Int
+  height              Int
+  overlayText         String    @map("overlay_text") @db.Text
   // 画像の代替テキスト（ALT）。null=未設定。web=ユーザー入力・mention=元投稿のALT引き継ぎ。
   // Fediverse へは Mastodon=description / Misskey=comment(512字上限) として送信。
   // サービス側の <img alt> は altText を優先し、未設定時は overlayText にフォールバック。
-  altText       String?  @map("alt_text") @db.VarChar(1500)
-  position      String   @db.VarChar(20)
-  font          String   @db.VarChar(50)
-  color         String   @db.VarChar(20)
-  size          String   @db.VarChar(20)
-  outputFormat  String   @map("output_format") @db.VarChar(20)
-  arrangement   String   @default("none") @db.VarChar(20)
+  altText             String?   @map("alt_text") @db.VarChar(1500)
+  position            String    @db.VarChar(20)
+  font                String    @db.VarChar(50)
+  color               String    @db.VarChar(20)
+  size                String    @db.VarChar(20)
+  outputFormat        String    @map("output_format") @db.VarChar(20)
+  arrangement         String    @default("none") @db.VarChar(20)
   // シーズン（期間限定）。null=通常投稿 / "tanabata-2026" 等のシーズンキー。
   // セット時はスタイル列（position/color/size/font）にシーズンのプリセット実値を保存する
   // （タイル表示のフォーカス位置・拡大率を実際の描画に一致させるため）。実績側は
   // season:null フィルタで別途隔離する。レジストリは src/lib/seasons/catalog.ts。
-  season        String?  @db.VarChar(40)
-  source        String   @default("web") @db.VarChar(20) // "web" | "email"
-  thumbnailKey  String?  @map("thumbnail_key") @db.VarChar(500)
+  season              String?   @db.VarChar(40)
+  source              String    @default("web") @db.VarChar(20) // "web" | "email"
+  thumbnailKey        String?   @map("thumbnail_key") @db.VarChar(500)
   // 一覧のBlurプレースホルダ用 LQIP。原本を32pxに縮小したWebPの data URI
   // （data:image/webp;base64,...）。原本AVIF読み込み中にこれを即描画してぼかし表示する
   // ため、追加の画像リクエストは発生しない（JSONに相乗り・1画像~1KB以内）。
   // null=未生成（旧画像。灰色プレースホルダにフォールバック）。生成は compute finalize。
-  blurDataUrl   String?  @map("blur_data_url") @db.Text
-  postUrl       String?  @map("post_url") @db.Text
-  postId        String?  @map("post_id") @db.VarChar(255)
-  isPublic      Boolean  @default(true) @map("is_public")
-  // Mastodonのお気に入りキャッシュ（Mastodonが正データ）
-  favoriteCount     Int       @default(0) @map("favorite_count")
-  favoritersCache   Json?     @map("favoriters_cache")
-  favoritesSyncedAt DateTime? @map("favorites_synced_at")
-  postStatus        Int?      @map("post_status") // 最後のMastodon sync HTTP status（0=接続失敗、200=OK、4xx=失敗、5xx=サーバ不調）
-  pinnedAt      DateTime? @map("pinned_at")
+  blurDataUrl         String?   @map("blur_data_url") @db.Text
+  postUrl             String?   @map("post_url") @db.Text
+  postId              String?   @map("post_id") @db.VarChar(255)
+  isPublic            Boolean   @default(true) @map("is_public")
+  // オーナーインスタンス上のリアクション/favキャッシュ（オーナーインスタンスが正データ）。
+  // favoriteCount は「Reaction テーブルとマージ済みの表示用合計」で、オーナー側の生の合計は
+  // fediverseCount に持つ（一覧クエリが favoriteCount をそのまま件数表示に使えるようにするため）。
+  favoriteCount       Int       @default(0) @map("favorite_count")
+  favoritersCache     Json?     @map("favoriters_cache")
+  favoritesSyncedAt   DateTime? @map("favorites_synced_at")
+  postStatus          Int?      @map("post_status") // 最後のMastodon sync HTTP status（0=接続失敗、200=OK、4xx=失敗、5xx=サーバ不調）
+  // オーナーインスタンス上の生のリアクション/fav合計（sync時のスナップショット）
+  fediverseCount      Int       @default(0) @map("fediverse_count")
+  // 絵文字別カウントと表示用URLのキャッシュ（ReactionTotalsCache）。
+  // Misskeyオーナー: notes/show の reactions を正規化キーに直したもの。
+  // Mastodonオーナー: { totals: { "♡": count } }（favouriteは種別を持たないため）。
+  // null = 旧データ（種別不明。♡単一チップとして扱う）。
+  reactionTotalsCache Json?     @map("reaction_totals_cache")
+  pinnedAt            DateTime? @map("pinned_at")
   // カレンダーで「その日のサムネイル」にユーザーが手動指定した印。null=自動（その日の最古の投稿）。
   // pinnedAt と同じ timestamp idiom（同日に複数指定されたら最新のpickを優先してtie-break）。
-  calendarPickedAt DateTime? @map("calendar_picked_at")
+  calendarPickedAt    DateTime? @map("calendar_picked_at")
   // 皆勤賞の穴埋め割当（永続化）。この投稿(donor)が埋める「同月の空き日(1-31)」。null=穴埋めに使っていない。
   // カレンダー表示・皆勤賞判定の両方がこの永続値を読む（表示と👑のズレを防ぐ単一ソース）。
   // 書き込み: 投稿時の自動割当(autoMakeup=true)／カレンダー編集モードの手動指定／既存分はbackfill。
-  makeupTargetDay  Int?      @map("makeup_target_day")
+  makeupTargetDay     Int?      @map("makeup_target_day")
   // 管理者によるモデレーション取り下げフラグ。true で全公開面から隠す（投稿者含め非表示・復元可能）
-  isDisabled    Boolean   @default(false) @map("is_disabled")
+  isDisabled          Boolean   @default(false) @map("is_disabled")
   // EXIFメタデータ（出力画像からは常に除去、ここはDB保存のみ／位置情報は投稿時オプトイン）
-  cameraMake         String?   @map("camera_make") @db.VarChar(100)
-  cameraModel        String?   @map("camera_model") @db.VarChar(100)
-  capturedAt         DateTime? @map("captured_at")
+  cameraMake          String?   @map("camera_make") @db.VarChar(100)
+  cameraModel         String?   @map("camera_model") @db.VarChar(100)
+  capturedAt          DateTime? @map("captured_at")
   // 詳細撮影情報（F値・SS・ISO・焦点距離・レンズ・露出補正・フラッシュ）。
   // cameraOption="detail" のときのみ保存。表示済み文字列の JSON（ExifDetails 型）。
-  exifDetails        Json?     @map("exif_details")
-  locationPrefecture String?   @map("location_prefecture") @db.VarChar(50)
-  locationCity       String?   @map("location_city") @db.VarChar(100)
-  createdAt     DateTime @default(now()) @map("created_at")
+  exifDetails         Json?     @map("exif_details")
+  locationPrefecture  String?   @map("location_prefecture") @db.VarChar(50)
+  locationCity        String?   @map("location_city") @db.VarChar(100)
+  createdAt           DateTime  @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   achievements  Achievement[]
   notifications Notification[]
   reports       Report[]
+  reactions     Reaction[]
 
   @@index([userId, createdAt])
   @@index([isPublic, createdAt])
   @@map("images")
+}
+
+// SHAMEZO上で実施されたリアクション（このテーブルが正データ）。
+// Fediverse側の連合キャッシュ（Image.favoritersCache / reactionTotalsCache）とは別系統で、
+// 表示時にマージする（同一ユーザーが両方に現れたらこちらを優先）。理由は2つ:
+//   - Mastodonは favourite に絵文字種別を持てないため、選ばれた絵文字はここにしか残らない
+//   - visibility=local（このサービスのみ）投稿は Fediverse 上に対応するノートが無い
+model Reaction {
+  id            String   @id @default(uuid())
+  imageId       String   @map("image_id")
+  userId        String   @map("user_id")
+  // 正規化済みリアクションキー（src/lib/reactions/emojiKey.ts）。
+  // Unicode絵文字はそのまま（異体字セレクタ除去済み）、カスタム絵文字は ":name@host:" 完全修飾。
+  // host は押した時点の viewer サーバー＝連合先ノートでの表記と一致するため、
+  // 同期で戻ってきたキャッシュのキーと文字列比較で突き合わせられる。
+  emoji         String   @db.VarChar(400)
+  // カスタム絵文字の表示用画像URL（viewerインスタンスの /api/emojis 由来）。Unicode絵文字はnull。
+  emojiImageUrl String?  @map("emoji_image_url") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  image Image @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([imageId, userId]) // 1ユーザー1リアクション（別絵文字を押したら付け替え）
+  @@index([userId, createdAt]) // 「リアクションした画像一覧」(/favorite)
+  @@map("reactions")
 }
 
 // 通報。ログインユーザーが画像を通報した記録。

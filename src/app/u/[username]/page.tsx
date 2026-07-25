@@ -17,7 +17,12 @@ import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { userPageRobotsMetadata } from "@/lib/crawlers";
 import { buildOgImage, DEFAULT_OG_IMAGE } from "@/lib/ogImage";
 import { ProfileFeedCard, type ProfileFeedImage } from "@/components/user/ProfileFeedCard";
-import type { CachedFavoriter } from "@/lib/fediverse/favorite";
+import type { CachedFavoriter, ReactionTotalsCache } from "@/lib/reactions/types";
+import { mergeReactions, toMergedFavoriters } from "@/lib/reactions/merge";
+import { loadStoredReactionsByImage } from "@/lib/reactions/store";
+
+// フィードカードのアバター行に渡す上限（描画は FavoriterAvatars が実幅で更に絞る）。
+const MAX_FEED_REACTORS = 12;
 import { ToastFlasher } from "@/components/ToastFlasher";
 import { buildDeleteFlash } from "./deleteFlash";
 import type { Metadata } from "next";
@@ -158,7 +163,9 @@ export default async function UserHomePage({ params, searchParams }: UserHomePag
     // postId=Fediverse投稿済みの印。未投稿(local)はお気に入りが付きようがないため数を隠す。
     postId: true,
     favoriteCount: true,
+    fediverseCount: true,
     favoritersCache: true,
+    reactionTotalsCache: true,
     cameraModel: true,
     locationPrefecture: true,
     locationCity: true,
@@ -193,7 +200,15 @@ export default async function UserHomePage({ params, searchParams }: UserHomePag
       hasRecentPerfectAttendance(user.id),
     ]);
 
-  // JSON列 favoritersCache を型付きに直し、フィードカード用の形へ整える。
+  // カードに出す絵文字の内訳は連合キャッシュだけでは足りない（Mastodonユーザーの選択や
+  // local投稿は SHAMEZO 側にしか無い）。候補ぶんをまとめて1回で読む。
+  const storedReactions = await loadStoredReactionsByImage([
+    ...new Set(
+      [...pinnedRaw, ...popularRaw, ...recentPool].map((img) => img.id)
+    ),
+  ]);
+
+  // JSON列（favoritersCache / reactionTotalsCache）を型付きに直し、フィードカード用の形へ整える。
   const toFeedImage = (img: {
     id: string;
     storageKey: string;
@@ -205,7 +220,9 @@ export default async function UserHomePage({ params, searchParams }: UserHomePag
     createdAt: Date;
     postId: string | null;
     favoriteCount: number;
+    fediverseCount: number;
     favoritersCache: unknown;
+    reactionTotalsCache: unknown;
     cameraModel: string | null;
     locationPrefecture: string | null;
     locationCity: string | null;
@@ -220,7 +237,24 @@ export default async function UserHomePage({ params, searchParams }: UserHomePag
     createdAt: img.createdAt.toISOString(),
     postId: img.postId,
     favoriteCount: img.favoriteCount,
-    favoriters: (img.favoritersCache as CachedFavoriter[] | null) ?? [],
+    // リアクションした人のアイコンは、連合キャッシュと SHAMEZO 上のリアクションをマージして出す。
+    // 概要カードは読み取り専用なので閲覧者の状態（viewerAcct）は見ない。
+    reactors: toMergedFavoriters(
+      mergeReactions({
+        fediverseCount: img.fediverseCount,
+        totalsCache: (img.reactionTotalsCache as ReactionTotalsCache | null) ?? null,
+        cachedFavoriters: (img.favoritersCache as CachedFavoriter[] | null) ?? [],
+        storedReactions: storedReactions.get(img.id) ?? [],
+        viewerAcct: null,
+      })
+    )
+      .slice(0, MAX_FEED_REACTORS)
+      .map((user) => ({
+        acct: user.acct,
+        label: user.displayName || user.acct,
+        avatarUrl: getAvatarUrl(user.avatarUrl),
+        profileUrl: user.profileUrl,
+      })),
     cameraModel: img.cameraModel,
     locationPrefecture: img.locationPrefecture,
     locationCity: img.locationCity,

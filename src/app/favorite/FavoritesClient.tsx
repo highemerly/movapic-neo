@@ -56,8 +56,8 @@ export function FavoritesClient({
         images={images}
         getKey={(image) => image.id}
         aspect={(image) => image.width / image.height}
-        emptyMessage="まだお気に入りに登録した画像がありません"
-        endMessage="すべてのお気に入りを表示しました"
+        emptyMessage="まだリアクションした画像がありません"
+        endMessage="リアクションした画像をすべて表示しました"
         isLoading={isLoading}
         nextCursor={nextCursor}
         loaderRef={loaderRef}

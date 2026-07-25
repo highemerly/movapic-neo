@@ -2,16 +2,17 @@
 
 import { useMemo, useState } from "react";
 import Link from "@/components/Link";
-import { Heart } from "lucide-react";
+import { SmilePlus } from "lucide-react";
 import type { NotificationFeedItem } from "@/lib/achievements/notifications";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { favoriteNotificationWho, formatNotificationDate } from "@/lib/notifications/format";
+import { ReactionEmojiView } from "@/components/reaction/ReactionEmojiView";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 
 type Category = "favorite" | "achievement" | "other";
 
 const CATEGORIES: { key: Category; label: string }[] = [
-  { key: "favorite", label: "お気に入り" },
+  { key: "favorite", label: "リアクション" },
   { key: "achievement", label: "実績" },
   { key: "other", label: "その他" },
 ];
@@ -81,6 +82,11 @@ export function NotificationsList({
           {filtered.map((n) => {
             const isReminder = n.type === "makeup-reminder";
             const isFavorite = n.type === "favorite";
+            // 直近のリアクション（絵文字が無い旧通知は既定のアイコンで出す）
+            const latestFavoriter = n.favorite?.favoriters[0];
+            const latestReaction = latestFavoriter?.emoji
+              ? { emoji: latestFavoriter.emoji, imageUrl: latestFavoriter.emojiImageUrl }
+              : null;
             const a = !isReminder && !isFavorite && n.achievementKey ? resolveAchievement(n.achievementKey) : null;
             const href = isReminder
               ? `/u/${selfSeg}/calendar`
@@ -100,7 +106,7 @@ export function NotificationsList({
                     />
                   ) : isFavorite ? (
                     <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-300">
-                      <Heart className="h-7 w-7 fill-current" />
+                      <SmilePlus className="h-7 w-7" />
                     </span>
                   ) : (
                     <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
@@ -110,7 +116,17 @@ export function NotificationsList({
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium leading-snug line-clamp-2">
                       {isFavorite ? (
-                        "❤️ お気に入りに追加されました"
+                        <span className="flex items-center gap-1">
+                          {latestReaction ? (
+                            <ReactionEmojiView
+                              emoji={latestReaction.emoji}
+                              imageUrl={latestReaction.imageUrl}
+                            />
+                          ) : (
+                            <SmilePlus className="h-4 w-4" />
+                          )}
+                          リアクションされました
+                        </span>
                       ) : isReminder ? (
                         "👑 皆勤賞の穴埋めをしよう"
                       ) : (

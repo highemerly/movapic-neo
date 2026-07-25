@@ -18,6 +18,12 @@
 
 import { USER_AGENT } from "@/lib/userAgent";
 import { apShowNoteId, ApShowError } from "@/lib/fediverse/misskey";
+import {
+  FAVOURITE_KEY,
+  normalizeReactionKey,
+  reactionEmojisKeyToInternal,
+  toMisskeyReaction,
+} from "@/lib/reactions/emojiKey";
 
 const SHORT_TIMEOUT = 4000; // 4秒（オーナーインスタンス＝自前サーバーへの読み取り・お気に入り操作）
 // 別インスタンスの投稿解決（search?resolve=true）は、viewerインスタンスがオーナー
@@ -98,17 +104,24 @@ export function favoriteErrorMessage(
   }
 }
 
-// favourited_byのキャッシュ1件分
-export interface CachedFavoriter {
-  acct: string;
-  displayName: string | null;
-  avatarUrl: string | null;
-  profileUrl: string | null;
-}
+// favourited_by / notes/reactions のキャッシュ1件分。定義は reactions 側（マージ処理と
+// 共有するため）に置き、従来の import パスを保つためここから再エクスポートする。
+export type { CachedFavoriter } from "@/lib/reactions/types";
+
+import type { CachedFavoriter } from "@/lib/reactions/types";
 
 export interface FavoriteData {
+  /** オーナーインスタンス上のリアクション/fav の合計 */
   count: number;
+  /** リアクションしたユーザー上位40件 */
   favoriters: CachedFavoriter[];
+  /**
+   * 絵文字別カウント（正規化キー→件数）。上位40件の一覧と違い全件を数えた値なので、
+   * チップの件数はこちらが正確。Mastodonは種別を持たないため { "❤": count }。
+   */
+  totals: Record<string, number>;
+  /** カスタム絵文字キー→表示用画像URL */
+  emojiUrls: Record<string, string>;
 }
 
 // Mastodon Account（必要なフィールドのみ）
@@ -139,6 +152,9 @@ function mapFavoriter(account: MastodonAccount, ownerDomain: string): CachedFavo
     displayName: account.display_name || null,
     avatarUrl: account.avatar || null,
     profileUrl: account.url || null,
+    // Mastodonのfavouriteは絵文字を持たないため、種別不明を表す受け皿に寄せる
+    emoji: FAVOURITE_KEY,
+    emojiImageUrl: null,
   };
 }
 
@@ -185,17 +201,16 @@ export async function fetchMastodonFavoriteData(
   const status = (await statusRes.json()) as MastodonStatus;
   const accounts = (await favBoyRes.json()) as MastodonAccount[];
 
+  const count = status.favourites_count ?? 0;
   return {
-    count: status.favourites_count ?? 0,
+    count,
     favoriters: accounts.map((a) => mapFavoriter(a, ownerDomain)),
+    totals: count > 0 ? { [FAVOURITE_KEY]: count } : {},
+    emojiUrls: {},
   };
 }
 
 // ---- Misskey（リアクションで favourite を代替）----------------------------
-
-// Mastodonのfavouriteに対応させるリアクション。Unicode絵文字なので、Misskey間でも
-// Mastodonへ連合する際も「いいね/favourite」として伝わる（カスタム絵文字は連合先で化けるため避ける）。
-const MISSKEY_REACTION = "❤️";
 
 // Misskey Note（必要なフィールドのみ）
 interface MisskeyNote {
@@ -203,6 +218,10 @@ interface MisskeyNote {
   // 合計リアクション数。古い実装等で欠ける場合は reactions の合算でフォールバック。
   reactionCount?: number;
   reactions?: Record<string, number>;
+  // 使われているカスタム絵文字のURL（キーは "name@host"）。
+  // 実サーバーで確認したとおり、ここに載るのはリモート絵文字だけで、
+  // オーナー自身のローカル絵文字は含まれない（URLは別途カタログから解決する）。
+  reactionEmojis?: Record<string, string>;
   // トークン付きで取得したときの自分のリアクション（未リアクションは null/undefined）
   myReaction?: string | null;
 }
@@ -230,17 +249,22 @@ function sumReactions(note: MisskeyNote): number {
 }
 
 function mapMisskeyFavoriter(
-  user: MisskeyUserLite,
-  ownerDomain: string
+  reaction: MisskeyReaction,
+  ownerDomain: string,
+  emojiUrls: Record<string, string>
 ): CachedFavoriter {
+  const user = reaction.user;
   // リモートユーザーは host を、ローカルユーザーはオーナードメインを補う。
   // Misskey/Mastodon ともユーザーページは https://{host}/@{username} で開ける。
   const host = user.host || ownerDomain;
+  const emoji = normalizeReactionKey(reaction.type, ownerDomain);
   return {
     acct: `${user.username}@${host}`,
     displayName: user.name || null,
     avatarUrl: user.avatarUrl || null,
     profileUrl: `https://${host}/@${user.username}`,
+    emoji,
+    emojiImageUrl: emojiUrls[emoji] ?? null,
   };
 }
 
@@ -316,9 +340,20 @@ export async function fetchMisskeyFavoriteData(
   const note = (await noteRes.json()) as MisskeyNote;
   const reactions = (await reactionsRes.json()) as MisskeyReaction[];
 
+  const totals: Record<string, number> = {};
+  for (const [raw, count] of Object.entries(note.reactions ?? {})) {
+    totals[normalizeReactionKey(raw, ownerDomain)] = count;
+  }
+  const emojiUrls: Record<string, string> = {};
+  for (const [raw, url] of Object.entries(note.reactionEmojis ?? {})) {
+    emojiUrls[reactionEmojisKeyToInternal(raw, ownerDomain)] = url;
+  }
+
   return {
     count: sumReactions(note),
-    favoriters: reactions.map((r) => mapMisskeyFavoriter(r.user, ownerDomain)),
+    favoriters: reactions.map((r) => mapMisskeyFavoriter(r, ownerDomain, emojiUrls)),
+    totals,
+    emojiUrls,
   };
 }
 
@@ -389,10 +424,16 @@ interface FavoriteActionParams {
   postUrl: string;
 }
 
+/** リアクション操作後の viewer 側の状態 */
+export interface ReactionActionResult {
+  reacted: boolean;
+  count: number;
+}
+
 async function toggleFavorite(
   params: FavoriteActionParams,
   action: "favourite" | "unfavourite"
-): Promise<{ favourited: boolean; count: number }> {
+): Promise<ReactionActionResult> {
   const localStatusId = await resolveViewerStatusId(params);
 
   const response = await fetch(
@@ -417,7 +458,7 @@ async function toggleFavorite(
 
   const status = (await response.json()) as MastodonStatus;
   return {
-    favourited: status.favourited ?? action === "favourite",
+    reacted: status.favourited ?? action === "favourite",
     count: status.favourites_count ?? 0,
   };
 }
@@ -453,72 +494,116 @@ async function resolveMisskeyNoteId(params: FavoriteActionParams): Promise<strin
   return noteId;
 }
 
-async function toggleMisskeyReaction(
+/**
+ * Misskey の notes/reactions/create|delete を1回呼ぶ。
+ * 「既に望む状態」を表すエラーは成功として扱い、付け替えが要るケースだけ呼び出し元へ返す。
+ */
+async function misskeyReactionRequest(
   params: FavoriteActionParams,
-  action: "favourite" | "unfavourite"
-): Promise<{ favourited: boolean; count: number }> {
-  const noteId = await resolveMisskeyNoteId(params);
-
-  const endpoint =
-    action === "favourite" ? "notes/reactions/create" : "notes/reactions/delete";
-  const body =
-    action === "favourite"
-      ? { i: params.viewerToken, noteId, reaction: MISSKEY_REACTION }
-      : { i: params.viewerToken, noteId };
-
-  const response = await fetch(`https://${params.viewerDomain}/api/${endpoint}`, {
-    method: "POST",
-    headers: MISSKEY_HEADERS,
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(SHORT_TIMEOUT),
-  });
-
-  if (!response.ok) {
-    // 冪等性: お気に入り済みで再リアクション（ALREADY_REACTED）、未リアクションで解除
-    // （NOT_REACTED）は「既に望む状態」なので成功扱いにする。
-    const detail = await response.text().catch(() => "");
-    const alreadyInDesiredState =
-      (action === "favourite" && detail.includes("ALREADY_REACTED")) ||
-      (action === "unfavourite" && detail.includes("NOT_REACTED"));
-    if (!alreadyInDesiredState) {
-      const { reason, status } = classifyMisskeyError(detail, response.status);
-      throw new FavoriteError(reason, status, `reaction action failed: ${response.status}`);
+  noteId: string,
+  action: "create" | "delete",
+  reaction?: string
+): Promise<{ alreadyReacted: boolean }> {
+  const response = await fetch(
+    `https://${params.viewerDomain}/api/notes/reactions/${action}`,
+    {
+      method: "POST",
+      headers: MISSKEY_HEADERS,
+      body: JSON.stringify(
+        action === "create"
+          ? { i: params.viewerToken, noteId, reaction }
+          : { i: params.viewerToken, noteId }
+      ),
+      signal: AbortSignal.timeout(SHORT_TIMEOUT),
     }
-  }
+  );
+  if (response.ok) return { alreadyReacted: false };
 
-  // Misskeyの reactions/create|delete は204でcountを返さないため、操作後の最新状態を
-  // viewer側から取り直して即時表示に使う（federation遅延はオーナー側syncで後追い補正）。
-  let count = 0;
-  let favourited = action === "favourite";
+  const detail = await response.text().catch(() => "");
+  // 冪等性: 未リアクションでの解除は「既に望む状態」なので成功扱い。
+  if (action === "delete" && detail.includes("NOT_REACTED")) {
+    return { alreadyReacted: false };
+  }
+  // Misskeyは既にリアクション済みだと（別の絵文字であっても）ALREADY_REACTED を返す。
+  // 付け替えが必要かどうかの判断材料として呼び出し元へ渡す。
+  if (action === "create" && detail.includes("ALREADY_REACTED")) {
+    return { alreadyReacted: true };
+  }
+  const { reason, status } = classifyMisskeyError(detail, response.status);
+  throw new FavoriteError(reason, status, `reaction ${action} failed: ${response.status}`);
+}
+
+/**
+ * 操作後の viewer 側の状態を読み直す。
+ * reactions/create|delete は204で件数を返さないため、即時表示用にここで取得する
+ * （オーナー側との連合遅延は後追いの sync が補正する）。
+ */
+async function readMisskeyReactionState(
+  params: FavoriteActionParams,
+  noteId: string,
+  optimisticReacted: boolean
+): Promise<ReactionActionResult> {
   try {
-    const showRes = await fetch(`https://${params.viewerDomain}/api/notes/show`, {
+    const response = await fetch(`https://${params.viewerDomain}/api/notes/show`, {
       method: "POST",
       headers: MISSKEY_HEADERS,
       body: JSON.stringify({ i: params.viewerToken, noteId }),
       signal: AbortSignal.timeout(SHORT_TIMEOUT),
     });
-    if (showRes.ok) {
-      const note = (await showRes.json()) as MisskeyNote;
-      count = sumReactions(note);
-      favourited = !!note.myReaction;
+    if (response.ok) {
+      const note = (await response.json()) as MisskeyNote;
+      return { reacted: !!note.myReaction, count: sumReactions(note) };
     }
   } catch {
     // 取得失敗時は楽観値（操作が成功した前提）を返す
   }
-
-  return { favourited, count };
+  return { reacted: optimisticReacted, count: 0 };
 }
 
-/** viewerのトークンで投稿をお気に入り登録（Mastodon=favourite / Misskey=リアクション） */
-export function favoriteStatus(params: FavoriteActionParams) {
+async function sendMisskeyReaction(
+  params: FavoriteActionParams,
+  reaction: string
+): Promise<ReactionActionResult> {
+  const noteId = await resolveMisskeyNoteId(params);
+  const misskeyReaction = toMisskeyReaction(reaction, params.viewerDomain);
+
+  const created = await misskeyReactionRequest(params, noteId, "create", misskeyReaction);
+  if (created.alreadyReacted) {
+    // Misskeyには付け替えAPIが無いため、外してから付け直す。手元のDBではなく
+    // viewerサーバーの応答で判断するので、過去の失敗でDBと実状態がズレていても収束する。
+    await misskeyReactionRequest(params, noteId, "delete");
+    await misskeyReactionRequest(params, noteId, "create", misskeyReaction);
+  }
+  return readMisskeyReactionState(params, noteId, true);
+}
+
+async function removeMisskeyReaction(
+  params: FavoriteActionParams
+): Promise<ReactionActionResult> {
+  const noteId = await resolveMisskeyNoteId(params);
+  await misskeyReactionRequest(params, noteId, "delete");
+  return readMisskeyReactionState(params, noteId, false);
+}
+
+/**
+ * viewerのトークンでリアクションを設定する（付け替えを含む）。
+ * Mastodonはリアクションを持たないため、絵文字によらず favourite を送る
+ * （選ばれた絵文字は SHAMEZO の Reaction テーブルにだけ残る）。
+ */
+export function sendReaction(
+  params: FavoriteActionParams,
+  reaction: string
+): Promise<ReactionActionResult> {
   return params.viewerType === "misskey"
-    ? toggleMisskeyReaction(params, "favourite")
+    ? sendMisskeyReaction(params, reaction)
     : toggleFavorite(params, "favourite");
 }
 
-/** viewerのトークンで投稿のお気に入りを解除 */
-export function unfavoriteStatus(params: FavoriteActionParams) {
+/** viewerのトークンでリアクションを解除する（Mastodonは unfavourite） */
+export function removeReaction(
+  params: FavoriteActionParams
+): Promise<ReactionActionResult> {
   return params.viewerType === "misskey"
-    ? toggleMisskeyReaction(params, "unfavourite")
+    ? removeMisskeyReaction(params)
     : toggleFavorite(params, "unfavourite");
 }

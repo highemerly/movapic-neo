@@ -1,10 +1,12 @@
 /**
- * お気に入り一覧エンドポイント（best-effort）
+ * リアクションした画像の一覧エンドポイント
  * GET /api/v1/favorites
  *
- * Mastodonが正データのため「自分がお気に入りした画像」を正確に出す手段はない。
- * favoritersCache（オーナーインスタンスから取得した上位40件）に自分のacctが
- * 含まれる画像をbest-effortで一覧する。人気投稿で上位40件外の自分のfavは出ない。
+ * 情報源は2つ:
+ *  - Reaction テーブル … SHAMEZO 上で押したリアクション。件数に関わらず確実に出る
+ *  - favoritersCache … Fediverse 側（Misskeyのリアクション / Mastodonのお気に入り）で
+ *    直接押したぶん。オーナーインスタンス由来の上位40件なので、人気投稿で40件外に
+ *    なったものは出ない（best-effort）
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -33,9 +35,14 @@ export async function GET(request: NextRequest) {
       where: {
         isPublic: true,
         isDisabled: false,
-        favoritersCache: {
-          array_contains: [{ acct: viewerAcct }] as Prisma.InputJsonValue,
-        },
+        OR: [
+          { reactions: { some: { userId: currentUser.id } } },
+          {
+            favoritersCache: {
+              array_contains: [{ acct: viewerAcct }] as Prisma.InputJsonValue,
+            },
+          },
+        ],
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       ...cursorPageArgs(cursor, limit),

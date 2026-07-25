@@ -153,11 +153,22 @@ GET（`computeCacheTtl` の Infinity）と定期（fire2）は、**同じ「14�
 
 楽観表示（POST/DELETE 直後の即時反映）は DB に保存しない。viewer 自身を一覧へ仮反映してレスポンスにのみ載せる（federation 遅延＋上位40件の壁による割り切り）。リロードするとオーナー同期が連合反映を持ってくるまで一旦消えることがある。
 
+### オーナー側で取り消されたリアクションの反映（`reconcileRemovals`）
+
+SHAMEZO 上のリアクションは押した本人のトークンで Fediverse 側にも favourite/reaction を送っている（[favorite.ts](../src/lib/fediverse/favorite.ts) `sendReaction`）。よって「SHAMEZO の Reaction テーブルには残っているが、オーナー一覧に居ない acct」＝相手サーバー側で取り消された人、と判定できる（[reconcile.ts](../src/lib/reactions/reconcile.ts) `reactionsUnfavoritedOnOwner` → [store.ts](../src/lib/reactions/store.ts) `deleteReactions`）。
+
+- **定期同期のときだけ**判定する（`syncFavoriteCache(image, { reconcileRemovals: true })`。定期ジョブのみが渡す）。route の POST/DELETE 直後は連合がまだ伝播しておらず「付けた直後を取り消しと誤検知」するため対象外。
+- **一覧が40件フルの回は諦める**（41件目以降に隠れているだけかを区別できないため、その回はまるごと判定しない）。
+- **作成から10分（`UNFAVORITE_GRACE_MS`）未満のリアクションは対象外**（連合伝播の緩衝）。
+- ❤→👍 の**付け替えは対象外**（acct 自体は一覧に残るため消えない）。
+- 削除は best-effort（失敗しても sync 本体は止めない。次の定期でまた判定できる）。
+
 ## 9. ログ（worker-front / web pod）
 
 | ログ | 出る場所 | 条件 |
 |---|---|---|
 | `[favorite] synced imageId=… count=… favoriters=…` | worker-front | **定期ジョブ経由の成功時のみ**（`logSuccess`）。GET 経由の成功は無音（高頻度のため） |
+| `[favorite] removed N unfavorited reaction(s): imageId=…` | worker-front | 定期同期でオーナー側の取り消しを検知し Reaction を削除したとき（`reconcileRemovals`。§8参照） |
 | `[periodic] favorite-sync: candidates=処理/総数 synced=… failed=… (Nms)` | worker-front | 候補が1件以上ある実行で毎回（総数は LIMIT に当たったときだけ COUNT で算出＝backlog 可視化） |
 | `[favorite] sync failed (status=…, reason=…): imageId=…` | worker-front / web | 想定内の `FavoriteError`（404/429/5xx 等）。**スタックトレースは出さない** |
 | `[favorite] sync failed (unexpected): imageId=…` ＋ stack | worker-front / web | 想定外（タイムアウト・復号/DBエラー等）。調査用にスタックを残す |

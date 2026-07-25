@@ -3,7 +3,7 @@
 import Link from "@/components/Link";
 import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
 import { RetryImg } from "@/components/RetryImg";
-import { FavoriteOverlay } from "@/components/favorite/FavoriteOverlay";
+import { ReactionOverlay } from "@/components/reaction/ReactionOverlay";
 import { userPathSegment } from "@/lib/userHandle";
 import { useHomeServer } from "@/components/HomeServerProvider";
 
@@ -86,7 +86,7 @@ export function TimelineImageCard({
             </span>
           </div>
           {/* お気に入り数オーバーレイ */}
-          <FavoriteOverlay count={image.favoriteCount} />
+          <ReactionOverlay count={image.favoriteCount} />
         </>
       ) : (
         // grid（正方形タイル）: アバターを右下隅に小さく（名前・お気に入り数なし）

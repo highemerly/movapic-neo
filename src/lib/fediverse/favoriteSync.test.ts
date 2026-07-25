@@ -15,15 +15,29 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // vi.mock はファイル先頭へ巻き上げられるため、参照する mock 関数は vi.hoisted で先に生成する。
-const { imageUpdate, fetchFavoriteDataMock, reconcileMock } = vi.hoisted(() => ({
+const {
+  imageUpdate,
+  reactionFindMany,
+  reactionDeleteMany,
+  fetchFavoriteDataMock,
+  reconcileMock,
+  resolveLocalEmojiUrlsMock,
+} = vi.hoisted(() => ({
   imageUpdate: vi.fn(),
+  reactionFindMany: vi.fn(),
+  reactionDeleteMany: vi.fn(),
   fetchFavoriteDataMock: vi.fn(),
   reconcileMock: vi.fn(),
+  resolveLocalEmojiUrlsMock: vi.fn(),
 }));
 
-// prisma は image.update だけ使う
+// prisma は image.update と reaction.findMany（マージ／取り消し検知）・reaction.deleteMany
+// （取り消し反映）を使う
 vi.mock("@/lib/db", () => ({
-  default: { image: { update: imageUpdate } },
+  default: {
+    image: { update: imageUpdate },
+    reaction: { findMany: reactionFindMany, deleteMany: reactionDeleteMany },
+  },
 }));
 
 // ネットワーク層は fetchFavoriteData のみ差し替え、FavoriteError/分類ヘルパは実物を使う
@@ -31,6 +45,11 @@ vi.mock("@/lib/fediverse/favorite", async (importActual) => {
   const actual = await importActual<typeof import("@/lib/fediverse/favorite")>();
   return { ...actual, fetchFavoriteData: fetchFavoriteDataMock };
 });
+
+// カスタム絵文字URLの解決はカタログ取得（ネットワーク＋DB）なのでここでは遮断する
+vi.mock("@/lib/fediverse/emojis", () => ({
+  resolveLocalEmojiUrls: resolveLocalEmojiUrlsMock,
+}));
 
 // 通知差分の中身は favoriteNotifications 側の責務。ここでは呼び出し有無・wasFirstSync だけ見る
 vi.mock("@/lib/notifications/favoriteNotifications", () => ({
@@ -40,12 +59,24 @@ vi.mock("@/lib/notifications/favoriteNotifications", () => ({
 import { FavoriteError, type CachedFavoriter } from "@/lib/fediverse/favorite";
 import { syncFavoriteCache, type ImageForFavorite } from "@/lib/fediverse/favoriteSync";
 
-const FAV = (acct: string): CachedFavoriter => ({
+const FAV = (acct: string, emoji = "❤"): CachedFavoriter => ({
   acct,
   displayName: null,
   avatarUrl: null,
   profileUrl: null,
+  emoji,
+  emojiImageUrl: null,
 });
+
+/** fetchFavoriteData の戻り値。Mastodonオーナー相当（種別を持たないので ❤ に寄る） */
+function favoriteData(count: number, favoriters: CachedFavoriter[]) {
+  return {
+    count,
+    favoriters,
+    totals: count > 0 ? { "❤": count } : {},
+    emojiUrls: {},
+  };
+}
 
 function makeImage(over: Partial<Record<string, unknown>> = {}): ImageForFavorite {
   return {
@@ -53,6 +84,7 @@ function makeImage(over: Partial<Record<string, unknown>> = {}): ImageForFavorit
     postId: "note-1",
     userId: "user-1",
     favoriteCount: 5,
+    fediverseCount: 5,
     favoritersCache: [FAV("old@x")],
     favoritesSyncedAt: null,
     postStatus: null,
@@ -72,16 +104,19 @@ function lastUpdateData(): Record<string, unknown> {
 
 beforeEach(() => {
   imageUpdate.mockReset().mockResolvedValue({});
+  reactionFindMany.mockReset().mockResolvedValue([]);
+  reactionDeleteMany.mockReset().mockResolvedValue({ count: 0 });
   fetchFavoriteDataMock.mockReset();
   reconcileMock.mockReset().mockResolvedValue(undefined);
+  resolveLocalEmojiUrlsMock.mockReset().mockResolvedValue({});
 });
 
 describe("syncFavoriteCache - ステータス別の結果（3経路共通の同期エンジン）", () => {
   it("200成功: count/cache/postStatus=200/syncedAt を更新し、取得値を返す", async () => {
-    fetchFavoriteDataMock.mockResolvedValue({ count: 3, favoriters: [FAV("a@x")] });
+    fetchFavoriteDataMock.mockResolvedValue(favoriteData(3, [FAV("a@x")]));
     const res = await syncFavoriteCache(makeImage({ favoritersCache: [], postStatus: null }));
 
-    expect(res).toEqual({ count: 3, favoriters: [FAV("a@x")], errorReason: null });
+    expect(res).toMatchObject({ count: 3, favoriters: [FAV("a@x")], errorReason: null });
     const data = lastUpdateData();
     expect(data.favoriteCount).toBe(3);
     expect(data.favoritersCache).toEqual([FAV("a@x")]);
@@ -95,7 +130,7 @@ describe("syncFavoriteCache - ステータス別の結果（3経路共通の同�
     fetchFavoriteDataMock.mockRejectedValue(new FavoriteError("deleted", 404));
     const res = await syncFavoriteCache(makeImage({ favoriteCount: 5, favoritersCache: [FAV("old@x")] }));
 
-    expect(res).toEqual({ count: 5, favoriters: [FAV("old@x")], errorReason: "deleted" });
+    expect(res).toMatchObject({ count: 5, favoriters: [FAV("old@x")], errorReason: "deleted" });
     const data = lastUpdateData();
     expect(data.postStatus).toBe(404);
     expect(data.favoritesSyncedAt).toBeInstanceOf(Date);
@@ -128,16 +163,16 @@ describe("syncFavoriteCache - throw しない契約（POST/DELETE の 500→二�
     fetchFavoriteDataMock.mockRejectedValue(new Error("The operation was aborted (timeout)"));
     const res = await syncFavoriteCache(makeImage({ favoriteCount: 9, favoritersCache: [FAV("keep@x")] }));
 
-    expect(res).toEqual({ count: 9, favoriters: [FAV("keep@x")], errorReason: "unavailable" });
+    expect(res).toMatchObject({ count: 9, favoriters: [FAV("keep@x")], errorReason: "unavailable" });
     expect(lastUpdateData().postStatus).toBe(0);
   });
 
   it("成功パスで DB 永続化が失敗しても throw せず取得値を返し、通知差分はスキップ", async () => {
-    fetchFavoriteDataMock.mockResolvedValue({ count: 3, favoriters: [FAV("a@x")] });
+    fetchFavoriteDataMock.mockResolvedValue(favoriteData(3, [FAV("a@x")]));
     imageUpdate.mockRejectedValue(new Error("db down"));
 
     const res = await syncFavoriteCache(makeImage());
-    expect(res).toEqual({ count: 3, favoriters: [FAV("a@x")], errorReason: null });
+    expect(res).toMatchObject({ count: 3, favoriters: [FAV("a@x")], errorReason: null });
     // 永続化できていないので誤通知を避けるため差分はスキップ
     expect(reconcileMock).not.toHaveBeenCalled();
   });
@@ -147,13 +182,113 @@ describe("syncFavoriteCache - throw しない契約（POST/DELETE の 500→二�
     imageUpdate.mockRejectedValue(new Error("db down"));
 
     const res = await syncFavoriteCache(makeImage({ favoriteCount: 7, favoritersCache: [FAV("keep@x")] }));
-    expect(res).toEqual({ count: 7, favoriters: [FAV("keep@x")], errorReason: "unavailable" });
+    expect(res).toMatchObject({ count: 7, favoriters: [FAV("keep@x")], errorReason: "unavailable" });
+  });
+});
+
+describe("syncFavoriteCache - リアクション（絵文字別カウントと SHAMEZO 側の重ね合わせ）", () => {
+  it("絵文字別カウントと生の合計を別々に保存する", async () => {
+    fetchFavoriteDataMock.mockResolvedValue({
+      count: 5,
+      favoriters: [FAV("a@x", "👍"), FAV("b@x", ":ai@owner.example:")],
+      totals: { "👍": 3, ":ai@owner.example:": 2 },
+      emojiUrls: {},
+    });
+    const res = await syncFavoriteCache(makeImage({ favoritersCache: [], postStatus: 200 }));
+
+    const data = lastUpdateData();
+    expect(data.fediverseCount).toBe(5);
+    expect(data.favoriteCount).toBe(5);
+    expect(data.reactionTotalsCache).toEqual({
+      totals: { "👍": 3, ":ai@owner.example:": 2 },
+      emojiUrls: {},
+    });
+    expect(res.count).toBe(5);
+  });
+
+  it("オーナーのローカル絵文字URLをカタログから補い、キャッシュにも焼き込む", async () => {
+    resolveLocalEmojiUrlsMock.mockResolvedValue({
+      ":ai@owner.example:": "https://owner.example/emoji/ai.webp",
+    });
+    fetchFavoriteDataMock.mockResolvedValue({
+      count: 1,
+      favoriters: [FAV("a@x", ":ai@owner.example:")],
+      totals: { ":ai@owner.example:": 1 },
+      emojiUrls: {},
+    });
+    await syncFavoriteCache(makeImage({ favoritersCache: [], postStatus: 200 }));
+
+    const data = lastUpdateData();
+    expect(data.reactionTotalsCache).toEqual({
+      totals: { ":ai@owner.example:": 1 },
+      emojiUrls: { ":ai@owner.example:": "https://owner.example/emoji/ai.webp" },
+    });
+    expect((data.favoritersCache as CachedFavoriter[])[0].emojiImageUrl).toBe(
+      "https://owner.example/emoji/ai.webp"
+    );
+  });
+
+  it("カタログ取得に失敗しても同期は続行する（URLが付かないだけ）", async () => {
+    resolveLocalEmojiUrlsMock.mockRejectedValue(new Error("catalog down"));
+    fetchFavoriteDataMock.mockResolvedValue(favoriteData(2, [FAV("a@x")]));
+
+    const res = await syncFavoriteCache(makeImage({ postStatus: 200 }));
+    expect(res.errorReason).toBeNull();
+    expect(lastUpdateData().favoriteCount).toBe(2);
+  });
+
+  it("連合に載らない SHAMEZO 上のリアクションを合計に足して favoriteCount に保存する", async () => {
+    reactionFindMany.mockResolvedValue([
+      {
+        emoji: "🎉",
+        emojiImageUrl: null,
+        user: {
+          username: "local",
+          displayName: null,
+          avatarUrl: null,
+          instance: { domain: "shamezo.example" },
+        },
+      },
+    ]);
+    fetchFavoriteDataMock.mockResolvedValue(favoriteData(2, [FAV("a@x"), FAV("b@x")]));
+
+    const res = await syncFavoriteCache(makeImage({ postStatus: 200 }));
+
+    // 連合の2件 + キャッシュに居ないSHAMEZOの1件
+    expect(lastUpdateData().favoriteCount).toBe(3);
+    expect(lastUpdateData().fediverseCount).toBe(2);
+    expect(res.count).toBe(3);
+  });
+
+  it("通知の差分にはマージ後の一覧を渡す（SHAMEZO 上だけのリアクションも通知する）", async () => {
+    reactionFindMany.mockResolvedValue([
+      {
+        emoji: "🎉",
+        emojiImageUrl: null,
+        user: {
+          username: "local",
+          displayName: null,
+          avatarUrl: null,
+          instance: { domain: "shamezo.example" },
+        },
+      },
+    ]);
+    fetchFavoriteDataMock.mockResolvedValue(favoriteData(1, [FAV("a@x")]));
+
+    await syncFavoriteCache(makeImage({ postStatus: 200 }));
+
+    const call = reconcileMock.mock.calls[0][0];
+    expect(call.currentFavoriters.map((f: CachedFavoriter) => f.acct)).toEqual([
+      "a@x",
+      "local@shamezo.example",
+    ]);
+    expect(call.count).toBe(2);
   });
 });
 
 describe("syncFavoriteCache - 初回“成功”sync の判定（通知誤爆の防止）", () => {
   it("失敗が先行(postStatus=503)＋キャッシュ空 → 初成功は wasFirstSync=true（ベースライン化）", async () => {
-    fetchFavoriteDataMock.mockResolvedValue({ count: 3, favoriters: [FAV("a@x"), FAV("b@x")] });
+    fetchFavoriteDataMock.mockResolvedValue(favoriteData(3, [FAV("a@x"), FAV("b@x")]));
     const img = makeImage({
       postStatus: 503,
       favoritesSyncedAt: new Date("2026-06-25T00:00:00Z"), // 失敗で更新済み
@@ -166,7 +301,7 @@ describe("syncFavoriteCache - 初回“成功”sync の判定（通知誤爆の
   });
 
   it("成功実績あり(postStatus=200) → wasFirstSync=false（差分通知する）", async () => {
-    fetchFavoriteDataMock.mockResolvedValue({ count: 4, favoriters: [FAV("a@x"), FAV("c@x")] });
+    fetchFavoriteDataMock.mockResolvedValue(favoriteData(4, [FAV("a@x"), FAV("c@x")]));
     const img = makeImage({
       postStatus: 200,
       favoritesSyncedAt: new Date("2026-06-25T00:00:00Z"),
@@ -175,5 +310,70 @@ describe("syncFavoriteCache - 初回“成功”sync の判定（通知誤爆の
     await syncFavoriteCache(img);
 
     expect(reconcileMock.mock.calls[0][0].wasFirstSync).toBe(false);
+  });
+});
+
+describe("syncFavoriteCache - オーナー側の取り消し反映（reconcileRemovals）", () => {
+  // reconcile 用に userId/createdAt を、merge 用に emoji 等を両方満たす行
+  function reactionRow(
+    userId: string,
+    username: string,
+    domain: string,
+    createdAt: Date
+  ) {
+    return {
+      userId,
+      createdAt,
+      emoji: "❤",
+      emojiImageUrl: null,
+      user: { username, displayName: null, avatarUrl: null, instance: { domain } },
+    };
+  }
+  const OLD = new Date("2026-06-20T00:00:00Z"); // 猶予を十分超えた過去
+
+  it("定期同期で、一覧から消えたユーザーのリアクションを削除する", async () => {
+    reactionFindMany.mockResolvedValue([
+      reactionRow("u-gone", "bob", "mi.hiyoko.club", OLD),
+      reactionRow("u-keep", "alice", "owner.example", OLD),
+    ]);
+    // オーナー一覧には alice だけ残り bob は消えた
+    fetchFavoriteDataMock.mockResolvedValue(favoriteData(1, [FAV("alice@owner.example")]));
+
+    await syncFavoriteCache(makeImage({ postStatus: 200 }), { reconcileRemovals: true });
+
+    expect(reactionDeleteMany).toHaveBeenCalledWith({
+      where: { imageId: "img-1", userId: { in: ["u-gone"] } },
+    });
+  });
+
+  it("reconcileRemovals 無し（操作直後の経路）では取り消し判定しない", async () => {
+    reactionFindMany.mockResolvedValue([reactionRow("u-gone", "bob", "mi.hiyoko.club", OLD)]);
+    fetchFavoriteDataMock.mockResolvedValue(favoriteData(0, []));
+
+    await syncFavoriteCache(makeImage({ postStatus: 200 }));
+
+    expect(reactionDeleteMany).not.toHaveBeenCalled();
+  });
+
+  it("一覧が40件フルの回は（隠れた41件目と区別できないため）取り消し判定を諦める", async () => {
+    reactionFindMany.mockResolvedValue([reactionRow("u-gone", "bob", "mi.hiyoko.club", OLD)]);
+    const full = Array.from({ length: 40 }, (_, i) => FAV(`f${i}@owner.example`));
+    fetchFavoriteDataMock.mockResolvedValue(favoriteData(40, full));
+
+    await syncFavoriteCache(makeImage({ postStatus: 200 }), { reconcileRemovals: true });
+
+    expect(reactionDeleteMany).not.toHaveBeenCalled();
+  });
+
+  it("付けた直後（猶予内）のリアクションは一覧に無くても消さない", async () => {
+    // 連合がまだ伝播していないだけの可能性があるため
+    reactionFindMany.mockResolvedValue([
+      reactionRow("u-fresh", "bob", "mi.hiyoko.club", new Date()),
+    ]);
+    fetchFavoriteDataMock.mockResolvedValue(favoriteData(0, []));
+
+    await syncFavoriteCache(makeImage({ postStatus: 200 }), { reconcileRemovals: true });
+
+    expect(reactionDeleteMany).not.toHaveBeenCalled();
   });
 });

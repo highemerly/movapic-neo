@@ -19,14 +19,20 @@ export default async function FavoritePage() {
     redirect("/?reason=login_required&returnTo=%2Ffavorite");
   }
 
-  // best-effort: favoritersCache に自分のacctが含まれる画像を一覧
+  // SHAMEZO 上のリアクション（確実）と、Fediverse 側で直接押したぶん（上位40件の
+  // キャッシュ由来なので best-effort）の和集合。条件は /api/v1/favorites と同じ。
   const viewerAcct = `${currentUser.username}@${currentUser.instance.domain}`;
   const images = await prisma.image.findMany({
     where: {
       isPublic: true, isDisabled: false,
-      favoritersCache: {
-        array_contains: [{ acct: viewerAcct }] as Prisma.InputJsonValue,
-      },
+      OR: [
+        { reactions: { some: { userId: currentUser.id } } },
+        {
+          favoritersCache: {
+            array_contains: [{ acct: viewerAcct }] as Prisma.InputJsonValue,
+          },
+        },
+      ],
     },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: PAGE_SIZE,

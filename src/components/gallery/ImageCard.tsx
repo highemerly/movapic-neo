@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "@/components/Link";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { ThumbnailImage } from "./ThumbnailImage";
-import { FavoriteOverlay } from "@/components/favorite/FavoriteOverlay";
+import { ReactionOverlay } from "@/components/reaction/ReactionOverlay";
 import { PinOverlay } from "@/components/pin/PinOverlay";
 
 interface ImageCardProps {
@@ -88,7 +88,7 @@ export function ImageCard({ image, publicUrl, username, showDelete, onDelete, is
       <PinOverlay isPinned={!!isPinned} />
       {/* お気に入り数オーバーレイ */}
       {image.favoriteCount !== undefined && (
-        <FavoriteOverlay count={image.favoriteCount} />
+        <ReactionOverlay count={image.favoriteCount} />
       )}
     </div>
   );

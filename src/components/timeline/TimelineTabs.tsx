@@ -1,4 +1,4 @@
-import { Globe, Server, Heart } from "lucide-react";
+import { Globe, Server, SmilePlus } from "lucide-react";
 
 import { TabBar, type TabItem } from "@/components/TabBar";
 
@@ -25,7 +25,7 @@ export function TimelineTabs({ ownInstance, active }: TimelineTabsProps) {
       icon: Server,
       href: `/public?instances=${encodeURIComponent(ownInstance)}`,
     },
-    { key: "favorites", label: "お気に入り", icon: Heart, href: "/favorite" },
+    { key: "favorites", label: "リアクション", icon: SmilePlus, href: "/favorite" },
   ];
 
   return (

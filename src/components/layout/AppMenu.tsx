@@ -18,7 +18,7 @@ import {
   Globe,
   Server,
   Shuffle,
-  Heart,
+  SmilePlus,
   Bell,
   Images,
   Calendar,
@@ -204,8 +204,8 @@ function useMenuSections(nav: MenuNav): MenuSectionData[] {
     everyone.push({
       key: "favorite",
       href: "/favorite",
-      label: "お気に入り",
-      Icon: Heart,
+      label: "リアクション",
+      Icon: SmilePlus,
       active: pathname === "/favorite",
       primary: true,
     });

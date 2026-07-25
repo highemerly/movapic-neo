@@ -15,16 +15,16 @@ import { ImageActionsMenu } from "./ImageActionsMenu";
 import { isImageRepostable } from "@/lib/publish/repostImage";
 import { MisskeyOpenButton } from "./MisskeyOpenButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
-import { FavoriteButton } from "@/components/favorite/FavoriteButton";
-import { FavoriteAvatarsLive } from "@/components/favorite/FavoriteAvatarsLive";
+import { ReactionChips } from "@/components/reaction/ReactionChips";
+import { ReactionPickerButton } from "@/components/reaction/ReactionPickerButton";
 import { ExpandableDetailImage } from "./ExpandableDetailImage";
 import { BackLink } from "@/components/BackLink";
 import { PageContainer } from "@/components/PageContainer";
-import {
-  classifyPostStatus,
-  favoriteErrorMessage,
-  type CachedFavoriter,
-} from "@/lib/fediverse/favorite";
+import { classifyPostStatus, favoriteErrorMessage } from "@/lib/fediverse/favorite";
+import { readCache, readTotalsCache } from "@/lib/fediverse/favoriteSync";
+import { mergeReactions } from "@/lib/reactions/merge";
+import { loadStoredReactions } from "@/lib/reactions/store";
+import { getEmojiImageUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
 import { getBotAcct } from "@/lib/postMethods";
@@ -54,8 +54,7 @@ const IMAGE_MAX_VH = 72;
 
 // モバイル限定フローティングバーがログイン時に下部ナビの真上へ乗るための bottom オフセット。
 // 下部ナビ（BottomNav）はログイン時のみ・モバイル(<768px)で表示され、globals.css が body に
-// `3.5rem + safe-area` の余白を確保する。バーはナビ高さぶん持ち上げる。未ログイン(favoritableのみ)は
-// ナビが無いので呼び出し側で bottom-0＋自前 safe-area にフォールバックする。
+// `3.5rem + safe-area` の余白を確保する。バーはナビ高さぶん持ち上げる。
 // ナビ高さ（3.5rem+safe-area）に加えて 0.5rem だけ隙間を空け、バーがナビにくっつき過ぎないようにする。
 const NAV_OFFSET = "bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.5rem)]";
 
@@ -210,9 +209,8 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   // Bot投稿の表示・説明に使う Bot アカウント（env 未設定なら null＝説明では省略される）
   const botAcct = getBotAcct();
 
-  // お気に入りキャッシュから初期表示データを算出
-  // お気に入り可能 = Fediverseに投稿済み（postIdがある）投稿のみ（local投稿は対象外）
-  const favoritable =
+  // Fediverse へリアクションを送れる投稿か（local投稿は送り先が無く、DBだけで完結する）
+  const fediverseSendable =
     (image.user.instance.type === "mastodon" ||
       image.user.instance.type === "misskey") &&
     !!image.postId;
@@ -223,23 +221,44 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     postId: image.postId,
     createdAt: image.createdAt,
   });
-  const cachedFavoriters =
-    (image.favoritersCache as unknown as CachedFavoriter[] | null) ?? [];
   const viewerAcct = currentUser
     ? `${currentUser.username}@${currentUser.instance.domain}`
     : null;
-  const isFavorited = viewerAcct
-    ? cachedFavoriters.some((f) => f.acct === viewerAcct)
-    : false;
   // 前回sync結果（postStatus）から現状の理由を復元
-  const persistedReason = favoritable ? classifyPostStatus(image.postStatus) : null;
-  const initialSyncError = favoriteErrorMessage(persistedReason);
-  // 削除確定（404/410）が分かっている時はトグル不可
-  const canFavorite =
+  const persistedReason = fediverseSendable
+    ? classifyPostStatus(image.postStatus)
+    : null;
+  // 削除確定（404/410）が分かっている時は操作不可
+  const canReact =
     !!currentUser &&
     (currentUser.instance.type === "mastodon" ||
       currentUser.instance.type === "misskey") &&
     persistedReason !== "deleted";
+
+  // 連合キャッシュと SHAMEZO 上のリアクションをマージして初期表示を作る。
+  // マウント後にクライアントが同じ内容を API から取り直す（TTL切れならその時に同期される）。
+  const merged = mergeReactions({
+    fediverseCount: image.fediverseCount,
+    totalsCache: readTotalsCache(image),
+    cachedFavoriters: readCache(image),
+    storedReactions: await loadStoredReactions(imageId),
+    viewerAcct,
+  });
+  const initialReactionSnapshot = {
+    total: merged.total,
+    chips: merged.chips.map((chip) => ({
+      ...chip,
+      imageUrl: getEmojiImageUrl(chip.imageUrl),
+    })),
+    usersByEmoji: Object.fromEntries(
+      Object.entries(merged.usersByEmoji).map(([emoji, users]) => [
+        emoji,
+        users.map((user) => ({ ...user, avatarUrl: getAvatarUrl(user.avatarUrl) })),
+      ])
+    ),
+    viewerEmoji: merged.viewerEmoji,
+    statusMessage: favoriteErrorMessage(persistedReason),
+  };
 
   // 前後の画像を取得
   // 公開TLからの場合: 全ユーザーの公開画像を対象
@@ -259,7 +278,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
 
   // 前後ナビの対象範囲を遷移元で切り替える。
   // - 公開（みんな/同じサーバー）: 全体、または該当サーバーに限定
-  // - お気に入り: 閲覧者がお気に入りした投稿に限定（要ログイン）
+  // - リアクション: 閲覧者がリアクションした投稿に限定（要ログイン）
   // - それ以外（ギャラリー等）: その投稿のユーザーに限定
   let navigationScope: Prisma.ImageWhereInput;
   if (isFromPublic) {
@@ -268,12 +287,18 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         ? { user: { instance: { domain: { in: publicInstances } } } }
         : {};
   } else if (isFromFavorite && currentUser) {
+    // 前後ナビの母集合は一覧（/api/v1/favorites）と同じ条件にそろえる
     navigationScope = {
-      favoritersCache: {
-        array_contains: [
-          { acct: `${currentUser.username}@${currentUser.instance.domain}` },
-        ] as Prisma.InputJsonValue,
-      },
+      OR: [
+        { reactions: { some: { userId: currentUser.id } } },
+        {
+          favoritersCache: {
+            array_contains: [
+              { acct: `${currentUser.username}@${currentUser.instance.domain}` },
+            ] as Prisma.InputJsonValue,
+          },
+        },
+      ],
     };
   } else {
     navigationScope = { userId: image.userId };
@@ -397,7 +422,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     }
   } else if (fromKind === "favorite") {
     backUrl = "/favorite";
-    backLabel = "お気に入りの投稿一覧に戻る";
+    backLabel = "リアクションした投稿一覧に戻る";
   } else if (fromKind === "user-calendar") {
     // fromState = "YYYY-M"（CalendarView が埋め込む）。遷移元の月のカレンダーへ戻す。
     const [cy, cm] = fromState.split("-");
@@ -436,29 +461,25 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   // 返信・シェア・その他メニュー。PC（インライン）とモバイル（下部フローティングバー）で
   // 同じ操作を出すが、見た目・出し分けが異なる（floating）ので1箇所にまとめてフラグで切り替える。
   // - PC: 行幅いっぱいに伸ばす（flex-auto/flex-1）。従来どおり全ボタンを表示。
-  // - モバイル: 各ボタンを実寸ピル化し背景＋影を付与（PILL）。並びは お気に入り／サーバーで開く／
+  // - モバイル: 各ボタンを実寸ピル化し背景＋影を付与（PILL）。並びは リアクション／サーバーで開く／
   //   共有（ネイティブ・≥380px のみ）／メニュー。「リンクを投稿」はバーには出さず（横幅節約）
   //   ミートボール内に残す。狭い画面(<380px)は共有も隠して3つに収める。
   const actionButtons = (floating: boolean) => (
     <>
-      {/* お気に入りトグル（ハート＋数）。アイコン列は別途インラインに常時表示する。 */}
-      {favoritable && (
-        <FavoriteButton
-          imageId={imageId}
-          initialCount={image.favoriteCount}
-          initialIsFavorited={isFavorited}
-          initialFavoriters={[]}
-          canFavorite={canFavorite}
-          initialSyncError={initialSyncError}
-          disabledReason={
-            persistedReason === "deleted"
-              ? "この投稿は削除されているため操作できません"
-              : "お気に入りはMastodon・Misskeyアカウントで利用できます"
-          }
-          compact
-          floating={floating}
-        />
-      )}
+      {/* リアクションを付ける＋ボタン（内訳のチップは本文の下に出す）。
+          local投稿もDBに記録できるので、公開画像なら常に出す。 */}
+      <ReactionPickerButton
+        imageId={imageId}
+        initialSnapshot={initialReactionSnapshot}
+        canReact={canReact}
+        disabledReason={
+          persistedReason === "deleted"
+            ? "この投稿は削除されているため操作できません"
+            : "リアクションはMastodon・Misskeyアカウントで利用できます"
+        }
+        floating={floating}
+      />
+
       {/* 返信ボタンが出るケースは横が窮屈になるので、両ボタンを2行＋小さめ文字にして
           320px 幅でも収める（高さは h-[44px] 固定）。 */}
       {mastodonReplyUrl && (
@@ -606,7 +627,15 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           <p className="text-base whitespace-pre-wrap break-words">{image.overlayText}</p>
         </div>
 
-        {/* この投稿で獲得した実績（コメント直下。チップをクリックするとお祝いモーダルを開く） */}
+        {/* リアクション一覧（絵文字＋件数）。実績チップの上に並べる。枠なしの丸ピルで、
+            チップを押すとその場のポップオーバーで誰が押したかを出す。末尾の＋から追加できる。 */}
+        <ReactionChips
+          imageId={imageId}
+          initialSnapshot={initialReactionSnapshot}
+          canReact={canReact}
+        />
+
+        {/* この投稿で獲得した実績（チップをクリックするとお祝いモーダルを開く） */}
         <EarnedAchievementChips achievements={earnedAchievements} username={username} />
 
         {/* EXIF情報（カメラ機種・撮影場所）。投稿者本人のみ撮影場所だけ削除可能。 */}
@@ -683,24 +712,8 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           ) : null}
         </div>
 
-        {/* お気に入り者アイコン（インライン・読み取り専用）。先頭に ♡ アイコンを付けて誰が
-            お気に入りしたかを並べる。ログイン/未ログイン共通の表示で、操作トグルは持たない
-            （ログイン時のトグルはアクションバー内。バーでお気に入りすると favoriteSync 経由で
-            このアイコン列も即時更新される）。0件のときは行ごと非表示。 */}
-        {favoritable && (
-          <FavoriteAvatarsLive
-            imageId={imageId}
-            initialFavoriters={cachedFavoriters.map((f) => ({
-              acct: f.acct,
-              displayName: f.displayName,
-              avatarUrl: getAvatarUrl(f.avatarUrl),
-              profileUrl: f.profileUrl,
-            }))}
-          />
-        )}
-
-        {/* 返信・シェア・その他メニュー＋お気に入りトグル（インライン）。ログイン時かつ PC のみ描画
-            （モバイルのログイン時はフローティングバーへ）。 */}
+        {/* 返信・シェア・その他メニュー＋リアクションの＋ボタン（インライン）。ログイン時かつ PC のみ
+            描画（モバイルのログイン時はフローティングバーへ）。 */}
         {currentUser && (
           <div className="mt-[10px] hidden md:flex items-center gap-1">
             {actionButtons(false)}
@@ -785,11 +798,11 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         {currentUser && <div aria-hidden className="md:hidden h-[104px]" />}
       </PageContainer>
 
-      {/* モバイル(<md)かつログイン時だけの、お気に入り・返信・シェア・その他メニューのフローティング
-          バー。中身（お気に入りトグル含む）は actionButtons に集約。画像のアスペクト比で本文位置が
+      {/* モバイル(<md)かつログイン時だけの、リアクション・返信・シェア・その他メニューのフローティング
+          バー。中身（＋ボタン含む）は actionButtons に集約。画像のアスペクト比で本文位置が
           上下しても操作系を画面下部の同じ位置に固定する。帯は敷かず各ボタンだけ背景を持たせ、コンテナは
           pointer-events-none で隙間から下の画面が見え・クリックも透過する（各ボタンは pointer-events-auto）。
-          1行に収まるよう狭い画面は一部ボタンを隠す。お気に入り者アイコンは本文内インライン表示。 */}
+          1行に収まるよう狭い画面は一部ボタンを隠す。リアクションの内訳は本文内のチップ行に出す。 */}
       {currentUser && (
         <div
           className={`md:hidden pointer-events-none fixed inset-x-0 z-30 ${NAV_OFFSET}`}

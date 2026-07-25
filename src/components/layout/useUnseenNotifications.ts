@@ -21,6 +21,8 @@ export type FavoriteFeedData = {
     displayName: string | null;
     avatarUrl: string | null;
     profileUrl: string | null;
+    emoji: string | null;
+    emojiImageUrl: string | null;
   }[];
 };
 

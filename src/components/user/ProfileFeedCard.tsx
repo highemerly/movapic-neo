@@ -1,10 +1,8 @@
 import Link from "@/components/Link";
-import { CalendarDays, Camera, MapPin, Heart } from "lucide-react";
+import { CalendarDays, Camera, MapPin, SmilePlus } from "lucide-react";
 import { ThumbnailImage } from "@/components/gallery/ThumbnailImage";
 import { PinOverlay } from "@/components/pin/PinOverlay";
 import { FavoriterAvatars } from "@/components/user/FavoriterAvatars";
-import { getAvatarUrl } from "@/lib/avatar";
-import type { CachedFavoriter } from "@/lib/fediverse/favorite";
 
 export interface ProfileFeedImage {
   id: string;
@@ -16,27 +14,25 @@ export interface ProfileFeedImage {
   blurDataUrl: string | null;
   /** ISO 文字列 */
   createdAt: string;
-  /** Fediverse投稿済みの印（postId）。null=未投稿(local)でお気に入りが付かない。 */
+  /** Fediverse投稿済みの印（postId）。null=未投稿(local)。 */
   postId: string | null;
+  /** リアクション合計（連合＋SHAMEZO上のマージ済み） */
   favoriteCount: number;
-  favoriters: CachedFavoriter[];
+  /** リアクションした人（アバター表示用・プロキシ済みURL） */
+  reactors: { acct: string; label: string; avatarUrl: string | null; profileUrl: string | null }[];
   cameraModel: string | null;
   locationPrefecture: string | null;
   locationCity: string | null;
 }
 
-// お気に入りアバターは上位のみ描画し、はみ出しは overflow-hidden で切り取る（横スクロールしない）。
-// 全体数は左のハート数字が表すので、ここでは並べられるだけ並べれば十分。
-const MAX_FAVORITERS = 12;
-
 /**
  * 概要（ホーム）ページのフィード風カード。
  *
- * 画像詳細ページと同じ要素（コメント本文・投稿日・カメラ/位置・お気に入りした人）を
- * 読み取り専用で1枚に凝縮する。右カラムは常に4行（本文／投稿日／カメラ・位置／お気に入り）で、
+ * 画像詳細ページと同じ要素（コメント本文・投稿日・カメラ/位置・リアクションした人）を
+ * 読み取り専用で1枚に凝縮する。右カラムは常に4行（本文／投稿日／カメラ・位置／リアクション）で、
  * 左のサムネイルはその高さいっぱいの正方形にタイルモードと同じクロップで敷き詰める。
- * お気に入り情報は image.favoritersCache をそのまま使い、ここでは Fediverse へ再同期しない
- * （詳細ページを開いたときに最新化される）。本文・カメラ/位置は幅超過時に右を「…」で省略。
+ * リアクション情報は保存済みのキャッシュとDBから組み立てた値をそのまま使い、ここでは Fediverse へ
+ * 再同期しない（詳細ページを開いたときに最新化される）。本文・カメラ/位置は幅超過時に右を「…」で省略。
  */
 export function ProfileFeedCard({
   image,
@@ -57,13 +53,6 @@ export function ProfileFeedCard({
     month: "numeric",
     day: "numeric",
   });
-  const favoriters = image.favoriters.slice(0, MAX_FAVORITERS).map((f) => ({
-    acct: f.acct,
-    label: f.displayName || f.acct,
-    avatarUrl: getAvatarUrl(f.avatarUrl),
-    profileUrl: f.profileUrl,
-  }));
-
   return (
     <div className="rounded-lg border overflow-hidden">
       {/* items-stretch で左サムネイルが右カラム(4行)の高さいっぱいに伸びる。
@@ -109,16 +98,16 @@ export function ProfileFeedCard({
               </span>
             )}
           </p>
-          {/* 4行目: お気に入り数＋お気に入りした人（上位のみ・はみ出しは切り取り）。
-              未投稿(local)はお気に入りが付きようがないため数自体を出さない（min-h-5 で行高は確保）。 */}
+          {/* 4行目: リアクション合計＋リアクションした人（上位のみ・はみ出しは切り取り）。
+              0件のときはアイコンだけ浮かないよう何も出さない（min-h-5 で行高は確保）。 */}
           <div className="flex min-h-5 items-center gap-1.5">
-            {image.postId && (
+            {image.favoriteCount > 0 && (
               <>
                 <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                  <Heart className="h-3.5 w-3.5 fill-current text-red-500" />
+                  <SmilePlus className="h-3.5 w-3.5" />
                   <span className="font-medium tabular-nums">{image.favoriteCount}</span>
                 </span>
-                {favoriters.length > 0 && <FavoriterAvatars items={favoriters} />}
+                {image.reactors.length > 0 && <FavoriterAvatars items={image.reactors} />}
               </>
             )}
           </div>
