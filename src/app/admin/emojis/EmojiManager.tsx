@@ -34,8 +34,8 @@ function emptyForm(): FormState {
   return { name: "", category: "", aliases: "", file: null };
 }
 
-// ファイル名から名前欄の許可文字（英数字・_ + -）だけを残した候補を作る
-function nameFromFileName(fileName: string): string {
+// ファイル名からショートコードの許可文字（英数字・_ + -）だけを残した候補を作る
+function shortcodeFromFileName(fileName: string): string {
   const base = fileName.replace(/\.[^.]+$/, "");
   return base.replace(/[^A-Za-z0-9_+-]/g, "_").replace(/^_+|_+$/g, "");
 }
@@ -48,12 +48,17 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 既存カテゴリ（プルダウン候補）。手入力も許すため datalist で提示する
+  const categoryOptions = Array.from(
+    new Set(initial.map((e) => e.category?.trim()).filter((c): c is string => !!c)),
+  ).sort();
+
   const onPickFile = (file: File | null) => {
     setForm((f) => ({
       ...f,
       file,
-      // 名前が未入力のときだけファイル名から補完（入力済みは尊重）
-      name: f.name.trim() || !file ? f.name : nameFromFileName(file.name),
+      // ショートコードが未入力のときだけファイル名から補完（入力済みは尊重）
+      name: f.name.trim() || !file ? f.name : shortcodeFromFileName(file.name),
     }));
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(file ? URL.createObjectURL(file) : null);
@@ -69,7 +74,7 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
   const upload = async () => {
     if (pending) return;
     if (!form.name.trim()) {
-      toast.error("名前を入力してください");
+      toast.error("ショートコードを入力してください");
       return;
     }
     if (!form.file) {
@@ -147,7 +152,7 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
         <h2 className="text-sm font-semibold">絵文字を登録</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="emoji-name">名前</Label>
+            <Label htmlFor="emoji-name">ショートコード</Label>
             <Input
               id="emoji-name"
               value={form.name}
@@ -155,17 +160,23 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
               placeholder="shamezo_wktk"
             />
             <p className="text-xs text-muted-foreground">
-              英数字・_ + - のみ。リアクションでは :名前: で表示されます。
+              英数字・_ + - のみ
             </p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="emoji-category">カテゴリ（任意）</Label>
             <Input
               id="emoji-category"
+              list="emoji-category-options"
               value={form.category}
               onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
               placeholder="表情"
             />
+            <datalist id="emoji-category-options">
+              {categoryOptions.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
           </div>
         </div>
         <div className="space-y-1.5">
