@@ -4,10 +4,13 @@ import {
   FAVOURITE_KEY,
   isCustomEmojiKey,
   isSelectableUnicodeEmoji,
+  isShamezoEmojiKey,
   normalizeReactionKey,
   normalizeUnicodeEmoji,
   parseCustomEmojiKey,
   reactionEmojisKeyToInternal,
+  shamezoEmojiKey,
+  SHAMEZO_EMOJI_HOST,
   toDisplayEmoji,
   toMisskeyReaction,
 } from "./emojiKey";
@@ -181,5 +184,33 @@ describe("normalizeUnicodeEmoji", () => {
   it("異体字セレクタだけを落とす", () => {
     expect(normalizeUnicodeEmoji("❤️")).toBe("❤");
     expect(normalizeUnicodeEmoji("👍")).toBe("👍");
+  });
+});
+
+describe("shamezoEmojiKey / isShamezoEmojiKey", () => {
+  it("SHAMEZO 絵文字の内部キーを組める", () => {
+    expect(shamezoEmojiKey("wktk")).toBe(`:wktk@${SHAMEZO_EMOJI_HOST}:`);
+  });
+
+  it("SHAMEZO 絵文字キーだけを true とする", () => {
+    expect(isShamezoEmojiKey(":wktk@shamezo:")).toBe(true);
+    // 実在ドメイン host のカスタム絵文字は SHAMEZO ではない
+    expect(isShamezoEmojiKey(":ai@misskey.io:")).toBe(false);
+    // Unicode 絵文字も SHAMEZO ではない
+    expect(isShamezoEmojiKey("👍")).toBe(false);
+  });
+});
+
+describe("canViewerReactWith（SHAMEZO 絵文字）", () => {
+  it("Mastodon は SHAMEZO 絵文字を押せる", () => {
+    expect(canViewerReactWith(":wktk@shamezo:", "mastodon", "mstdn.example")).toBe(true);
+  });
+
+  it("Mastodon は Fediverse インスタンスのカスタム絵文字は押せない", () => {
+    expect(canViewerReactWith(":ai@misskey.io:", "mastodon", "mstdn.example")).toBe(false);
+  });
+
+  it("Misskey は SHAMEZO 絵文字を押せない（連合送信できないため）", () => {
+    expect(canViewerReactWith(":wktk@shamezo:", "misskey", "misskey.io")).toBe(false);
   });
 });

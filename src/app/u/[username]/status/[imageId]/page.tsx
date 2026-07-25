@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "@/components/Link";
-import { getAvatarUrl } from "@/lib/avatar";
+import { getAvatarUrl, getReactionEmojiImageUrl } from "@/lib/avatar";
 import { buildOgImage } from "@/lib/ogImage";
 import prisma from "@/lib/db";
 import { Prisma } from "@prisma/client";
@@ -24,7 +24,6 @@ import { classifyPostStatus, favoriteErrorMessage } from "@/lib/fediverse/favori
 import { readCache, readTotalsCache } from "@/lib/fediverse/favoriteSync";
 import { mergeReactions } from "@/lib/reactions/merge";
 import { loadStoredReactions } from "@/lib/reactions/store";
-import { getEmojiImageUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
 import { getBotAcct } from "@/lib/postMethods";
@@ -258,7 +257,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     total: merged.total,
     chips: merged.chips.map((chip) => ({
       ...chip,
-      imageUrl: getEmojiImageUrl(chip.imageUrl),
+      imageUrl: getReactionEmojiImageUrl(chip.emoji, chip.imageUrl),
     })),
     usersByEmoji: Object.fromEntries(
       Object.entries(merged.usersByEmoji).map(([emoji, users]) => [

@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, getCurrentUserWithValidation } from "@/lib/auth/session";
 import prisma from "@/lib/db";
 import { decryptToken } from "@/lib/auth/tokens";
-import { getAvatarUrl, getEmojiImageUrl } from "@/lib/avatar";
+import { getAvatarUrl, getReactionEmojiImageUrl } from "@/lib/avatar";
 import { ErrorCodes, errorResponse, handleUnknownError } from "@/lib/errors";
 import {
   sendReaction,
@@ -41,7 +41,9 @@ import {
   isSelectableUnicodeEmoji,
   normalizeReactionKey,
   parseCustomEmojiKey,
+  SHAMEZO_EMOJI_HOST,
 } from "@/lib/reactions/emojiKey";
+import { findShamezoEmoji } from "@/lib/reactions/customEmoji";
 import type { MergedReactions } from "@/lib/reactions/types";
 
 type Viewer = NonNullable<Awaited<ReturnType<typeof getCurrentUserWithValidation>>>;
@@ -65,7 +67,7 @@ function toClientPayload(merged: MergedReactions) {
     total: merged.total,
     chips: merged.chips.map((chip) => ({
       emoji: chip.emoji,
-      imageUrl: getEmojiImageUrl(chip.imageUrl),
+      imageUrl: getReactionEmojiImageUrl(chip.emoji, chip.imageUrl),
       count: chip.count,
       reactedByViewer: chip.reactedByViewer,
     })),
@@ -99,9 +101,24 @@ async function resolveRequestedEmoji(
   const emoji = normalizeReactionKey(raw, viewerDomain);
   const custom = parseCustomEmojiKey(emoji);
 
+  // SHAMEZO 独自カスタム絵文字（":name@shamezo:"）。Mastodon ユーザー向けに用意したもので、
+  // 連合には送れず SHAMEZO の Reaction テーブルにしか残らない（Mastodon の絵文字と同じ扱い）。
+  // Misskey ユーザーは自サーバーの絵文字を連合送信するため、これは使わせない。
+  if (custom && custom.host === SHAMEZO_EMOJI_HOST) {
+    if (viewer.instance.type !== "mastodon") {
+      return { error: "この絵文字はMastodonアカウントでのみ使用できます" };
+    }
+    const found = await findShamezoEmoji(custom.name);
+    if (!found) {
+      return { error: "その絵文字は見つかりませんでした" };
+    }
+    return { emoji, emojiImageUrl: found.imageUrl };
+  }
+
   if (viewer.instance.type === "mastodon") {
-    // Mastodonにはリアクションが無く favourite しか送れないため、選べるのは Unicode 絵文字のみ
-    // （どれを選んでも Fediverse へは favourite・絵文字は SHAMEZO のDBにだけ残る）。
+    // Mastodonにはリアクションが無く favourite しか送れないため、選べるのは Unicode 絵文字と
+    // SHAMEZO 独自絵文字（上で処理済み）のみ（どれを選んでも Fediverse へは favourite・
+    // 絵文字は SHAMEZO のDBにだけ残る）。
     if (custom || !isSelectableUnicodeEmoji(emoji)) {
       return { error: "リアクションには絵文字を指定してください" };
     }

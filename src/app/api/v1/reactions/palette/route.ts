@@ -22,6 +22,13 @@ import {
   type EmojiCatalog,
 } from "@/lib/fediverse/emojis";
 import {
+  groupShamezoEmojisByCategory,
+  listShamezoEmojis,
+  searchShamezoEmojis,
+  type ShamezoEmoji,
+} from "@/lib/reactions/customEmoji";
+import { shamezoEmojiKey } from "@/lib/reactions/emojiKey";
+import {
   listUnicodeSections,
   searchUnicodeEmojis,
 } from "@/lib/reactions/unicodeCatalog";
@@ -32,6 +39,7 @@ const SEARCH_LIMIT = 80;
 const CUSTOM_SECTION_LIMIT = 1500;
 
 const CUSTOM_PREFIX = "custom:";
+const SHAMEZO_PREFIX = "shamezo:";
 
 interface PaletteItem {
   key: string;
@@ -60,6 +68,15 @@ function customItem(emoji: CustomEmoji, host: string): PaletteItem {
   };
 }
 
+// SHAMEZO 独自絵文字は自前ストレージ配信＝プロキシを通さず imageUrl をそのまま渡す
+function shamezoItem(emoji: ShamezoEmoji): PaletteItem {
+  return {
+    key: shamezoEmojiKey(emoji.name),
+    imageUrl: emoji.imageUrl,
+    label: emoji.name,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const viewer = await getCurrentUser();
@@ -77,12 +94,20 @@ export async function GET(request: NextRequest) {
     const catalog: EmojiCatalog | null = isMisskey
       ? await getInstanceEmojiCatalog(viewer.instance.domain)
       : null;
+    // SHAMEZO 独自絵文字は Mastodon ユーザー向け（Misskey は自サーバー絵文字を連合送信できるが
+    // SHAMEZO 絵文字は連合に送れないため対象外。favorite.ts / docs/favorite.md 参照）。
+    const shamezoEmojis: ShamezoEmoji[] = isMisskey ? [] : await listShamezoEmojis();
 
-    // ── 検索: カスタム→Unicode の順に、1つのリストで返す ──
+    // ── 検索: SHAMEZO→(Misskeyカスタム)→Unicode の順に、1つのリストで返す ──
     const query = request.nextUrl.searchParams.get("q")?.trim();
     if (query) {
       const items: PaletteItem[] = [];
       let total = 0;
+      if (shamezoEmojis.length > 0) {
+        const shamezo = searchShamezoEmojis(shamezoEmojis, query, SEARCH_LIMIT);
+        items.push(...shamezo.emojis.map(shamezoItem));
+        total += shamezo.total;
+      }
       if (catalog) {
         const custom = searchEmojis(catalog, { query, limit: SEARCH_LIMIT });
         items.push(...custom.emojis.map((emoji) => customItem(emoji, host)));
@@ -105,6 +130,16 @@ export async function GET(request: NextRequest) {
     // ── 初期表示: 全絵文字をセクションで返す ──
     const sections: PaletteSection[] = [];
     let truncated = false;
+    // SHAMEZO 独自絵文字を先頭に（Mastodon ユーザーのみ・自前登録なので巨大化せず打ち切り不要）
+    for (const section of groupShamezoEmojisByCategory(shamezoEmojis)) {
+      sections.push({
+        id: `${SHAMEZO_PREFIX}${section.category}`,
+        label: section.category,
+        icon: null,
+        iconUrl: section.emojis[0]?.imageUrl ?? null,
+        emojis: section.emojis.map(shamezoItem),
+      });
+    }
     if (catalog) {
       const grouped = groupEmojisByCategory(catalog, CUSTOM_SECTION_LIMIT);
       truncated = grouped.truncated;

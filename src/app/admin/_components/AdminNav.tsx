@@ -7,6 +7,7 @@ import {
   Flag,
   Megaphone,
   Heart,
+  Smile,
   Settings,
   ChevronDown,
 } from "lucide-react";
@@ -26,7 +27,7 @@ import { cn } from "@/lib/utils";
  * admin 配下の共通タブナビ。
  *
  * - PC（md 以上）: ユーザーページ/タイムラインと共通の TabBar（横並びタブ）。
- * - スマホ（md 未満）: 項目が7つと多く横スクロールになり見づらいため、
+ * - スマホ（md 未満）: 項目が多く横スクロールになり見づらいため、
  *   「現在のページ名」をトリガーにしたドロップダウンで切り替える。
  *
  * layout は Server Component でパスを持たないため、アクティブ判定はここ（Client）で
@@ -44,6 +45,7 @@ const TABS: TabItem[] = [
     href: "/admin/announcements",
   },
   { key: "favorites", label: "お気に入り", icon: Heart, href: "/admin/favorites" },
+  { key: "emojis", label: "絵文字", icon: Smile, href: "/admin/emojis" },
   { key: "system", label: "システム", icon: Settings, href: "/admin/system" },
 ];
 

@@ -8,13 +8,30 @@ vi.mock("@/lib/fediverse/emojis", async (orig) => {
   // グルーピング・検索は純ロジックなので本物を使い、カタログ取得だけ遮断する
   return { ...actual, getInstanceEmojiCatalog: vi.fn() };
 });
+vi.mock("@/lib/reactions/customEmoji", async (orig) => {
+  const actual = await orig<typeof import("@/lib/reactions/customEmoji")>();
+  // グルーピング・検索は純ロジックなので本物を使い、DB取得だけ遮断する
+  return { ...actual, listShamezoEmojis: vi.fn() };
+});
 
 import { GET } from "./route";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getInstanceEmojiCatalog, type CustomEmoji } from "@/lib/fediverse/emojis";
+import {
+  listShamezoEmojis,
+  type ShamezoEmoji,
+} from "@/lib/reactions/customEmoji";
 
 const mockGetUser = vi.mocked(getCurrentUser);
 const mockCatalog = vi.mocked(getInstanceEmojiCatalog);
+const mockListShamezo = vi.mocked(listShamezoEmojis);
+
+const shamezoEmoji = (name: string, category: string | null = null): ShamezoEmoji => ({
+  name,
+  imageUrl: `https://s3.example/emoji/${name}.png`,
+  category,
+  aliases: [],
+});
 
 type Viewer = Awaited<ReturnType<typeof getCurrentUser>>;
 const viewerOf = (type: "mastodon" | "misskey") =>
@@ -45,6 +62,7 @@ type Section = { id: string; label: string; icon: string | null; iconUrl: string
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockListShamezo.mockResolvedValue([]);
 });
 
 describe("GET /api/v1/reactions/palette - 初期表示（全セクション）", () => {
@@ -53,7 +71,7 @@ describe("GET /api/v1/reactions/palette - 初期表示（全セクション）",
     expect((await GET(req())).status).toBe(401);
   });
 
-  it("Mastodonユーザーには Unicode 9セクションを返す（カスタムなし）", async () => {
+  it("Mastodonユーザー（SHAMEZO絵文字なし）には Unicode 9セクションのみ返す", async () => {
     mockGetUser.mockResolvedValue(viewerOf("mastodon"));
     const res = await GET(req());
     // env変更やカスタム追加が届くよう短いキャッシュにしている
@@ -64,7 +82,34 @@ describe("GET /api/v1/reactions/palette - 初期表示（全セクション）",
     expect(sections.every((s) => s.id.startsWith("unicode:"))).toBe(true);
     // 各Unicodeセクションはジャンプ用の代表絵文字を持つ
     expect(sections[0].icon).toBeTruthy();
+    // Mastodon は Misskey カタログを引かない
     expect(mockCatalog).not.toHaveBeenCalled();
+  });
+
+  it("MastodonユーザーにはSHAMEZO独自絵文字のセクションを先頭に返す（プロキシ非経由の直URL）", async () => {
+    mockGetUser.mockResolvedValue(viewerOf("mastodon"));
+    mockListShamezo.mockResolvedValue([
+      shamezoEmoji("wktk", "表情"),
+      shamezoEmoji("neko", "動物"),
+    ]);
+    const sections = (await json(await GET(req()))).sections as Section[];
+    // SHAMEZOカテゴリ（名前順）→ Unicode の順
+    expect(sections[0]).toMatchObject({ id: "shamezo:動物", label: "動物" });
+    expect(sections[1]).toMatchObject({ id: "shamezo:表情", label: "表情" });
+    // キーは ":name@shamezo:"、画像はプロキシを通さない直URL
+    expect(sections[1].emojis[0].key).toBe(":wktk@shamezo:");
+    expect(sections[1].iconUrl).toBe("https://s3.example/emoji/wktk.png");
+    expect(sections.filter((s) => s.id.startsWith("unicode:"))).toHaveLength(9);
+    // Mastodon は Misskey カタログを引かない
+    expect(mockCatalog).not.toHaveBeenCalled();
+  });
+
+  it("MisskeyユーザーにはSHAMEZO絵文字を出さない（連合送信できないため）", async () => {
+    mockGetUser.mockResolvedValue(viewerOf("misskey"));
+    mockCatalog.mockResolvedValue(catalogOf([]));
+    await GET(req());
+    // Misskey は SHAMEZO 絵文字を取得しにいかない
+    expect(mockListShamezo).not.toHaveBeenCalled();
   });
 
   it("Misskeyユーザーはカスタムセクションを先頭に、続けて Unicode セクションを返す", async () => {

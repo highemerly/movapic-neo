@@ -10,7 +10,16 @@ SHAMEZO のリアクションは**2つの情報源をマージ**して表示す�
 
 お気に入り（❤）はリアクションの一種で、正規化キー `FAVOURITE_KEY=❤`（[emojiKey.ts](../src/lib/reactions/emojiKey.ts)）。連合上 favourite ⇔ リアクションは相互伝播するため、Mastodon⇔Misskey をまたいでも成立する。
 
-- **絵文字**: Misskey は任意の Unicode 絵文字＋自サーバーのカスタム絵文字（キー `:name@host:`）。**Mastodon は連合上 favourite しか送れない**ため選べるのは Unicode 絵文字のみで、どれを選んでも Fediverse へは ❤（favourite）として伝わり、絵文字の別は SHAMEZO の DB にだけ残る。種別不明（Mastodon favourite・機能導入前の行）は `FAVOURITE_KEY(❤)` に寄せる。
+- **絵文字**: Misskey は任意の Unicode 絵文字＋自サーバーのカスタム絵文字（キー `:name@host:`）。**Mastodon は連合上 favourite しか送れない**ため選べるのは Unicode 絵文字＋SHAMEZO独自絵文字（下記）で、どれを選んでも Fediverse へは ❤（favourite）として伝わり、絵文字の別は SHAMEZO の DB にだけ残る。種別不明（Mastodon favourite・機能導入前の行）は `FAVOURITE_KEY(❤)` に寄せる。
+
+### SHAMEZO 独自カスタム絵文字（Mastodon 向け）
+Misskey ユーザーは自サーバーのカスタム絵文字を使えるが、Mastodon ユーザーは使えない。この非対称を埋めるため、**SHAMEZO が独自に持つカスタム絵文字**を Mastodon ユーザーがリアクションに使える。実装は [customEmoji.ts](../src/lib/reactions/customEmoji.ts) / `CustomEmoji` テーブル / 管理UI `/admin/emojis`。
+- **内部キーは `:name@shamezo:`**（host は実ドメインと衝突しない予約センチネル `SHAMEZO_EMOJI_HOST`＝[emojiKey.ts](../src/lib/reactions/emojiKey.ts)）。他のカスタム絵文字と同じ `:name@host:` 形式なので merge・チップ描画・`parseCustomEmojiKey` がそのまま通る。オーナーキャッシュのキーは必ず実在ドメインを host に持つため文字列比較で確実に区別できる。
+- **Mastodon 専用**（product 判断ではなく技術的必然）: Misskey ユーザーのリアクションは実際に自ノートへ送信されるが、`:name@shamezo:` は Misskey が解決できない。Mastodon は絵文字を連合送信せず DB にだけ残す（既存の Mastodon リアクションと同じ）ため成立する。よって**ピッカーに出す・押せるのは Mastodon viewer のみ**（[palette route](../src/app/api/v1/reactions/palette/route.ts)・`canViewerReactWith`）。**表示は全員**（emojiImageUrl は `Reaction` 行に載る＝viewer非依存。設定だけをゲートする）。
+- **画像は自前ストレージに原本保存し、メディアプロキシを通さず直接配信**する。プロキシ（`/proxy/image.webp`）は 128px 単一WebPへ再エンコードしアニメーション(APNG/GIF)を潰すため。表示URLの出し分けは [`getReactionEmojiImageUrl`](../src/lib/avatar.ts)（SHAMEZOキーは原URLそのまま／それ以外はプロキシ）。CSP `img-src` はストレージ公開URLを許可済み（[src/proxy.ts](../src/proxy.ts)）。
+- **入力フォーマット**（B案=原本保存・再エンコードしない）: PNG / APNG / GIF / WebP / JPEG / AVIF（横長・アニメーション可・3MBまで）。**SVG は XSS 回避のため不可**。寸法は縛らず、表示高さは CSS（`h-[1.3em]`＝[ReactionEmojiView](../src/components/reaction/ReactionEmojiView.tsx)）で固定。定数は customEmoji.ts。
+- **管理**: 当面は管理者のみ登録（`/admin/emojis`）。`CustomEmoji.createdById`（null=管理者）を最初から持たせており、将来ユーザー登録を許すときの枠制限は `count(createdById)` で乗る。**使用済み（Reaction にキーが残る）絵文字はハード削除不可**＝チップが壊れるため `enabled=false` で soft-disable（画像配信は継続）。カタログはプロセス内メモ化し、登録/更新/削除で `invalidateShamezoEmojiCatalog()`。
+- 名前は Reaction キーの charset と同じ `[a-zA-Z0-9_+-]`（グローバル一意）。カテゴリ・エイリアス（検索用）を持ち、ピッカーはカテゴリ別セクションで出す（Misskey カタログと同じ構造）。
 - 対象は public / unlisted の投稿（誰でも読める）。Fediverse へ送れる（Mastodon/Misskey ユーザー＋`postId`/`postUrl` あり＝`isFediverseSendable`）投稿はオーナー同期＋DB記録、**local投稿**（Fediverse 未投稿）は送り先が無いので **DB だけで完結**する（リアクション自体は公開画像なら可能）。
 
 ### トークンの使い分け
@@ -59,6 +68,8 @@ SHAMEZO のリアクションは**2つの情報源をマージ**して表示す�
 | ファイル | 役割 |
 |---|---|
 | [`src/lib/reactions/`](../src/lib/reactions/) | 型・マージ・Reaction テーブル・取り消し判定・絵文字キー・Unicodeカタログ（[README](../src/lib/reactions/README.md)） |
+| [`src/lib/reactions/customEmoji.ts`](../src/lib/reactions/customEmoji.ts) | SHAMEZO独自絵文字（`CustomEmoji`）のカタログ取得・検索・実在検証・アップロード制約定数 |
+| [`src/app/api/v1/admin/emojis/`](../src/app/api/v1/admin/emojis/) | 管理者用の登録/一覧/enable切替/削除API。UIは [`/admin/emojis`](../src/app/admin/emojis/) |
 | [`src/lib/fediverse/emojis.ts`](../src/lib/fediverse/emojis.ts) | Misskey 自サーバーのカスタム絵文字カタログ取得・検索・カテゴリ分け |
 | [`src/components/reaction/`](../src/components/reaction/) | 詳細ページUI（チップ＋ポップオーバー＋ピッカー・[useReactionActions](../src/components/reaction/useReactionActions.ts) に操作集約） |
 

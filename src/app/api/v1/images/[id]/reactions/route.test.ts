@@ -17,7 +17,9 @@ vi.mock("@/lib/auth/tokens", () => ({ decryptToken: vi.fn((t: string) => t) }));
 vi.mock("@/lib/avatar", () => ({
   getAvatarUrl: vi.fn((u: string | null) => u),
   getEmojiImageUrl: vi.fn((u: string | null) => u),
+  getReactionEmojiImageUrl: vi.fn((_emoji: string, u: string | null) => u),
 }));
+vi.mock("@/lib/reactions/customEmoji", () => ({ findShamezoEmoji: vi.fn() }));
 vi.mock("@/lib/fediverse/favoriteSync", () => ({
   readCache: vi.fn(() => []),
   readTotalsCache: vi.fn(() => null),
@@ -49,6 +51,7 @@ import { sendReaction, removeReaction, FavoriteError } from "@/lib/fediverse/fav
 import { enqueueFavoriteSync } from "@/lib/queue";
 import { reconcileFavoriteNotificationSafely } from "@/lib/notifications/favoriteNotifications";
 import { clearReaction, loadStoredReactions, setReaction } from "@/lib/reactions/store";
+import { findShamezoEmoji } from "@/lib/reactions/customEmoji";
 import { ErrorCodes } from "@/lib/errors";
 
 const mockGetUser = vi.mocked(getCurrentUser);
@@ -259,10 +262,46 @@ describe("PUT /api/v1/images/[id]/reactions - 絵文字の検証", () => {
     );
   });
 
-  it("Mastodonユーザーはカスタム絵文字を使えない", async () => {
+  it("Mastodonユーザーはインスタンスのカスタム絵文字を使えない", async () => {
     mockGetViewer.mockResolvedValue(viewerOf("mastodon"));
     const res = await PUT(req("PUT", { emoji: ":ai:" }), ctx);
     expect(res.status).toBe(400);
+  });
+
+  it("Mastodonユーザーは SHAMEZO 独自絵文字を実在確認して保存する（連合へは送らない）", async () => {
+    mockGetViewer.mockResolvedValue(viewerOf("mastodon"));
+    vi.mocked(findShamezoEmoji).mockResolvedValue({
+      name: "wktk",
+      imageUrl: "https://s3.example/emoji/wktk.png",
+      category: null,
+      aliases: [],
+    });
+
+    const res = await PUT(req("PUT", { emoji: ":wktk@shamezo:" }), ctx);
+    expect(res.status).toBe(200);
+    expect(mockSetReaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        emoji: ":wktk@shamezo:",
+        emojiImageUrl: "https://s3.example/emoji/wktk.png",
+      })
+    );
+    // Mastodon は絵文字によらず favourite(❤) を送る（SHAMEZO 絵文字は連合に送れない）
+    expect(mockSend).toHaveBeenCalledWith(expect.anything(), ":wktk@shamezo:");
+  });
+
+  it("存在しない SHAMEZO 絵文字は 400", async () => {
+    mockGetViewer.mockResolvedValue(viewerOf("mastodon"));
+    vi.mocked(findShamezoEmoji).mockResolvedValue(null);
+    const res = await PUT(req("PUT", { emoji: ":nope@shamezo:" }), ctx);
+    expect(res.status).toBe(400);
+    expect(mockSetReaction).not.toHaveBeenCalled();
+  });
+
+  it("Misskeyユーザーは SHAMEZO 絵文字を使えない", async () => {
+    mockGetViewer.mockResolvedValue(viewerOf("misskey"));
+    const res = await PUT(req("PUT", { emoji: ":wktk@shamezo:" }), ctx);
+    expect(res.status).toBe(400);
+    expect(mockSetReaction).not.toHaveBeenCalled();
   });
 
   it("Misskeyユーザーは絵文字でない文字列を弾く", async () => {

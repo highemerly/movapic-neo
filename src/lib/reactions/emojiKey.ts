@@ -33,6 +33,28 @@ export const FAVOURITE_KEY = "❤";
 
 const VARIATION_SELECTOR_16 = "\u{FE0F}";
 
+/**
+ * SHAMEZO 独自カスタム絵文字の host に使う予約センチネル。
+ *
+ * SHAMEZO 絵文字も内部キーは他のカスタム絵文字と同じ ":name@host:" 形式で表す（merge・チップ描画・
+ * parseCustomEmojiKey がそのまま通るため）。ただし host には実ドメインでなくドット無しの "shamezo" を
+ * 使う。理由:
+ *  - オーナーインスタンス由来のキャッシュのキーは必ず実在ドメイン（misskey.io 等）を host に持つため、
+ *    ドット無しの "shamezo" とは絶対に衝突しない＝単純な文字列比較で SHAMEZO 絵文字だと判別できる。
+ *  - 実際の SHAMEZO ドメインを埋めると dev/prod でキーが割れてしまうが、固定センチネルなら環境非依存。
+ */
+export const SHAMEZO_EMOJI_HOST = "shamezo";
+
+/** SHAMEZO 絵文字の内部キー ":name@shamezo:" を組む */
+export function shamezoEmojiKey(name: string): string {
+  return `:${name}@${SHAMEZO_EMOJI_HOST}:`;
+}
+
+/** 内部キーが SHAMEZO 独自カスタム絵文字か */
+export function isShamezoEmojiKey(key: string): boolean {
+  return parseCustomEmojiKey(key)?.host === SHAMEZO_EMOJI_HOST;
+}
+
 // Misskeyのカスタム絵文字名は英数字と _ + - のみ。host 省略・"@." はローカル絵文字を指す。
 const CUSTOM_EMOJI_PATTERN = /^:([a-zA-Z0-9_+-]+)(?:@([a-zA-Z0-9.\-_]+))?:$/;
 
@@ -122,9 +144,11 @@ export function isSelectableUnicodeEmoji(value: string): boolean {
  * （＝チップから同じリアクションを付け直せる導線の出し分け用）。サーバー側のカスタム絵文字カタログ
  * 照合だけは client では行えないため、そこは省く（自サーバーの絵文字なら実在するのが通常で、
  * 万一消えていてもサーバーがエラーで弾く）。
- *  - Mastodon: Unicode絵文字のみ（リアクションが無く favourite しか送れないため、他サーバーの
- *    カスタム絵文字は選べない）。
- *  - Misskey: Unicode絵文字、またはカスタム絵文字が自分のサーバーのもの（他サーバーの絵文字は押せない）。
+ *  - Mastodon: Unicode絵文字、または SHAMEZO 独自カスタム絵文字（":name@shamezo:"）。リアクションが
+ *    無く favourite しか送れないが、SHAMEZO 絵文字は連合に送らず DB にだけ残すので選べる。
+ *    Fediverse インスタンスのカスタム絵文字は選べない。
+ *  - Misskey: Unicode絵文字、またはカスタム絵文字が自分のサーバーのもの（他サーバー・SHAMEZO の
+ *    絵文字は連合送信できないため押せない）。
  */
 export function canViewerReactWith(
   emoji: string,
@@ -133,9 +157,12 @@ export function canViewerReactWith(
 ): boolean {
   const custom = parseCustomEmojiKey(emoji);
   if (viewerType === "mastodon") {
-    return !custom && isSelectableUnicodeEmoji(emoji);
+    // SHAMEZO 独自絵文字は Mastodon 向け。それ以外のカスタム絵文字は不可。
+    if (custom) return custom.host === SHAMEZO_EMOJI_HOST;
+    return isSelectableUnicodeEmoji(emoji);
   }
   // Misskey
   if (!custom) return isSelectableUnicodeEmoji(emoji);
+  // SHAMEZO 絵文字は連合送信できないため Misskey では押せない（自サーバー絵文字のみ）。
   return custom.host === viewerDomain.toLowerCase();
 }

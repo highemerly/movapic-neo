@@ -91,6 +91,7 @@ model User {
   mutesCreated  Mute[]         @relation("Muter")
   mutedBy       Mute[]         @relation("Muted")
   reactions     Reaction[]
+  customEmojis  CustomEmoji[]
 
   @@unique([instanceId, remoteId])
   @@unique([instanceId, username])
@@ -289,6 +290,38 @@ model Reaction {
   @@unique([imageId, userId]) // 1ユーザー1リアクション（別絵文字を押したら付け替え）
   @@index([userId, createdAt]) // 「リアクションした画像一覧」(/favorite)
   @@map("reactions")
+}
+
+// SHAMEZO 独自のカスタム絵文字。
+// Mastodon ユーザーはリアクションに favourite(❤) しか連合送信できず、選んだ絵文字は
+// SHAMEZO の Reaction テーブルにしか残らない（src/lib/reactions/emojiKey.ts）。この性質を使い、
+// Misskey ユーザーが自サーバーのカスタム絵文字を使えるのと同様の体験を Mastodon ユーザーへ提供する。
+// 内部キーは ":name@shamezo:"（host は実ドメインと衝突しない予約センチネル。SHAMEZO_EMOJI_HOST）。
+// 画像は自前ストレージに置き、メディアプロキシを通さず直接配信する（プロキシの再エンコードで
+// アニメーション(APNG/GIF)が潰れるのを避けるため。docs/favorite.md 参照）。
+model CustomEmoji {
+  id String @id @default(uuid())
+  // ピッカー名かつ内部キー ":name@shamezo:" の name 部分。charset は Reaction キーと同じ [a-zA-Z0-9_+-]
+  name String @unique @db.VarChar(64)
+  // 表示用画像の公開URL（自前ストレージ・プロキシ非経由で直接配信）
+  imageUrl String @map("image_url") @db.Text
+  // 削除時にストレージ実体を消すためのキー
+  storageKey String @map("storage_key") @db.Text
+  // ピッカーのセクション分け（未設定は「その他」）
+  category String? @db.VarChar(64)
+  // 検索用エイリアス（名前と併せて部分一致検索する）
+  aliases String[]
+  // false=ピッカーから隠す。画像配信は続ける（使用済みリアクションのチップを壊さないため soft-disable）
+  enabled Boolean @default(true)
+  // 登録者。null=管理者登録。将来ユーザー登録を許すときの枠制限は count(createdById) で判定する
+  createdById String? @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([enabled, category]) // ピッカー用に有効な絵文字をカテゴリ順で引く
+  @@map("custom_emojis")
 }
 
 // 通報。ログインユーザーが画像を通報した記録。
