@@ -58,12 +58,16 @@ const IMAGE_MAX_VH = 72;
 // ナビ高さ（3.5rem+safe-area）に加えて 0.5rem だけ隙間を空け、バーがナビにくっつき過ぎないようにする。
 const NAV_OFFSET = "bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.5rem)]";
 
-// モバイルのフローティングバーで各ボタンに共通で付ける「浮いて見える」ピル装飾。帯を敷かず各ボタン
-// だけ背景を持たせ、ボタン間の隙間から下の画面が透けるようにする（コンテナは pointer-events-none で
-// クリックも透過し、各ボタンだけ pointer-events-auto で操作できる）。背景は若干透過＋強めのブラーで
-// すりガラス風にし「浮いている」印象を出す（数値はここと各ボタン側を合わせて調整）。
+// モバイルのフローティングバーのミートボールメニューに付ける装飾。塗り＋影のはっきりしたボタンに
+// する。主役はリアクション（未リアクション時 primary）なので、メニューは常に secondary（薄い塗り）に
+// 落として階層をつける。完全な不透明だと下のコンテンツと同化して浮いて見えないため、少し透過させ
+// backdrop-blur で背後をぼかしつつ、縁取り（base class の border-border）で輪郭を立てて浮遊感を出す。
+// トリガー側の base class は PC 用に rounded-md / text-muted-foreground を固定しているため、まん丸・
+// 塗りにするには important（rounded-full! / text-secondary-foreground!）で上書きする（border-border
+// は縁取りとして活かすので上書きしない）。コンテナは pointer-events-none なので各ボタンに
+// pointer-events-auto を残す。
 const PILL =
-  "pointer-events-auto shrink-0 bg-background/60 backdrop-blur-xl shadow-md";
+  "pointer-events-auto shrink-0 bg-secondary/65 text-secondary-foreground! shadow-lg rounded-full! backdrop-blur-xl hover:bg-secondary/80";
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { username, imageId } = await params;
@@ -459,11 +463,10 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   const modalNext = buildModalNav(nextImage);
 
   // 返信・シェア・その他メニュー。PC（インライン）とモバイル（下部フローティングバー）で
-  // 同じ操作を出すが、見た目・出し分けが異なる（floating）ので1箇所にまとめてフラグで切り替える。
+  // 出し分けが異なる（floating）ので1箇所にまとめてフラグで切り替える。
   // - PC: 行幅いっぱいに伸ばす（flex-auto/flex-1）。従来どおり全ボタンを表示。
-  // - モバイル: 各ボタンを実寸ピル化し背景＋影を付与（PILL）。並びは リアクション／サーバーで開く／
-  //   共有（ネイティブ・≥380px のみ）／メニュー。「リンクを投稿」はバーには出さず（横幅節約）
-  //   ミートボール内に残す。狭い画面(<380px)は共有も隠して3つに収める。
+  // - モバイル: 画像を邪魔しないよう、リアクションとミートボールメニューの2つだけに絞る。
+  //   「サーバーで開く／リンクを投稿／ネイティブ共有」はバーに出さずミートボール内に残す。
   const actionButtons = (floating: boolean) => (
     <>
       {/* リアクションを付ける＋ボタン（内訳のチップは本文の下に出す）。
@@ -480,16 +483,12 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         floating={floating}
       />
 
-      {/* 返信ボタンが出るケースは横が窮屈になるので、両ボタンを2行＋小さめ文字にして
-          320px 幅でも収める（高さは h-[44px] 固定）。 */}
-      {mastodonReplyUrl && (
+      {/* 以下（サーバーで開く／リンクを投稿／ネイティブ共有）はモバイルのフローティングバーには
+          出さない（画像を邪魔しないよう2ボタンに絞る）。PC（インライン）は従来どおり全表示。 */}
+      {!floating && mastodonReplyUrl && (
         <a
           href={mastodonReplyUrl}
-          className={
-            floating
-              ? `${PILL} flex items-center justify-center gap-1 h-[44px] px-2 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border`
-              : "flex flex-auto items-center justify-center gap-1 h-[44px] px-1 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
-          }
+          className="flex flex-auto items-center justify-center gap-1 h-[44px] px-1 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
           title="あなたのサーバーでこの投稿を開きます（返信・ブースト・ブックマーク・お気に入りができます）"
         >
           <span className="flex shrink-0 items-center gap-0.5">
@@ -503,7 +502,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           </span>
         </a>
       )}
-      {misskeyOpenPostUrl && (
+      {!floating && misskeyOpenPostUrl && (
         <MisskeyOpenButton postUrl={misskeyOpenPostUrl} floating={floating} />
       )}
       {/* 「リンクを投稿」はモバイルのフローティングバーには出さない（横幅節約・ミートボールに残す）。
@@ -529,14 +528,16 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           )}
         </a>
       )}
-      <NativeShareButton
-        imageUrl={imageUrl}
-        mimeType={image.mimeType}
-        fileBaseName={`shamezo-${imageId}`}
-        text={image.overlayText}
-        url={pageUrl}
-        floating={floating}
-      />
+      {!floating && (
+        <NativeShareButton
+          imageUrl={imageUrl}
+          mimeType={image.mimeType}
+          fileBaseName={`shamezo-${imageId}`}
+          text={image.overlayText}
+          url={pageUrl}
+          floating={floating}
+        />
+      )}
       <ImageActionsMenu
         imageId={imageId}
         username={username}
@@ -798,11 +799,11 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         {currentUser && <div aria-hidden className="md:hidden h-[104px]" />}
       </PageContainer>
 
-      {/* モバイル(<md)かつログイン時だけの、リアクション・返信・シェア・その他メニューのフローティング
-          バー。中身（＋ボタン含む）は actionButtons に集約。画像のアスペクト比で本文位置が
-          上下しても操作系を画面下部の同じ位置に固定する。帯は敷かず各ボタンだけ背景を持たせ、コンテナは
-          pointer-events-none で隙間から下の画面が見え・クリックも透過する（各ボタンは pointer-events-auto）。
-          1行に収まるよう狭い画面は一部ボタンを隠す。リアクションの内訳は本文内のチップ行に出す。 */}
+      {/* モバイル(<md)かつログイン時だけの、リアクション＋ミートボールメニューのフローティングバー。
+          画像を邪魔しないよう2ボタンに絞る（他の操作はミートボール内）。中身は actionButtons に集約。
+          画像のアスペクト比で本文位置が上下しても操作系を画面下部の同じ位置に固定する。帯は敷かず各
+          ボタンだけ背景を持たせ、コンテナは pointer-events-none で隙間から下の画面が見え・クリックも
+          透過する（各ボタンは pointer-events-auto）。リアクションの内訳は本文内のチップ行に出す。 */}
       {currentUser && (
         <div
           className={`md:hidden pointer-events-none fixed inset-x-0 z-30 ${NAV_OFFSET}`}
