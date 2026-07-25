@@ -1,46 +1,66 @@
-# お気に入り（Favorite）機能 仕様
+# リアクション（Reaction）機能 仕様
 
-お気に入りの取得タイミング（TTL）・定期同期（バックオフ／fire1・fire2）はロジックが入り組んでいるため、ここを正とする。値や条件を変えるときは必ずこことテストを更新すること。
+リアクションの取得タイミング（TTL）・定期同期（バックオフ／fire1・fire2）はロジックが入り組んでいるため、ここを正とする。値や条件を変えるときは必ずこことテストを更新すること。ファイル名は歴史的経緯で `favorite` だが、お気に入りを含むリアクション全体の仕様書。
 
-## 1. 概要：お気に入りの「実体」
+## 1. 概要：リアクションの「実体」
 
-お気に入りは独自DBレコードではなく **Mastodon の favourite / Misskey の リアクション（❤️）そのもの**。連合上 favourite ⇔ リアクションは相互伝播するため、Mastodon⇔Misskey をまたいだお気に入りも成立する。
+SHAMEZO のリアクションは**2つの情報源をマージ**して表示する（[merge.ts](../src/lib/reactions/merge.ts)）:
+- **オーナー（投稿者）インスタンス側**の Fediverse リアクション（Mastodon の favourite / Misskey のリアクション）。正データはあちらにあり、サービスは総数（`fediverseCount`）・絵文字別カウント（`reactionTotalsCache`）・上位40件の一覧（`favoritersCache`）を**キャッシュ**として持つだけ。
+- **SHAMEZO の `Reaction` テーブル**。このサービス上で押されたリアクションの正データ。押した本人のトークンで Fediverse にも送る（下記）ため、二重計上しないよう表示時に acct でマージし、同じ人はこちらを正とする。
 
-- **正データはオーナー（投稿者）インスタンス側**にある。サービスは `favoriteCount` と上位40件の一覧（`favoritersCache`）を**キャッシュ**として保持するだけ。
-- 対象は「Mastodon/Misskey ユーザー＋ `postId` あり」の投稿のみ（`isFavoritable`）。local 投稿（Fediverse 未投稿）は対象外。公開範囲は public / unlisted のみなので、投稿自体は誰でも読める。
+お気に入り（❤）はリアクションの一種で、正規化キー `FAVOURITE_KEY=❤`（[emojiKey.ts](../src/lib/reactions/emojiKey.ts)）。連合上 favourite ⇔ リアクションは相互伝播するため、Mastodon⇔Misskey をまたいでも成立する。
+
+- **絵文字**: Misskey は任意の Unicode 絵文字＋自サーバーのカスタム絵文字（キー `:name@host:`）。**Mastodon は連合上 favourite しか送れない**ため選べるのは Unicode 絵文字のみで、どれを選んでも Fediverse へは ❤（favourite）として伝わり、絵文字の別は SHAMEZO の DB にだけ残る。種別不明（Mastodon favourite・機能導入前の行）は `FAVOURITE_KEY(❤)` に寄せる。
+- 対象は public / unlisted の投稿（誰でも読める）。Fediverse へ送れる（Mastodon/Misskey ユーザー＋`postId`/`postUrl` あり＝`isFediverseSendable`）投稿はオーナー同期＋DB記録、**local投稿**（Fediverse 未投稿）は送り先が無いので **DB だけで完結**する（リアクション自体は公開画像なら可能）。
 
 ### トークンの使い分け
 | 操作 | 使うトークン | 理由 |
 |---|---|---|
 | 読み取り（count / 一覧 上位40件） | **なし（未認証GET）** | 対象は public/unlisted のみで誰でも読める。オーナーインスタンスが正データ。トークン不使用＝オーナーのトークン失効に強い |
-| お気に入り 登録/解除（POST/DELETE） | **viewer** | 操作者本人として favourite/reaction する |
+| リアクション 設定/解除（PUT/DELETE） | **viewer** | 操作者本人として favourite/reaction する |
 
 > 読み取りを未認証にしている割り切り: 限定連合モード（Mastodon `DISALLOW_UNAUTHENTICATED_API_ACCESS` 等）のインスタンスは未認証 API を 401/403 で弾く。その場合 count/一覧が取れず `forbidden` 扱いになるが、現状は速度・失効耐性を優先して未認証一本。必要になればオーナートークンへのフォールバックを足す（[[feedback_no_speculative_protection]]）。
 
 別インスタンスの投稿に操作するときは、毎回 `postUrl` を viewer 側で解決してから操作する（Mastodon: `/api/v2/search?resolve=true` → favourite、Misskey: `/api/ap/show` → reactions/create）。`localStatusId` はキャッシュしない割り切り。
 
-## 2. データモデル（`Image`）
+## 2. データモデル
 
+### `Image`（オーナー側キャッシュ）
 | カラム | 意味 |
 |---|---|
-| `favoriteCount` | 総お気に入り数（上位40件外も含む）のキャッシュ |
-| `favoritersCache` | お気に入りした人 上位40件のスナップショット（JSON） |
+| `fediverseCount` | オーナー側の生の総数（favourite / リアクションの合計） |
+| `favoriteCount` | **表示用の合計**（`fediverseCount` に SHAMEZO 上のリアクションをマージした値）。一覧の「＋N」が読む |
+| `reactionTotalsCache` | 絵文字別カウントのキャッシュ（JSON）。Misskeyは全リアクションの内訳、Mastodonは `{ totals: { "❤": n } }` |
+| `favoritersCache` | リアクションした人 上位40件のスナップショット（JSON・`emoji` フィールドで種別も持つ） |
 | `favoritesSyncedAt` | 最後に同期を試みた時刻（成功・失敗いずれも更新） |
 | `postStatus` | 最後の同期の HTTP ステータス。`200`=成功 / `0`=接続失敗 / `4xx`・`5xx`=失敗 / `429`=レート制限 / `null`=未同期 |
 
 `favoritesSyncedAt` と `postStatus` は **常にペアで更新**される（成功時は `postStatus=200`、失敗時は失敗ステータス）。「`favoritesSyncedAt` が null ⇔ 一度も同期していない」が成立する。
 
+### `Reaction`（SHAMEZO 上のリアクション）
+- 1ユーザー1画像1リアクション（`@@unique([imageId, userId])`）。別の絵文字を押すと付け替え（upsert）。
+- カラム: `imageId` / `userId` / `emoji`（正規化キー）/ `emojiImageUrl`（カスタム絵文字の表示URL・Unicodeは null）/ `createdAt`。
+- 読み書きは [store.ts](../src/lib/reactions/store.ts)（sharp非依存＝worker-front可）。表示は必ず [merge.ts](../src/lib/reactions/merge.ts) でオーナー側キャッシュとマージする。
+
 ## 3. ファイル構成
 
 | ファイル | 役割 |
 |---|---|
-| [`src/lib/fediverse/favorite.ts`](../src/lib/fediverse/favorite.ts) | Fediverse への取得/操作の実体。`fetchFavoriteData` / `favoriteStatus` / `unfavoriteStatus`、`FavoriteError`、`classifyPostStatus`、エラー文言 |
+| [`src/lib/fediverse/favorite.ts`](../src/lib/fediverse/favorite.ts) | Fediverse への取得/操作の実体。`fetchFavoriteData` / `sendReaction` / `removeReaction`、`FavoriteError`、`classifyPostStatus`、エラー文言 |
 | [`src/lib/fediverse/favoriteSync.ts`](../src/lib/fediverse/favoriteSync.ts) | `syncFavoriteCache()`。オーナートークンで取得→DBキャッシュ更新→通知差分更新。GET とも定期ジョブとも共用（sharp非依存＝worker-front可） |
 | [`src/lib/fediverse/favoritePolicy.ts`](../src/lib/fediverse/favoritePolicy.ts) | **「いつ取りに行くか」の純粋ロジック**。`computeCacheTtl` / `shouldSyncOnGet`（GET）・`isFavoriteSyncDue`（定期）。I/Oなし・`now` 引数でテスト可能 |
 | [`src/lib/fediverse/favoritePolicy.test.ts`](../src/lib/fediverse/favoritePolicy.test.ts) | 上記の単体テスト（TTL各帯・境界・fire1/fire2・バックオフ） |
-| [`src/app/api/v1/images/[id]/favorite/route.ts`](../src/app/api/v1/images/[id]/favorite/route.ts) | GET（キャッシュ＋TTL切れ時sync）/ POST / DELETE |
-| [`src/lib/periodic/index.ts`](../src/lib/periodic/index.ts) | `favoriteSyncJob`（定期フォールバック同期） |
-| [`src/lib/notifications/favoriteNotifications.ts`](../src/lib/notifications/favoriteNotifications.ts) | 「お気に入りされた」通知の差分更新 |
+| [`src/app/api/v1/images/[id]/reactions/route.ts`](../src/app/api/v1/images/[id]/reactions/route.ts) | GET（キャッシュ＋TTL切れ時sync）/ PUT（設定・付け替え）/ DELETE。書き込みは本人トークンでFediverseへ送ってからDB記録 |
+| [`src/app/api/v1/reactions/palette/route.ts`](../src/app/api/v1/reactions/palette/route.ts) | リアクションピッカーの候補絵文字（カテゴリ別 sections / `q` で検索） |
+| [`src/lib/periodic/index.ts`](../src/lib/periodic/index.ts) | `favoriteSyncJob`（定期フォールバック同期。`reconcileRemovals` で取り消しも反映） |
+| [`src/lib/notifications/favoriteNotifications.ts`](../src/lib/notifications/favoriteNotifications.ts) | 「リアクションされた」通知の差分更新 |
+
+### リアクション固有（表示・絵文字）
+| ファイル | 役割 |
+|---|---|
+| [`src/lib/reactions/`](../src/lib/reactions/) | 型・マージ・Reaction テーブル・取り消し判定・絵文字キー・Unicodeカタログ（[README](../src/lib/reactions/README.md)） |
+| [`src/lib/fediverse/emojis.ts`](../src/lib/fediverse/emojis.ts) | Misskey 自サーバーのカスタム絵文字カタログ取得・検索・カテゴリ分け |
+| [`src/components/reaction/`](../src/components/reaction/) | 詳細ページUI（チップ＋ポップオーバー＋ピッカー・[useReactionActions](../src/components/reaction/useReactionActions.ts) に操作集約） |
 
 ## 4. エラー分類
 
@@ -60,7 +80,7 @@ Misskey は削除も権限不足も HTTP 400 で返すため、`classifyMisskeyE
 
 ## 5. GET 時の取得判定（TTL）
 
-`GET /api/v1/images/:id/favorite` は基本キャッシュを返すが、**stale なら同期してから返す**。判定は `shouldSyncOnGet()`：
+`GET /api/v1/images/:id/reactions` は基本キャッシュを返すが、**stale なら同期してから返す**。判定は `shouldSyncOnGet()`：
 
 ```
 未同期（favoritesSyncedAt = null）            → 必ず同期
@@ -91,7 +111,7 @@ Misskey は削除も権限不足も HTTP 400 で返すため、`classifyMisskeyE
 
 POST/DELETE 成功時は TTL に関係なく**必ず即同期**する。
 
-GET レスポンスには最終同期時刻 `lastSyncedAt`（ISO8601／未同期は null）を含む。また `Cache-Control: private, max-age=60` を付与してブラウザに60秒キャッシュさせる（`isFavorited` 等が viewer 依存のため共有キャッシュ不可＝`private`）。
+GET レスポンスには最終同期時刻 `lastSyncedAt`（ISO8601／未同期は null）を含む。また `Cache-Control: private, max-age=60` を付与してブラウザに60秒キャッシュさせる（`viewerEmoji` 等が viewer 依存のため共有キャッシュ不可＝`private`）。
 
 ## 6. 定期フォールバック同期（`favoriteSyncJob`）
 

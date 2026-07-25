@@ -22,7 +22,7 @@
 - `/create` → 投稿ページ
 - `/u/[username]` → ユーザーページ（`/calendar` カレンダー・`/achievements` 実績・`/status/[imageId]` 画像詳細）
 - `/public` → 公開タイムライン
-- `/favorite` → お気に入り
+- `/favorite` → リアクション一覧（自分がリアクションした写真）
 
 ## ドキュメント索引
 必要になった領域を触るときに読む。CLAUDE.md には常時必要な要点のみ記載。
@@ -30,12 +30,12 @@
 | ドキュメント | 内容 |
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | 3-tier構成（web/worker-front/compute）・ルート境界・ヘルスチェック・**HEIC/sharpソースビルド**・本番DBマイグレーション |
-| [docs/api.md](docs/api.md) | 各APIエンドポイント（generate / post / ingest/email / favorite / calendar 等） |
+| [docs/api.md](docs/api.md) | 各APIエンドポイント（generate / post / ingest/email / reactions / calendar 等） |
 | [docs/posting.md](docs/posting.md) | メール投稿・Bot（メンション）投稿・投稿ソース(source)・公開範囲(visibility) |
 | [docs/ui.md](docs/ui.md) | レスポンシブ(PC/モバイル)・ボタンカラー(primary/brand)・共通セレクター(SegmentControl)・画像リトライ表示 |
 | [docs/text-rendering.md](docs/text-rendering.md) | 文字配置・フォントサイズ・影・EXIF・代替テキスト(ALT)の配管 |
 | [docs/features.md](docs/features.md) | Fediverse認証・カレンダー・実績/通知・PWA |
-| [docs/favorite.md](docs/favorite.md) | お気に入り（Mastodon favourite連携）のTTL・定期同期など全仕様 |
+| [docs/favorite.md](docs/favorite.md) | リアクション（Mastodon favourite / Misskey reaction連携）のマージ表示・絵文字・TTL・定期同期・取り消し反映など全仕様 |
 | [docs/periodic-jobs.md](docs/periodic-jobs.md) | 定期ジョブ（graphile-worker crontab内蔵の30分毎メンテ） |
 | [docs/SETUP.md](docs/SETUP.md) | 環境構築 |
 | [src/lib/achievements/README.md](src/lib/achievements/README.md) | 実績の追加手順・不変条件 |
@@ -58,6 +58,12 @@
 - フォントサイズは短辺 `Math.min(w,h)/14` 基準・下限14/上限500px、係数 小0.75/中1.0/大1.4/特大2.35。
 - 全文字に影（薄色→黒影・濃色→白影）。EXIF Orientationで自動回転し、出力時にGPS/カメラ等メタは削除。
 - 代替テキスト(ALT)は `altText` を1本の配管で通す（`/api/v1/generate`には送らず`/api/v1/post`のFormDataのみ）。
+
+### リアクション（詳細: [docs/favorite.md](docs/favorite.md)）
+- **情報源は2系統**: オーナーインスタンスのキャッシュ（`Image.fediverseCount`/`reactionTotalsCache`/`favoritersCache`）＋ SHAMEZO の `Reaction` テーブル。**表示は必ず [`mergeReactions`](src/lib/reactions/merge.ts) を通す**（件数・ユーザー一覧・閲覧者状態を1本で組む＝表示とDB件数のズレ防止）。
+- お気に入り（❤）はリアクションの一種で正規化キー `FAVOURITE_KEY=❤`（[emojiKey.ts](src/lib/reactions/emojiKey.ts)）。**Mastodonは連合上 favourite しか送れない**ため選べるのはUnicode絵文字のみ・絵文字の別はSHAMEZO DBにだけ残る（連合には❤として伝播）。Misskeyは自サーバーのカスタム絵文字（`:name@host:`）も可。
+- 書き込みは本人トークンでFediverseへ送ってからDB記録。オーナー側で取り消されたら**定期同期でSHAMEZOからも除去**（`reconcileRemovals`・40件フル/連合遅延はガード）。
+- `src/lib/reactions/*` は sharp/skia 非依存＝worker-front から呼んで安全。
 
 ### API（詳細: [docs/api.md](docs/api.md)）
 - レート制限: プレビュー生成(`/api/v1/generate`)はIP単位のスライディングウィンドウ（[rateLimit.ts](src/lib/rateLimit.ts)）、投稿(`/api/v1/post`)はユーザー単位でDB履歴ベース（[postRateLimit.ts](src/lib/postRateLimit.ts)・15分/24時間の2窓、24時間は直近1週間の投稿数で上限が上がる）。閾値定数は将来env切り出し予定。処理タイムアウト30秒（超過で504）・レスポンスにContent-Lengthを含む。
