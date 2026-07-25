@@ -311,6 +311,8 @@ model CustomEmoji {
   category String? @db.VarChar(64)
   // 検索用エイリアス（名前と併せて部分一致検索する）
   aliases String[]
+  // ライセンス表記（自由記述）。素材の出典/利用条件を管理者が残すための任意メモ
+  license String? @db.Text
   // false=ピッカーから隠す。画像配信は続ける（使用済みリアクションのチップを壊さないため soft-disable）
   enabled Boolean @default(true)
   // 登録者。null=管理者登録。将来ユーザー登録を許すときの枠制限は count(createdById) で判定する

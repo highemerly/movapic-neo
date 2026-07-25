@@ -18,6 +18,7 @@ export type AdminEmoji = {
   imageUrl: string;
   category: string | null;
   aliases: string[];
+  license: string | null;
   enabled: boolean;
   createdById: string | null;
   createdAt: string;
@@ -27,11 +28,12 @@ type FormState = {
   name: string;
   category: string;
   aliases: string;
+  license: string;
   file: File | null;
 };
 
 function emptyForm(): FormState {
-  return { name: "", category: "", aliases: "", file: null };
+  return { name: "", category: "", aliases: "", license: "", file: null };
 }
 
 // ファイル名からショートコードの許可文字（英数字・_ + -）だけを残した候補を作る
@@ -87,6 +89,7 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
       body.set("name", form.name.trim());
       body.set("category", form.category.trim());
       body.set("aliases", form.aliases.trim());
+      body.set("license", form.license.trim());
       body.set("image", form.file);
       const res = await fetch("/api/v1/admin/emojis", { method: "POST", body });
       if (!res.ok) {
@@ -189,6 +192,18 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
           />
         </div>
         <div className="space-y-1.5">
+          <Label htmlFor="emoji-license">ライセンス（任意）</Label>
+          <Input
+            id="emoji-license"
+            value={form.license}
+            onChange={(e) => setForm((f) => ({ ...f, license: e.target.value }))}
+            placeholder="出典・利用条件など"
+          />
+          <p className="text-xs text-muted-foreground">
+            素材の出典や利用条件を自由記述で残せます。
+          </p>
+        </div>
+        <div className="space-y-1.5">
           <Label htmlFor="emoji-file">画像</Label>
           <input
             id="emoji-file"
@@ -246,6 +261,11 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
                   {e.category ?? "その他"}
                   {e.aliases.length > 0 ? ` ・ ${e.aliases.join(", ")}` : ""}
                 </p>
+                {e.license && (
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    ライセンス: {e.license}
+                  </p>
+                )}
               </div>
               <div className="flex shrink-0 gap-1">
                 <Button

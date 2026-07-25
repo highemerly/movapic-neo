@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("@/lib/db", () => ({ default: {} }));
 vi.mock("@/lib/auth/session", () => ({ getCurrentUser: vi.fn() }));
 
-import { validateEmojiName, parseAliases, parseCategory } from "./shared";
+import { validateEmojiName, parseAliases, parseCategory, parseLicense } from "./shared";
 
 describe("validateEmojiName", () => {
   it("正しい名前は trim して通す", () => {
@@ -42,5 +42,17 @@ describe("parseCategory", () => {
     expect(parseCategory("  表情 ")).toBe("表情");
     expect(parseCategory("   ")).toBeNull();
     expect(parseCategory(undefined)).toBeNull();
+  });
+});
+
+describe("parseLicense", () => {
+  it("trim して返す・空は null", () => {
+    expect(parseLicense("  CC BY 4.0 ")).toBe("CC BY 4.0");
+    expect(parseLicense("   ")).toBeNull();
+    expect(parseLicense(null)).toBeNull();
+  });
+
+  it("500文字で打ち切る", () => {
+    expect(parseLicense("a".repeat(600))).toHaveLength(500);
   });
 });

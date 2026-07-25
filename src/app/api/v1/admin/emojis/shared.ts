@@ -37,3 +37,10 @@ export function parseCategory(raw: unknown): string | null {
   const c = raw.trim().slice(0, 64);
   return c === "" ? null : c;
 }
+
+/** ライセンス表記（自由記述の任意メモ）を trim し、空なら null。 */
+export function parseLicense(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const c = raw.trim().slice(0, 500);
+  return c === "" ? null : c;
+}

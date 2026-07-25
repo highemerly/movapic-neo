@@ -20,6 +20,7 @@ export default async function AdminEmojisPage() {
       imageUrl: true,
       category: true,
       aliases: true,
+      license: true,
       enabled: true,
       createdById: true,
       createdAt: true,

@@ -28,6 +28,7 @@ import {
   isRequestAdmin,
   parseAliases,
   parseCategory,
+  parseLicense,
   validateEmojiName,
 } from "./shared";
 
@@ -44,6 +45,7 @@ export async function GET() {
         imageUrl: true,
         category: true,
         aliases: true,
+        license: true,
         enabled: true,
         createdById: true,
         createdAt: true,
@@ -80,6 +82,7 @@ export async function POST(request: NextRequest) {
     const { name } = nameResult;
     const category = parseCategory(form.get("category"));
     const aliases = parseAliases(form.get("aliases"));
+    const license = parseLicense(form.get("license"));
 
     const blob = form.get("image");
     if (!(blob instanceof Blob) || blob.size === 0) {
@@ -120,6 +123,7 @@ export async function POST(request: NextRequest) {
         storageKey,
         category,
         aliases,
+        license,
         createdById: currentUser?.id ?? null,
       },
       select: { id: true },
