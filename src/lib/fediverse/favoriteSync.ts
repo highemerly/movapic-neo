@@ -37,9 +37,11 @@ import type { ReactionTotalsCache } from "@/lib/reactions/types";
 // 一覧がこの件数に達している回は「41件目以降が隠れているだけ」かを区別できないため、
 // 取り消し検知をまるごと諦める（ユーザー合意済みの割り切り）。
 const OWNER_FAVOURITER_LIMIT = 40;
-// オーナーインスタンスへ連合が伝播するのを待つ猶予。定期同期は30分毎なので、付けた直後
-// （まだ相手サーバーの一覧に出ていない）を取り消しと誤検知しないための緩衝。
-const UNFAVORITE_GRACE_MS = 10 * 60 * 1000;
+// オーナーインスタンスへ連合が伝播するのを待つ猶予。付けた直後（まだ相手サーバーの一覧に
+// 出ていない）を取り消しと誤検知しないための緩衝。
+// 判定は閲覧時（GET）の同期でも走り、投稿直後は TTL が1分まで詰まる＝定期の30分間隔より
+// はるかに早く回るため、猶予は「相手サーバーの配送キューが詰まっていても届く」時間で取る。
+const UNFAVORITE_GRACE_MS = 60 * 60 * 1000;
 
 export type ImageForFavorite = Prisma.ImageGetPayload<{
   include: { user: { include: { instance: true } } };
@@ -77,7 +79,8 @@ export interface SyncResult {
 /**
  * オーナーインスタンス側で取り消されたリアクションを SHAMEZO からも取り除く。
  * 判定条件・割り切りの根拠は reactionsUnfavoritedOnOwner の doc を参照。
- * 定期同期からのみ呼ぶ（route の操作直後は連合遅延で誤検知するため）。
+ * 閲覧時（GET）と定期同期から呼ぶ。route の POST/DELETE 直後だけは除外する
+ * （自分が今付けたぶんを、連合が伝播する前に取り消しと誤検知するため）。
  */
 async function reconcileUnfavoritedReactions(
   imageId: string,
@@ -167,8 +170,8 @@ export async function syncFavoriteCache(
   );
   const totalsCache: ReactionTotalsCache = { totals: data.totals, emojiUrls };
 
-  // 定期同期のときだけ、オーナー側で取り消されたリアクションを SHAMEZO からも消す。
-  // 削除に失敗しても sync 本体は止めない（次の定期でまた判定できる）。この後の
+  // 呼び出し元が許した回だけ、オーナー側で取り消されたリアクションを SHAMEZO からも消す。
+  // 削除に失敗しても sync 本体は止めない（次の同期でまた判定できる）。この後の
   // loadStoredReactions は削除を反映した状態を読むので favoriteCount も整合する。
   if (opts.reconcileRemovals) {
     try {

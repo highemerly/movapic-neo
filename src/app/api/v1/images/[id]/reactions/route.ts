@@ -191,7 +191,11 @@ export async function GET(
       sendable &&
       shouldSyncOnGet(image.createdAt, image.postStatus, image.favoritesSyncedAt)
     ) {
-      synced = await syncFavoriteCache(image);
+      // オーナー側で取り消されたリアクションの反映もここで行う（定期は day1/day14 で各1回
+      // しか回らず、閲覧の多い投稿では取り消しが最大13日反映されないため）。操作直後の
+      // POST/DELETE 経路とは違い、GET は誰かの操作の直後とは限らず、猶予（UNFAVORITE_GRACE_MS）
+      // が連合の伝播待ちを担保する。
+      synced = await syncFavoriteCache(image, { reconcileRemovals: true });
       errorReason = synced.errorReason;
       lastSyncedAt = new Date();
     }

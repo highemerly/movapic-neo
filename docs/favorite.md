@@ -93,7 +93,7 @@ Misskey は削除も権限不足も HTTP 400 で返すため、`classifyMisskeyE
 
 ## 5. GET 時の取得判定（TTL）
 
-`GET /api/v1/images/:id/reactions` は基本キャッシュを返すが、**stale なら同期してから返す**。判定は `shouldSyncOnGet()`：
+`GET /api/v1/images/:id/reactions` は基本キャッシュを返すが、**stale なら同期してから返す**（この同期はオーナー側の取り消し反映も行う＝§8 `reconcileRemovals`）。判定は `shouldSyncOnGet()`：
 
 ```
 未同期（favoritesSyncedAt = null）            → 必ず同期
@@ -190,18 +190,19 @@ GET（`computeCacheTtl` の Infinity）と定期（fire2）は、**同じ「14�
 
 SHAMEZO 上のリアクションは押した本人のトークンで Fediverse 側にも favourite/reaction を送っている（[favorite.ts](../src/lib/fediverse/favorite.ts) `sendReaction`）。よって「SHAMEZO の Reaction テーブルには残っているが、オーナー一覧に居ない acct」＝相手サーバー側で取り消された人、と判定できる（[reconcile.ts](../src/lib/reactions/reconcile.ts) `reactionsUnfavoritedOnOwner` → [store.ts](../src/lib/reactions/store.ts) `deleteReactions`）。
 
-- **定期同期のときだけ**判定する（`syncFavoriteCache(image, { reconcileRemovals: true })`。定期ジョブのみが渡す）。route の POST/DELETE 直後は連合がまだ伝播しておらず「付けた直後を取り消しと誤検知」するため対象外。
+- **判定するのは GET（§5）と定期（§6）の同期**（`syncFavoriteCache(image, { reconcileRemovals: true })`）。**route の POST/DELETE 直後だけは対象外**＝連合がまだ伝播しておらず「自分が今付けたぶんを取り消しと誤検知」するため。操作後の遅延sync（5s/30s）も同じ理由で渡さない。
+  - GET でも判定する理由: 定期の発火は fire1/fire2 の設計上 **day1 と day14 の各1回だけ**で、閲覧の多い投稿は GET 側が先に成功同期して fire1 を消すため、定期だけに任せると取り消しが最大13日反映されない（14日マーク以降は両経路とも停止するので永久に残る）。
 - **一覧が40件フルの回は諦める**（41件目以降に隠れているだけかを区別できないため、その回はまるごと判定しない）。
-- **作成から10分（`UNFAVORITE_GRACE_MS`）未満のリアクションは対象外**（連合伝播の緩衝）。
+- **作成から1時間（`UNFAVORITE_GRACE_MS`）未満のリアクションは対象外**（連合伝播の緩衝）。GET 経由の同期は投稿直後だと TTL 1分で回る＝定期の30分間隔よりはるかに早いため、相手サーバーの配送キューが詰まっていても届く長さを取る。
 - ❤→👍 の**付け替えは対象外**（acct 自体は一覧に残るため消えない）。
-- 削除は best-effort（失敗しても sync 本体は止めない。次の定期でまた判定できる）。
+- 削除は best-effort（失敗しても sync 本体は止めない。次の同期でまた判定できる）。
 
 ## 9. ログ（worker-front / web pod）
 
 | ログ | 出る場所 | 条件 |
 |---|---|---|
 | `[favorite] synced imageId=… count=… favoriters=…` | worker-front | **定期ジョブ経由の成功時のみ**（`logSuccess`）。GET 経由の成功は無音（高頻度のため） |
-| `[favorite] removed N unfavorited reaction(s): imageId=…` | worker-front | 定期同期でオーナー側の取り消しを検知し Reaction を削除したとき（`reconcileRemovals`。§8参照） |
+| `[favorite] removed N unfavorited reaction(s): imageId=…` | worker-front / web | GET・定期同期でオーナー側の取り消しを検知し Reaction を削除したとき（`reconcileRemovals`。§8参照） |
 | `[periodic] favorite-sync: candidates=処理/総数 synced=… failed=… (Nms)` | worker-front | 候補が1件以上ある実行で毎回（総数は LIMIT に当たったときだけ COUNT で算出＝backlog 可視化） |
 | `[favorite] sync failed (status=…, reason=…): imageId=…` | worker-front / web | 想定内の `FavoriteError`（404/429/5xx 等）。**スタックトレースは出さない** |
 | `[favorite] sync failed (unexpected): imageId=…` ＋ stack | worker-front / web | 想定外（タイムアウト・復号/DBエラー等）。調査用にスタックを残す |

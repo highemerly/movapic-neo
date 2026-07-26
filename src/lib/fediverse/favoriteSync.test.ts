@@ -331,7 +331,7 @@ describe("syncFavoriteCache - オーナー側の取り消し反映（reconcileRe
   }
   const OLD = new Date("2026-06-20T00:00:00Z"); // 猶予を十分超えた過去
 
-  it("定期同期で、一覧から消えたユーザーのリアクションを削除する", async () => {
+  it("取り消し反映が有効な同期（GET/定期）で、一覧から消えたユーザーのリアクションを削除する", async () => {
     reactionFindMany.mockResolvedValue([
       reactionRow("u-gone", "bob", "mi.hiyoko.club", OLD),
       reactionRow("u-keep", "alice", "owner.example", OLD),
@@ -369,6 +369,17 @@ describe("syncFavoriteCache - オーナー側の取り消し反映（reconcileRe
     // 連合がまだ伝播していないだけの可能性があるため
     reactionFindMany.mockResolvedValue([
       reactionRow("u-fresh", "bob", "mi.hiyoko.club", new Date()),
+    ]);
+    fetchFavoriteDataMock.mockResolvedValue(favoriteData(0, []));
+
+    await syncFavoriteCache(makeImage({ postStatus: 200 }), { reconcileRemovals: true });
+
+    expect(reactionDeleteMany).not.toHaveBeenCalled();
+  });
+
+  it("30分前のリアクションも消さない（猶予は1時間。GET経由は定期より早く回るため）", async () => {
+    reactionFindMany.mockResolvedValue([
+      reactionRow("u-recent", "bob", "mi.hiyoko.club", new Date(Date.now() - 30 * 60 * 1000)),
     ]);
     fetchFavoriteDataMock.mockResolvedValue(favoriteData(0, []));
 

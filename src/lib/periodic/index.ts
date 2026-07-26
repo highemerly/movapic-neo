@@ -175,8 +175,8 @@ const favoriteSyncJob: PeriodicJob = {
           if (!isFavoriteSyncDue(image, now)) return null;
           // syncFavoriteCache は内部で例外を握り errorReason を返す（throw しない）。
           // 定期ジョブ経由は成功時に1行ログを残す（GET 経由は無音）。
-          // reconcileRemovals: オーナー側で取り消されたリアクションの反映は、連合遅延で
-          // 誤検知しない定期経由に限定する（route の操作直後では判定しない）。
+          // reconcileRemovals: オーナー側で取り消されたリアクションの反映（一度も閲覧されない
+          // 投稿はこの経路しか通らない）。route の GET も同じく判定する＝除外は操作直後だけ。
           return syncFavoriteCache(image, { logSuccess: true, reconcileRemovals: true });
         })
       );

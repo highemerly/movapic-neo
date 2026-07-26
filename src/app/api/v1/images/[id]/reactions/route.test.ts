@@ -170,6 +170,8 @@ describe("GET /api/v1/images/[id]/reactions", () => {
 
     const body = await json(await GET(req("GET"), ctx));
     expect(mockSync).toHaveBeenCalledTimes(1);
+    // 閲覧時の同期はオーナー側の取り消しも反映する（定期だけでは day1/day14 の2回しか回らない）
+    expect(mockSync).toHaveBeenCalledWith(expect.anything(), { reconcileRemovals: true });
     expect(body.chips).toEqual([
       { emoji: "👍", imageUrl: null, count: 3, reactedByViewer: false },
       { emoji: "🎉", imageUrl: null, count: 1, reactedByViewer: false },
@@ -427,6 +429,13 @@ describe("PUT/DELETE /api/v1/images/[id]/reactions - 反映先", () => {
     expect(mockRemove).toHaveBeenCalledTimes(1);
     expect(mockClearReaction).toHaveBeenCalledWith("img1", "user-1");
     expect(mockSync).toHaveBeenCalledTimes(1);
+  });
+
+  it("操作直後のsyncは取り消し反映を行わない（自分の操作を誤検知するため）", async () => {
+    mockFindImage.mockResolvedValue(mockImage());
+
+    await PUT(req("PUT", { emoji: "👍" }), ctx);
+    expect(mockSync).toHaveBeenCalledWith(expect.anything());
   });
 
   it("即時syncに操作が載っていなければ遅延syncを積む", async () => {
