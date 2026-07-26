@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Camera } from "lucide-react";
 import { ExifDetailDialog } from "./ExifDetailDialog";
+import { MetaItem } from "./MetaItem";
 import { type ExifDetails } from "@/lib/exif/details";
 
 /**
@@ -21,15 +22,14 @@ export function ExifDetailModal({ cameraMake, cameraModel, details }: Props) {
 
   return (
     <>
-      <button
-        type="button"
+      <MetaItem
+        as="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-[3px] -my-1 py-1 hover:text-foreground transition-colors"
         title="撮影情報を表示"
+        icon={<Camera className="h-3.5 w-3.5 shrink-0" aria-hidden />}
       >
-        <Camera className="h-3.5 w-3.5 shrink-0" aria-hidden />
         {cameraModel}
-      </button>
+      </MetaItem>
 
       <ExifDetailDialog
         cameraMake={cameraMake}

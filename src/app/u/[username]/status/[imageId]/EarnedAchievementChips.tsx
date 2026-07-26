@@ -5,6 +5,7 @@ import { Trophy } from "lucide-react";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import type { ResolvedAchievement } from "@/lib/achievements/catalog";
 import { AchievementCelebrationModal } from "./AchievementCelebrationModal";
+import { MetaItem } from "./MetaItem";
 
 /**
  * 画像詳細ページの「この投稿で獲得した実績」チップ。
@@ -31,15 +32,15 @@ export function EarnedAchievementChips({
           aria-label="この投稿で獲得した実績"
         />
         {achievements.map((a) => (
-          <button
+          <MetaItem
             key={a.key}
-            type="button"
+            as="button"
+            tone="amber"
             onClick={() => setSelected(a)}
-            className="inline-flex items-center gap-1 -my-1 py-1 hover:underline"
+            icon={<AchievementIcon name={a.icon} className="h-3.5 w-3.5 shrink-0" />}
           >
-            <AchievementIcon name={a.icon} className="h-3.5 w-3.5" />
             {a.title}
-          </button>
+          </MetaItem>
         ))}
       </p>
       {selected && (

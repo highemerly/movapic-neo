@@ -5,6 +5,7 @@ import { Mail } from "lucide-react";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import Link from "@/components/Link";
+import { MetaItem } from "./MetaItem";
 import {
   DEFAULT_POSITION,
   DEFAULT_COLOR,
@@ -121,15 +122,15 @@ export function PostSourceBadge({
 
   return (
     <>
-      <button
-        type="button"
+      <MetaItem
+        as="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1 -my-1 py-1 hover:text-foreground transition-colors"
         title={isMention ? "Bot投稿について" : "メール投稿について"}
+        icon={<Icon className="h-3.5 w-3.5 shrink-0" />}
+        labelClassName="block max-w-[160px] truncate"
       >
-        <Icon className="h-3.5 w-3.5 shrink-0" />
-        <span className="max-w-[160px] truncate">{label}</span>
-      </button>
+        {label}
+      </MetaItem>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">

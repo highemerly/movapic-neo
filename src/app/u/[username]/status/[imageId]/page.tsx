@@ -42,6 +42,7 @@ import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import { PostSourceBadge } from "./PostSourceBadge";
 import { ExifDetailModal } from "./ExifDetailModal";
+import { MetaItem } from "./MetaItem";
 import { sanitizeExifDetails } from "@/lib/exif/details";
 import { Images, CalendarDays, MapPin, Reply, Repeat2, Bookmark, Link2 } from "lucide-react";
 
@@ -680,17 +681,19 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               />
             )}
             {image.locationPrefecture && (
-              <span className="inline-flex items-center gap-1">
-                <span className="inline-flex items-center gap-0.5">
-                  <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <PrefectureScrollLink
-                    href={`/u/${username}/map?prefecture=${encodeURIComponent(image.locationPrefecture)}`}
-                    className="hover:underline"
-                  >
-                    {image.locationPrefecture}
-                  </PrefectureScrollLink>
-                  {image.locationCity ?? ""}
-                </span>
+              // 遷移先（地図の絞り込み）は都道府県単位なので、押せるのは都道府県だけ。市区町村は
+              // 続けて読ませたいので MetaItem の外に素のテキストで置く。
+              <span className="inline-flex items-center gap-0.5">
+                <MetaItem
+                  as="link"
+                  linkComponent={PrefectureScrollLink}
+                  href={`/u/${username}/map?prefecture=${encodeURIComponent(image.locationPrefecture)}`}
+                  icon={<MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />}
+                  title={`${image.locationPrefecture}の写真を地図で見る`}
+                >
+                  {image.locationPrefecture}
+                </MetaItem>
+                {image.locationCity ?? ""}
                 {isOwner && (
                   <DeleteLocationButton
                     imageId={imageId}
@@ -704,21 +707,20 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
 
         {/* メタ情報（日時・ソース・設定） */}
         <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
-          <span className="inline-flex items-center gap-0.5">
-            <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            {image.postUrl ? (
-              <a
-                href={image.postUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:underline"
-              >
-                {formattedCreatedAt}
-              </a>
-            ) : (
-              formattedCreatedAt
-            )}
-          </span>
+          {image.postUrl ? (
+            <MetaItem
+              as="external"
+              href={image.postUrl}
+              icon={<CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />}
+              title="元の投稿を開く"
+            >
+              {formattedCreatedAt}
+            </MetaItem>
+          ) : (
+            <MetaItem icon={<CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden />}>
+              {formattedCreatedAt}
+            </MetaItem>
+          )}
           <FontLicenseBadge
             font={image.font}
             hasEmoji={hasEmoji(image.overlayText)}

@@ -5,6 +5,7 @@ import { Type, Smile } from "lucide-react";
 import { FONT_LABELS, type FontFamily } from "@/types";
 import { FONT_LICENSES, type FontLicense } from "@/lib/fonts/licenses";
 import { FontLicenseDialog } from "@/components/fonts/FontLicenseDialog";
+import { MetaItem } from "./MetaItem";
 
 /** アイコン＋ラベルのライセンスバッジ。license があればクリックでモーダル表示。 */
 function LicenseBadge({
@@ -18,28 +19,17 @@ function LicenseBadge({
   license: FontLicense | undefined;
   title: string;
 }) {
-  const content = (
-    <>
-      {icon}
-      {label}
-    </>
-  );
-
   if (!license) {
-    return <span className="inline-flex items-center gap-0">{content}</span>;
+    return <MetaItem icon={icon}>{label}</MetaItem>;
   }
 
   return (
     <FontLicenseDialog
       license={license}
       trigger={
-        <button
-          type="button"
-          className="inline-flex items-center gap-0 -my-1 py-1 hover:text-foreground transition-colors"
-          title={title}
-        >
-          {content}
-        </button>
+        <MetaItem as="button" title={title} icon={icon}>
+          {label}
+        </MetaItem>
       }
     />
   );
