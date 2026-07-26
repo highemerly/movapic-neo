@@ -18,6 +18,7 @@ import {
   SEASON_CATEGORY,
   type AchStats,
   type PostFacts,
+  type ReactionStats,
 } from "./catalog";
 import {
   currentMonthMakeupStatus,
@@ -26,7 +27,7 @@ import {
   shouldRemindMakeup,
 } from "./perfectMonth";
 import { perfectMonthGrace } from "./grace";
-import { collectStats } from "./stats";
+import { collectReactionStats, collectStats } from "./stats";
 
 export interface GrantCandidate {
   key: string;
@@ -61,6 +62,8 @@ export function selectNewlyGranted(
 ): GrantCandidate[] {
   const out: GrantCandidate[] = [];
   for (const def of CATALOG) {
+    // リアクション起点の実績は投稿では確定しない（selectNewlyGrantedReaction 側で評価する）
+    if (def.trigger === "reaction") continue;
     if (ownedKeys.has(def.key)) continue;
     if (def.evaluate(stats, post)) {
       out.push({ key: def.key, category: def.category });
@@ -76,6 +79,86 @@ export function selectNewlyGranted(
     out.push({ key: season, category: SEASON_CATEGORY });
   }
   return out;
+}
+
+/**
+ * リアクション起点の実績から新規付与すべきものを選ぶ純粋関数（DBアクセスなし）。
+ * 投稿と違い「押した／受け取った瞬間」にしか確定しないため、評価も付与も別経路にする。
+ */
+export function selectNewlyGrantedReaction(
+  stats: ReactionStats,
+  ownedKeys: Set<string>
+): GrantCandidate[] {
+  const out: GrantCandidate[] = [];
+  for (const def of CATALOG) {
+    if (def.trigger !== "reaction") continue;
+    if (ownedKeys.has(def.key)) continue;
+    if (def.evaluate(stats)) {
+      out.push({ key: def.key, category: def.category });
+    }
+  }
+  return out;
+}
+
+/** 既に付与済みの実績キー。 */
+async function ownedKeysOf(userId: string): Promise<Set<string>> {
+  const rows = await prisma.achievement.findMany({ where: { userId }, select: { key: true } });
+  return new Set(rows.map((a) => a.key));
+}
+
+/**
+ * 候補を per-key insert し、付与できたぶんだけ通知を1件ずつ作る（実績1件＝通知1件）。
+ *
+ * 実績の imageId と通知の imageId を分けて受けるのは、リアクション起点の実績では
+ * 「きっかけ写真」が他人の写真になり得るため。画像詳細ページの「この投稿がきっかけで獲得した実績」は
+ * imageId だけで引く（所有者で絞らない）ので、他人の写真に自分の実績を紐づけてはいけない。
+ * 通知のサムネイル・遷移先としては他人の写真でも問題ない。
+ */
+async function grantAll(
+  userId: string,
+  candidates: GrantCandidate[],
+  images: { achievementImageId: string | null; notificationImageId: string | null }
+): Promise<GrantedAchievement[]> {
+  const granted: GrantedAchievement[] = [];
+  for (const c of candidates) {
+    try {
+      const row = await prisma.achievement.create({
+        data: { userId, key: c.key, category: c.category, imageId: images.achievementImageId },
+      });
+      granted.push({ key: row.key, category: row.category, grantedAt: row.grantedAt });
+    } catch (e) {
+      // 並行実行で同じ実績が同時付与された場合は unique 制約で弾かれる → スキップ
+      if (!isUniqueViolation(e)) throw e;
+    }
+  }
+
+  if (granted.length > 0) {
+    await prisma.notification.createMany({
+      data: granted.map((g) => ({
+        userId,
+        type: "achievement",
+        achievementKey: g.key,
+        imageId: images.notificationImageId,
+      })),
+    });
+  }
+  return granted;
+}
+
+/**
+ * live 用: リアクションが動いた後に呼び、新規付与した実績を返す。
+ * 呼び出し側（リアクションAPI・お気に入り同期）は reactionTriggers.ts 経由で使う。
+ */
+export async function evaluateAndGrantReaction(opts: {
+  userId: string;
+  achievementImageId: string | null;
+  notificationImageId: string | null;
+}): Promise<GrantedAchievement[]> {
+  const owned = await ownedKeysOf(opts.userId);
+  const stats = await collectReactionStats(opts.userId);
+  const candidates = selectNewlyGrantedReaction(stats, owned);
+  if (candidates.length === 0) return [];
+  return grantAll(opts.userId, candidates, opts);
 }
 
 /**
@@ -95,43 +178,16 @@ export async function evaluateAndGrant(opts: {
   const { userId, post, imageId, instanceDomain } = opts;
   const grace = perfectMonthGrace(instanceDomain);
 
-  const owned = new Set(
-    (
-      await prisma.achievement.findMany({
-        where: { userId },
-        select: { key: true },
-      })
-    ).map((a) => a.key)
-  );
+  const owned = await ownedKeysOf(userId);
 
   const stats = await collectStats(userId, post);
   const candidates = selectNewlyGranted(stats, post, owned, grace);
   if (candidates.length === 0) return [];
 
-  const granted: GrantedAchievement[] = [];
-  for (const c of candidates) {
-    try {
-      const row = await prisma.achievement.create({
-        data: { userId, key: c.key, category: c.category, imageId },
-      });
-      granted.push({ key: row.key, category: row.category, grantedAt: row.grantedAt });
-    } catch (e) {
-      // 並行投稿で同じ実績が同時付与された場合は unique 制約で弾かれる → スキップ
-      if (!isUniqueViolation(e)) throw e;
-    }
-  }
-
-  // 実際に付与できた実績ごとに通知を1件作る（実績1件＝通知1件）。
-  if (granted.length > 0) {
-    await prisma.notification.createMany({
-      data: granted.map((g) => ({
-        userId,
-        type: "achievement",
-        achievementKey: g.key,
-        imageId,
-      })),
-    });
-  }
+  const granted = await grantAll(userId, candidates, {
+    achievementImageId: imageId,
+    notificationImageId: imageId,
+  });
 
   // 皆勤賞の穴埋め推奨通知（今日投稿した・穴がある・埋め切っていない人にだけ・月1通）。
   // 投稿フローを止めないため、ここは独立して握りつぶす。

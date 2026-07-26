@@ -9,15 +9,18 @@
 | `catalog.ts` | 実績定義（カタログ）・カテゴリ／表示順（`ACHIEVEMENT_LAYOUT`）・皆勤賞の動的評価。**サーバー/クライアント両方から import されるので React・サーバー専用APIを入れない**（型・`@/lib/streak`・`@/types` のみ） |
 | `perfectMonth.ts` | **皆勤賞ロジックの単一ソース**。しきい値（`perfectMonthGrace(domain)` ＝ ホーム handon.club は4・その他は3 / `MAKEUP_REMINDER_MAX_SKIPPED`）・穴埋め割当の貪欲決定（`pickMakeupHole`＝投稿1件ぶん / `assignMonthMakeups`＝月一括）・達成判定（`isPerfectMonth`）・当月進捗（`currentMonthMakeupStatus`）・穴埋め通知ゲート（`shouldRemindMakeup`）・日別集計（`summarizeDayCounts`）。catalog 同様 React/サーバー専用APIを入れない。**穴埋め割当は Image.makeupTargetDay に永続化し、表示（カレンダー）も判定（皆勤賞）も同じ永続値を読む**＝表示と👑が食い違わない。判定は `filledHoleDays`（永続割当が指す空き日）を数える（貪欲の再計算はしない） |
 | `makeupAssign.ts` | 穴埋め割当を DB に書く side（サーバー専用）。`assignMakeupForNewPost`（投稿時に autoMakeup=true なら1件割当）/ `recomputeMonthMakeups`（削除後の自己修復で月を再割当）。純粋な割当規則は perfectMonth.ts に集約し、ここは橋渡しだけ |
-| `stats.ts` | live 用。投稿後に DB から集計（`collectStats`）して `AchStats` を作る |
-| `engine.ts` | live 用。`evaluateAndGrant` が新規付与＋通知作成。`selectNewlyGranted` は純粋関数で live/backfill 共有 |
+| `stats.ts` | live 用。投稿後に DB から集計（`collectStats`）して `AchStats` を作る。リアクション起点の集計（`collectReactionStats`＝`ReactionStats`）もここ |
+| `engine.ts` | live 用。`evaluateAndGrant`（投稿起点）/ `evaluateAndGrantReaction`（リアクション起点）が新規付与＋通知作成。`selectNewlyGranted` / `selectNewlyGrantedReaction` は純粋関数で live/backfill 共有 |
+| `reactionTriggers.ts` | リアクション起点のフック（`onReactionGiven` / `onReactionsReceived`）。例外を握り潰してリアクション操作・同期を止めない |
 | `notifications.ts` | 通知フィード取得（直近90日の `Notification` をサムネ・リンク付きで返す） |
 | `../publish/publishImage.ts` | 3経路（web/email/mention）すべての投稿後フック。`result.imageId` がある時だけ評価し、try/catch で投稿を止めない |
 | `scripts/backfill-achievements.ts` | 既存ユーザーの過去投稿を**時系列リプレイ**して付与＋通知補填（メモリ集計版の stats） |
 | `components/achievements/AchievementsView.tsx` | 実績タブの表示（`ACHIEVEMENT_LAYOUT` 駆動） |
 | `components/achievements/AchievementIcon.tsx` | アイコン名 → lucide コンポーネントのマップ |
 
-評価は「**ユーザー自身が投稿した瞬間**」に確定する条件のみ。しきい値はすべて **`>=`（到達で付与）**。一度付与した実績は**永続**（要件を満たさなくなっても剥奪しない）。
+評価タイミングは2系統ある（実績定義の `trigger` で区別。既定は `"post"`）。しきい値はすべて **`>=`（到達で付与）**。一度付与した実績は**永続**（要件を満たさなくなっても剥奪しない）。
+- **投稿起点（`trigger` 省略）**: 「ユーザー自身が投稿した瞬間」に確定する条件のみ。集計は `AchStats`・投稿の属性は `PostFacts`。
+- **リアクション起点（`trigger: "reaction"`）**: リアクションは投稿と無関係に増減するため、**リアクションが実際に動いた瞬間**に評価する。集計は `ReactionStats` のみ（`PostFacts` は無い）。
 **例外（皆勤賞のみ）**: カレンダー編集モードの終了時にも皆勤賞だけ再判定する（`POST /api/v1/me/calendar/reevaluate`・**付与のみ・剥奪なし**）。これは「③自動穴埋めOFFのユーザーが後から手動で穴を埋めて皆勤を成立させた」ケースを拾うため。③ON（貪欲最適）では投稿時に判定済みなので新規付与は起きない。
 
 ## 不変条件（壊すと既存データが壊れる）
@@ -69,6 +72,22 @@
    - 「現在の連続日数」のような**その投稿時点**の値が要るものは、`new Date()` 基準の関数（`calculateStreak`）をそのまま使わず、投稿日基準で計算する（既存の `streakEndingAt` を参照）。
 4. `PostFacts`（投稿そのものの属性）で足りるなら集計は不要。必要なら `PostFacts` に足し、`publishImage.ts` の `toPostFacts` と backfill の `ReplayImage`/select も合わせる。
 
+## 手順C-2: リアクション起点の実績を追加する
+
+投稿フック（`publishImage`）では確定しないため、専用の配管を通す。定義は `catalog.ts` に **`trigger: "reaction"` 付き**で書き、`evaluate` は `ReactionStats` だけを受ける（型は `ReactionAchievementDef`）。あとは単発なら手順A・段階なら手順B と同じ（`ACHIEVEMENT_LAYOUT` への追加を忘れない）。
+
+評価される瞬間（**この2箇所以外に増やさない**。増やすと同じ実績が別経路で二重評価される）:
+
+| 起点 | 呼び出し元 | フック |
+|---|---|---|
+| 押した側 | リアクションAPI の書き込み（`PUT /api/v1/images/:id/reactions`） | `onReactionGiven(userId, imageId)` |
+| 受け取った側 | 表示用合計 `Image.favoriteCount` を書き換えた瞬間（`syncFavoriteCache` / local投稿はルート側の直接更新） | `onReactionsReceived({ ownerUserId, imageId, previousCount, currentCount })` |
+
+- **受け取り側は「件数が増えた回」だけ評価する**。同期は閲覧のたびに走るため、増えていない回に集計クエリを撃たない。逆に言うと、実績が動くのは表示件数が動いたときだけ＝画面の数字と実績の数え方が常に一致する。
+- 解除（DELETE）では評価しない（件数が減るだけで、実績は剥奪しない）。
+- **押した側の実績に「きっかけ写真」を紐づけない**（`Achievement.imageId = null`）。画像詳細ページの「この投稿がきっかけで獲得した実績」は `imageId` だけで引く（所有者で絞らない）ため、他人の写真に自分の実績が並んでしまう。通知の `imageId`（サムネ・遷移先）には押した写真を使ってよい。
+- `ReactionStats` はいずれも**現在値**（リアクションは取り消し・付け替えができ履歴が無いため累計は復元できない）。実績は永続なので、一度到達すれば以後値が下がっても保持される。
+
 ## 手順D: 既存ユーザーへ反映（バックフィル）
 
 ```bash
@@ -79,6 +98,7 @@ DATABASE_URL="postgresql://..." npx tsx scripts/backfill-achievements.ts
 ```
 - `backfill-makeups.ts`: 「そのユーザーに makeupTargetDay が1件も無い」ときだけ処理（移行済み/手動編集済みは丸ごとスキップ＝手動割当を絶対に上書きしない）。再実行安全。
 - `backfill-achievements.ts`: 冪等（実績は skipDuplicates、通知は achievementKey 既存分を除外）。何度流しても安全。皆勤賞は永続割当（makeupTargetDay）を読んで判定する。
+- リアクション起点は `replayReactions` が担当。押した側は `Reaction` を時系列リプレイするので **grantedAt は真の獲得日**、受け取った側は履歴が無いため現在値で一括判定し **grantedAt はスクリプト実行時刻**（通知もその日付で作られる＝ベルが光る）。
 - 新しい実績の付与＋（過去日付きの）通知補填を行う。
 
 ## 手順E: 検証

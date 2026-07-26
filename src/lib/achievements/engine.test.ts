@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { selectNewlyGranted } from "./engine";
-import { PERFECT_MONTH_CATEGORY, SEASON_CATEGORY, type AchStats, type PostFacts } from "./catalog";
+import { selectNewlyGranted, selectNewlyGrantedReaction } from "./engine";
+import {
+  PERFECT_MONTH_CATEGORY,
+  SEASON_CATEGORY,
+  type AchStats,
+  type PostFacts,
+  type ReactionStats,
+} from "./catalog";
 import {
   DEFAULT_POSITION,
   DEFAULT_FONT,
@@ -147,5 +153,51 @@ describe("selectNewlyGranted: 動的キー（皆勤賞・シーズン）", () =>
     expect(keysOf(stats(), post({ season: "tanabata" }), new Set(["season:tanabata"]))).not.toContain(
       "season:tanabata"
     );
+  });
+});
+
+// --- リアクション起点（押した瞬間・受け取った瞬間にしか確定しない実績） ---
+function rstats(overrides: Partial<ReactionStats> = {}): ReactionStats {
+  return { given: 0, givenCustomEmoji: 0, received: 0, ...overrides };
+}
+const reactionKeysOf = (s: ReactionStats, owned: Set<string> = new Set()) =>
+  selectNewlyGrantedReaction(s, owned).map((c) => c.key);
+
+describe("selectNewlyGrantedReaction: リアクション起点の実績", () => {
+  it("1件目のリアクションで first-reaction が立つ（0件では立たない）", () => {
+    expect(reactionKeysOf(rstats())).toEqual([]);
+    expect(reactionKeysOf(rstats({ given: 1 }))).toEqual(["first-reaction"]);
+  });
+
+  it("カスタム絵文字リアクションはしきい値到達で段が立つ（Unicodeのみでは立たない）", () => {
+    expect(reactionKeysOf(rstats({ given: 30 }))).toEqual(["first-reaction"]);
+    expect(reactionKeysOf(rstats({ given: 30, givenCustomEmoji: 30 }))).toEqual([
+      "reaction:custom:5",
+      "reaction:custom:30",
+      "first-reaction",
+    ]);
+    expect(reactionKeysOf(rstats({ given: 4, givenCustomEmoji: 4 }))).toEqual(["first-reaction"]);
+  });
+
+  it("獲得したリアクション総数は到達した段まで立ち、取得済みは除外する", () => {
+    expect(reactionKeysOf(rstats({ received: 50 }))).toEqual([
+      "reaction:received:10",
+      "reaction:received:50",
+    ]);
+    expect(reactionKeysOf(rstats({ received: 50 }), new Set(["reaction:received:10"]))).toEqual([
+      "reaction:received:50",
+    ]);
+  });
+
+  it("投稿起点の実績は混ざらない（評価タイミングが違う）", () => {
+    const keys = reactionKeysOf(rstats({ given: 100, givenCustomEmoji: 100, received: 1000 }));
+    expect(keys).not.toContain("first-post");
+    expect(keys.every((k) => k.startsWith("reaction:") || k === "first-reaction")).toBe(true);
+  });
+
+  it("リアクション起点の実績は投稿の評価では絶対に立たない", () => {
+    const keys = keysOf(stats({ totalPosts: 500 }), post());
+    expect(keys).not.toContain("first-reaction");
+    expect(keys.some((k) => k.startsWith("reaction:"))).toBe(false);
   });
 });

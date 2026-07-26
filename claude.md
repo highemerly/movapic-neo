@@ -64,6 +64,7 @@
 - お気に入り（❤）はリアクションの一種で正規化キー `FAVOURITE_KEY=❤`（[emojiKey.ts](src/lib/reactions/emojiKey.ts)）。**Mastodonは連合上 favourite しか送れない**ため選べるのはUnicode絵文字のみ・絵文字の別はSHAMEZO DBにだけ残る（連合には❤として伝播）。Misskeyは自サーバーのカスタム絵文字（`:name@host:`）も可。
 - 書き込みは本人トークンでFediverseへ送ってからDB記録（絵文字の付け替えだけでも毎回送る＝DB行があっても連合側に残っている保証は無いため）。オーナー側で取り消されたら**閲覧時(GET)・定期同期でSHAMEZOからも除去**（`reconcileRemovals`・40件フル/連合遅延はガード。操作直後の同期だけ対象外）。
 - `src/lib/reactions/*` は sharp/skia 非依存＝worker-front から呼んで安全。
+- リアクション起点の実績（押した／獲得した）は投稿フックでは確定しないため、**リアクションAPIの書き込みと `favoriteCount` を更新した瞬間からだけ**評価する（[reactionTriggers.ts](src/lib/achievements/reactionTriggers.ts)。増設禁止＝二重評価になる）。
 
 ### API（詳細: [docs/api.md](docs/api.md)）
 - レート制限: プレビュー生成(`/api/v1/generate`)はIP単位のスライディングウィンドウ（[rateLimit.ts](src/lib/rateLimit.ts)）、投稿(`/api/v1/post`)はユーザー単位でDB履歴ベース（[postRateLimit.ts](src/lib/postRateLimit.ts)・15分/24時間の2窓、24時間は直近1週間の投稿数で上限が上がる）。閾値定数は将来env切り出し予定。処理タイムアウト30秒（超過で504）・レスポンスにContent-Lengthを含む。

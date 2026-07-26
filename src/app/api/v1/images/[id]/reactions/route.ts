@@ -35,6 +35,7 @@ import { shouldSyncOnGet } from "@/lib/fediverse/favoritePolicy";
 import { getInstanceEmojiCatalog } from "@/lib/fediverse/emojis";
 import { enqueueFavoriteSync } from "@/lib/queue";
 import { reconcileFavoriteNotificationSafely } from "@/lib/notifications/favoriteNotifications";
+import { onReactionGiven, onReactionsReceived } from "@/lib/achievements/reactionTriggers";
 import { mergeReactions, toMergedFavoriters } from "@/lib/reactions/merge";
 import { clearReaction, loadStoredReactions, setReaction } from "@/lib/reactions/store";
 import {
@@ -331,6 +332,9 @@ async function handleWrite(
       emoji: resolved!.emoji,
       emojiImageUrl: resolved!.emojiImageUrl,
     });
+    // 押した側の実績（はじめてのリアクション・カスタム絵文字リアクション）は
+    // この瞬間にしか確定しない。解除(clear)では件数が減るだけなので評価しない。
+    await onReactionGiven(viewer.id, imageId);
   } else {
     await clearReaction(imageId, viewer.id);
   }
@@ -365,6 +369,13 @@ async function handleWrite(
     await prisma.image.update({
       where: { id: imageId },
       data: { favoriteCount: merged.total },
+    });
+    // 受け取った側の実績も、同期経路（syncFavoriteCache）と同じくここで評価する
+    await onReactionsReceived({
+      ownerUserId: image.userId,
+      imageId,
+      previousCount: image.favoriteCount,
+      currentCount: merged.total,
     });
     await reconcileFavoriteNotificationSafely({
       imageId,

@@ -197,6 +197,14 @@ SHAMEZO 上のリアクションは押した本人のトークンで Fediverse �
 - ❤→👍 の**付け替えは対象外**（acct 自体は一覧に残るため消えない）。
 - 削除は best-effort（失敗しても sync 本体は止めない。次の同期でまた判定できる）。
 
+### リアクション起点の実績評価
+
+リアクション関連の実績（はじめてのリアクション／カスタム絵文字リアクション／獲得したリアクション総数）は投稿の瞬間に確定しないため、リアクションが動く経路から評価する（[reactionTriggers.ts](../src/lib/achievements/reactionTriggers.ts)・仕様は[実績README](../src/lib/achievements/README.md) 手順C-2）。
+
+- **押した側**: リアクションAPI の書き込み（PUT）で `setReaction` の直後（解除では評価しない）。
+- **受け取った側**: `favoriteCount` を書き換えた瞬間＝この同期処理と、local投稿でルートが直接更新する箇所の2つ。**件数が増えた回だけ**評価する。
+- どちらも例外は握り潰す（同期・リアクション操作を止めない）。`src/lib/achievements/*` は sharp/skia 非依存なので worker-front から呼んでも安全。
+
 ## 9. ログ（worker-front / web pod）
 
 | ログ | 出る場所 | 条件 |

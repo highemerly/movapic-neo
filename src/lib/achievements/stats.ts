@@ -5,7 +5,7 @@
 
 import prisma from "@/lib/db";
 import { calculateStreak, toJstDateString } from "@/lib/streak";
-import type { AchStats, PostFacts } from "./catalog";
+import type { AchStats, PostFacts, ReactionStats } from "./catalog";
 import {
   summarizeDayCounts,
   daysInMonthOf,
@@ -101,6 +101,30 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
 }
 
 /**
+ * カスタム絵文字キーの接頭辞。正規化キーは Unicode 絵文字そのもの or `:name@host:` の
+ * 2種類しかないため（src/lib/reactions/emojiKey.ts）、先頭が ":" ならカスタム絵文字と判定できる
+ * （SQL に正規表現を持ち込まないための前方一致）。
+ */
+const CUSTOM_EMOJI_PREFIX = ":";
+
+/** リアクション由来の集計値（live）。押した瞬間・受け取った瞬間に呼ぶ。 */
+export async function collectReactionStats(userId: string): Promise<ReactionStats> {
+  const [given, givenCustomEmoji, received] = await prisma.$transaction([
+    prisma.reaction.count({ where: { userId } }),
+    prisma.reaction.count({ where: { userId, emoji: { startsWith: CUSTOM_EMOJI_PREFIX } } }),
+    // favoriteCount は連合キャッシュと Reaction をマージ済みの表示用合計（同期のたびに更新される）。
+    // 画面に出ている件数と実績の数え方を一致させるため、これを総和する。
+    prisma.image.aggregate({ where: { userId }, _sum: { favoriteCount: true } }),
+  ]);
+
+  return {
+    given,
+    givenCustomEmoji,
+    received: received._sum.favoriteCount ?? 0,
+  };
+}
+
+/**
  * 実績タブのラダー表示用に、各 ladderKey の「今時点の数」を集める（表示専用）。
  * 累計系（投稿数・機能利用・カメラ・都道府県）はそのままの現在値、
  * streak は現在の連続日数、daily は今日（JST）の投稿数。
@@ -108,7 +132,7 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
 export async function collectLadderValues(userId: string): Promise<Record<string, number>> {
   const todayStr = toJstDateString(new Date());
 
-  const [dateRows, featureCounts, distinctGroups] = await Promise.all([
+  const [dateRows, featureCounts, distinctGroups, reactionStats] = await Promise.all([
     prisma.image.findMany({ where: { userId }, select: { createdAt: true } }),
     prisma.$transaction([
       prisma.image.count({ where: { userId, season: null, arrangement: "neon" } }),
@@ -129,6 +153,7 @@ export async function collectLadderValues(userId: string): Promise<Record<string
       }),
       prisma.image.groupBy({ by: ["color"], where: { userId, season: null }, orderBy: { color: "asc" } }),
     ]),
+    collectReactionStats(userId),
   ]);
 
   const jstDays = dateRows.map((r) => toJstDateString(r.createdAt));
@@ -146,6 +171,8 @@ export async function collectLadderValues(userId: string): Promise<Record<string
     cameras: cameraGroups.length,
     prefectures: prefGroups.length,
     colors: colorGroups.length,
+    "reaction-custom": reactionStats.givenCustomEmoji,
+    "reaction-received": reactionStats.received,
   };
 }
 

@@ -22,6 +22,7 @@ import {
   type FavoriteErrorReason,
 } from "@/lib/fediverse/favorite";
 import { reconcileFavoriteNotificationSafely } from "@/lib/notifications/favoriteNotifications";
+import { onReactionsReceived } from "@/lib/achievements/reactionTriggers";
 import { isFirstSuccessfulSync } from "@/lib/fediverse/favoritePolicy";
 import { resolveLocalEmojiUrls } from "@/lib/fediverse/emojis";
 import { mergeReactions, toMergedFavoriters } from "@/lib/reactions/merge";
@@ -227,6 +228,14 @@ export async function syncFavoriteCache(
     previousFavoriters,
     currentFavoriters: toMergedFavoriters(merged),
     count: merged.total,
+  });
+  // 「獲得したリアクション総数」の実績は投稿の瞬間には決まらない。件数を書き換えたこの瞬間が
+  // 唯一の確定点なので、ここで評価する（失敗しても同期本体は止めない）。
+  await onReactionsReceived({
+    ownerUserId: image.userId,
+    imageId: image.id,
+    previousCount: image.favoriteCount,
+    currentCount: merged.total,
   });
   // 高頻度な GET 経由は無音。定期ジョブ経由（logSuccess）のときだけ1行残す
   if (opts.logSuccess) {

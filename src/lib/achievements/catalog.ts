@@ -70,6 +70,24 @@ export interface AchStats {
   distinctSourcesToday: number;
 }
 
+/**
+ * リアクション由来の集計値。
+ *
+ * 投稿の瞬間には確定しない（自分がリアクションを押した／自分の投稿がリアクションを受け取った
+ * ときに動く）ため、AchStats とは別立てにして評価タイミングも分ける（engine.ts の
+ * selectNewlyGrantedReaction）。値はいずれも「今この瞬間の現在値」で、過去の累計ではない
+ * （リアクションは取り消し・付け替えができ、履歴を持たないため）。実績は永続なので
+ * 一度しきい値に到達すれば以後値が下がっても剥奪しない。
+ */
+export interface ReactionStats {
+  /** 自分が SHAMEZO から押しているリアクションの件数 */
+  given: number;
+  /** うちカスタム絵文字（`:name@host:`）で押している件数 */
+  givenCustomEmoji: number;
+  /** 自分の投稿が獲得したリアクションの総数（表示合計＝Image.favoriteCount の総和） */
+  received: number;
+}
+
 /** 今まさに作成された投稿そのものの属性。 */
 export interface PostFacts {
   overlayText: string;
@@ -91,7 +109,8 @@ export interface PostFacts {
 /** 実績のランク（難易度）。段階実績は段ごとに割り当てる。 */
 export type AchievementRank = "gold" | "silver";
 
-export interface AchievementDef {
+/** 表示に必要な属性（評価述語を除く共通部分）。UI・集計は全てここだけを見る。 */
+export interface AchievementMeta {
   /** 安定キー。例: "posts:50" / "feature:neon:5" / "first-post" */
   key: string;
   /** 系列キー（DBの category 列。タブ表示・通知導出のグルーピング用） */
@@ -110,9 +129,26 @@ export interface AchievementDef {
   icon: string;
   /** シークレット実績: 未達成のあいだ実績タブで「？？？」表示にする（達成で公開） */
   secret?: boolean;
+}
+
+/** 投稿の瞬間に評価する実績（既定）。集計は AchStats、投稿の属性は PostFacts から読む。 */
+export type PostAchievementDef = AchievementMeta & {
+  trigger?: "post";
   /** 条件成立判定（純粋関数。付与済み判定は呼び出し側） */
   evaluate: (s: AchStats, p: PostFacts) => boolean;
-}
+};
+
+/**
+ * リアクションが動いた瞬間に評価する実績。
+ * 投稿フック（publishImage）では確定できないため、リアクションの書き込み経路から評価する
+ * （src/lib/achievements/reactionTriggers.ts）。
+ */
+export type ReactionAchievementDef = AchievementMeta & {
+  trigger: "reaction";
+  evaluate: (s: ReactionStats) => boolean;
+};
+
+export type AchievementDef = PostAchievementDef | ReactionAchievementDef;
 
 // ラダー（段階実績）のまとめ表示用メタ。ladderKey で引く。
 export const LADDER_META: Record<string, { label: string; unit: string }> = {
@@ -126,10 +162,19 @@ export const LADDER_META: Record<string, { label: string; unit: string }> = {
   cameras: { label: "カメラ機種", unit: "機種" },
   prefectures: { label: "都道府県", unit: "都道府県" },
   colors: { label: "文字色", unit: "色" },
+  "reaction-custom": { label: "カスタム絵文字リアクション", unit: "件" },
+  "reaction-received": { label: "獲得したリアクション", unit: "件" },
 };
 
 // セクション（カテゴリ）表示順
-export const SECTIONS = ["デビュー", "投稿数", "使いこなし", "期間限定", "シークレット"] as const;
+export const SECTIONS = [
+  "デビュー",
+  "投稿数",
+  "使いこなし",
+  "リアクション",
+  "期間限定",
+  "シークレット",
+] as const;
 
 // 文字数は書記素（grapheme）ベースで数える。入力バリデーション（UI/各API）と同一の
 // 数え方に統一し、絵文字1個＝1文字として実績条件（1文字 / 130文字以上）を判定する。
@@ -148,7 +193,7 @@ const POST_COUNT_TITLES: Record<number, string> = {
   300: "言の葉の仙人",
   500: "SHAMEZOの神",
 };
-const postCount: AchievementDef[] = [5, 10, 20, 30, 50, 100, 200, 300, 500].map((n) => ({
+const postCount: PostAchievementDef[] = [5, 10, 20, 30, 50, 100, 200, 300, 500].map((n) => ({
   key: `posts:${n}`,
   category: "post-count",
   rank: n >= 100 ? "gold" : "silver",
@@ -169,7 +214,7 @@ const STREAK_TITLES: Record<number, string> = {
   50: "燃ゆる星",
   100: "太陽",
 };
-const streak: AchievementDef[] = [2, 7, 20, 50, 100].map((n) => ({
+const streak: PostAchievementDef[] = [2, 7, 20, 50, 100].map((n) => ({
   key: `streak:${n}`,
   category: "streak",
   rank: n >= 50 ? "gold" : "silver",
@@ -188,7 +233,7 @@ const DAILY_TITLES: Record<number, string> = {
   5: "忙しい日",
   10: "何があったの？",
 };
-const dailyBurst: AchievementDef[] = [3, 5, 10].map((n) => ({
+const dailyBurst: PostAchievementDef[] = [3, 5, 10].map((n) => ({
   key: `daily:${n}`,
   category: "daily-burst",
   rank: n >= 10 ? "gold" : "silver",
@@ -220,7 +265,7 @@ const FEATURES: {
     titles: { 1: "縦書き、はじめました", 5: "やっぱり縦書きだよね", 30: "書道初段", 100: "書道の達人" },
   },
 ];
-const featureUsage: AchievementDef[] = FEATURES.flatMap(({ f, label, icon, tiers, titles }) =>
+const featureUsage: PostAchievementDef[] = FEATURES.flatMap(({ f, label, icon, tiers, titles }) =>
   tiers.map((n) => ({
     key: `feature:${f}:${n}`,
     category: "feature-usage",
@@ -240,7 +285,7 @@ const CAMERA_TITLES: Record<number, string> = {
   2: "二刀流カメラマン",
   5: "カメラコレクター",
 };
-const cameras: AchievementDef[] = [2, 5].map((n) => ({
+const cameras: PostAchievementDef[] = [2, 5].map((n) => ({
   key: `cameras:${n}`,
   category: "camera-models",
   rank: n >= 5 ? "gold" : "silver",
@@ -261,7 +306,7 @@ const PREFECTURE_TITLES: Record<number, string> = {
   30: "全国行脚",
   47: "日本制覇",
 };
-const prefectures: AchievementDef[] = [2, 5, 15, 30, 47].map((n) => ({
+const prefectures: PostAchievementDef[] = [2, 5, 15, 30, 47].map((n) => ({
   key: `prefectures:${n}`,
   category: "prefectures",
   rank: n >= 30 ? "gold" : "silver",
@@ -279,7 +324,7 @@ const COLOR_TITLES: Record<number, string> = {
   4: "色とりどり",
   8: "色彩の魔術師",
 };
-const colors: AchievementDef[] = [4, 8].map((n) => ({
+const colors: PostAchievementDef[] = [4, 8].map((n) => ({
   key: `colors:${n}`,
   category: "colors",
   rank: n >= 8 ? "gold" : "silver",
@@ -292,8 +337,66 @@ const colors: AchievementDef[] = [4, 8].map((n) => ({
   evaluate: (s) => s.distinctColors >= n,
 }));
 
+// --- カスタム絵文字で押したリアクション（自分が押した側） ---
+const CUSTOM_REACTION_TITLES: Record<number, string> = {
+  5: "気持ちを添えて",
+  30: "心を込めて",
+  100: "見たら押す人",
+  300: "絵文字団長",
+};
+const customEmojiReactions: ReactionAchievementDef[] = [5, 30, 100, 300].map((n) => ({
+  key: `reaction:custom:${n}`,
+  category: "reaction-custom",
+  rank: n >= 300 ? "gold" : "silver",
+  section: "リアクション",
+  ladderKey: "reaction-custom",
+  tier: n,
+  trigger: "reaction",
+  title: CUSTOM_REACTION_TITLES[n],
+  description: `カスタム絵文字で累計${n}件のリアクションをしました`,
+  icon: "Sticker",
+  evaluate: (s) => s.givenCustomEmoji >= n,
+}));
+
+// --- 獲得したリアクション総数（自分の投稿が受け取った側） ---
+const RECEIVED_REACTION_TITLES: Record<number, string> = {
+  10: "線香花火",
+  50: "小さな花火",
+  100: "打ち上げ花火",
+  300: "花火大会",
+  1000: "夜空を埋めつくす花火",
+};
+const receivedReactions: ReactionAchievementDef[] = [10, 50, 100, 300, 1000].map((n) => ({
+  key: `reaction:received:${n}`,
+  category: "reaction-received",
+  rank: n >= 300 ? "gold" : "silver",
+  section: "リアクション",
+  ladderKey: "reaction-received",
+  tier: n,
+  trigger: "reaction",
+  title: RECEIVED_REACTION_TITLES[n],
+  description: `自分の投稿が累計${n}件のリアクションを獲得しました`,
+  icon: "Heart",
+  evaluate: (s) => s.received >= n,
+}));
+
+// --- 単発実績（リアクション起点） ---
+const reactionSingletons: ReactionAchievementDef[] = [
+  {
+    key: "first-reaction",
+    category: "first-reaction",
+    rank: "silver",
+    section: "デビュー",
+    trigger: "reaction",
+    title: "はじめてのリアクション",
+    description: "SHAMEZOからはじめてリアクションをしました",
+    icon: "SmilePlus",
+    evaluate: (s) => s.given >= 1,
+  },
+];
+
 // --- 単発実績 ---
-const singletons: AchievementDef[] = [
+const singletons: PostAchievementDef[] = [
   {
     key: "first-post",
     category: "first-post",
@@ -465,6 +568,9 @@ export const CATALOG: AchievementDef[] = [
   ...prefectures,
   ...colors,
   ...singletons,
+  ...customEmojiReactions,
+  ...receivedReactions,
+  ...reactionSingletons,
 ];
 
 /** key → 定義の逆引き（固定実績のみ） */
@@ -493,6 +599,7 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
       { kind: "single", key: "first-email" },
       { kind: "single", key: "first-mention" },
       { kind: "single", key: "local-only" },
+      { kind: "single", key: "first-reaction" },
     ],
   },
   {
@@ -516,6 +623,13 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
       { kind: "ladder", ladderKey: "cameras" },
       { kind: "ladder", ladderKey: "prefectures" },
       { kind: "ladder", ladderKey: "colors" },
+    ],
+  },
+  {
+    title: "リアクション",
+    blocks: [
+      { kind: "ladder", ladderKey: "reaction-custom" },
+      { kind: "ladder", ladderKey: "reaction-received" },
     ],
   },
   {

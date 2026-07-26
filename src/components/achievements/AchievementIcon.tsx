@@ -27,6 +27,9 @@ import {
   Rainbow,
   Feather,
   Brush,
+  Heart,
+  Sticker,
+  SmilePlus,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { cn } from "@/lib/utils";
@@ -82,6 +85,9 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   Rainbow,
   Feather,
   Brush,
+  Heart,
+  Sticker,
+  SmilePlus,
   SoccerBall,
 };
 

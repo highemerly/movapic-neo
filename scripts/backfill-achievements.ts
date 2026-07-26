@@ -3,6 +3,8 @@
  *
  * 1. 既存ユーザーの過去投稿を時系列でリプレイし、条件を満たした実績を付与する。
  *    各実績の grantedAt / imageId は「達成した投稿（閾値を超えた1枚）」の値を使う（真の獲得日）。
+ * 1.5 リアクション起点の実績を付与する（押した側は Reaction を時系列リプレイ＝真の獲得日、
+ *    受け取った側は履歴が無いため現在値で判定＝獲得日はスクリプト実行時刻）。
  * 2. 通知が無い実績に対して通知(type="achievement")を生成する。
  *    通知の createdAt は実績の grantedAt（過去日）にするため、フィードには履歴が並ぶが
  *    ベルの赤ドットは初回アクセス時の now 基準なので光らない。
@@ -29,6 +31,7 @@ import {
   SEASON_CATEGORY,
   type AchStats,
   type PostFacts,
+  type ReactionStats,
 } from "@/lib/achievements/catalog";
 import { summarizeDayCounts } from "@/lib/achievements/perfectMonth";
 import { perfectMonthGrace } from "@/lib/achievements/grace";
@@ -81,7 +84,9 @@ interface GrantRow {
   userId: string;
   key: string;
   category: string;
-  imageId: string;
+  // リアクション起点の実績は「きっかけ写真」を持たない（押した相手の写真は他人のもの・
+  // 受け取り側は特定の1枚に帰せない）ため null。
+  imageId: string | null;
   grantedAt: Date;
 }
 
@@ -182,8 +187,9 @@ function replayUser(userId: string, images: ReplayImage[], grace: number): Grant
       createdAt: img.createdAt,
     };
 
-    // 固定実績
+    // 固定実績（リアクション起点は投稿では確定しないので replayReactions 側で扱う）
     for (const def of CATALOG) {
+      if (def.trigger === "reaction") continue;
       if (grantedKeys.has(def.key)) continue;
       if (def.evaluate(stats, post)) {
         grantedKeys.add(def.key);
@@ -221,6 +227,48 @@ function replayUser(userId: string, images: ReplayImage[], grace: number): Grant
       });
     }
   }
+
+  return grants;
+}
+
+/** カスタム絵文字キーは ":name@host:"（live=stats.ts の startsWith 判定と同一）。 */
+function isCustomEmojiKey(emoji: string): boolean {
+  return emoji.startsWith(":");
+}
+
+/**
+ * リアクション起点の実績を付与する。
+ * - 押した側（first-reaction / reaction:custom:N）は Reaction を時系列リプレイして真の獲得日を使う。
+ * - 受け取った側（reaction:received:N）は履歴が無いため現在値で一括判定し、獲得日は now。
+ *   （リアクションは取り消し・付け替えができ、過去の件数を復元できないため）
+ */
+function replayReactions(
+  userId: string,
+  reactions: { emoji: string; createdAt: Date }[],
+  received: number,
+  now: Date
+): GrantRow[] {
+  const grants: GrantRow[] = [];
+  const grantedKeys = new Set<string>();
+  const evaluate = (stats: ReactionStats, grantedAt: Date) => {
+    for (const def of CATALOG) {
+      if (def.trigger !== "reaction") continue;
+      if (grantedKeys.has(def.key)) continue;
+      if (def.evaluate(stats)) {
+        grantedKeys.add(def.key);
+        grants.push({ userId, key: def.key, category: def.category, imageId: null, grantedAt });
+      }
+    }
+  };
+
+  let given = 0;
+  let givenCustomEmoji = 0;
+  for (const r of reactions) {
+    given += 1;
+    if (isCustomEmojiKey(r.emoji)) givenCustomEmoji += 1;
+    evaluate({ given, givenCustomEmoji, received: 0 }, r.createdAt);
+  }
+  evaluate({ given, givenCustomEmoji, received }, now);
 
   return grants;
 }
@@ -292,6 +340,30 @@ async function main() {
         grantedCount += result.count;
         totalGranted += result.count;
       }
+    }
+
+    // 1.5 リアクションベースの実績付与（投稿が0枚のユーザーにも付き得るので独立して回す）
+    const [reactions, receivedAgg] = await Promise.all([
+      prisma.reaction.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: "asc" },
+        select: { emoji: true, createdAt: true },
+      }),
+      prisma.image.aggregate({ where: { userId: user.id }, _sum: { favoriteCount: true } }),
+    ]);
+    const reactionGrants = replayReactions(
+      user.id,
+      reactions,
+      receivedAgg._sum.favoriteCount ?? 0,
+      new Date()
+    );
+    if (reactionGrants.length > 0) {
+      const result = await prisma.achievement.createMany({
+        data: reactionGrants,
+        skipDuplicates: true,
+      });
+      grantedCount += result.count;
+      totalGranted += result.count;
     }
 
     // 2. 通知の補填: まだ通知が無い実績に対して通知を作る（createdAt=grantedAt）。

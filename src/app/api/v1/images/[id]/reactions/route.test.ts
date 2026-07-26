@@ -30,6 +30,10 @@ vi.mock("@/lib/queue", () => ({ enqueueFavoriteSync: vi.fn() }));
 vi.mock("@/lib/notifications/favoriteNotifications", () => ({
   reconcileFavoriteNotificationSafely: vi.fn(),
 }));
+vi.mock("@/lib/achievements/reactionTriggers", () => ({
+  onReactionGiven: vi.fn(),
+  onReactionsReceived: vi.fn(),
+}));
 vi.mock("@/lib/reactions/store", () => ({
   loadStoredReactions: vi.fn(async () => []),
   setReaction: vi.fn(),
@@ -49,6 +53,7 @@ import { getInstanceEmojiCatalog } from "@/lib/fediverse/emojis";
 import { sendReaction, removeReaction, FavoriteError } from "@/lib/fediverse/favorite";
 import { enqueueFavoriteSync } from "@/lib/queue";
 import { reconcileFavoriteNotificationSafely } from "@/lib/notifications/favoriteNotifications";
+import { onReactionGiven, onReactionsReceived } from "@/lib/achievements/reactionTriggers";
 import { clearReaction, loadStoredReactions, setReaction } from "@/lib/reactions/store";
 import { findShamezoEmoji } from "@/lib/reactions/customEmoji";
 import { ErrorCodes } from "@/lib/errors";
@@ -69,6 +74,8 @@ const mockReconcile = vi.mocked(reconcileFavoriteNotificationSafely);
 const mockLoadStored = vi.mocked(loadStoredReactions);
 const mockSetReaction = vi.mocked(setReaction);
 const mockClearReaction = vi.mocked(clearReaction);
+const mockOnGiven = vi.mocked(onReactionGiven);
+const mockOnReceived = vi.mocked(onReactionsReceived);
 
 type ImageRow = Awaited<ReturnType<typeof prisma.image.findUnique>>;
 const mockImage = (over: Record<string, unknown> = {}) =>
@@ -429,6 +436,41 @@ describe("PUT/DELETE /api/v1/images/[id]/reactions - 反映先", () => {
     expect(mockRemove).toHaveBeenCalledTimes(1);
     expect(mockClearReaction).toHaveBeenCalledWith("img1", "user-1");
     expect(mockSync).toHaveBeenCalledTimes(1);
+  });
+
+  it("押した側の実績評価はDB記録後に走る（解除では走らない）", async () => {
+    mockFindImage.mockResolvedValue(mockImage());
+
+    await PUT(req("PUT", { emoji: "👍" }), ctx);
+    expect(mockOnGiven).toHaveBeenCalledWith("user-1", "img1");
+
+    mockOnGiven.mockClear();
+    await DELETE(req("DELETE"), ctx);
+    expect(mockOnGiven).not.toHaveBeenCalled();
+  });
+
+  it("local投稿は受け取り側の実績評価も自分で行う（同期が走らないため）", async () => {
+    mockFindImage.mockResolvedValue(
+      mockImage({ postId: null, postUrl: null, fediverseCount: 0, favoriteCount: 0 })
+    );
+    mockLoadStored.mockResolvedValue([
+      {
+        acct: "bob@viewer.example",
+        displayName: "Bob",
+        avatarUrl: null,
+        profileUrl: null,
+        emoji: "👍",
+        emojiImageUrl: null,
+      },
+    ]);
+
+    await PUT(req("PUT", { emoji: "👍" }), ctx);
+    expect(mockOnReceived).toHaveBeenCalledWith({
+      ownerUserId: "owner-1",
+      imageId: "img1",
+      previousCount: 0,
+      currentCount: 1,
+    });
   });
 
   it("操作直後のsyncは取り消し反映を行わない（自分の操作を誤検知するため）", async () => {

@@ -170,6 +170,7 @@ const SECTION_ORDER = [
   "デビュー",
   "投稿数",
   "使いこなし",
+  "リアクション",
   "期間限定",
   "皆勤賞",
   "シークレット",
@@ -287,7 +288,7 @@ const JST_DATE = Prisma.sql`(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/To
  * スタイル由来（色・ネオン等）はシーズン投稿を除外（ユーザーが選んだ分だけ）。
  */
 async function getDistributionStats(): Promise<DistributionBreakdown[]> {
-  const [instanceRows, main, dailyRows, streakRows] = await Promise.all([
+  const [instanceRows, main, dailyRows, streakRows, reactionRows] = await Promise.all([
     // サーバー種別（Mastodon/Misskey）ごとのユーザー数
     prisma.instance.findMany({
       select: { type: true, _count: { select: { users: true } } },
@@ -302,7 +303,9 @@ async function getDistributionStats(): Promise<DistributionBreakdown[]> {
         COUNT(*) FILTER (WHERE position IN ('left','right') AND season IS NULL)::int AS vertical,
         COUNT(DISTINCT color) FILTER (WHERE season IS NULL)::int AS colors,
         COUNT(DISTINCT camera_model) FILTER (WHERE camera_model IS NOT NULL)::int AS cameras,
-        COUNT(DISTINCT location_prefecture) FILTER (WHERE location_prefecture IS NOT NULL)::int AS prefectures
+        COUNT(DISTINCT location_prefecture) FILTER (WHERE location_prefecture IS NOT NULL)::int AS prefectures,
+        -- favorite_count は連合キャッシュと Reaction をマージ済みの表示用合計（実績と同じ数え方）
+        COALESCE(SUM(favorite_count), 0)::int AS received_reactions
       FROM images
       WHERE ${PUBLIC_SQL}
       GROUP BY user_id
@@ -329,6 +332,12 @@ async function getDistributionStats(): Promise<DistributionBreakdown[]> {
       SELECT MAX(cnt)::int AS streak FROM (
         SELECT user_id, g, COUNT(*)::int AS cnt FROM grp GROUP BY user_id, g
       ) t GROUP BY user_id
+    `),
+    // カスタム絵文字で押したリアクション数（キーは ":name@host:"＝先頭が ":" のもの）
+    prisma.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+      SELECT COUNT(*) FILTER (WHERE emoji LIKE ':%')::int AS custom_reactions
+      FROM reactions
+      GROUP BY user_id
     `),
   ]);
 
@@ -357,6 +366,18 @@ async function getDistributionStats(): Promise<DistributionBreakdown[]> {
     histogram("ハンコの利用回数", column(main, "stamp"), [5, 30], "回"),
     histogram("特大文字の利用回数", column(main, "xlarge"), [5, 30], "回"),
     histogram("縦書きの利用回数", column(main, "vertical"), [1, 5, 30, 100], "回"),
+    histogram(
+      "カスタム絵文字リアクション数",
+      column(reactionRows, "custom_reactions"),
+      [5, 30, 100, 300],
+      "件"
+    ),
+    histogram(
+      "獲得したリアクション数",
+      column(main, "received_reactions"),
+      [10, 50, 100, 300, 1000],
+      "件"
+    ),
   ];
 }
 
