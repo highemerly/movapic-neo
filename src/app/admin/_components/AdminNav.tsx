@@ -60,7 +60,12 @@ export function AdminNav() {
     <>
       {/* PC: 横並びタブ */}
       <div className="mb-6 hidden md:block">
-        <TabBar tabs={TABS} activeKey={activeTab?.key ?? ""} ariaLabel="管理メニュー" />
+        <TabBar
+          tabs={TABS}
+          activeKey={activeTab?.key ?? ""}
+          compact
+          ariaLabel="管理メニュー"
+        />
       </div>
 
       {/* スマホ: 現在地ドロップダウン */}

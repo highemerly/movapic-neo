@@ -31,13 +31,18 @@ interface TabBarProps {
    * Tailwind JIT にクラスを拾わせるため、生成クラスはリテラルの対応表で持つ。
    */
   labelBreakpoint?: "xs" | "md";
+  /**
+   * タブ数が多く既定の余白では PC でも横スクロールになる場合に詰める（管理画面の8タブ）。
+   * responsiveLabels とは併用しない（ラベルは常時表示のまま幅だけ節約する）。
+   */
+  compact?: boolean;
   ariaLabel?: string;
   /** コンテナ（border-b 付き）への追加クラス。余白調整用。 */
   className?: string;
 }
 
 const tabClass =
-  "flex items-center gap-1.5 py-[13px] text-sm font-medium border-b-2 transition-colors whitespace-nowrap";
+  "flex items-center py-[13px] text-sm font-medium border-b-2 transition-colors whitespace-nowrap";
 const activeClass = "border-brand text-brand";
 const inactiveClass =
   "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30";
@@ -69,6 +74,7 @@ export function TabBar({
   prefetch = false,
   responsiveLabels = false,
   labelBreakpoint = "xs",
+  compact = false,
   ariaLabel = "Tabs",
   className,
 }: TabBarProps) {
@@ -85,7 +91,12 @@ export function TabBar({
               prefetch={prefetch}
               className={cn(
                 tabClass,
-                responsiveLabels ? PADDING_CLASS[labelBreakpoint] : "px-3",
+                compact ? "gap-1" : "gap-1.5",
+                responsiveLabels
+                  ? PADDING_CLASS[labelBreakpoint]
+                  : compact
+                    ? "px-2"
+                    : "px-3",
                 isActive ? activeClass : inactiveClass,
               )}
             >
