@@ -71,7 +71,7 @@ Misskey ユーザーは自サーバーのカスタム絵文字を使えるが、
 |---|---|
 | [`src/lib/reactions/`](../src/lib/reactions/) | 型・マージ・Reaction テーブル・取り消し判定・絵文字キー・Unicodeカタログ（[README](../src/lib/reactions/README.md)） |
 | [`src/lib/reactions/customEmoji.ts`](../src/lib/reactions/customEmoji.ts) | SHAMEZO独自絵文字（`CustomEmoji`）のカタログ取得・検索・実在検証・アップロード制約定数 |
-| [`src/app/api/v1/admin/emojis/`](../src/app/api/v1/admin/emojis/) | 管理者用の登録/一覧/enable切替/削除API。UIは [`/admin/emojis`](../src/app/admin/emojis/) |
+| [`src/app/api/v1/admin/emojis/`](../src/app/api/v1/admin/emojis/) | 管理者用の登録/一覧/enable切替/後編集（カテゴリ・エイリアス・ライセンス）/削除API。UIは [`/admin/emojis`](../src/app/admin/emojis/) |
 | [`src/lib/fediverse/emojis.ts`](../src/lib/fediverse/emojis.ts) | Misskey 自サーバーのカスタム絵文字カタログ取得・検索・カテゴリ分け |
 | [`src/components/reaction/`](../src/components/reaction/) | 詳細ページUI（チップ＋ポップオーバー＋ピッカー・[useReactionActions](../src/components/reaction/useReactionActions.ts) に操作集約） |
 

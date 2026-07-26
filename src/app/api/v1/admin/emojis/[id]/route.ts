@@ -1,6 +1,6 @@
 /**
  * 管理者用: SHAMEZO 独自カスタム絵文字の更新・削除
- * PATCH  /api/v1/admin/emojis/:id   … enabled の切り替え（soft-disable）／category・license の後編集
+ * PATCH  /api/v1/admin/emojis/:id   … enabled の切り替え（soft-disable）／category・aliases・license の後編集
  * DELETE /api/v1/admin/emojis/:id   … 未使用なら実体ごと削除
  *
  * 使用済み（Reaction テーブルにそのキーが残っている）絵文字を消すとチップの画像が壊れるため、
@@ -17,7 +17,7 @@ import {
   invalidateShamezoEmojiCatalog,
 } from "@/lib/reactions/customEmoji";
 import { shamezoEmojiKey } from "@/lib/reactions/emojiKey";
-import { isRequestAdmin, parseCategory, parseLicense } from "../shared";
+import { isRequestAdmin, parseAliases, parseCategory, parseLicense } from "../shared";
 
 export async function PATCH(
   request: NextRequest,
@@ -29,7 +29,12 @@ export async function PATCH(
     }
     const { id } = await params;
     const body = (await request.json().catch(() => null)) as
-      | { enabled?: unknown; category?: unknown; license?: unknown }
+      | {
+          enabled?: unknown;
+          category?: unknown;
+          aliases?: unknown;
+          license?: unknown;
+        }
       | null;
     if (!body || typeof body !== "object") {
       return errorResponse(ErrorCodes.VALIDATION_INVALID, "リクエストが不正です", 400);
@@ -45,6 +50,9 @@ export async function PATCH(
     }
     if ("category" in body) {
       data.category = parseCategory(body.category);
+    }
+    if ("aliases" in body) {
+      data.aliases = parseAliases(body.aliases);
     }
     if ("license" in body) {
       data.license = parseLicense(body.license);

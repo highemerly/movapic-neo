@@ -50,9 +50,13 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 一覧行のカテゴリ・ライセンス後編集。編集中の行 id と入力値を保持する
+  // 一覧行のカテゴリ・エイリアス・ライセンス後編集。編集中の行 id と入力値を保持する
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ category: "", license: "" });
+  const [editForm, setEditForm] = useState({
+    category: "",
+    aliases: "",
+    license: "",
+  });
   const [editPending, setEditPending] = useState(false);
 
   // 既存カテゴリ（プルダウン候補）。手入力も許すため datalist で提示する
@@ -155,7 +159,11 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
 
   const startEdit = (e: AdminEmoji) => {
     setEditingId(e.id);
-    setEditForm({ category: e.category ?? "", license: e.license ?? "" });
+    setEditForm({
+      category: e.category ?? "",
+      aliases: e.aliases.join(", "),
+      license: e.license ?? "",
+    });
   };
 
   const cancelEdit = () => {
@@ -171,6 +179,7 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           category: editForm.category.trim(),
+          aliases: editForm.aliases.trim(),
           license: editForm.license.trim(),
         }),
       });
@@ -314,7 +323,11 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
                     size="sm"
                     variant="outline"
                     onClick={() => (editingId === e.id ? cancelEdit() : startEdit(e))}
-                    aria-label={editingId === e.id ? "編集をやめる" : "カテゴリ・ライセンスを編集"}
+                    aria-label={
+                      editingId === e.id
+                        ? "編集をやめる"
+                        : "カテゴリ・エイリアス・ライセンスを編集"
+                    }
                   >
                     {editingId === e.id ? <X className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
                   </Button>
@@ -355,6 +368,19 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
                       />
                     </div>
                     <div className="space-y-1.5">
+                      <Label htmlFor={`edit-aliases-${e.id}`}>
+                        エイリアス（カンマ区切り）
+                      </Label>
+                      <Input
+                        id={`edit-aliases-${e.id}`}
+                        value={editForm.aliases}
+                        onChange={(ev) =>
+                          setEditForm((f) => ({ ...f, aliases: ev.target.value }))
+                        }
+                        placeholder="わくわく, ワクワク"
+                      />
+                    </div>
+                    <div className="space-y-1.5 sm:col-span-2">
                       <Label htmlFor={`edit-license-${e.id}`}>ライセンス</Label>
                       <Input
                         id={`edit-license-${e.id}`}
