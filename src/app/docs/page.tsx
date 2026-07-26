@@ -537,15 +537,17 @@ export default async function SpecPage() {
             </div>
 
             <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-2">機能: お気に入り</p>
+              <p className="font-medium mb-2">機能: リアクション</p>
               <p className="text-sm text-muted-foreground">
-                Fediverse上（Mastodonサーバー・Misskeyサーバー）上でのお気に入りとSHAMEZOのお気に入りは自動で同期されます。
+                公開・未収載の投稿には好きな絵文字でリアクションできます。Fediverse上（Mastodonサーバー・Misskeyサーバー）でのお気に入り・リアクションとSHAMEZOのリアクションは自動で同期され、合算して表示されます。
               </p>
               <ul className="mt-4 list-disc list-inside text-sm text-muted-foreground space-y-1">
                   <li>Fediverseサーバー上の情報が元データです</li>
-                  <li>SHAMEZO側から投稿元のサーバーに対し、お気に入り件数などを取得します（結果はSHAMEZO側にキャッシュされており、投稿直後は比較的頻繁に取得しますが、投稿から時間が経つと頻度を落としています）</li>
-                  <li>Fediverseサーバー上でお気に入り登録した場合、一定期間後にSHAMEZO側にも反映されます</li>
-                  <li>SHAMEZO上でお気に入り登録した場合、あなたの所属するFesiberseサーバー上でお気に入り登録を行うため、Fediverse上・SHAMEZO側の両方にほぼ即時に反映されます（連合による遅延が発生する場合があります）</li>
+                  <li>SHAMEZO側から投稿元のサーバーに対し、リアクション件数などを取得します（結果はSHAMEZO側にキャッシュされており、投稿日時からの経過時間によりキャッシュTTLが変化します）。</li>
+                  <li>Fediverseサーバー上でお気に入り・リアクションをした場合、一定期間後にSHAMEZO側にも反映されます。取り消した場合も同様に反映されます</li>
+                  <li>SHAMEZO上でリアクションした場合、あなたの所属するFediverseサーバー上でもお気に入り・リアクションを行うため、Fediverse上・SHAMEZO側の両方にほぼ即時に反映されます（連合による遅延が発生する場合があります）</li>
+                  <li>Misskeyサーバーのユーザーは、ご自身のサーバーのカスタム絵文字が使えます。</li>
+                  <li>Mastodonサーバーのユーザーは、SHAMEZO独自のカスタム絵文字が使えます。ただしMastodonは連合上「お気に入り」しか送れないため、どの絵文字を選んでもFediverseサーバーへはお気に入りとして伝わり、リアクションした絵文字はSHAMEZO上にのみ残ります</li>
               </ul>
             </div>
 
@@ -602,7 +604,7 @@ export default async function SpecPage() {
                 <p className="font-medium">トークンに必要な権限</p>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                ログイン時、連携する Fediverse サーバーに対し、以下の権限スコープを要求します。投稿・画像アップロード・お気に入りなど、必要な最小限の範囲に限っています。
+                ログイン時、連携する Fediverse サーバーに対し、以下の権限スコープを要求します。投稿・画像アップロード・リアクションなど、必要な最小限の範囲に限っています。
               </p>
               <PermissionTabs />
             </div>
