@@ -182,7 +182,7 @@ GET（`computeCacheTtl` の Infinity）と定期（fire2）は、**同じ「14�
 
 ## 8. 同期処理（`syncFavoriteCache`）
 
-未認証GETで `fetchFavoriteData`（count＋上位40件）を取得し、成功なら `favoriteCount`/`favoritersCache`/`favoritesSyncedAt`/`postStatus=200` を更新、失敗なら `favoritesSyncedAt`/`postStatus=失敗ステータス` のみ更新。続けて「お気に入りされた」通知を差分更新する（失敗しても本体は止めない）。
+未認証GETで `fetchFavoriteData`（count＋上位40件）を取得し、成功なら `favoriteCount`/`favoritersCache`/`favoritesSyncedAt`/`postStatus=200` を更新、失敗なら `favoritesSyncedAt`/`postStatus=失敗ステータス` のみ更新。続けて「リアクションされた」通知を差分更新する（失敗しても本体は止めない）。
 
 楽観表示（POST/DELETE 直後の即時反映）は DB に保存しない。viewer 自身を一覧へ仮反映してレスポンスにのみ載せる（federation 遅延＋上位40件の壁による割り切り）。リロードするとオーナー同期が連合反映を持ってくるまで一旦消えることがある。
 

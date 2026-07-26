@@ -7,6 +7,8 @@
 ## 現状のサブジョブ
 - `mention-poll`: メンション取りこぼし回収（since_id ポーリング→`process-mention` を enqueue。dedup は jobKey=mention:statusId）。
 - `tmp-cleanup`: オブジェクトストレージ `tmp/` の一時ファイルを30分経過で削除。メール投稿の元画像は producer が `tmp/email/{uuid}` に保存し worker が成功時のみ削除するため、投稿失敗（リトライ上限超過等）で残留する分を回収する。実装は `listExpiredObjects`（[storage.ts](../src/lib/storage/storage.ts)・LastModified判定）＋ `deleteImage`。出力画像/サムネは `{year}/{month}/{day}/` プレフィックスなので混在しない。
+- `favorite-sync`: リアクションのフォールバック同期。画像詳細ページが一度も開かれない投稿は閲覧時（GET）の同期に乗らないため、ここで拾う。オーナー側で取り消されたリアクションの反映（`reconcileRemovals`）も兼ねる。発火条件・バックオフ・停止条件は入り組んでいるので [リアクション仕様](./favorite.md) を正とする。
+- `mute-cleanup`: 期限切れミュート行の削除（`expiresAt=null` の無期は残す）。表示・除外は期限切れ行が残っていても正しく動くので、肥大防止のための掃除。
 
 ## 追加予定（未実装）
-お気に入り未取得かつ投稿後2時間経過分の取得 ／ 定期判定でのみ付与できる実績。`periodicJobs` 配列に1要素足すだけ。
+定期判定でのみ付与できる実績。`periodicJobs` 配列に1要素足すだけ。

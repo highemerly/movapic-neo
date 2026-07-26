@@ -61,7 +61,7 @@
 
 ### リアクション（詳細: [docs/favorite.md](docs/favorite.md)）
 - **情報源は2系統**: オーナーインスタンスのキャッシュ（`Image.fediverseCount`/`reactionTotalsCache`/`favoritersCache`）＋ SHAMEZO の `Reaction` テーブル。**表示は必ず [`mergeReactions`](src/lib/reactions/merge.ts) を通す**（件数・ユーザー一覧・閲覧者状態を1本で組む＝表示とDB件数のズレ防止）。
-- お気に入り（❤）はリアクションの一種で正規化キー `FAVOURITE_KEY=❤`（[emojiKey.ts](src/lib/reactions/emojiKey.ts)）。**Mastodonは連合上 favourite しか送れない**ため選べるのはUnicode絵文字のみ・絵文字の別はSHAMEZO DBにだけ残る（連合には❤として伝播）。Misskeyは自サーバーのカスタム絵文字（`:name@host:`）も可。
+- お気に入り（❤）はリアクションの一種で正規化キー `FAVOURITE_KEY=❤`（[emojiKey.ts](src/lib/reactions/emojiKey.ts)）。**Mastodonは連合上 favourite しか送れない**ため選べるのはUnicode絵文字＋SHAMEZO独自カスタム絵文字（`:name@shamezo:`・管理者が `/admin/emojis` で登録）・絵文字の別はSHAMEZO DBにだけ残る（連合には❤として伝播）。Misskeyは自サーバーのカスタム絵文字（`:name@host:`）も可。
 - 書き込みは本人トークンでFediverseへ送ってからDB記録（絵文字の付け替えだけでも毎回送る＝DB行があっても連合側に残っている保証は無いため）。オーナー側で取り消されたら**閲覧時(GET)・定期同期でSHAMEZOからも除去**（`reconcileRemovals`・40件フル/連合遅延はガード。操作直後の同期だけ対象外）。
 - `src/lib/reactions/*` は sharp/skia 非依存＝worker-front から呼んで安全。
 - リアクション起点の実績（押した／獲得した）は投稿フックでは確定しないため、**リアクションAPIの書き込みと `favoriteCount` を更新した瞬間からだけ**評価する（[reactionTriggers.ts](src/lib/achievements/reactionTriggers.ts)。増設禁止＝二重評価になる）。
