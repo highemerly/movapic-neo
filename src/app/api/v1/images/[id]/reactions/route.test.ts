@@ -281,6 +281,7 @@ describe("PUT /api/v1/images/[id]/reactions - 絵文字の検証", () => {
       imageUrl: "https://s3.example/emoji/wktk.png",
       category: null,
       aliases: [],
+      license: null,
     });
 
     const res = await PUT(req("PUT", { emoji: ":wktk@shamezo:" }), ctx);

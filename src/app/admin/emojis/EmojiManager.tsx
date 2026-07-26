@@ -290,7 +290,7 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
             placeholder="出典・利用条件など"
           />
           <p className="text-xs text-muted-foreground">
-            素材の出典や利用条件を自由記述で残せます。
+            素材の出典や利用条件を自由記述で残せます。公開カタログ（/docs/emojis）に表示されます。
           </p>
         </div>
         <div className="space-y-1.5">

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "@/components/Link";
-import { History, ChevronRight, Type, ChartColumn } from "lucide-react";
+import { History, ChevronRight, Type, ChartColumn, Smile } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getFavorServers } from "@/lib/auth/serverPolicy";
 import {
@@ -67,6 +67,17 @@ export default async function SpecPage() {
               <div className="flex items-center gap-2 min-w-0">
                 <Type className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                 <span className="text-sm font-medium">フォントライセンス</span>
+              </div>
+              <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+            </Link>
+
+            <Link
+              href="/docs/emojis"
+              className="flex items-center justify-between gap-4 bg-muted rounded-lg p-4 hover:bg-muted/70 transition-colors"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <Smile className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <span className="text-sm font-medium">カスタム絵文字</span>
               </div>
               <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
             </Link>
@@ -549,6 +560,13 @@ export default async function SpecPage() {
                   <li>Misskeyサーバーのユーザーは、ご自身のサーバーのカスタム絵文字が使えます。</li>
                   <li>Mastodonサーバーのユーザーは、SHAMEZO独自のカスタム絵文字が使えます。ただしMastodonは連合上「お気に入り」しか送れないため、どの絵文字を選んでもFediverseサーバーへはお気に入りとして伝わり、リアクションした絵文字はSHAMEZO上にのみ残ります</li>
               </ul>
+              <Link
+                href="/docs/emojis"
+                className="mt-2 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                カスタム絵文字の一覧をみる
+                <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
+              </Link>
             </div>
 
             <div className="bg-muted rounded-lg p-4">

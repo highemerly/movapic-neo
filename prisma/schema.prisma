@@ -311,7 +311,7 @@ model CustomEmoji {
   category String? @db.VarChar(64)
   // 検索用エイリアス（名前と併せて部分一致検索する）
   aliases String[]
-  // ライセンス表記（自由記述）。素材の出典/利用条件を管理者が残すための任意メモ
+  // ライセンス表記（自由記述）。素材の出典/利用条件。公開カタログ /docs/emojis に掲示するため内部メモは書かない
   license String? @db.Text
   // false=ピッカーから隠す。画像配信は続ける（使用済みリアクションのチップを壊さないため soft-disable）
   enabled Boolean @default(true)

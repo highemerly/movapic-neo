@@ -31,6 +31,7 @@ const shamezoEmoji = (name: string, category: string | null = null): ShamezoEmoj
   imageUrl: `https://s3.example/emoji/${name}.png`,
   category,
   aliases: [],
+  license: null,
 });
 
 type Viewer = Awaited<ReturnType<typeof getCurrentUser>>;

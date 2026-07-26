@@ -20,6 +20,7 @@ Misskey ユーザーは自サーバーのカスタム絵文字を使えるが、
 - **入力フォーマット**（B案=原本保存・再エンコードしない）: PNG / APNG / GIF / WebP / JPEG / AVIF（横長・アニメーション可・3MBまで）。**SVG は XSS 回避のため不可**。寸法は縛らず、表示高さは CSS（`h-[1.3em]`＝[ReactionEmojiView](../src/components/reaction/ReactionEmojiView.tsx)）で固定。定数は customEmoji.ts。
 - **管理**: 当面は管理者のみ登録（`/admin/emojis`）。`CustomEmoji.createdById`（null=管理者）を最初から持たせており、将来ユーザー登録を許すときの枠制限は `count(createdById)` で乗る。**使用済み（Reaction にキーが残る）絵文字はハード削除不可**＝チップが壊れるため `enabled=false` で soft-disable（画像配信は継続）。カタログはプロセス内メモ化し、登録/更新/削除で `invalidateShamezoEmojiCatalog()`。
 - 名前は Reaction キーの charset と同じ `[a-zA-Z0-9_+-]`（グローバル一意）。カテゴリ・エイリアス（検索用）を持ち、ピッカーはカテゴリ別セクションで出す（Misskey カタログと同じ構造）。
+- **公開カタログ `/docs/emojis`**（[page.tsx](../src/app/docs/emojis/page.tsx)）: 登録済み絵文字を未ログインでも見られる一覧。ピッカーと同じ `listShamezoEmojis` を通すため無効化した絵文字は出ない。カテゴリ別の `<details>` セクション＋チップのグリッド（モバイル2列〜PC8列）で、エイリアスと `license` はチップを押したポップオーバーに畳む（`license` は公開掲示前提の記述にする）。検索エンジンは**ページ側 noindex** で外し（robots.txt の `*` では Disallow しない＝メタを読ませるため）、メタを尊重しない AI Bot 群だけ [robots.ts](../src/app/robots.ts) で Disallow する。
 - 対象は public / unlisted の投稿（誰でも読める）。Fediverse へ送れる（Mastodon/Misskey ユーザー＋`postId`/`postUrl` あり＝`isFediverseSendable`）投稿はオーナー同期＋DB記録、**local投稿**（Fediverse 未投稿）は送り先が無いので **DB だけで完結**する（リアクション自体は公開画像なら可能）。
 
 ### トークンの使い分け

@@ -17,12 +17,14 @@
 
 import prisma from "@/lib/db";
 
-/** カタログ1件分（ピッカー・検証で使うフィールドだけ） */
+/** カタログ1件分（ピッカー・検証・公開カタログ /docs/emojis で使うフィールドだけ） */
 export interface ShamezoEmoji {
   name: string;
   imageUrl: string;
   category: string | null;
   aliases: string[];
+  /** 素材の出典・利用条件（管理者の自由記述）。公開カタログで掲示する */
+  license: string | null;
 }
 
 // ── アップロード制約（B案: 原本をそのまま保存。表示高さは CSS で固定するため寸法は縛らない）──
@@ -76,7 +78,13 @@ export async function listShamezoEmojis(): Promise<ShamezoEmoji[]> {
 
   const rows = await prisma.customEmoji.findMany({
     where: { enabled: true },
-    select: { name: true, imageUrl: true, category: true, aliases: true },
+    select: {
+      name: true,
+      imageUrl: true,
+      category: true,
+      aliases: true,
+      license: true,
+    },
     orderBy: [{ category: "asc" }, { name: "asc" }],
   });
   memo = { at: Date.now(), emojis: rows };

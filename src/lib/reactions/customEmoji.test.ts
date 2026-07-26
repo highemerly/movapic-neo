@@ -14,7 +14,13 @@ import {
 } from "./customEmoji";
 
 function emoji(name: string, category: string | null, aliases: string[] = []): ShamezoEmoji {
-  return { name, category, aliases, imageUrl: `https://s3.example/emoji/${name}.png` };
+  return {
+    name,
+    category,
+    aliases,
+    imageUrl: `https://s3.example/emoji/${name}.png`,
+    license: null,
+  };
 }
 
 describe("EMOJI_NAME_PATTERN", () => {
