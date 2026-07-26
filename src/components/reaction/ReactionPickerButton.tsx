@@ -18,12 +18,20 @@ export function ReactionPickerButton({
   imageId,
   initialSnapshot,
   canReact,
+  sendsToFediverse,
+  viewerType,
+  viewerDomain,
   disabledReason,
   floating = false,
 }: {
   imageId: string;
   initialSnapshot: ReactionSnapshot;
   canReact: boolean;
+  /** この投稿へのリアクションが Fediverse にも送られるか（ピッカーの注釈に使う） */
+  sendsToFediverse: boolean;
+  /** 閲覧者のインスタンス種別／ドメイン。ピッカーの注釈の文言に使う（未ログインは null） */
+  viewerType: "mastodon" | "misskey" | null;
+  viewerDomain: string | null;
   disabledReason?: string;
   /** フローティング（画像上のバー）で使うか。塗り＋まん丸のボタンにし、未リアクションは primary・
    *  リアクション済みは secondary で状態を色分けする。 */
@@ -90,6 +98,9 @@ export function ReactionPickerButton({
           onOpenChange={setPickerOpen}
           onPick={handlePick}
           currentEmoji={viewerEmoji}
+          sendsToFediverse={sendsToFediverse}
+          viewerType={viewerType}
+          viewerDomain={viewerDomain}
         />
       )}
     </div>

@@ -20,12 +20,15 @@ export function ReactionChips({
   imageId,
   initialSnapshot,
   canReact,
+  sendsToFediverse,
   viewerType,
   viewerDomain,
 }: {
   imageId: string;
   initialSnapshot: ReactionSnapshot;
   canReact: boolean;
+  /** この投稿へのリアクションが Fediverse にも送られるか（ピッカーの注釈に使う） */
+  sendsToFediverse: boolean;
   /** 閲覧者のインスタンス種別／ドメイン。チップと同じ絵文字を送れるかの厳密判定に使う（未ログインは null） */
   viewerType: "mastodon" | "misskey" | null;
   viewerDomain: string | null;
@@ -101,6 +104,9 @@ export function ReactionChips({
           onOpenChange={setPickerOpen}
           onPick={handlePick}
           currentEmoji={viewerEmoji}
+          sendsToFediverse={sendsToFediverse}
+          viewerType={viewerType}
+          viewerDomain={viewerDomain}
         />
       )}
     </div>

@@ -44,12 +44,20 @@ export function ReactionPickerModal({
   onOpenChange,
   onPick,
   currentEmoji,
+  sendsToFediverse,
+  viewerType,
+  viewerDomain,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** 選択されたリアクション。同じ絵文字をもう一度選んだ場合の扱いは呼び出し側に任せる */
   onPick: (emoji: string, imageUrl: string | null) => void;
   currentEmoji: string | null;
+  /** この投稿へのリアクションが Fediverse にも送られるか（local投稿はSHAMEZO内で完結する） */
+  sendsToFediverse: boolean;
+  /** 閲覧者のインスタンス種別／ドメイン。送信先の注釈の文言に使う */
+  viewerType: "mastodon" | "misskey" | null;
+  viewerDomain: string | null;
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -69,6 +77,9 @@ export function ReactionPickerModal({
       >
         <PickerBody
           currentEmoji={currentEmoji}
+          sendsToFediverse={sendsToFediverse}
+          viewerType={viewerType}
+          viewerDomain={viewerDomain}
           onPick={(emoji, imageUrl) => {
             onPick(emoji, imageUrl);
             onOpenChange(false);
@@ -82,9 +93,15 @@ export function ReactionPickerModal({
 function PickerBody({
   currentEmoji,
   onPick,
+  sendsToFediverse,
+  viewerType,
+  viewerDomain,
 }: {
   currentEmoji: string | null;
   onPick: (emoji: string, imageUrl: string | null) => void;
+  sendsToFediverse: boolean;
+  viewerType: "mastodon" | "misskey" | null;
+  viewerDomain: string | null;
 }) {
   const [sections, setSections] = useState<PaletteSection[]>([]);
   const [truncated, setTruncated] = useState(false);
@@ -281,6 +298,25 @@ function PickerBody({
           </div>
         </div>
       )}
+
+      {/* リアクションは本人のトークンで Fediverse へも送られる（＝相手サーバーに残る）ため、
+          押す前に分かるようピッカー内で常時知らせる。local投稿は送り先が無いので出さない。 */}
+      {sendsToFediverse && (
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          {viewerType === "mastodon" ? (
+            // Mastodon は連合上 favourite しか送れず、絵文字の別は SHAMEZO にしか残らない
+            <>
+              リアクションは、{viewerDomain ?? "あなたのアカウント"}
+              から投稿元サーバーにはお気に入りとして送信されます。
+            </>
+          ) : (
+            <>
+              リアクションは、{viewerDomain ?? "あなたのアカウント"}
+              から投稿元のサーバーにも送信されます。
+            </>
+          )}
+        </p>
+      )}
     </>
   );
 }
@@ -394,8 +430,11 @@ function EmojiButton({
       onClick={onClick}
       title={item.label}
       aria-pressed={selected}
+      // 選択中の枠は内側に描く（inset-ring）。外向きの ring だとボタンの箱の外側に出るため、
+      // gap-0.5 しかない隣接ボタン・overflow-x-hidden のスクロールコンテナ左右端・sticky 見出しの
+      // 背景に上下左右が食われて枠が切れて見える。
       className={`flex h-11 w-11 items-center justify-center rounded-md text-2xl transition-colors ${
-        selected ? "bg-accent ring-1 ring-foreground/40" : "hover:bg-accent"
+        selected ? "bg-accent inset-ring-1 inset-ring-foreground/40" : "hover:bg-accent"
       }`}
     >
       <ReactionEmojiView emoji={item.key} imageUrl={item.imageUrl} />

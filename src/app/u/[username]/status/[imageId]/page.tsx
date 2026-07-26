@@ -480,6 +480,9 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         imageId={imageId}
         initialSnapshot={initialReactionSnapshot}
         canReact={canReact}
+        sendsToFediverse={fediverseSendable}
+        viewerType={viewerType}
+        viewerDomain={viewerDomain}
         disabledReason={
           persistedReason === "deleted"
             ? "この投稿は削除されているため操作できません"
@@ -639,6 +642,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           imageId={imageId}
           initialSnapshot={initialReactionSnapshot}
           canReact={canReact}
+          sendsToFediverse={fediverseSendable}
           viewerType={viewerType}
           viewerDomain={viewerDomain}
         />
