@@ -30,6 +30,8 @@ Misskey ユーザーは自サーバーのカスタム絵文字を使えるが、
 
 > 読み取りを未認証にしている割り切り: 限定連合モード（Mastodon `DISALLOW_UNAUTHENTICATED_API_ACCESS` 等）のインスタンスは未認証 API を 401/403 で弾く。その場合 count/一覧が取れず `forbidden` 扱いになるが、現状は速度・失効耐性を優先して未認証一本。必要になればオーナートークンへのフォールバックを足す（[[feedback_no_speculative_protection]]）。
 
+リアクションの設定（PUT）は、**絵文字を変えるだけの付け替えでも毎回 Fediverse へ送る**。Mastodon は favourite に絵文字を持たないため「変更だけなら送り直さない」最適化ができそうに見えるが、`Reaction` 行があることは相手サーバーに favourite が残っている保証にならない（オーナー側で取り消された／local投稿時代に付いた行が再投稿で連合対象になった等）。送らずに DB だけ更新すると SHAMEZO 側にだけリアクションが残り、後の `reconcileRemovals`（§8）が消す＝ユーザーには理由不明の消失になる。favourite / リアクション作成は冪等なので毎回送って状態を揃える（別インスタンス投稿では解決＋favouriteの2リクエストになるが、一貫性を優先する）。
+
 別インスタンスの投稿に操作するときは、毎回 `postUrl` を viewer 側で解決してから操作する（Mastodon: `/api/v2/search?resolve=true` → favourite、Misskey: `/api/ap/show` → reactions/create）。`localStatusId` はキャッシュしない割り切り。
 
 ## 2. データモデル

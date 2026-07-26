@@ -274,10 +274,6 @@ async function handleWrite(
   }
 
   const viewerAcct = viewerAcctOf(viewer);
-  const previous = await prisma.reaction.findUnique({
-    where: { imageId_userId: { imageId, userId: viewer.id } },
-    select: { emoji: true },
-  });
 
   let resolved: { emoji: string; emojiImageUrl: string | null } | null = null;
   if (action === "set") {
@@ -299,26 +295,26 @@ async function handleWrite(
       postId: image.postId!,
       postUrl: image.postUrl!,
     };
-    // Mastodonのfavouriteは絵文字を持たないため、絵文字の変更だけなら送り直す必要がない
-    const emojiChangeOnly =
-      action === "set" && viewer.instance.type === "mastodon" && previous !== null;
-    if (!emojiChangeOnly) {
-      try {
-        if (action === "set") await sendReaction(actionParams, resolved!.emoji);
-        else await removeReaction(actionParams);
-      } catch (error) {
-        const reason = toFavoriteReason(error);
-        if (error instanceof FavoriteError) {
-          // 想定内の分類済みエラー（404/429/5xx 等）はスタックトレース不要。1行で残す
-          console.error(
-            `[reaction] ${action} failed (status=${error.httpStatus}, reason=${reason}): imageId=${imageId}`
-          );
-        } else {
-          // 想定外（タイムアウト・復号/DB エラー等）はスタックトレース付きで調査可能にする
-          console.error(`[reaction] ${action} failed (unexpected): imageId=${imageId}`, error);
-        }
-        return fediverseErrorResponse(reason);
+    // pitfall: Mastodon の favourite は絵文字を持たないため「絵文字を変えるだけなら送り直さない」
+    // 最適化を入れていたが、`Reaction` 行があることは相手サーバーに favourite が残っていることを
+    // 意味しない（オーナー側で取り消された／local投稿時代に付いた行が再投稿で連合対象になった等）。
+    // 送らずにDBだけ更新すると SHAMEZO 側にだけリアクションが残り、後の reconcileRemovals が
+    // 消す＝ユーザーには理由不明の消失になる。favourite/reaction 作成は冪等なので毎回送る。
+    try {
+      if (action === "set") await sendReaction(actionParams, resolved!.emoji);
+      else await removeReaction(actionParams);
+    } catch (error) {
+      const reason = toFavoriteReason(error);
+      if (error instanceof FavoriteError) {
+        // 想定内の分類済みエラー（404/429/5xx 等）はスタックトレース不要。1行で残す
+        console.error(
+          `[reaction] ${action} failed (status=${error.httpStatus}, reason=${reason}): imageId=${imageId}`
+        );
+      } else {
+        // 想定外（タイムアウト・復号/DB エラー等）はスタックトレース付きで調査可能にする
+        console.error(`[reaction] ${action} failed (unexpected): imageId=${imageId}`, error);
       }
+      return fediverseErrorResponse(reason);
     }
   }
 

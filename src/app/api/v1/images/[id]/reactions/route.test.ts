@@ -10,7 +10,6 @@ vi.mock("@/lib/auth/session", () => ({
 vi.mock("@/lib/db", () => ({
   default: {
     image: { findUnique: vi.fn(), update: vi.fn() },
-    reaction: { findUnique: vi.fn() },
   },
 }));
 vi.mock("@/lib/auth/tokens", () => ({ decryptToken: vi.fn((t: string) => t) }));
@@ -58,7 +57,6 @@ const mockGetUser = vi.mocked(getCurrentUser);
 const mockGetViewer = vi.mocked(getCurrentUserWithValidation);
 const mockFindImage = vi.mocked(prisma.image.findUnique);
 const mockUpdateImage = vi.mocked(prisma.image.update);
-const mockFindReaction = vi.mocked(prisma.reaction.findUnique);
 const mockReadCache = vi.mocked(readCache);
 const mockReadTotals = vi.mocked(readTotalsCache);
 const mockSync = vi.mocked(syncFavoriteCache);
@@ -129,7 +127,6 @@ beforeEach(() => {
   mockReadCache.mockReturnValue([]);
   mockReadTotals.mockReturnValue(null);
   mockLoadStored.mockResolvedValue([]);
-  mockFindReaction.mockResolvedValue(null);
   mockSync.mockResolvedValue(syncResult());
 });
 
@@ -401,14 +398,15 @@ describe("PUT/DELETE /api/v1/images/[id]/reactions - 反映先", () => {
     expect(mockReconcile).toHaveBeenCalledTimes(1);
   });
 
-  it("Mastodonユーザーの絵文字変更はfavouriteを送り直さない", async () => {
+  // Mastodon は絵文字を連合送信できないので「変更だけなら送らない」最適化ができそうに見えるが、
+  // DB行の存在は相手サーバーに favourite が残っている保証にならない（route.ts の pitfall 参照）。
+  it("Mastodonユーザーの絵文字変更でもfavouriteを送り直す", async () => {
     mockGetViewer.mockResolvedValue(viewerOf("mastodon"));
     mockFindImage.mockResolvedValue(mockImage());
-    mockFindReaction.mockResolvedValue({ emoji: "👍" } as never);
 
     const res = await PUT(req("PUT", { emoji: "🎉" }), ctx);
     expect(res.status).toBe(200);
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockSend).toHaveBeenCalledWith(expect.anything(), "🎉");
     expect(mockSetReaction).toHaveBeenCalledWith(
       expect.objectContaining({ emoji: "🎉" })
     );
@@ -416,7 +414,6 @@ describe("PUT/DELETE /api/v1/images/[id]/reactions - 反映先", () => {
 
   it("Misskeyユーザーの絵文字変更はリアクションを送り直す（付け替え）", async () => {
     mockFindImage.mockResolvedValue(mockImage());
-    mockFindReaction.mockResolvedValue({ emoji: "👍" } as never);
 
     await PUT(req("PUT", { emoji: "🎉" }), ctx);
     expect(mockSend).toHaveBeenCalledWith(expect.anything(), "🎉");
