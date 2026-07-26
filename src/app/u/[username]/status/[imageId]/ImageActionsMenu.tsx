@@ -84,6 +84,8 @@ interface ImageActionsMenuProps {
   isMuted: boolean;
   /** トリガー（ミートボール）に足すクラス（非ログイン時に狭い画面のみ表示する等） */
   triggerClassName?: string;
+  /** トリガーの見た目。plain は枠なし・小さめ（上部の戻る行など、主張させたくない場所用）。 */
+  triggerVariant?: "boxed" | "plain";
   /** ネイティブ共有（Web Share API 対応時のみメニューに出す）。行内ボタンとは別に常に出す。 */
   nativeShare?: NativeShareParams;
   /** 撮影情報（EXIF）。値があるときだけ「詳細情報を表示」を出す。 */
@@ -167,6 +169,7 @@ export function ImageActionsMenu({
   canMute,
   isMuted,
   triggerClassName,
+  triggerVariant = "boxed",
   nativeShare,
   exif,
   postUrl,
@@ -417,7 +420,11 @@ export function ImageActionsMenu({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
-          className={`flex shrink-0 items-center justify-center h-[44px] w-[44px] border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border ${triggerClassName ?? ""}`}
+          className={`flex shrink-0 items-center justify-center rounded-md transition-colors text-muted-foreground hover:text-foreground ${
+            triggerVariant === "plain"
+              ? "h-7 w-7 hover:bg-accent"
+              : "h-[44px] w-[44px] border border-border"
+          } ${triggerClassName ?? ""}`}
           title="その他"
         >
           <MoreHorizontal className="h-4 w-4" />

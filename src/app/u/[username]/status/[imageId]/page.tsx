@@ -467,6 +467,55 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   const modalPrev = buildModalNav(prevImage);
   const modalNext = buildModalNav(nextImage);
 
+  // ミートボールメニュー。操作行（PC インライン／モバイルのフローティングバー）と、上部の
+  // 「◯◯に戻る」行の右端の計2箇所に同じ内容を出すので、プロパティ一式をここに1本化して
+  // 見た目（triggerVariant / triggerClassName）だけを呼び出し側で変える。
+  const actionsMenu = (opts: {
+    triggerVariant?: "boxed" | "plain";
+    triggerClassName?: string;
+  }) => (
+    <ImageActionsMenu
+      imageId={imageId}
+      username={username}
+      isOwner={isOwner}
+      initialIsPinned={!!image.pinnedAt}
+      repostable={repostable}
+      instanceDomain={image.user.instance.domain}
+      defaultVisibility={
+        image.user.defaultVisibility === "unlisted" ? "unlisted" : "public"
+      }
+      canReport={!isOwner}
+      canMute={!isOwner}
+      isMuted={isMutingAuthor}
+      exif={exif}
+      postUrl={image.postUrl}
+      viewerServerName={currentUser?.instance.domain ?? ""}
+      mastodonOpenUrl={mastodonReplyUrl}
+      misskeyOpenPostUrl={misskeyOpenPostUrl}
+      shareLinkUrl={shareUrl}
+      locationLabel={isOwner ? locationLabel : null}
+      options={{
+        position: image.position,
+        color: image.color,
+        size: image.size,
+        font: image.font,
+        arrangement: image.arrangement,
+        season: image.season,
+      }}
+      hasEmoji={hasEmoji(image.overlayText)}
+      hasNonEmojiText={hasNonEmojiText(image.overlayText)}
+      nativeShare={{
+        imageUrl,
+        mimeType: image.mimeType,
+        fileBaseName: `shamezo-${imageId}`,
+        text: image.overlayText,
+        url: pageUrl,
+      }}
+      triggerVariant={opts.triggerVariant}
+      triggerClassName={opts.triggerClassName}
+    />
+  );
+
   // 返信・シェア・その他メニュー。PC（インライン）とモバイル（下部フローティングバー）で
   // 出し分けが異なる（floating）ので1箇所にまとめてフラグで切り替える。
   // - PC: 行幅いっぱいに伸ばす（flex-auto/flex-1）。従来どおり全ボタンを表示。
@@ -546,47 +595,11 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           floating={floating}
         />
       )}
-      <ImageActionsMenu
-        imageId={imageId}
-        username={username}
-        isOwner={isOwner}
-        initialIsPinned={!!image.pinnedAt}
-        repostable={repostable}
-        instanceDomain={image.user.instance.domain}
-        defaultVisibility={
-          image.user.defaultVisibility === "unlisted" ? "unlisted" : "public"
-        }
-        canReport={!isOwner}
-        canMute={!isOwner}
-        isMuted={isMutingAuthor}
-        exif={exif}
-        postUrl={image.postUrl}
-        viewerServerName={currentUser?.instance.domain ?? ""}
-        mastodonOpenUrl={mastodonReplyUrl}
-        misskeyOpenPostUrl={misskeyOpenPostUrl}
-        shareLinkUrl={shareUrl}
-        locationLabel={isOwner ? locationLabel : null}
-        options={{
-          position: image.position,
-          color: image.color,
-          size: image.size,
-          font: image.font,
-          arrangement: image.arrangement,
-          season: image.season,
-        }}
-        hasEmoji={hasEmoji(image.overlayText)}
-        hasNonEmojiText={hasNonEmojiText(image.overlayText)}
-        nativeShare={{
-          imageUrl,
-          mimeType: image.mimeType,
-          fileBaseName: `shamezo-${imageId}`,
-          text: image.overlayText,
-          url: pageUrl,
-        }}
-        // フローティングではミートボールを常に右端へ寄せる（左の余白を ml-auto で吸わせる。
-        // 他ボタンの有無に依らず右寄せになる）。PC インラインは他ボタンが伸びるので不要。
-        triggerClassName={floating ? `${PILL} ml-auto` : undefined}
-      />
+      {/* フローティングではミートボールを常に右端へ寄せる（左の余白を ml-auto で吸わせる。
+          他ボタンの有無に依らず右寄せになる）。PC インラインは他ボタンが伸びるので不要。 */}
+      {actionsMenu({
+        triggerClassName: floating ? `${PILL} ml-auto` : undefined,
+      })}
     </>
   );
 
@@ -608,7 +621,12 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
       {justPosted && <AchievementCelebration username={username} />}
       <PageContainer>
         {/* ヘッダー */}
-        <BackLink href={backUrl}>{backLabel}</BackLink>
+        <BackLink
+          href={backUrl}
+          trailing={actionsMenu({ triggerVariant: "plain" })}
+        >
+          {backLabel}
+        </BackLink>
 
         {/* 画像。ALTがある場合は右下に「ALT」バッジを重ね、押すと画像下にALTテキストを展開。
             アスペクト比で幅から高さが決まる（RetryImage の aspectRatio）ため、縦長画像だと

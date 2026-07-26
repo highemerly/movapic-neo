@@ -9,19 +9,23 @@ import { ChevronLeft } from "lucide-react";
 export function BackLink({
   href,
   children,
+  trailing,
 }: {
   href: string;
   children: React.ReactNode;
+  /** 行の右端に寄せて置く要素（例: 画像詳細ページのミートボールメニュー）。 */
+  trailing?: React.ReactNode;
 }) {
   return (
-    <div className="mb-2">
+    <div className="mb-2 flex items-center gap-2">
       <Link
         href={href}
-        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground"
+        className="inline-flex min-w-0 items-center text-sm text-muted-foreground hover:text-foreground"
       >
-        <ChevronLeft className="h-4 w-4" />
-        {children}
+        <ChevronLeft className="h-4 w-4 shrink-0" />
+        <span className="truncate">{children}</span>
       </Link>
+      {trailing && <div className="ml-auto shrink-0">{trailing}</div>}
     </div>
   );
 }
