@@ -36,7 +36,7 @@ export default async function AdminEmojisPage() {
       <div>
         <h1 className="text-lg font-semibold">カスタム絵文字</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Mastodon ユーザーがリアクションで使える独自絵文字です（横長・アニメーション可）。
+          Mastodon ユーザーがリアクションで使える独自絵文字です。
         </p>
       </div>
       <EmojiManager initial={initial} />
