@@ -51,10 +51,22 @@ export function ReactionPickerModal({
   onPick: (emoji: string, imageUrl: string | null) => void;
   currentEmoji: string | null;
 }) {
+  const contentRef = useRef<HTMLDivElement>(null);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* 中身は開いている間だけマウントされる（開閉ごとに効くエフェクトを持たなくて済む）。 */}
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent
+        ref={contentRef}
+        className="sm:max-w-sm"
+        // 既定では最初のフォーカス可能要素（＝検索input）にフォーカスが入り、スマホで
+        // ソフトウェアキーボードが勝手に開いてしまう。代わりにダイアログ本体（tabIndex=-1）へ
+        // フォーカスして、キーボードは出さずに Esc / フォーカストラップだけ効かせる。
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          contentRef.current?.focus();
+        }}
+      >
         <PickerBody
           currentEmoji={currentEmoji}
           onPick={(emoji, imageUrl) => {
