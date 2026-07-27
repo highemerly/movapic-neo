@@ -55,9 +55,12 @@ export function ReactionChipPopover({
       <PopoverTrigger asChild>
         <button
           type="button"
+          // 自分が付けたチップは primary で塗りつぶす。他のチップ（薄いグレー地に muted 文字）とは
+          // 地と文字が反転する関係になるので、絵文字を読まなくても一目で自分のものが分かる。
+          // brand（ピンク）は主役CTA専用なので、こういう状態表示には使わない。
           className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
             chip.reactedByViewer
-              ? "bg-brand/10 text-brand hover:bg-brand/15"
+              ? "bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
               : "bg-muted/60 text-muted-foreground hover:bg-muted"
           }`}
           title="リアクションした人を見る"

@@ -79,7 +79,7 @@ export function ReactionPickerButton({
         {viewerEmoji ? <Check className="h-6 w-6" /> : <SmilePlus className="h-6 w-6" />}
         {/* 総数はチップ行に出るのでボタンには載せない（重複回避）。
             リアクション済みは✓、未リアクションは＋アイコンだけで状態が分かる。どの絵文字を
-            付けたかはチップ行（自分のチップが brand 色で出る）を見れば分かるので、ここでは
+            付けたかはチップ行（自分のチップが primary で塗られる）を見れば分かるので、ここでは
             「付けたかどうか」だけを示す。 */}
       </button>
 
