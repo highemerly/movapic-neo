@@ -19,6 +19,7 @@ import {
   PostLocationNotice,
 } from "@/components/PostVisibilityNotice";
 import { useStickyVisible } from "@/hooks/useStickyVisible";
+import { CACHE_NAMES, SESSION_KEYS, SHARED_IMAGE_CACHE_KEY } from "@/lib/storageKeys";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { ResultDetails } from "@/components/ResultDetails";
@@ -412,7 +413,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
   );
 
   // PWA の Web Share Target 経由で共有された画像を受け取る。
-  // Service Worker が画像を Cache Storage("shared-image"/"/__shared") に置き、
+  // Service Worker が画像を Cache Storage(CACHE_NAMES.sharedImage) に置き、
   // /create?shared=1 へ誘導してくるので、ここで取り出して通常のアップロードと
   // 同じ handleImageSelect に流す（EXIF抽出等もそのまま再利用）。
   const sharedConsumedRef = useRef(false);
@@ -426,8 +427,8 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
     let cancelled = false;
     (async () => {
       try {
-        const cache = await caches.open("shared-image");
-        const res = await cache.match("/__shared");
+        const cache = await caches.open(CACHE_NAMES.sharedImage);
+        const res = await cache.match(SHARED_IMAGE_CACHE_KEY);
         if (res && !cancelled) {
           const blob = await res.blob();
           const type = blob.type || "image/jpeg";
@@ -436,7 +437,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
           const preview = URL.createObjectURL(file);
           await handleImageSelect(file, preview);
         }
-        await cache.delete("/__shared");
+        await cache.delete(SHARED_IMAGE_CACHE_KEY);
       } catch (e) {
         console.error("共有画像の読み込みに失敗しました:", e);
       } finally {
@@ -770,7 +771,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
       ) {
         try {
           sessionStorage.setItem(
-            "movapic_new_achievements",
+            SESSION_KEYS.newAchievements,
             JSON.stringify(data.newAchievements),
           );
         } catch {

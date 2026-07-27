@@ -7,6 +7,7 @@ import { ImageCard } from "@/components/gallery/ImageCard";
 import { GalleryGrid } from "@/components/gallery/GalleryGrid";
 import { useInfiniteImages } from "@/hooks/useInfiniteImages";
 import { useTimelinePersistence } from "@/hooks/useTimelinePersistence";
+import { timelineKey } from "@/lib/storageKeys";
 import { useRegisterPullToRefresh } from "@/components/PullToRefresh";
 import { NewItemsPill } from "@/components/gallery/NewItemsPill";
 import { RefreshResultPill } from "@/components/gallery/RefreshResultPill";
@@ -42,7 +43,7 @@ export function UserGalleryClient({
 }: UserGalleryClientProps) {
   // ユーザー単位でスクロール位置・一覧を永続化する（ハードリロードで復元）。
   const { restore, onChange } = useTimelinePersistence<GalleryImage>(
-    `tl:user:${username}`
+    timelineKey.user(username)
   );
   const { images, isLoading, nextCursor, loaderRef, newIds, newCount, clearNewCount, refreshResult, refresh } = useInfiniteImages<GalleryImage>({
     initialImages,

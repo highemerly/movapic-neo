@@ -10,12 +10,15 @@
  * 注: Web Share Target は Android Chrome 等のみ対応。iOS Safari では発火しない。
  */
 
-const SHARED_CACHE = "shared-image";
+// pitfall: SW は ES import できないため、キー名は src/lib/storageKeys.ts と二重管理になる。
+// 片方だけ変えると CreateClient が共有画像を取り出せない／古いキャッシュが残るので必ず両方直す。
+const SHARED_CACHE = "shamezo:shared-image";
 const SHARED_KEY = "/__shared";
 
 // 投稿画像キャッシュ。URL は不変（storageKey = YYYY/MM/DD/<uuid>.<ext>）なので CacheFirst で
 // 永久保持して安全。多く持っても仕方ないので少数＋FIFO で上限管理する。
-const IMG_CACHE = "post-img-v1";
+// `-v1` は保存形式を変えたいときに名前を変えて捨てるための版番号。
+const IMG_CACHE = "shamezo:post-image-v1";
 const IMG_CACHE_LIMIT = 50;
 // 投稿画像のパス構造（/YYYY/MM/DD/…）。env でホストが変わっても・SW 再起動で状態が消えても
 // パスだけで判定できるので、オリジンの受け渡し（postMessage）が不要になる。
@@ -27,8 +30,21 @@ self.addEventListener("install", () => {
 });
 
 self.addEventListener("activate", (event) => {
-  // 既存クライアントをすぐ制御下に置く
-  event.waitUntil(self.clients.claim());
+  // 既存クライアントをすぐ制御下に置く。あわせて旧名のキャッシュを掃除する
+  // （キャッシュ名を変えても Cache Storage は明示削除するまで残り、投稿画像50件分が
+  //   端末に居座り続けるため。このオリジンでキャッシュを作るのはこの SW だけ）。
+  event.waitUntil(
+    Promise.all([
+      self.clients.claim(),
+      caches.keys().then((names) =>
+        Promise.all(
+          names
+            .filter((name) => name !== SHARED_CACHE && name !== IMG_CACHE)
+            .map((name) => caches.delete(name)),
+        ),
+      ),
+    ]),
+  );
 });
 
 self.addEventListener("fetch", (event) => {

@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/sheet";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { useUnseenNotifications, useUnseenBadge } from "./useUnseenNotifications";
+import { SESSION_KEYS } from "@/lib/storageKeys";
 
 /**
  * メニューの2つの姿:
@@ -613,7 +614,7 @@ function LogoutButton() {
       await fetch("/api/auth/logout", { method: "POST" });
       // トップ着地時に「ログアウトしました」トーストを出すため sessionStorage に合図を積む（SessionFlasher が読んで即削除）。
       sessionStorage.setItem(
-        "flash:loggedOut",
+        SESSION_KEYS.flashLoggedOut,
         JSON.stringify({ variant: "success", message: "ログアウトしました" }),
       );
       window.location.href = "/";
@@ -938,7 +939,7 @@ function RailLogout({ expanded }: { expanded: boolean }) {
       await fetch("/api/auth/logout", { method: "POST" });
       // トップ着地時に「ログアウトしました」トーストを出すため sessionStorage に合図を積む（SessionFlasher が読んで即削除）。
       sessionStorage.setItem(
-        "flash:loggedOut",
+        SESSION_KEYS.flashLoggedOut,
         JSON.stringify({ variant: "success", message: "ログアウトしました" }),
       );
       window.location.href = "/";

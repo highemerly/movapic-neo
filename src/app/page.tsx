@@ -15,6 +15,7 @@ import { Footer } from "@/components/Footer";
 import { SessionFlasher } from "@/components/SessionFlasher";
 import { getAllowedServers, getHomeServer } from "@/lib/auth/serverPolicy";
 import { userPathSegment } from "@/lib/userHandle";
+import { SESSION_KEYS } from "@/lib/storageKeys";
 
 // マーキーに流す枚数と、スコアリング元になる候補プールの上限。
 // プールから「お気に入り×新しさ」でスコアし、投稿者1人1枚に間引いて上位 MARQUEE_COUNT 枚を選ぶ。
@@ -119,7 +120,7 @@ export default async function HomePage() {
   return (
     <div className="min-h-screen bg-background">
       {/* ログアウト（フルリロードで着地）時に sessionStorage 経由で一度だけトーストを出す。 */}
-      <SessionFlasher storageKey="flash:loggedOut" />
+      <SessionFlasher storageKey={SESSION_KEYS.flashLoggedOut} />
       <main className="py-6">
         {/* ロゴ */}
         <div className="container mx-auto max-w-2xl px-4">

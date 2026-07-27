@@ -3,10 +3,7 @@
 import { useEffect, useState } from "react";
 import { LegalInfoDialog } from "@/components/legal/LegalInfoDialog";
 import { ServiceInfoContent } from "@/components/legal/ServiceInfoContent";
-
-// LoginButton と同じ localStorage キー（前回ログインしたサーバー名）。
-// 値があれば過去ログイン済み＝リピーターとみなす。
-const LAST_SERVER_KEY = "shamezo.lastServer";
+import { LOCAL_KEYS } from "@/lib/storageKeys";
 
 /**
  * 「SHAMEZO（しゃめぞう）とは？」の共通説明ブロック。
@@ -23,8 +20,9 @@ export function AboutShamezo() {
   useEffect(() => {
     try {
       // localStorage は外部ストア。SSR と一致させるためマウント後に読む（lazy init だと hydration 不整合）。
+      // 前回ログインしたサーバー名があれば過去ログイン済み＝リピーターとみなす。
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (localStorage.getItem(LAST_SERVER_KEY)) setIsReturning(true);
+      if (localStorage.getItem(LOCAL_KEYS.lastServer)) setIsReturning(true);
     } catch {
       // localStorage 不可（プライベートモード等）は無視＝説明を出す
     }

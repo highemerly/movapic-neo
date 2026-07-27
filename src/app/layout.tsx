@@ -12,6 +12,7 @@ import { PullToRefreshProvider } from "@/components/PullToRefresh";
 import { getSessionClaims } from "@/lib/auth/session";
 import { isAdmin } from "@/lib/auth/admin";
 import { userPathSegment } from "@/lib/userHandle";
+import { LEGACY_LOCAL_KEY_MIGRATIONS } from "@/lib/storageKeys";
 import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { HomeServerProvider } from "@/components/HomeServerProvider";
 import { getAvatarUrl } from "@/lib/avatar";
@@ -77,6 +78,15 @@ export const metadata: Metadata = {
 // 警告が出たのでネイティブ <script> に変更）。
 const STANDALONE_DETECT_SCRIPT = `(function(){try{var n=navigator,ua=n.userAgent||"",isIos=/iphone|ipad|ipod/i.test(ua)||(n.platform==="MacIntel"&&n.maxTouchPoints>1),s=isIos?n.standalone===true:(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches);if(s)document.documentElement.setAttribute("data-standalone","");}catch(e){}})();`;
 
+// 旧キー（命名統一前）の localStorage 値を新キーへ移し、旧キーを削除する（移行表と削除時期は
+// storageKeys.ts 参照）。React の描画が始まる前に同期で済ませる必要があるためネイティブ
+// <script> で実行する: useGalleryLayout は useSyncExternalStore で初回描画中に localStorage を
+// 読むので、useEffect で移行すると初回描画に間に合わず既定値（grid）で描かれてしまう。
+// 新キーに値がある場合は上書きしない（改名後に設定し直したユーザーの値を旧値で潰さない）。
+const LEGACY_STORAGE_MIGRATION_SCRIPT = `(function(){try{var m=${JSON.stringify(
+  LEGACY_LOCAL_KEY_MIGRATIONS
+)};for(var i=0;i<m.length;i++){var o=m[i][0],n=m[i][1],v=localStorage.getItem(o);if(v===null)continue;if(localStorage.getItem(n)===null)localStorage.setItem(n,v);localStorage.removeItem(o);}}catch(e){}})();`;
+
 export const viewport: Viewport = {
   themeColor: "#ffffff",
   // iOSのノッチ等でも safe-area を使えるように画面いっぱいに広げる
@@ -117,6 +127,11 @@ export default async function RootLayout({
         <script
           id="standalone-detect"
           dangerouslySetInnerHTML={{ __html: STANDALONE_DETECT_SCRIPT }}
+        />
+        {/* 旧キーの localStorage 値を新キーへ移して旧キーを消す（一時コード。上部コメント参照）。 */}
+        <script
+          id="legacy-storage-migration"
+          dangerouslySetInnerHTML={{ __html: LEGACY_STORAGE_MIGRATION_SCRIPT }}
         />
         <HomeServerProvider value={homeServer}>
         <ThemeProvider

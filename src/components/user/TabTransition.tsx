@@ -2,12 +2,11 @@
 
 import { useEffect, useLayoutEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { SESSION_KEYS } from "@/lib/storageKeys";
 
 // ユーザーページのタブ並び順。左右どちら向きにスライドするかの判定に使う。
 const TAB_ORDER = ["home", "photos", "calendar", "map", "achievements"] as const;
 type TabKey = (typeof TAB_ORDER)[number];
-
-const STORAGE_KEY = "movapic_user_tab";
 
 // サーバーでは useLayoutEffect が警告を出すため、クライアントのみ layout effect を使う
 // （ペイント前に方向を確定してスライドを走らせたいので useEffect では遅い）。
@@ -36,8 +35,8 @@ export function TabTransition({
   useIsomorphicLayoutEffect(() => {
     let prev: string | null = null;
     try {
-      prev = sessionStorage.getItem(STORAGE_KEY);
-      sessionStorage.setItem(STORAGE_KEY, tab);
+      prev = sessionStorage.getItem(SESSION_KEYS.userTab);
+      sessionStorage.setItem(SESSION_KEYS.userTab, tab);
     } catch {
       // sessionStorage 不可（プライベートモード等）ならアニメ無しで継続
     }

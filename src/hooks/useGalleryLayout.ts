@@ -1,4 +1,5 @@
 import { useSyncExternalStore, useCallback } from "react";
+import { LOCAL_KEYS } from "@/lib/storageKeys";
 
 /**
  * 写真一覧の表示レイアウト。閲覧者ごとの好み（ブラウザローカル）で、
@@ -8,14 +9,13 @@ import { useSyncExternalStore, useCallback } from "react";
  */
 export type GalleryLayout = "grid" | "packed";
 
-const STORAGE_KEY = "gallery-layout";
 // 同一タブ内の別コンポーネントへ即時反映するための独自イベント
 // （storage イベントは別タブにしか飛ばないため併用する）
 const CHANGE_EVENT = "gallery-layout-change";
 
 function getSnapshot(): GalleryLayout {
   if (typeof window === "undefined") return "grid";
-  return window.localStorage.getItem(STORAGE_KEY) === "packed" ? "packed" : "grid";
+  return window.localStorage.getItem(LOCAL_KEYS.galleryLayout) === "packed" ? "packed" : "grid";
 }
 
 function getServerSnapshot(): GalleryLayout {
@@ -40,7 +40,7 @@ export function useGalleryLayout(): [GalleryLayout, (next: GalleryLayout) => voi
   const layout = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const setLayout = useCallback((next: GalleryLayout) => {
-    window.localStorage.setItem(STORAGE_KEY, next);
+    window.localStorage.setItem(LOCAL_KEYS.galleryLayout, next);
     window.dispatchEvent(new Event(CHANGE_EVENT));
   }, []);
 

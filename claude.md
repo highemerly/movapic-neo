@@ -90,6 +90,10 @@ App Router の `<Link>` はビューポート進入で RSC ペイロードを自
 - **カスタムPTR**（[PullToRefresh.tsx](src/components/PullToRefresh.tsx)・layout に1個）は **standalone PWA 限定**（iOSはネイティブPTR無し／Androidは全リロードのため自前化。タブは触らない）。一覧は `useRegisterPullToRefresh(refresh)` で in-place 更新、他ページは `location.reload`。Android ネイティブPTRは `overscroll-behavior:contain` で抑止。
 - **SW画像キャッシュ**（[public/sw.js](public/sw.js)）: iOS が画像を退避し再DLするため、投稿画像をパス `/YYYY/MM/DD/` で CacheFirst（FIFO50・cors非opaque）。
 
+### ブラウザストレージのキー
+- localStorage / sessionStorage / Cache Storage のキーは**必ず [storageKeys.ts](src/lib/storageKeys.ts) に定義**して import する（使用箇所へのベタ書き禁止＝同じキーが複数箇所に散ると片方だけ直したとき無言で壊れる）。命名は `shamezo:` + kebab-case・階層は `:` 区切り。
+- 例外はテーマの `theme`（next-themes 既定キー。改名すると全ユーザーのテーマが飛ぶ）と、ES import できない [sw.js](public/sw.js)（同名定数を自前で持つ＝変更時は両方直す）。
+
 ### プライバシー制御
 - `User.blockCrawlers` フラグで検索（noindexメタ）とAI Bot（robots.txt Disallow）をユーザー単位制御・`revalidateTag`で即反映。
 

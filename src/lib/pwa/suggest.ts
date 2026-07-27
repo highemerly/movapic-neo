@@ -6,8 +6,7 @@
  */
 
 import type { PwaPlatform } from "./install";
-
-export const SUGGEST_STORAGE_KEY = "shamezo.pwa-suggest";
+import { LOCAL_KEYS } from "@/lib/storageKeys";
 
 /** 断られた回数に対する次回表示までの猶予（日）。配列を使い切ったら打ち止め。 */
 const COOLDOWN_DAYS = [30, 90];
@@ -89,7 +88,7 @@ export function parseSuggestState(raw: string | null): SuggestState {
 export function loadSuggestState(): SuggestState {
   if (typeof window === "undefined") return INITIAL_SUGGEST_STATE;
   try {
-    return parseSuggestState(localStorage.getItem(SUGGEST_STORAGE_KEY));
+    return parseSuggestState(localStorage.getItem(LOCAL_KEYS.pwaSuggest));
   } catch {
     // プライベートブラウズ等で localStorage が使えない場合は毎回初期値（＝提案は出る）
     return INITIAL_SUGGEST_STATE;
@@ -99,7 +98,7 @@ export function loadSuggestState(): SuggestState {
 export function saveSuggestState(state: SuggestState): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(SUGGEST_STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(LOCAL_KEYS.pwaSuggest, JSON.stringify(state));
   } catch {
     // 保存できなくても導線自体は動かす
   }

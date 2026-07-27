@@ -8,6 +8,7 @@ import {
 } from "@/components/gallery/TimelineImageCard";
 import { useInfiniteImages } from "@/hooks/useInfiniteImages";
 import { useTimelinePersistence } from "@/hooks/useTimelinePersistence";
+import { timelineKey } from "@/lib/storageKeys";
 import { useRegisterPullToRefresh } from "@/components/PullToRefresh";
 import { NewItemsPill } from "@/components/gallery/NewItemsPill";
 import { RefreshResultPill } from "@/components/gallery/RefreshResultPill";
@@ -35,7 +36,7 @@ export function PublicTimelineClient({
   const mutedSet = useMemo(() => new Set(mutedAuthorKeys ?? []), [mutedAuthorKeys]);
   // サーバー絞り込み単位でスクロール位置・一覧を永続化する（ハードリロードで復元）。
   const { restore, onChange } = useTimelinePersistence<TimelineImage>(
-    `tl:public:${instancesParam ?? "all"}`
+    timelineKey.public(instancesParam ?? "all")
   );
   const { images, isLoading, nextCursor, loaderRef, newIds, newCount, clearNewCount, refreshResult, refresh } = useInfiniteImages<TimelineImage>({
     initialImages,

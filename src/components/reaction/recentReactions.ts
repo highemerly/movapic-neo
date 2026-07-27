@@ -5,7 +5,8 @@
  * 「よく使う」タブに管理者既定（REACTION_EMOJIS）と合わせて並べる。
  */
 
-export const RECENT_REACTIONS_KEY = "shamezo:recent-reactions";
+import { LOCAL_KEYS } from "@/lib/storageKeys";
+
 export const MAX_RECENT_REACTIONS = 24;
 
 export interface RecentReaction {
@@ -18,7 +19,7 @@ export interface RecentReaction {
 export function loadRecentReactions(): RecentReaction[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(RECENT_REACTIONS_KEY);
+    const raw = window.localStorage.getItem(LOCAL_KEYS.recentReactions);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
@@ -40,7 +41,7 @@ export function pushRecentReaction(entry: RecentReaction): RecentReaction[] {
     ...loadRecentReactions().filter((item) => item.emoji !== entry.emoji),
   ].slice(0, MAX_RECENT_REACTIONS);
   try {
-    window.localStorage.setItem(RECENT_REACTIONS_KEY, JSON.stringify(next));
+    window.localStorage.setItem(LOCAL_KEYS.recentReactions, JSON.stringify(next));
   } catch {
     // プライベートブラウジング等で保存できなくても選択自体は成立する
   }

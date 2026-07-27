@@ -12,9 +12,7 @@ import { TermsContent } from "@/components/legal/TermsContent";
 import { PrivacyContent } from "@/components/legal/PrivacyContent";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
-
-// 直近に使ったサーバー名を記憶する localStorage キー（次回の初期値に使う）
-const LAST_SERVER_KEY = "shamezo.lastServer";
+import { LOCAL_KEYS } from "@/lib/storageKeys";
 
 // プレースホルダーに順に表示する例サーバー（Mastodon / Misskey 混在）
 const PLACEHOLDER_SERVERS = [
@@ -100,7 +98,7 @@ export function LoginButton({ allowedServers, callbackUrl, loggedInHref, initial
   // （マウント後にクライアントで実行＝ハイドレーション不整合を避ける）
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(LAST_SERVER_KEY);
+      const saved = localStorage.getItem(LOCAL_KEYS.lastServer);
       if (!saved) return;
       // 一度ログイン成功済み＝過去に規約へ同意済みとみなす（termsPreAgreed の根拠）。
       // localStorage は外部ストアで、SSR と一致させるためマウント後に読む必要がある
@@ -165,7 +163,7 @@ export function LoginButton({ allowedServers, callbackUrl, loggedInHref, initial
 
       // 検証OKで認可へ進むので、次回の初期値として正規化済みサーバー名を記憶
       try {
-        localStorage.setItem(LAST_SERVER_KEY, data.server || targetServer);
+        localStorage.setItem(LOCAL_KEYS.lastServer, data.server || targetServer);
       } catch {
         // localStorage 不可は無視
       }

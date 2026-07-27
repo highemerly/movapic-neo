@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { SESSION_KEYS } from "@/lib/storageKeys";
 
 interface LogoutButtonProps {
   className?: string;
@@ -32,7 +33,7 @@ export function LogoutButton({ className, variant = "destructive" }: LogoutButto
       });
       // トップ着地時に「ログアウトしました」トーストを出すため sessionStorage に合図を積む（SessionFlasher が読んで即削除）。
       sessionStorage.setItem(
-        "flash:loggedOut",
+        SESSION_KEYS.flashLoggedOut,
         JSON.stringify({ variant: "success", message: "ログアウトしました" }),
       );
       window.location.href = "/";

@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { useIsHydrated } from "@/hooks/useIsHydrated";
 import { AchievementCelebrationModal } from "./AchievementCelebrationModal";
-
-const STORAGE_KEY = "movapic_new_achievements";
+import { SESSION_KEYS } from "@/lib/storageKeys";
 
 type Raw = { key: string; category: string };
 
@@ -30,7 +29,7 @@ export function AchievementCelebration({
   const items = useMemo(() => {
     if (!hydrated) return [];
     try {
-      const raw = sessionStorage.getItem(STORAGE_KEY);
+      const raw = sessionStorage.getItem(SESSION_KEYS.newAchievements);
       if (!raw) return [];
       const parsed = JSON.parse(raw) as Raw[];
       if (!Array.isArray(parsed) || parsed.length === 0) return [];
@@ -44,7 +43,7 @@ export function AchievementCelebration({
   useEffect(() => {
     if (items.length > 0) {
       try {
-        sessionStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem(SESSION_KEYS.newAchievements);
       } catch {
         // 無視
       }

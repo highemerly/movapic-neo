@@ -3,14 +3,12 @@
 import { useEffect } from "react";
 import type { ComponentProps } from "react";
 import Link from "@/components/Link";
-
-/** クリックで都道府県を選んだことを次ページ(同一ルートのソフトナビ後)へ伝えるフラグ */
-export const PREF_SCROLL_FLAG = "movapic:scrollToPrefImages";
+import { SESSION_KEYS } from "@/lib/storageKeys";
 
 /** 都道府県タイル/パスのクリック時に呼ぶ。遷移後にスクロールさせる目印を立てる */
 export function markPrefScroll() {
   try {
-    sessionStorage.setItem(PREF_SCROLL_FLAG, "1");
+    sessionStorage.setItem(SESSION_KEYS.prefScroll, "1");
   } catch {
     // sessionStorage 不可環境では何もしない
   }
@@ -66,8 +64,8 @@ export function ScrollIntoViewOnSelect({
 
     let flagged = false;
     try {
-      flagged = sessionStorage.getItem(PREF_SCROLL_FLAG) === "1";
-      if (flagged) sessionStorage.removeItem(PREF_SCROLL_FLAG);
+      flagged = sessionStorage.getItem(SESSION_KEYS.prefScroll) === "1";
+      if (flagged) sessionStorage.removeItem(SESSION_KEYS.prefScroll);
     } catch {
       // ignore
     }
