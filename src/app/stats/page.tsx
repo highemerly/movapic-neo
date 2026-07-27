@@ -53,7 +53,7 @@ export default async function StatsPage() {
         }
       />
       <PageContainer width="6xl">
-        <BackLink href="/docs">ドキュメントへ</BackLink>
+        <BackLink href="/docs">ドキュメントセンターへ</BackLink>
         {/* 投稿オプションの利用傾向 */}
         <section className="mt-4">
           <h2 className="mb-1 text-xl font-bold">文字合成オプションの利用傾向</h2>

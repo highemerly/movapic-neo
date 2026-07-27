@@ -15,7 +15,7 @@ import { PermissionTabs } from "@/components/auth/PermissionTabs";
 
 /**
  * ログイン時に要求する権限（scope / permission）の説明モーダル。
- * 本体はMastodonとMisskeyのタブ切り替え（PermissionTabs）で、/docs と共有している。
+ * 本体はMastodonとMisskeyのタブ切り替え（PermissionTabs）で、/docs/permissions と共有している。
  */
 
 export function PermissionInfoDialog() {

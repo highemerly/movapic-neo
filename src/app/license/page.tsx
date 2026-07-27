@@ -23,7 +23,7 @@ export default async function LicensePage() {
       <SiteHeader user={user ? { username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) } : null} />
       <PageContainer>
 
-        <BackLink href="/docs">ドキュメントへ</BackLink>
+        <BackLink href="/docs">ドキュメントセンターへ</BackLink>
 
         <section className="mb-8">
           <h2 className="text-lg font-semibold mb-4">フォントライセンス</h2>

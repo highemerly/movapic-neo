@@ -334,9 +334,9 @@ function useMenuSections(nav: MenuNav): MenuSectionData[] {
       {
         key: "spec",
         href: "/docs",
-        label: "ドキュメント",
+        label: "ドキュメントセンター",
         Icon: Code,
-        active: pathname === "/docs",
+        active: pathname.startsWith("/docs"),
         primary: false,
       },
       {

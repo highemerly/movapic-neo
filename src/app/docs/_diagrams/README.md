@@ -1,6 +1,6 @@
 # ドキュメントページの図（プリレンダーSVG）
 
-`/docs` の画像処理フロー図は、mermaid ソースを**ビルド前に一度だけ静的SVGへ変換**し、
+`/docs/spec`（技術仕様）の画像処理フロー図は、mermaid ソースを**ビルド前に一度だけ静的SVGへ変換**し、
 `public/diagrams/` に置いて `<img>` で読み込む（実行時mermaid不使用＝CSP `script-src` 非依存）。
 
 - ソース: [pipeline.mmd](pipeline.mmd)

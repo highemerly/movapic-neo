@@ -27,7 +27,7 @@ export default async function ReleaseNoteListPage() {
     <>
       <SiteHeader user={user ? { username: user.username, instanceDomain: user.instance.domain, avatarUrl: getAvatarUrl(user.avatarUrl) } : null} />
       <PageContainer>
-        <BackLink href="/docs">ドキュメントへ</BackLink>
+        <BackLink href="/docs">ドキュメントセンターへ</BackLink>
 
         <h1 className="text-lg font-semibold mb-6">リリースノート</h1>
 

@@ -15,7 +15,7 @@ import {
 
 /**
  * 要求する権限（scope / permission）をMastodon / Misskeyのタブで切り替えて表示する本体。
- * ログイン画面の説明モーダル（PermissionInfoDialog）と /docs の「要求する権限」セクションで共有する。
+ * ログイン画面の説明モーダル（PermissionInfoDialog）と /docs/permissions で共有する。
  * 権限の文言は @/lib/auth/permissions に集約している。
  */
 

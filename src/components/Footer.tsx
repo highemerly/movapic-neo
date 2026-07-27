@@ -33,16 +33,10 @@ export function Footer() {
           プライバシーポリシー
         </Link>
         <Link
-          href="/stats"
-          className="py-1 text-sm text-muted-foreground hover:text-foreground hover:underline"
-        >
-          統計
-        </Link>
-        <Link
           href="/docs"
           className="py-1 text-sm text-muted-foreground hover:text-foreground hover:underline"
         >
-          ドキュメント
+          ドキュメントセンター
         </Link>
         <a
           href="https://highemerly.net/contact.html"

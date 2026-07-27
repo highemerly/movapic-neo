@@ -50,7 +50,7 @@ export default async function DocsEmojisPage() {
         }
       />
       <PageContainer width="6xl">
-        <BackLink href="/docs">ドキュメントへ</BackLink>
+        <BackLink href="/docs">ドキュメントセンターへ</BackLink>
 
         <div className="mb-4 flex items-baseline gap-2">
           <h1 className="text-lg font-semibold">カスタム絵文字</h1>
@@ -62,7 +62,7 @@ export default async function DocsEmojisPage() {
         <div className="mb-6 rounded-lg bg-muted p-4 text-sm text-muted-foreground">
           <p>
             SHAMEZO
-            独自のカスタム絵文字です。Mastodonサーバーのユーザーが、投稿へのリアクションに使えます（Misskeyサーバーのユーザーは、ご自身のサーバーのカスタム絵文字が使えます）。絵文字を押すと、エイリアス（検索用の別名）とライセンスを表示します。
+            独自のカスタム絵文字です。Mastodonサーバーのユーザーは、投稿へのリアクションに使えます（Misskeyサーバーのユーザーは、このカスタム絵文字ではなく、ご自身の所属するサーバーのカスタム絵文字を使います）。
           </p>
           <p className="mt-2 pl-3 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground/80">
             Mastodonは連合上「お気に入り」しか送れないため、どの絵文字を選んでもFediverseサーバーへはお気に入りとして伝わり、リアクションした絵文字はSHAMEZO上にのみ残ります。
