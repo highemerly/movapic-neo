@@ -382,6 +382,10 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   const locationLabel = image.locationPrefecture
     ? `${image.locationPrefecture}${image.locationCity ?? ""}`
     : null;
+  // 地図（/u/[username]/map）は投稿者のオプトインが必要で、OFFなら本人にも見せない。
+  // よって非公開時は地図への導線（メタ行のリンク・ミートボールの項目）を出さない。
+  // 撮影場所そのものは投稿の情報なので、都道府県名は素のテキストとして残す。
+  const showMapLink = image.user.showLocationMap;
 
   // 「あなたのサーバーで開く」動線。閲覧者自身のサーバーで元投稿を解決して開き、
   // 返信・リノート・お気に入り等ができるようにする。条件は閲覧者がそのサーバーWebに
@@ -505,6 +509,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
       misskeyOpenPostUrl={misskeyOpenPostUrl}
       shareLinkUrl={shareUrl}
       locationLabel={isOwner ? locationLabel : null}
+      locationPrefecture={showMapLink ? image.locationPrefecture : null}
       options={{
         position: image.position,
         color: image.color,
@@ -612,15 +617,24 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               // 遷移先（地図の絞り込み）は都道府県単位なので、押せるのは都道府県だけ。市区町村は
               // 続けて読ませたいので MetaItem の外に素のテキストで置く。
               <span className="inline-flex items-center gap-0.5">
-                <MetaItem
-                  as="link"
-                  linkComponent={PrefectureScrollLink}
-                  href={`/u/${username}/map?prefecture=${encodeURIComponent(image.locationPrefecture)}`}
-                  icon={<MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />}
-                  title={`${image.locationPrefecture}の写真を地図で見る`}
-                >
-                  {image.locationPrefecture}
-                </MetaItem>
+                {showMapLink ? (
+                  <MetaItem
+                    as="link"
+                    linkComponent={PrefectureScrollLink}
+                    href={`/u/${username}/map?prefecture=${encodeURIComponent(image.locationPrefecture)}`}
+                    icon={<MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />}
+                    title={`${image.locationPrefecture}の写真を地図で見る`}
+                  >
+                    {image.locationPrefecture}
+                  </MetaItem>
+                ) : (
+                  // 地図非公開。遷移先が無いので押せない素のテキストにする。
+                  <MetaItem
+                    icon={<MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />}
+                  >
+                    {image.locationPrefecture}
+                  </MetaItem>
+                )}
                 {image.locationCity ?? ""}
                 {isOwner && (
                   <DeleteLocationButton

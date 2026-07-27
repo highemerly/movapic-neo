@@ -14,6 +14,7 @@ import {
   Repeat2,
   Bookmark,
   Camera,
+  MapPin,
   MapPinOff,
   Image as ImageIcon,
   Settings2,
@@ -65,6 +66,7 @@ import { ExifDetailDialog, type ExifDetailData } from "./ExifDetailDialog";
 import { useMisskeyOpen } from "./useMisskeyOpen";
 import { useDeleteLocation } from "./useDeleteLocation";
 import { emitPinned, subscribePinned } from "./pinSync";
+import { PrefectureScrollLink } from "@/components/ScrollIntoViewOnSelect";
 
 interface ImageActionsMenuProps {
   imageId: string;
@@ -108,6 +110,12 @@ interface ImageActionsMenuProps {
   shareLinkUrl?: string | null;
   /** 撮影場所の表示名（例: 千葉県流山市）。isOwner かつ位置情報ありのとき「位置情報を取り除く」を出す。 */
   locationLabel?: string | null;
+  /**
+   * 撮影場所の都道府県（例: 千葉県）。あるとき「○○の写真を地図で見る」を出す（誰でも）。
+   * 地図の絞り込みは都道府県単位なので市区町村は使わない。
+   * 投稿者が地図を非公開にしているときはページ側で null（遷移先が見られないため）。
+   */
+  locationPrefecture?: string | null;
   /** コメント合成オプション（メニュー→モーダルで確認）。 */
   options: {
     position: string;
@@ -184,6 +192,7 @@ export function ImageActionsMenu({
   misskeyOpenPostUrl,
   shareLinkUrl,
   locationLabel,
+  locationPrefecture,
   options,
   hasEmoji = false,
   hasNonEmojiText = true,
@@ -477,6 +486,18 @@ export function ImageActionsMenu({
           >
             <Camera className="mr-2 h-4 w-4" />
             詳細情報（EXIF）を表示
+          </DropdownMenuItem>
+        )}
+        {/* 撮影場所の都道府県で絞り込んだ地図へ。メタ行の都道府県リンクと同じ導線
+            （PrefectureScrollLink で遷移後に写真一覧まで自動スクロール）。 */}
+        {locationPrefecture && (
+          <DropdownMenuItem asChild>
+            <PrefectureScrollLink
+              href={`/u/${username}/map?prefecture=${encodeURIComponent(locationPrefecture)}`}
+            >
+              <MapPin className="mr-2 h-4 w-4" />
+              {locationPrefecture}の写真を地図で見る
+            </PrefectureScrollLink>
           </DropdownMenuItem>
         )}
         {/* 投稿主のサーバー上の元投稿を開く（外部リンク）。 */}
