@@ -87,7 +87,7 @@ interface ImageActionsMenuProps {
   triggerClassName?: string;
   /**
    * トリガーの見た目。
-   * - boxed: 枠付き・44px（モバイルのフローティングバー。PILL で塗り＋まん丸に上書きされる）
+   * - boxed: 48px 角丸（モバイルのフローティングバー。PILL で塗り＋影が足される）
    * - plain: 枠なし・小さめ（上部の戻る行など、主張させたくない場所用）
    * - card: 丸型・40px（投稿者カード内。隣のギャラリー/カレンダーアイコンと同じ寸法に揃える）
    */
@@ -441,13 +441,20 @@ export function ImageActionsMenu({
               ? "h-7 w-7 rounded-md hover:bg-accent"
               : triggerVariant === "card"
                 ? "h-10 w-10 rounded-full hover:bg-background"
-                : "h-[44px] w-[44px] rounded-md border border-border"
+                : "h-[48px] w-[48px] rounded-lg"
           } ${triggerClassName ?? ""}`}
           title="その他"
         >
-          {/* card は隣に並ぶギャラリー/カレンダーアイコン（h-5 w-5）に合わせる。 */}
+          {/* アイコンもトリガーの寸法に比例させる。card は隣に並ぶギャラリー/カレンダーアイコン
+              （h-5 w-5）に、boxed はフローティングのリアクションボタンの絵文字に合わせる。 */}
           <MoreHorizontal
-            className={triggerVariant === "card" ? "h-5 w-5" : "h-4 w-4"}
+            className={
+              triggerVariant === "plain"
+                ? "h-4 w-4"
+                : triggerVariant === "card"
+                  ? "h-5 w-5"
+                  : "h-6 w-6"
+            }
           />
         </button>
       </DropdownMenuTrigger>

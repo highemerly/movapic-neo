@@ -53,19 +53,22 @@ const IMAGE_MAX_VH = 72;
 // モバイル限定フローティングバーがログイン時に下部ナビの真上へ乗るための bottom オフセット。
 // 下部ナビ（BottomNav）はログイン時のみ・モバイル(<768px)で表示され、globals.css が body に
 // `3.5rem + safe-area` の余白を確保する。バーはナビ高さぶん持ち上げる。
-// ナビ高さ（3.5rem+safe-area）に加えて 0.5rem だけ隙間を空け、バーがナビにくっつき過ぎないようにする。
-const NAV_OFFSET = "bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.5rem)]";
+// ナビとの隙間はコンテナ側の py-2 で足りるので、ここでは上乗せしない（以前は +0.5rem していたが、
+// ボタンを大きくしたぶんナビから浮きすぎて見えたため詰めた）。
+const NAV_OFFSET = "bottom-[calc(3.5rem+env(safe-area-inset-bottom))]";
 
 // モバイルのフローティングバーのミートボールメニューに付ける装飾。塗り＋影のはっきりしたボタンに
 // する。主役はリアクション（未リアクション時 primary）なので、メニューは常に secondary（薄い塗り）に
-// 落として階層をつける。完全な不透明だと下のコンテンツと同化して浮いて見えないため、少し透過させ
-// backdrop-blur で背後をぼかしつつ、縁取り（boxed variant の border-border）で輪郭を立てて浮遊感を出す。
-// トリガー側は boxed variant が rounded-md を、base class が text-muted-foreground を当てているため、
-// まん丸・塗りにするには important（rounded-full! / text-secondary-foreground!）で上書きする
-// （border-border は縁取りとして活かすので上書きしない）。コンテナは pointer-events-none なので
-// 各ボタンに pointer-events-auto を残す。
+// 落として階層をつける。下のコンテンツを隠しすぎないよう強めに透過させ、輪郭は枠線ではなく影と
+// backdrop-blur で出す（強い透過に枠線を足すと線だけが浮いて見えるため付けない）。影は既定色
+// （黒10%前後）だと写真の上で消えるので shadow-black/30 まで濃くして輪郭を成立させる。
+// ダークテーマでは黒い影が暗い背景に沈んで輪郭にならないため、白のリング（縁のハイライト）で
+// 浮かせ、さらに secondary の塗り自体も濃くする（暗い灰色のままだと暗背景に埋もれるため）。
+// 角丸と寸法は boxed variant 側（rounded-lg / 48px）に持たせているのでここでは触らない。文字色だけは
+// base class の text-muted-foreground と競合するため important で上書きする。
+// コンテナは pointer-events-none なので各ボタンに pointer-events-auto を残す。
 const PILL =
-  "pointer-events-auto shrink-0 bg-secondary/65 text-secondary-foreground! shadow-lg rounded-full! backdrop-blur-xl hover:bg-secondary/80";
+  "pointer-events-auto shrink-0 bg-secondary/35 dark:bg-secondary/70 text-secondary-foreground! shadow-xl shadow-black/30 backdrop-blur-xl dark:ring-1 dark:ring-white/20 hover:bg-secondary/55 dark:hover:bg-secondary/85";
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { username, imageId } = await params;

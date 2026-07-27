@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { SmilePlus } from "lucide-react";
-import { ReactionEmojiView } from "./ReactionEmojiView";
+import { Check, SmilePlus } from "lucide-react";
 import { ReactionPickerModal } from "./ReactionPickerModal";
 import { useReactionActions } from "./useReactionActions";
 import type { ReactionSnapshot } from "./reactionSync";
@@ -32,11 +31,9 @@ export function ReactionPickerButton({
   viewerDomain: string | null;
   disabledReason?: string;
 }) {
-  const { snapshot, isLoading, errorMessage, viewerEmoji, handlePick, removeWithConfirm } =
+  const { isLoading, errorMessage, viewerEmoji, handlePick, removeWithConfirm } =
     useReactionActions(imageId, initialSnapshot);
   const [pickerOpen, setPickerOpen] = useState(false);
-
-  const viewerChip = snapshot.chips.find((chip) => chip.emoji === viewerEmoji);
 
   // ボタン押下: 未リアクションならピッカーを開く。リアクション済みなら、確認のうえ取り消す
   // （付け替えたい場合は一度取り消してから選び直す）。
@@ -54,13 +51,20 @@ export function ReactionPickerButton({
         type="button"
         onClick={() => void handleButtonClick()}
         disabled={!canReact || isLoading}
-        // 塗り＋まん丸のはっきりしたボタン。未リアクションは primary で押下を促し、リアクション済みは
-        // secondary に落として「もう付けた」状態を控えめに見せる。完全な不透明だと下のコンテンツと
-        // 同化するので、少し透過＋backdrop-blur ＋縁取り（border-border）で浮遊感を出す。
-        className={`flex h-[44px] items-center gap-1.5 rounded-full border border-border px-3 shadow-lg backdrop-blur-xl transition-colors ${
+        // 塗り＋角丸（rounded-lg＝ページ内のカードと同じ角）のはっきりしたボタン。未リアクションは
+        // primary で押下を促し、リアクション済みは secondary に落として「もう付けた」状態を控えめに
+        // 見せる。下のコンテンツを隠しすぎないよう強めに透過させ、輪郭は枠線ではなく影と backdrop-blur
+        // で出す（強い透過に枠線を足すと線だけが浮いて見えるため付けない）。影は既定色（黒10%前後）
+        // だと写真の上で消えるので shadow-black/30 まで濃くして輪郭を成立させる。
+        // ダークテーマでは黒い影が暗い背景に沈んで輪郭にならないため、代わりに白のリング（縁の
+        // ハイライト）で浮かせる。ライトテーマで枠線が浮いて見えたのとは逆に、暗い背景では
+        // 明るい細線が「上に乗っている」手掛かりになる。
+        className={`flex h-[48px] items-center gap-1.5 rounded-lg px-3.5 shadow-xl shadow-black/30 backdrop-blur-xl transition-colors dark:ring-1 dark:ring-white/20 ${
           viewerEmoji
-            ? "bg-secondary/65 text-secondary-foreground hover:bg-secondary/80"
-            : "bg-primary/75 text-primary-foreground hover:bg-primary/90"
+            ? // secondary はダークテーマだと暗い灰色＝暗背景に埋もれるので、塗りだけ濃いめにする
+              // （primary はダークテーマでは明るい色なので輝度差で立ち、そのままで足りる）。
+              "bg-secondary/35 dark:bg-secondary/70 text-secondary-foreground hover:bg-secondary/55 dark:hover:bg-secondary/85"
+            : "bg-primary/45 text-primary-foreground hover:bg-primary/65"
         } ${!canReact ? "cursor-not-allowed opacity-50" : ""}`}
         title={
           errorMessage ??
@@ -72,13 +76,11 @@ export function ReactionPickerButton({
         }
         aria-label={viewerEmoji ? "リアクションを取り消す" : "リアクションする"}
       >
-        {viewerEmoji ? (
-          <ReactionEmojiView emoji={viewerEmoji} imageUrl={viewerChip?.imageUrl} />
-        ) : (
-          <SmilePlus className="h-4 w-4" />
-        )}
+        {viewerEmoji ? <Check className="h-6 w-6" /> : <SmilePlus className="h-6 w-6" />}
         {/* 総数はチップ行に出るのでボタンには載せない（重複回避）。
-            リアクション済みは絵文字、未リアクションは＋アイコンだけで状態が分かる。 */}
+            リアクション済みは✓、未リアクションは＋アイコンだけで状態が分かる。どの絵文字を
+            付けたかはチップ行（自分のチップが brand 色で出る）を見れば分かるので、ここでは
+            「付けたかどうか」だけを示す。 */}
       </button>
 
       {canReact && (

@@ -55,14 +55,14 @@ export function ReactionChipPopover({
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[13px] transition-colors ${
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
             chip.reactedByViewer
               ? "bg-brand/10 text-brand hover:bg-brand/15"
               : "bg-muted/60 text-muted-foreground hover:bg-muted"
           }`}
           title="リアクションした人を見る"
         >
-          <ReactionEmojiView emoji={chip.emoji} imageUrl={chip.imageUrl} className="text-[15px]" />
+          <ReactionEmojiView emoji={chip.emoji} imageUrl={chip.imageUrl} className="text-[18px]" />
           <span className="tabular-nums">{chip.count}</span>
         </button>
       </PopoverTrigger>

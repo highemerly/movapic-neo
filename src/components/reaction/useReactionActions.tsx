@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { ReactionEmojiView } from "./ReactionEmojiView";
 import {
   emitReaction,
   subscribeReaction,
@@ -75,14 +76,41 @@ export function useReactionActions(
   );
 
   const removeWithConfirm = useCallback(async () => {
+    // 呼び出し元（＋ボタン・自分のチップ）はリアクション済みのときしか出さないので実質通らない。
+    // 以降で絵文字を描画するための型の絞り込みを兼ねる。
+    if (!viewerEmoji) return;
+    // 取り消す対象がどれかを本文に出す。カスタム絵文字は画像で見せたいので文字列ではなく
+    // ReactionEmojiView を埋める（description は ReactNode を受け取れる）。
+    const imageUrl =
+      snapshot.chips.find((chip) => chip.emoji === viewerEmoji)?.imageUrl ?? null;
     const ok = await confirm({
       title: "リアクションを取り消す",
-      description: "このリアクションを取り消します。よろしいですか？",
+      description: (
+        // pitfall: 絵文字は1文字として文中に流すだけにし、レイアウトを足さないこと。
+        // - flex にすると地の文まで1アイテム扱いになり、途中で折れず絵文字の直後で丸ごと改行される
+        // - align-middle や text-[18px] を足すと、画像（h-[1.3em]）が本文 text-sm より大きくなって
+        //   ベースラインからはみ出し、行の高さが膨らむ
+        // ただしカスタム絵文字は横長のものがあり、素のまま流すと画像の直後で折り返して
+        // 「（画像）／を取り消します。」と分かれてしまう。述語だけは絵文字と同じ行に残したいので、
+        // そこだけ whitespace-nowrap で括って改行を禁じる（「よろしいですか？」は溢れたら折り返す）。
+        // JSX は要素前後の改行＋インデントを削るので、絵文字の右の空きは mr-1 で作る。
+        <>
+          <span className="whitespace-nowrap">
+            <ReactionEmojiView
+              emoji={viewerEmoji}
+              imageUrl={imageUrl}
+              className="mr-1"
+            />
+            を取り消します。
+          </span>
+          よろしいですか？
+        </>
+      ),
       confirmText: "取り消す",
       destructive: true,
     });
     if (ok) void submit(null);
-  }, [confirm, submit]);
+  }, [confirm, submit, viewerEmoji, snapshot.chips]);
 
   return {
     snapshot,

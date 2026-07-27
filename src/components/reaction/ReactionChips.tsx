@@ -67,7 +67,7 @@ export function ReactionChips({
 
   return (
     <div className="mb-2">
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-2">
         {snapshot.chips.map((chip) => (
           <ReactionChipPopover
             key={chip.emoji}
@@ -85,11 +85,12 @@ export function ReactionChips({
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
-            className="inline-flex items-center rounded-full bg-muted/60 px-2.5 py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="inline-flex items-center rounded-full bg-muted/60 px-3 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             title="リアクションする"
             aria-label="リアクションする"
           >
-            <Plus className="h-4 w-4" />
+            {/* チップ側の絵文字（text-[18px]）と高さが揃うようアイコンも一段大きくする。 */}
+            <Plus className="h-5 w-5" />
           </button>
         )}
       </div>
