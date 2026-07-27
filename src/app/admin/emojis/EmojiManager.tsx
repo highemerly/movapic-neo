@@ -242,57 +242,8 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
     <div className="space-y-6">
       {/* 登録フォーム */}
       <div className="space-y-4 rounded-lg border border-border p-4">
-        <h2 className="text-sm font-semibold">絵文字を登録</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5">
-            <Label htmlFor="emoji-name">ショートコード</Label>
-            <Input
-              id="emoji-name"
-              value={form.name}
-              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="shamezo_wktk"
-            />
-            <p className="text-xs text-muted-foreground">
-              英数字・_ + - のみ
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="emoji-category">カテゴリ（任意）</Label>
-            <Input
-              id="emoji-category"
-              list="emoji-category-options"
-              value={form.category}
-              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-              placeholder="表情"
-            />
-            <datalist id="emoji-category-options">
-              {categoryOptions.map((c) => (
-                <option key={c} value={c} />
-              ))}
-            </datalist>
-          </div>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="emoji-aliases">エイリアス（任意・カンマ区切り）</Label>
-          <Input
-            id="emoji-aliases"
-            value={form.aliases}
-            onChange={(e) => setForm((f) => ({ ...f, aliases: e.target.value }))}
-            placeholder="わくわく, ワクワク"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="emoji-license">ライセンス（任意）</Label>
-          <Input
-            id="emoji-license"
-            value={form.license}
-            onChange={(e) => setForm((f) => ({ ...f, license: e.target.value }))}
-            placeholder="出典・利用条件など"
-          />
-          <p className="text-xs text-muted-foreground">
-            素材の出典や利用条件を自由記述で残せます。公開カタログ（/docs/emojis）に表示されます。
-          </p>
-        </div>
+        <h2 className="text-sm font-semibold">新規登録</h2>
+        {/* 画像を先頭に置くのは、ファイル名からショートコードを補完する導線に合わせるため */}
         <div className="space-y-1.5">
           <Label htmlFor="emoji-file">画像</Label>
           <input
@@ -304,15 +255,65 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
             className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-sm"
           />
           <p className="text-xs text-muted-foreground">
-            PNG / APNG / GIF / WebP / JPEG / AVIF（3MBまで）。横長・アニメーション可。原本のまま保存されます。
+            PNG / APNG / GIF / WebP / JPEG / AVIF（3MBまで）
           </p>
           {previewUrl && (
             <div className="mt-2 flex items-center gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
               {/* eslint-disable-next-line @next/next/no-img-element -- ローカルObjectURLプレビュー */}
               <img src={previewUrl} alt="プレビュー" className="h-[1.5em] w-auto" />
-              <span className="text-xs text-muted-foreground">実寸プレビュー（行の高さに合わせて表示されます）</span>
+              <span className="text-xs text-muted-foreground">実寸プレビュー</span>
             </div>
           )}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="emoji-name">ショートコード</Label>
+          <Input
+            id="emoji-name"
+            value={form.name}
+            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            placeholder="shamezo_wktk"
+          />
+          <p className="text-xs text-muted-foreground">
+            英数字・_ + - のみ
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="emoji-category">カテゴリ（任意）</Label>
+            <Input
+              id="emoji-category"
+              list="emoji-category-options"
+              value={form.category}
+              onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+              placeholder="キャラクター"
+            />
+            <datalist id="emoji-category-options">
+              {categoryOptions.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="emoji-aliases">エイリアス（任意・カンマ区切り）</Label>
+            <Input
+              id="emoji-aliases"
+              value={form.aliases}
+              onChange={(e) => setForm((f) => ({ ...f, aliases: e.target.value }))}
+              placeholder="わくわく, ワクワク"
+            />
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="emoji-license">ライセンス（任意）</Label>
+          <Input
+            id="emoji-license"
+            value={form.license}
+            onChange={(e) => setForm((f) => ({ ...f, license: e.target.value }))}
+            placeholder="出典・利用条件など"
+          />
+          <p className="text-xs text-muted-foreground">
+            素材の出典や利用条件を自由記述で残します。ユーザーに公開されます。
+          </p>
         </div>
         <div className="flex justify-end">
           <Button type="button" onClick={upload} disabled={pending}>
@@ -437,7 +438,7 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
                     <div className="mt-3 space-y-3 rounded-md border border-border bg-muted/30 p-3">
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
-                          <Label htmlFor={`edit-category-${e.id}`}>カテゴリ</Label>
+                          <Label htmlFor={`edit-category-${e.id}`}>カテゴリ（任意）</Label>
                           <Input
                             id={`edit-category-${e.id}`}
                             list="emoji-category-options"
@@ -445,12 +446,12 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
                             onChange={(ev) =>
                               setEditForm((f) => ({ ...f, category: ev.target.value }))
                             }
-                            placeholder="表情"
+                            placeholder="キャラクター"
                           />
                         </div>
                         <div className="space-y-1.5">
                           <Label htmlFor={`edit-aliases-${e.id}`}>
-                            エイリアス（カンマ区切り）
+                            エイリアス（任意・カンマ区切り）
                           </Label>
                           <Input
                             id={`edit-aliases-${e.id}`}
@@ -461,17 +462,18 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
                             placeholder="わくわく, ワクワク"
                           />
                         </div>
-                        <div className="space-y-1.5 sm:col-span-2">
-                          <Label htmlFor={`edit-license-${e.id}`}>ライセンス</Label>
-                          <Input
-                            id={`edit-license-${e.id}`}
-                            value={editForm.license}
-                            onChange={(ev) =>
-                              setEditForm((f) => ({ ...f, license: ev.target.value }))
-                            }
-                            placeholder="出典・利用条件など"
-                          />
-                        </div>
+                      </div>
+                      {/* ライセンスは自由記述で長くなるため、カテゴリ/エイリアスの行とは分けて1行使う */}
+                      <div className="space-y-1.5">
+                        <Label htmlFor={`edit-license-${e.id}`}>ライセンス（任意）</Label>
+                        <Input
+                          id={`edit-license-${e.id}`}
+                          value={editForm.license}
+                          onChange={(ev) =>
+                            setEditForm((f) => ({ ...f, license: ev.target.value }))
+                          }
+                          placeholder="出典・利用条件など"
+                        />
                       </div>
                       <div className="flex justify-end gap-2">
                         <Button type="button" size="sm" variant="ghost" onClick={cancelEdit}>
