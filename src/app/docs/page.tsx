@@ -22,6 +22,7 @@ import {
   Mail,
   Activity,
   ExternalLink,
+  GitBranch,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -43,6 +44,7 @@ export const metadata: Metadata = {
 
 const CONTACT_URL = "https://highemerly.net/contact.html";
 const STATUS_URL = "https://status.highemerly.net";
+const REPOSITORY_URL = "https://github.com/highemerly/movapic-neo";
 
 const CARD_CLASS =
   "flex items-center justify-between gap-4 bg-muted rounded-lg p-4 hover:bg-muted/70 transition-colors";
@@ -126,7 +128,7 @@ export default async function DocsPage() {
             <DocsLink
               href="/docs/spec"
               label="技術仕様"
-              description="システム構成・画像処理・入力制限・テキスト合成・各機能の仕組み"
+              description="システム構成・画像処理・入力制限・テキスト合成・各機能の仕組みなど"
               Icon={Code}
             />
             {latest && (
@@ -164,6 +166,12 @@ export default async function DocsPage() {
               label="統計"
               description="投稿数・ユーザー数などのサービス全体の統計"
               Icon={ChartColumn}
+            />
+            <ExternalDocsLink
+              href={REPOSITORY_URL}
+              label="ソースコード"
+              description="GitHub（外部サイト）"
+              Icon={GitBranch}
             />
           </div>
         </section>
