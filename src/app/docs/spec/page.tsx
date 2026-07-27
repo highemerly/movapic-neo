@@ -26,6 +26,54 @@ export const metadata: Metadata = {
   description: "SHAMEZOのシステム構成・画像処理・制限事項",
 };
 
+/**
+ * 節の並びと表題。目次と本文の見出しが食い違わないよう、ここだけを情報源にする
+ * （本文側は id を渡すだけで表題を引く）。
+ */
+const SECTIONS = [
+  { id: "architecture", title: "システム構成" },
+  { id: "image-processing", title: "画像処理" },
+  { id: "input-limits", title: "入力制限" },
+  { id: "text-composition", title: "テキスト合成" },
+  { id: "exif", title: "EXIFに関する追加処理" },
+  { id: "rate-limit", title: "レート制限" },
+  { id: "post-methods", title: "Webブラウザ以外の投稿方法" },
+  { id: "reactions", title: "機能: リアクション" },
+  { id: "open-on-server", title: "機能: サーバーで開く" },
+  { id: "perfect-month", title: "機能: 皆勤賞" },
+  { id: "calendar", title: "機能: カレンダー" },
+] as const;
+
+type SectionId = (typeof SECTIONS)[number]["id"];
+
+/** 見出し付きの節カード。scroll-mt はPC幅で sticky になるヘッダー（h-12）の下に見出しを逃がすため。 */
+function SpecSection({ id, children }: { id: SectionId; children: React.ReactNode }) {
+  const title = SECTIONS.find((s) => s.id === id)!.title;
+  return (
+    <section id={id} className="bg-muted rounded-lg p-4 scroll-mt-16">
+      <h2 className="font-medium mb-3">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function TableOfContents() {
+  return (
+    <nav aria-label="目次" className="mb-8 rounded-lg border border-border p-4">
+      <p className="text-sm font-medium mb-3">目次</p>
+      <ol className="grid gap-x-6 gap-y-1 sm:grid-cols-2 text-sm list-decimal list-inside marker:text-muted-foreground marker:text-xs">
+        {SECTIONS.map((s) => (
+          <li key={s.id}>
+            <a href={`#${s.id}`} className="text-primary hover:underline">
+              {s.title}
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
 export default async function SpecPage() {
   const user = await getCurrentUser();
 
@@ -40,11 +88,12 @@ export default async function SpecPage() {
           <span className="text-xs text-muted-foreground tabular-nums">v{version}</span>
         </div>
 
-        <section className="mb-8">
+        <TableOfContents />
+
+        <div className="mb-8">
           <div className="space-y-4">
 
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-3">システム構成</p>
+            <SpecSection id="architecture">
               <div className="space-y-4 text-sm text-muted-foreground">
                 <p>
                   処理を担う3コンポーネント（プロセス）と、共有するデータストアで構成されます。画像処理のような重い処理は専用のコンポーネントへ隔離し、スケールできるように配慮されています。
@@ -83,10 +132,9 @@ export default async function SpecPage() {
                   </table>
                 </div>
               </div>
-            </div>
+            </SpecSection>
 
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-3">画像処理</p>
+            <SpecSection id="image-processing">
               <p className="text-sm text-muted-foreground mb-3">
                 元画像とパラメーターを受け取ると、即座に画像処理を行い、出力します。処理は、ベータテスト期間中のA/Bテストを通じて、品質を確保しつつより早い処理を実現するパイプライン処理を最適化しています。
               </p>
@@ -208,10 +256,9 @@ export default async function SpecPage() {
                   </p>
                 </div>
               </div>
-            </div>
+            </SpecSection>
 
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-3">入力制限</p>
+            <SpecSection id="input-limits">
               <div className="space-y-3">
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">画像</p>
@@ -238,10 +285,9 @@ export default async function SpecPage() {
                   </p>
                 </div>
               </div>
-            </div>
+            </SpecSection>
 
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-3">テキスト合成</p>
+            <SpecSection id="text-composition">
               <div className="space-y-3">
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">文字位置</p>
@@ -368,10 +414,9 @@ export default async function SpecPage() {
                   </p>
                 </div>
               </div>
-            </div>
+            </SpecSection>
 
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-3">EXIFに関する追加処理</p>
+            <SpecSection id="exif">
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>
                   位置情報・撮影日時・カメラ機種などが含まれるEXIF（Exchangeable image file format）情報は、個人情報が含まれる可能性があるため、常に削除してから投稿・アップロードします。
@@ -453,17 +498,15 @@ export default async function SpecPage() {
                   <p>なお、Web投稿では、写真に位置情報が含まれない場合、過去に一度投稿したことのある都道府県または市町村に限って、手動で設定するオプションがあります。</p>
                 </div>
               </div>
-            </div>
+            </SpecSection>
 
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-2">レート制限</p>
+            <SpecSection id="rate-limit">
               <p className="text-sm text-muted-foreground">
                 画像生成を短時間に連続して行った場合や、投稿数が普段より急増した場合など、いくつかのレート制限を設けています。詳細はセキュリティ上の理由から非開示とします。
               </p>
-            </div>
+            </SpecSection>
 
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-3">Webブラウザ以外の投稿方法</p>
+            <SpecSection id="post-methods">
               <div className="space-y-3">
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">Bot投稿（メンション投稿）</p>
@@ -492,10 +535,9 @@ export default async function SpecPage() {
                   </Link>
                 </div>
               </div>
-            </div>
+            </SpecSection>
 
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-2">機能: リアクション</p>
+            <SpecSection id="reactions">
               <p className="text-sm text-muted-foreground">
                 公開・未収載の投稿には好きな絵文字でリアクションできます。Fediverse上（Mastodonサーバー・Misskeyサーバー）でのお気に入り・リアクションとSHAMEZOのリアクションは自動で同期され、合算して表示されます。
               </p>
@@ -514,10 +556,9 @@ export default async function SpecPage() {
                 カスタム絵文字の一覧をみる
                 <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
               </Link>
-            </div>
+            </SpecSection>
 
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-3">機能: サーバーで開く</p>
+            <SpecSection id="open-on-server">
               <div className="space-y-3 text-sm text-muted-foreground">
                 <p>
                   Fediverseでは、同じ投稿でもサーバーごとに別々のローカルID（Mastodonのステータス ID／Misskeyのノート ID）が割り当てられます。そのため、投稿者のサーバー上のURLをそのまま開いても、閲覧者は自分のアカウントで返信・ブースト（リノート）・お気に入りといった操作ができません。「サーバーで開く」は、投稿のActivityPub URIを閲覧者自身のサーバーで解決し、閲覧者のアカウントで操作できる状態にして開く機能です。
@@ -533,10 +574,9 @@ export default async function SpecPage() {
                   </ul>
                 </div>
               </div>
-            </div>
+            </SpecSection>
 
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-2">機能: 皆勤賞</p>
+            <SpecSection id="perfect-month">
               <p className="text-sm text-muted-foreground">
                 皆勤賞は、SHAMEZOにおける最も栄誉のある実績です。
               </p>
@@ -553,19 +593,18 @@ export default async function SpecPage() {
                   <li>皆勤賞はユーザー画面のカレンダータブ・実績タブで公開され、誰でも確認できます</li>
                   <li>皆勤賞は月ごとに計算されるため、毎月獲得することができます</li>
                 </ul>
-            </div>
+            </SpecSection>
 
-            <div className="bg-muted rounded-lg p-4">
-              <p className="font-medium mb-2">機能: カレンダー</p>
+            <SpecSection id="calendar">
               <p className="text-sm text-muted-foreground">
                 ユーザーページの「カレンダー」タブでは、その月の投稿を日ごとのサムネイルで一覧表示します。
                 編集モードでは、各日に表示するサムネイルを変更できるほか、皆勤賞の穴埋めに使う投稿も選び直せます
                 （サムネイルを変更後、その画像が削除された場合は、自動で再選出されます）。
               </p>
-            </div>
+            </SpecSection>
 
           </div>
-        </section>
+        </div>
 
         <Footer />
       </PageContainer>
