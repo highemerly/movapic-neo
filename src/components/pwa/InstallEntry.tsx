@@ -1,39 +1,11 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { SettingLinkRow, SettingActionRow } from "@/components/SettingRow";
-import {
-  subscribeInstall,
-  getCanInstall,
-  triggerInstall,
-  detectPwaPlatform,
-  isStandaloneDisplay,
-  type PwaPlatform,
-} from "@/lib/pwa/install";
-
-// 値が変化しない購読（プラットフォーム/standalone は実行中ほぼ不変）
-const noopSubscribe = () => () => {};
-
-function usePwaInstallState() {
-  const platform = useSyncExternalStore<PwaPlatform>(
-    noopSubscribe,
-    detectPwaPlatform,
-    () => "other",
-  );
-  const standalone = useSyncExternalStore(
-    noopSubscribe,
-    isStandaloneDisplay,
-    () => false,
-  );
-  const canInstall = useSyncExternalStore(
-    subscribeInstall,
-    getCanInstall,
-    () => false,
-  );
-  return { platform, standalone, canInstall };
-}
+import { usePwaInstallState } from "@/hooks/usePwaInstallState";
+import { triggerInstall } from "@/lib/pwa/install";
 
 /**
  * 設定ページの最下部に置く、控えめなインストール導線。
@@ -42,8 +14,7 @@ function usePwaInstallState() {
  * - **Android（インストール可能なとき）**: タップで beforeinstallprompt を発火（行ボタン）。
  * - デスクトップ／インストール済み／Android非対応時は何も出さない。
  *
- * サーバー/初回描画では出さず、マウント後に判定（useSyncExternalStore の
- * getServerSnapshot で SSR 安全）。
+ * サーバー/初回描画では出さず、マウント後に判定（[usePwaInstallState]）。
  */
 export function InstallEntry() {
   const { platform, standalone, canInstall } = usePwaInstallState();

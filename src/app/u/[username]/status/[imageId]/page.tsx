@@ -31,6 +31,7 @@ import { getAllowedServers, getHomeServer } from "@/lib/auth/serverPolicy";
 import { ToastFlasher } from "@/components/ToastFlasher";
 import { buildPostFlash } from "./postFlash";
 import { AchievementCelebration } from "./AchievementCelebration";
+import { InstallSuggestModal } from "@/components/pwa/InstallSuggestModal";
 import { EarnedAchievementChips } from "./EarnedAchievementChips";
 import { PrefectureScrollLink } from "@/components/ScrollIntoViewOnSelect";
 import { resolveAchievement } from "@/lib/achievements/catalog";
@@ -358,6 +359,16 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   // 閲覧者が投稿者を既にミュート中か（メニューの文言・解除導線の出し分け用）
   const isMutingAuthor = await isMutedByViewer(currentUser?.id, image.userId);
 
+  // PWAおすすめモーダルの前提: 投稿直後の本人で、かつ2投稿目以降（初投稿では出さない）。
+  // 件数は要らないので findFirst の存在確認だけにする（count より軽い）。posted=1 のときしか引かない。
+  const canSuggestPwa =
+    justPosted &&
+    isOwner &&
+    (await prisma.image.findFirst({
+      where: { userId: image.userId, id: { not: image.id } },
+      select: { id: true },
+    })) !== null;
+
   // ミートボールの「詳細情報（EXIF）を表示」用。機種名があるときだけ項目を出す
   // （インラインの機種名ボタンと同じ内容・同じダイアログを共有）。
   const exif = image.cameraModel
@@ -531,7 +542,12 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           clearParams={["posted", "federr", "fedstatus"]}
         />
       )}
-      {justPosted && <AchievementCelebration username={username} />}
+      {justPosted && (
+        <AchievementCelebration
+          username={username}
+          fallback={canSuggestPwa ? <InstallSuggestModal /> : null}
+        />
+      )}
       <PageContainer>
         {/* ヘッダー */}
         <BackLink
