@@ -14,7 +14,7 @@ import { emitReaction, toSnapshot, type ReactionSnapshot } from "./reactionSync"
  * 見せる（ReactionChipPopover）。末尾の＋からはピッカーを開いてこの画面からリアクションできる。
  *
  * このページで唯一 API から最新状態を取りに行くインスタンスで、取得結果は reactionSync 経由で
- * アクションバーの＋ボタン側にも配る（＋ボタンは PC/モバイルで2つマウントされるため集約する）。
+ * モバイルのフローティングバーの＋ボタン（ReactionPickerButton）にも配る。
  */
 export function ReactionChips({
   imageId,

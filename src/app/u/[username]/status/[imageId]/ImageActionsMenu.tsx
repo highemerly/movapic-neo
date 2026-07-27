@@ -84,9 +84,14 @@ interface ImageActionsMenuProps {
   isMuted: boolean;
   /** トリガー（ミートボール）に足すクラス（非ログイン時に狭い画面のみ表示する等） */
   triggerClassName?: string;
-  /** トリガーの見た目。plain は枠なし・小さめ（上部の戻る行など、主張させたくない場所用）。 */
-  triggerVariant?: "boxed" | "plain";
-  /** ネイティブ共有（Web Share API 対応時のみメニューに出す）。行内ボタンとは別に常に出す。 */
+  /**
+   * トリガーの見た目。
+   * - boxed: 枠付き・44px（モバイルのフローティングバー。PILL で塗り＋まん丸に上書きされる）
+   * - plain: 枠なし・小さめ（上部の戻る行など、主張させたくない場所用）
+   * - card: 丸型・40px（投稿者カード内。隣のギャラリー/カレンダーアイコンと同じ寸法に揃える）
+   */
+  triggerVariant?: "boxed" | "plain" | "card";
+  /** ネイティブ共有（Web Share API 対応時のみメニューに出す）。 */
   nativeShare?: NativeShareParams;
   /** 撮影情報（EXIF）。値があるときだけ「詳細情報を表示」を出す。 */
   exif?: ExifDetailData | null;
@@ -126,7 +131,7 @@ interface ImageActionsMenuProps {
 
 /**
  * 「あなたのサーバーで開く」の先頭アイコン。返信だけでなくリノート・お気に入りもできる導線
- * なので、行内ボタンと同じ3アイコン（返信/リノート/ブックマーク）で誤解を防ぐ。
+ * なので、3アイコン（返信/リノート/ブックマーク）を見せて「返信だけ」という誤解を防ぐ。
  */
 function InteractIcons() {
   // 1アイコン分の枠（size-4）に3アイコンを絶対配置で重ね、順番に1つずつ表示する。
@@ -155,7 +160,7 @@ function InteractIcons() {
  *   2. 対他者（ミュート/通報）— ログイン済み かつ 非オーナー
  *   3. オーナー操作（再投稿/サムネ/位置削除/ピン/削除）— オーナーのみ
  * 2と3は互いに排他（!isOwner / isOwner）なので区切り線は1本で足りる。
- * 画面に専用ボタンがある項目（各サーバーで開く・リンク投稿・共有）も、メニューにも重複して出す。
+ * 各サーバーで開く・リンク投稿・共有はかつて画面に専用ボタンがあったが、現在はここが唯一の導線。
  */
 export function ImageActionsMenu({
   imageId,
@@ -419,15 +424,22 @@ export function ImageActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
+        {/* 角丸は variant ごとに違う（card は丸型）ので base には置かない。base に rounded-md を
+            持たせると同レイヤーの rounded-full と競合し、important でしか上書きできなくなる。 */}
         <button
-          className={`flex shrink-0 items-center justify-center rounded-md transition-colors text-muted-foreground hover:text-foreground ${
+          className={`flex shrink-0 items-center justify-center transition-colors text-muted-foreground hover:text-foreground ${
             triggerVariant === "plain"
-              ? "h-7 w-7 hover:bg-accent"
-              : "h-[44px] w-[44px] border border-border"
+              ? "h-7 w-7 rounded-md hover:bg-accent"
+              : triggerVariant === "card"
+                ? "h-10 w-10 rounded-full hover:bg-background"
+                : "h-[44px] w-[44px] rounded-md border border-border"
           } ${triggerClassName ?? ""}`}
           title="その他"
         >
-          <MoreHorizontal className="h-4 w-4" />
+          {/* card は隣に並ぶギャラリー/カレンダーアイコン（h-5 w-5）に合わせる。 */}
+          <MoreHorizontal
+            className={triggerVariant === "card" ? "h-5 w-5" : "h-4 w-4"}
+          />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[180px]">
@@ -490,7 +502,7 @@ export function ImageActionsMenu({
             </a>
           </DropdownMenuItem>
         )}
-        {/* ネイティブ共有（Web Share API 対応時のみ。行内ボタンとは別に常に出す）。 */}
+        {/* ネイティブ共有（Web Share API 対応時のみ出す）。 */}
         {showNativeShare && (
           <DropdownMenuItem
             onSelect={(e) => {

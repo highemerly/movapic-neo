@@ -99,7 +99,7 @@ export function ReactionChipPopover({
         </ul>
 
         {chip.reactedByViewer ? (
-          // このチップが自分のリアクション。取り消し（アクションバーと同じ確認モーダル）。
+          // このチップが自分のリアクション。取り消し（＋ボタンからの取り消しと同じ確認モーダル）。
           // canReact でなくても自分の付けたものは取り消せてよいが、取り消しも Fediverse 送信を伴うため
           // canReact に合わせる（deleted 等では非表示）。
           canReact && (

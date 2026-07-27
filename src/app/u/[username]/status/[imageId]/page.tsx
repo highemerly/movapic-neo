@@ -13,7 +13,6 @@ import { FontLicenseBadge } from "./FontLicenseBadge";
 import { hasEmoji, hasNonEmojiText } from "@/lib/text/grapheme";
 import { ImageActionsMenu } from "./ImageActionsMenu";
 import { isImageRepostable } from "@/lib/publish/repostImage";
-import { MisskeyOpenButton } from "./MisskeyOpenButton";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { ReactionChips } from "@/components/reaction/ReactionChips";
 import { ReactionPickerButton } from "@/components/reaction/ReactionPickerButton";
@@ -34,7 +33,6 @@ import { buildPostFlash } from "./postFlash";
 import { AchievementCelebration } from "./AchievementCelebration";
 import { EarnedAchievementChips } from "./EarnedAchievementChips";
 import { PrefectureScrollLink } from "@/components/ScrollIntoViewOnSelect";
-import { NativeShareButton } from "./NativeShareButton";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { AttendanceCrown } from "@/components/user/AttendanceCrown";
@@ -44,7 +42,7 @@ import { PostSourceBadge } from "./PostSourceBadge";
 import { ExifDetailModal } from "./ExifDetailModal";
 import { MetaItem } from "./MetaItem";
 import { sanitizeExifDetails } from "@/lib/exif/details";
-import { Images, CalendarDays, MapPin, Reply, Repeat2, Bookmark, Link2 } from "lucide-react";
+import { Images, CalendarDays, MapPin } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -61,11 +59,11 @@ const NAV_OFFSET = "bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.5rem)]";
 // モバイルのフローティングバーのミートボールメニューに付ける装飾。塗り＋影のはっきりしたボタンに
 // する。主役はリアクション（未リアクション時 primary）なので、メニューは常に secondary（薄い塗り）に
 // 落として階層をつける。完全な不透明だと下のコンテンツと同化して浮いて見えないため、少し透過させ
-// backdrop-blur で背後をぼかしつつ、縁取り（base class の border-border）で輪郭を立てて浮遊感を出す。
-// トリガー側の base class は PC 用に rounded-md / text-muted-foreground を固定しているため、まん丸・
-// 塗りにするには important（rounded-full! / text-secondary-foreground!）で上書きする（border-border
-// は縁取りとして活かすので上書きしない）。コンテナは pointer-events-none なので各ボタンに
-// pointer-events-auto を残す。
+// backdrop-blur で背後をぼかしつつ、縁取り（boxed variant の border-border）で輪郭を立てて浮遊感を出す。
+// トリガー側は boxed variant が rounded-md を、base class が text-muted-foreground を当てているため、
+// まん丸・塗りにするには important（rounded-full! / text-secondary-foreground!）で上書きする
+// （border-border は縁取りとして活かすので上書きしない）。コンテナは pointer-events-none なので
+// 各ボタンに pointer-events-auto を残す。
 const PILL =
   "pointer-events-auto shrink-0 bg-secondary/65 text-secondary-foreground! shadow-lg rounded-full! backdrop-blur-xl hover:bg-secondary/80";
 
@@ -377,7 +375,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   // - Mastodon: authorize_interaction で uri を解決して即開ける（純正の返信ボタンもここに行き着く）。
   //   Mastodon 4.x で /interact/:id は削除済みのため、この方式が唯一。
   // - Misskey: authorize_interaction 相当が無いため、クリック時に ap/show 解決して
-  //   /notes/{id} を開く（MisskeyOpenButton がオンデマンドで解決）。
+  //   /notes/{id} を開く（ミートボールの項目が useMisskeyOpen でオンデマンド解決）。
   const mastodonReplyUrl =
     currentUser?.instance.type === "mastodon" && image.postUrl
       ? `https://${currentUser.instance.domain}/authorize_interaction?uri=${encodeURIComponent(image.postUrl)}`
@@ -386,8 +384,6 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     currentUser?.instance.type === "misskey" && image.postUrl
       ? image.postUrl
       : null;
-  // シェアボタン側のレイアウト切り替えに使う（インタラクションボタンが出るか）
-  const hasInteractButton = !!mastodonReplyUrl || !!misskeyOpenPostUrl;
 
   // シェアリンク。本文はページの <title>（generateMetadata の「<投稿テキスト> - <投稿者名>」
   // ＋テンプレート %s | SHAMEZO ＝「<投稿テキスト> - <投稿者名> | SHAMEZO」）に揃える
@@ -468,11 +464,11 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   const modalPrev = buildModalNav(prevImage);
   const modalNext = buildModalNav(nextImage);
 
-  // ミートボールメニュー。操作行（PC インライン／モバイルのフローティングバー）と、上部の
-  // 「◯◯に戻る」行の右端の計2箇所に同じ内容を出すので、プロパティ一式をここに1本化して
+  // ミートボールメニュー。上部の「◯◯に戻る」行の右端・投稿者カードの右端（PC）・モバイルの
+  // フローティングバーの計3箇所に同じ内容を出すので、プロパティ一式をここに1本化して
   // 見た目（triggerVariant / triggerClassName）だけを呼び出し側で変える。
   const actionsMenu = (opts: {
-    triggerVariant?: "boxed" | "plain";
+    triggerVariant?: "boxed" | "plain" | "card";
     triggerClassName?: string;
   }) => (
     <ImageActionsMenu
@@ -515,93 +511,6 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
       triggerVariant={opts.triggerVariant}
       triggerClassName={opts.triggerClassName}
     />
-  );
-
-  // 返信・シェア・その他メニュー。PC（インライン）とモバイル（下部フローティングバー）で
-  // 出し分けが異なる（floating）ので1箇所にまとめてフラグで切り替える。
-  // - PC: 行幅いっぱいに伸ばす（flex-auto/flex-1）。従来どおり全ボタンを表示。
-  // - モバイル: 画像を邪魔しないよう、リアクションとミートボールメニューの2つだけに絞る。
-  //   「サーバーで開く／リンクを投稿／ネイティブ共有」はバーに出さずミートボール内に残す。
-  const actionButtons = (floating: boolean) => (
-    <>
-      {/* リアクションを付ける＋ボタン（内訳のチップは本文の下に出す）。
-          local投稿もDBに記録できるので、公開画像なら常に出す。 */}
-      <ReactionPickerButton
-        imageId={imageId}
-        initialSnapshot={initialReactionSnapshot}
-        canReact={canReact}
-        sendsToFediverse={fediverseSendable}
-        viewerType={viewerType}
-        viewerDomain={viewerDomain}
-        disabledReason={
-          persistedReason === "deleted"
-            ? "この投稿は削除されているため操作できません"
-            : "リアクションはMastodon・Misskeyアカウントで利用できます"
-        }
-        floating={floating}
-      />
-
-      {/* 以下（サーバーで開く／リンクを投稿／ネイティブ共有）はモバイルのフローティングバーには
-          出さない（画像を邪魔しないよう2ボタンに絞る）。PC（インライン）は従来どおり全表示。 */}
-      {!floating && mastodonReplyUrl && (
-        <a
-          href={mastodonReplyUrl}
-          className="flex flex-auto items-center justify-center gap-1 h-[44px] px-1 border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border"
-          title="あなたのサーバーでこの投稿を開きます（返信・ブースト・ブックマーク・お気に入りができます）"
-        >
-          <span className="flex shrink-0 items-center gap-0.5">
-            <Reply className="h-4 w-4" />
-            <Repeat2 className="h-4 w-4" />
-            <Bookmark className="h-4 w-4" />
-          </span>
-          <span className="flex flex-col items-start leading-tight text-[10px] font-medium">
-            <span>あなたの</span>
-            <span>サーバーで開く</span>
-          </span>
-        </a>
-      )}
-      {!floating && misskeyOpenPostUrl && (
-        <MisskeyOpenButton postUrl={misskeyOpenPostUrl} floating={floating} />
-      )}
-      {/* 「リンクを投稿」はモバイルのフローティングバーには出さない（横幅節約・ミートボールに残す）。
-          PC（インライン）は従来どおり表示。 */}
-      {!floating && shareUrl && (
-        <a
-          href={shareUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`flex items-center justify-center gap-1.5 h-[44px] border rounded-md transition-colors text-muted-foreground hover:text-foreground border-border ${hasInteractButton ? "flex-auto px-1.5" : "flex-1 px-2.5"}`}
-          title="あなたのサーバーで、このURLを投稿します"
-        >
-          <Link2 className="h-4 w-4 shrink-0" />
-          {hasInteractButton ? (
-            <span className="flex flex-col items-start leading-tight text-[10px] font-medium">
-              <span>リンクを</span>
-              <span>投稿</span>
-            </span>
-          ) : (
-            <span className="flex flex-col items-start leading-none">
-              <span className="text-xs font-medium whitespace-nowrap mt-0.5">リンクを投稿</span>
-            </span>
-          )}
-        </a>
-      )}
-      {!floating && (
-        <NativeShareButton
-          imageUrl={imageUrl}
-          mimeType={image.mimeType}
-          fileBaseName={`shamezo-${imageId}`}
-          text={image.overlayText}
-          url={pageUrl}
-          floating={floating}
-        />
-      )}
-      {/* フローティングではミートボールを常に右端へ寄せる（左の余白を ml-auto で吸わせる。
-          他ボタンの有無に依らず右寄せになる）。PC インラインは他ボタンが伸びるので不要。 */}
-      {actionsMenu({
-        triggerClassName: floating ? `${PILL} ml-auto` : undefined,
-      })}
-    </>
   );
 
   return (
@@ -744,66 +653,69 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           ) : null}
         </div>
 
-        {/* 返信・シェア・その他メニュー＋リアクションの＋ボタン（インライン）。ログイン時かつ PC のみ
-            描画（モバイルのログイン時はフローティングバーへ）。 */}
-        {currentUser && (
-          <div className="mt-[10px] hidden md:flex items-center gap-1">
-            {actionButtons(false)}
-          </div>
-        )}
-
-        {/* 投稿者情報（王冠が頭上に出るぶん、王冠ありのときだけ上パディングを確保） */}
-        <div
-          className={`flex items-center gap-2 mt-3 px-3 pb-3 bg-muted rounded-lg ${
-            posterPerfectAttendance ? "pt-5" : "pt-3"
-          }`}
-        >
-          {image.user.avatarUrl && (
-            <div className="relative shrink-0">
-              <Link href={`/u/${username}`}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={getAvatarUrl(image.user.avatarUrl) ?? image.user.avatarUrl}
-                  alt={image.user.displayName || image.user.username}
-                  className="w-10 h-10 rounded-full hover:opacity-80 transition-opacity"
-                  loading="lazy"
-                />
+        {/* 投稿者情報と、その右の「その他」カード（PCのみ）。items-stretch で2枚の高さを揃える
+            （王冠ありのとき投稿者カードが pt-5 で高くなるが、右のカードも自動で追従する）。 */}
+        <div className="mt-3 flex items-stretch gap-2">
+          {/* 投稿者情報（王冠が頭上に出るぶん、王冠ありのときだけ上パディングを確保） */}
+          <div
+            className={`flex min-w-0 flex-1 items-center gap-2 px-3 pb-3 bg-muted rounded-lg ${
+              posterPerfectAttendance ? "pt-5" : "pt-3"
+            }`}
+          >
+            {image.user.avatarUrl && (
+              <div className="relative shrink-0">
+                <Link href={`/u/${username}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={getAvatarUrl(image.user.avatarUrl) ?? image.user.avatarUrl}
+                    alt={image.user.displayName || image.user.username}
+                    className="w-10 h-10 rounded-full hover:opacity-80 transition-opacity"
+                    loading="lazy"
+                  />
+                </Link>
+                {posterPerfectAttendance && <AttendanceCrown />}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <Link
+                href={`/u/${username}`}
+                className="block truncate text-sm font-semibold hover:underline"
+              >
+                {image.user.displayName || image.user.username}
               </Link>
-              {posterPerfectAttendance && <AttendanceCrown />}
+              <a
+                href={`https://${image.user.instance.domain}/@${image.user.username}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:underline truncate"
+              >
+                <PosterInstanceIcon className="w-3 h-3 shrink-0" />
+                <span className="truncate">@{image.user.username}@{image.user.instance.domain}</span>
+              </a>
             </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <Link
-              href={`/u/${username}`}
-              className="block truncate text-sm font-semibold hover:underline"
-            >
-              {image.user.displayName || image.user.username}
-            </Link>
-            <a
-              href={`https://${image.user.instance.domain}/@${image.user.username}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:underline truncate"
-            >
-              <PosterInstanceIcon className="w-3 h-3 shrink-0" />
-              <span className="truncate">@{image.user.username}@{image.user.instance.domain}</span>
-            </a>
+            <div className="flex items-center gap-1 shrink-0">
+              <Link
+                href={`/u/${username}/photos`}
+                className="p-2.5 rounded-full hover:bg-background transition-colors"
+                title="ギャラリー"
+              >
+                <Images className="w-5 h-5 text-muted-foreground" />
+              </Link>
+              <Link
+                href={`/u/${username}/calendar`}
+                className="p-2.5 rounded-full hover:bg-background transition-colors"
+                title="カレンダー"
+              >
+                <CalendarDays className="w-5 h-5 text-muted-foreground" />
+              </Link>
+            </div>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <Link
-              href={`/u/${username}/photos`}
-              className="p-2.5 rounded-full hover:bg-background transition-colors"
-              title="ギャラリー"
-            >
-              <Images className="w-5 h-5 text-muted-foreground" />
-            </Link>
-            <Link
-              href={`/u/${username}/calendar`}
-              className="p-2.5 rounded-full hover:bg-background transition-colors"
-              title="カレンダー"
-            >
-              <CalendarDays className="w-5 h-5 text-muted-foreground" />
-            </Link>
+
+          {/* 「その他」だけの独立カード。写真より下からもメニューに届くようにする（上部の戻る行まで
+              戻らずに済む）。投稿者への導線と混ざらないよう投稿者カードとは分ける。モバイルは下部
+              フローティングバーに同じメニューが常時あるので PC だけに出す。 */}
+          <div className="hidden md:flex shrink-0 items-center justify-center px-2 bg-muted rounded-lg">
+            {actionsMenu({ triggerVariant: "card" })}
           </div>
         </div>
 
@@ -831,16 +743,36 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
       </PageContainer>
 
       {/* モバイル(<md)かつログイン時だけの、リアクション＋ミートボールメニューのフローティングバー。
-          画像を邪魔しないよう2ボタンに絞る（他の操作はミートボール内）。中身は actionButtons に集約。
+          画像を邪魔しないよう2ボタンに絞る（他の操作はミートボール内）。
           画像のアスペクト比で本文位置が上下しても操作系を画面下部の同じ位置に固定する。帯は敷かず各
           ボタンだけ背景を持たせ、コンテナは pointer-events-none で隙間から下の画面が見え・クリックも
-          透過する（各ボタンは pointer-events-auto）。リアクションの内訳は本文内のチップ行に出す。 */}
+          透過する（各ボタンは pointer-events-auto）。リアクションの内訳は本文内のチップ行に出す。
+          PC には同じ操作をインラインで並べたバーがあったが、右上のミートボールで用が足り
+          （ミートボール自体も BackLink の trailing と二重に出ていた）、リアクションも本文下の
+          チップ行末尾の＋から付けられるため撤去した。写真より下の導線は投稿者カード右端の
+          ミートボール（card variant・PC のみ）が担う。 */}
       {currentUser && (
         <div
           className={`md:hidden pointer-events-none fixed inset-x-0 z-30 ${NAV_OFFSET}`}
         >
           <div className="mx-auto flex max-w-2xl flex-wrap items-center justify-start gap-3 px-4 py-2">
-            {actionButtons(true)}
+            {/* リアクションを付ける＋ボタン（内訳のチップは本文の下に出す）。
+                local投稿もDBに記録できるので、公開画像なら常に出す。 */}
+            <ReactionPickerButton
+              imageId={imageId}
+              initialSnapshot={initialReactionSnapshot}
+              canReact={canReact}
+              sendsToFediverse={fediverseSendable}
+              viewerType={viewerType}
+              viewerDomain={viewerDomain}
+              disabledReason={
+                persistedReason === "deleted"
+                  ? "この投稿は削除されているため操作できません"
+                  : "リアクションはMastodon・Misskeyアカウントで利用できます"
+              }
+            />
+            {/* ミートボールは常に右端へ寄せる（左の余白を ml-auto で吸わせる）。 */}
+            {actionsMenu({ triggerClassName: `${PILL} ml-auto` })}
           </div>
         </div>
       )}

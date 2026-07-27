@@ -12,7 +12,7 @@ import { parseApiError, formatErrorMessage } from "@/lib/errors";
  * ノートURL（/notes/{id}）へ遷移する。解決の間はローディング表示にし、解決後に同じタブで
  * 遷移する（非同期解決後の window.open はポップアップブロックされるため新タブにしない）。
  *
- * 行内ボタン（MisskeyOpenButton）とミートボールメニューの双方で使う。
+ * 呼び出し元はミートボールメニューの「あなたのサーバーで開く」項目。
  */
 export function useMisskeyOpen(postUrl: string) {
   const [loading, setLoading] = useState(false);

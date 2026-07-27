@@ -8,11 +8,10 @@ import { useReactionActions } from "./useReactionActions";
 import type { ReactionSnapshot } from "./reactionSync";
 
 /**
- * リアクションを付ける「＋」ボタン（画像詳細のアクションバー）。
+ * リアクションを付ける「＋」ボタン（画像詳細のモバイル用フローティングバー）。
  *
- * PC のインライン行とモバイルのフローティングバーに1つずつマウントされる（CSSで出し分け）。
  * 状態と操作は useReactionActions に集約し、最新状態の取得は ReactionChips に任せて
- * reactionSync 経由で受け取る。操作結果はフック側が emit してチップ行・もう片方へ配る。
+ * reactionSync 経由で受け取る。操作結果はフック側が emit してチップ行へ配る。
  */
 export function ReactionPickerButton({
   imageId,
@@ -22,7 +21,6 @@ export function ReactionPickerButton({
   viewerType,
   viewerDomain,
   disabledReason,
-  floating = false,
 }: {
   imageId: string;
   initialSnapshot: ReactionSnapshot;
@@ -33,9 +31,6 @@ export function ReactionPickerButton({
   viewerType: "mastodon" | "misskey" | null;
   viewerDomain: string | null;
   disabledReason?: string;
-  /** フローティング（画像上のバー）で使うか。塗り＋まん丸のボタンにし、未リアクションは primary・
-   *  リアクション済みは secondary で状態を色分けする。 */
-  floating?: boolean;
 }) {
   const { snapshot, isLoading, errorMessage, viewerEmoji, handlePick, removeWithConfirm } =
     useReactionActions(imageId, initialSnapshot);
@@ -59,19 +54,13 @@ export function ReactionPickerButton({
         type="button"
         onClick={() => void handleButtonClick()}
         disabled={!canReact || isLoading}
-        className={`flex h-[44px] items-center gap-1.5 border px-3 transition-colors ${
-          floating
-            ? // フローティングは塗り＋まん丸のはっきりしたボタン。未リアクションは primary で押下を促し、
-              // リアクション済みは secondary に落として「もう付けた」状態を控えめに見せる。完全な不透明だと
-              // 下のコンテンツと同化するので、少し透過＋backdrop-blur ＋縁取り（border-border）で浮遊感を出す。
-              viewerEmoji
-              ? "rounded-full! border-border bg-secondary/65 text-secondary-foreground shadow-lg backdrop-blur-xl hover:bg-secondary/80"
-              : "rounded-full! border-border bg-primary/75 text-primary-foreground shadow-lg backdrop-blur-xl hover:bg-primary/90"
-            : `rounded-md ${
-                viewerEmoji
-                  ? "border-brand/50 text-foreground"
-                  : "border-border text-muted-foreground hover:text-foreground"
-              }`
+        // 塗り＋まん丸のはっきりしたボタン。未リアクションは primary で押下を促し、リアクション済みは
+        // secondary に落として「もう付けた」状態を控えめに見せる。完全な不透明だと下のコンテンツと
+        // 同化するので、少し透過＋backdrop-blur ＋縁取り（border-border）で浮遊感を出す。
+        className={`flex h-[44px] items-center gap-1.5 rounded-full border border-border px-3 shadow-lg backdrop-blur-xl transition-colors ${
+          viewerEmoji
+            ? "bg-secondary/65 text-secondary-foreground hover:bg-secondary/80"
+            : "bg-primary/75 text-primary-foreground hover:bg-primary/90"
         } ${!canReact ? "cursor-not-allowed opacity-50" : ""}`}
         title={
           errorMessage ??
