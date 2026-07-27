@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   MoreHorizontal,
@@ -64,6 +64,7 @@ import { useNativeShare, type NativeShareParams } from "./useNativeShare";
 import { ExifDetailDialog, type ExifDetailData } from "./ExifDetailDialog";
 import { useMisskeyOpen } from "./useMisskeyOpen";
 import { useDeleteLocation } from "./useDeleteLocation";
+import { emitPinned, subscribePinned } from "./pinSync";
 
 interface ImageActionsMenuProps {
   imageId: string;
@@ -199,6 +200,9 @@ export function ImageActionsMenu({
   const locationDelete = useDeleteLocation(imageId, locationLabel ?? "");
   const [isPinned, setIsPinned] = useState(initialIsPinned);
   const [isPinning, setIsPinning] = useState(false);
+  // 同ページの他のミートボール（上部の戻る行・投稿者カード・フローティングバー）と表示を揃える。
+  // 受信側は state を更新するだけで emit しない＝echo ループにならない（詳細は pinSync.ts）。
+  useEffect(() => subscribePinned(imageId, setIsPinned), [imageId]);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSettingThumb, setIsSettingThumb] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -261,8 +265,13 @@ export function ImageActionsMenu({
     if (isPinning) return;
     const wasPinned = isPinned;
 
-    // Optimistic update
-    setIsPinned(!wasPinned);
+    // Optimistic update。他インスタンスへも同時に流し、通信中も全ミートボールの表示を揃える
+    // （失敗時のロールバックも同じように流す）。
+    const applyPinned = (next: boolean) => {
+      setIsPinned(next);
+      emitPinned(imageId, next);
+    };
+    applyPinned(!wasPinned);
     setIsPinning(true);
     try {
       const response = await fetch(`/api/v1/images/${imageId}/pin`, {
@@ -270,14 +279,14 @@ export function ImageActionsMenu({
       });
 
       if (!response.ok) {
-        setIsPinned(wasPinned);
+        applyPinned(wasPinned);
         toast.error(formatErrorMessage(await parseApiError(response)));
         return;
       }
 
       toast.success(wasPinned ? "ピン留めを解除しました" : "ピン留めしました");
     } catch (error) {
-      setIsPinned(wasPinned);
+      applyPinned(wasPinned);
       console.error("Pin error:", error);
       toast.error("ピン留めの操作に失敗しました");
     } finally {
