@@ -25,8 +25,10 @@ export interface InstanceInfo {
  * サーバー名を正規化
  */
 export function normalizeServer(server: string): string {
-  // プロトコルを除去
-  let normalized = server.replace(/^https?:\/\//, "");
+  // プロトコルを除去。i フラグ必須: 大文字混じり（HTTPS://）だと除去されないまま
+  // 後段の toLowerCase() で "https://example" がドメイン名として残り、
+  // URL 解釈時にホスト名が "https" になって「サーバーが見つかりません」になる。
+  let normalized = server.replace(/^https?:\/\//i, "");
   // 末尾のスラッシュを除去
   normalized = normalized.replace(/\/+$/, "");
   // 小文字に変換

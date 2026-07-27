@@ -129,7 +129,7 @@ describe("POST /api/auth/fediverse/register 入力検証", () => {
   });
 
   it("サーバー名は正規化してから扱う（プロトコル/大文字/末尾スラッシュ）", async () => {
-    const res = await POST(req({ server: "https://Mastodon.Example/" }));
+    const res = await POST(req({ server: "HTTPS://Mastodon.Example/" }));
     expect(detectInstanceTypeMock).toHaveBeenCalledWith(MASTODON);
     expect((await json(res)).server).toBe(MASTODON);
   });
@@ -256,7 +256,7 @@ describe("POST /api/auth/fediverse/register Mastodon", () => {
   });
 
   it("アプリ登録は正規化済みドメインと自前の redirect_uri で行う", async () => {
-    await POST(req({ server: "https://Mastodon.Example" }));
+    await POST(req({ server: "HTTPS://Mastodon.Example" }));
 
     expect(getOrRegisterMastodonAppMock).toHaveBeenCalledWith(
       MASTODON,
