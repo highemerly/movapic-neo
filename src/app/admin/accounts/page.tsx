@@ -1,7 +1,7 @@
 /**
  * 管理ページ: ユーザーアカウント一覧（/admin/accounts）
  *
- * 管理者ガードは admin/layout.tsx に集約。登録日・総投稿数でソートでき、オフセットページング。
+ * 管理者ガードは admin/layout.tsx に集約。登録日・総投稿数・容量でソートでき、オフセットページング。
  */
 
 import Link from "@/components/Link";
@@ -13,7 +13,13 @@ import { getAccounts, normalizeAccountSort } from "@/lib/admin/accounts";
 import { InstanceLogo } from "../_components/InstanceLogo";
 import { SortHeader } from "../_components/SortHeader";
 import { Pagination } from "../_components/Pagination";
-import { TableWrap, theadRowCls, fmtDate, EmptyBox } from "../_components/ui";
+import {
+  TableWrap,
+  theadRowCls,
+  fmtDate,
+  fmtBytes,
+  EmptyBox,
+} from "../_components/ui";
 import { normalizeParams, parsePage } from "../_components/query";
 
 export const dynamic = "force-dynamic";
@@ -34,13 +40,14 @@ export default async function AdminAccountsPage({
     <>
       <h1 className="mb-1 text-2xl font-bold">アカウント一覧</h1>
       <p className="mb-6 text-sm text-muted-foreground tabular-nums">
-        登録ユーザー {totalCount.toLocaleString("ja-JP")} 名。
+        登録ユーザー {totalCount.toLocaleString("ja-JP")} 名。容量は保存画像の
+        file_size 合計による概算です（サムネイルは含みません）。
       </p>
 
       {rows.length === 0 ? (
         <EmptyBox>ユーザーがいません。</EmptyBox>
       ) : (
-        <TableWrap minWidth="40rem">
+        <TableWrap minWidth="46rem">
           <thead>
             <tr className={theadRowCls}>
               <th className="py-1.5 pr-3 text-left font-semibold" colSpan={2}>
@@ -72,6 +79,15 @@ export default async function AdminAccountsPage({
                 label="投稿"
                 ascValue="posts_asc"
                 descValue="posts_desc"
+                className="py-1.5 pr-3 text-right font-semibold"
+              />
+              <SortHeader
+                basePath={BASE}
+                params={params}
+                current={sort}
+                label="容量"
+                ascValue="size_asc"
+                descValue="size_desc"
                 className="py-1.5 pr-3 text-right font-semibold"
               />
               <th className="py-1.5 text-right font-semibold">実績（金/銀）</th>
@@ -118,6 +134,9 @@ export default async function AdminAccountsPage({
                   </td>
                   <td className="py-1.5 pr-3 text-right font-medium">
                     {u.postCount.toLocaleString("ja-JP")}
+                  </td>
+                  <td className="py-1.5 pr-3 text-right whitespace-nowrap text-muted-foreground">
+                    {u.storageBytes > 0 ? fmtBytes(u.storageBytes) : "—"}
                   </td>
                   <td className="py-1.5 text-right whitespace-nowrap">
                     <span className="text-amber-500" title="金">

@@ -16,14 +16,18 @@ export type AccountSort =
   | "posts_desc"
   | "posts_asc"
   | "lastpost_desc"
-  | "lastpost_asc";
+  | "lastpost_asc"
+  | "size_desc"
+  | "size_asc";
 
 export function normalizeAccountSort(v: string | undefined): AccountSort {
   return v === "oldest" ||
     v === "posts_desc" ||
     v === "posts_asc" ||
     v === "lastpost_desc" ||
-    v === "lastpost_asc"
+    v === "lastpost_asc" ||
+    v === "size_desc" ||
+    v === "size_asc"
     ? v
     : "newest";
 }
@@ -38,6 +42,8 @@ const ORDER_BY: Record<AccountSort, Prisma.Sql> = {
   // 降順(新しい順)は未投稿を末尾に、昇順(古い順)は未投稿(=最も古い扱い)を先頭に。
   lastpost_desc: Prisma.raw("last_post_at DESC NULLS LAST, u.created_at DESC"),
   lastpost_asc: Prisma.raw("last_post_at ASC NULLS FIRST, u.created_at DESC"),
+  size_desc: Prisma.raw("storage_bytes DESC, u.created_at DESC"),
+  size_asc: Prisma.raw("storage_bytes ASC, u.created_at DESC"),
 };
 
 export interface AccountRow {
@@ -51,6 +57,8 @@ export interface AccountRow {
   /** 最終投稿日（投稿ゼロなら null） */
   lastPostAt: Date | null;
   postCount: number;
+  /** 保存画像の概算容量（Image.file_size 合計・サムネイルは含まない。/admin/system と同じ算出） */
+  storageBytes: number;
   /** 獲得実績（金/銀ランク別） */
   gold: number;
   silver: number;
@@ -80,6 +88,7 @@ export async function getAccounts(
         type: string;
         post_count: number;
         last_post_at: Date | null;
+        storage_bytes: bigint;
       }[]
     >(Prisma.sql`
       SELECT
@@ -91,7 +100,9 @@ export async function getAccounts(
         inst.domain,
         inst.type,
         count(i.id)::int AS post_count,
-        max(i.created_at) AS last_post_at
+        max(i.created_at) AS last_post_at,
+        -- int の合計は 2GB 強で溢れるため bigint で受ける
+        coalesce(sum(i.file_size), 0)::bigint AS storage_bytes
       FROM users u
       JOIN instances inst ON inst.id = u.instance_id
       LEFT JOIN images i ON i.user_id = u.id
@@ -130,6 +141,7 @@ export async function getAccounts(
         createdAt: u.created_at,
         lastPostAt: u.last_post_at,
         postCount: u.post_count,
+        storageBytes: Number(u.storage_bytes),
         gold,
         silver,
       };
