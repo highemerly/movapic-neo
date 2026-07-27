@@ -15,14 +15,9 @@ import { evaluateAndGrantReaction } from "./engine";
 /** 自分がリアクションを押した（付け替え含む）直後に呼ぶ。 */
 export async function onReactionGiven(userId: string, imageId: string): Promise<void> {
   try {
-    // 実績の「きっかけ写真」は他人の写真になるため付けない（imageId だけで引かれる
-    // 画像詳細ページの「この投稿がきっかけで獲得した実績」に混ざるため）。
-    // 通知の遷移先としては押した写真が自然なので、そちらにだけ渡す。
-    await evaluateAndGrantReaction({
-      userId,
-      achievementImageId: null,
-      notificationImageId: imageId,
-    });
+    // 通知の遷移先としては押した写真が自然なので、そちらにだけ渡す
+    // （実績側の imageId は evaluateAndGrantReaction が常に null にする）。
+    await evaluateAndGrantReaction({ userId, notificationImageId: imageId });
   } catch (error) {
     console.error(`[achievement] リアクション実績の評価に失敗: userId=${userId}`, error);
   }
@@ -43,7 +38,6 @@ export async function onReactionsReceived(params: {
   try {
     await evaluateAndGrantReaction({
       userId: params.ownerUserId,
-      achievementImageId: params.imageId,
       notificationImageId: params.imageId,
     });
   } catch (error) {

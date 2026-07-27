@@ -109,10 +109,11 @@ async function ownedKeysOf(userId: string): Promise<Set<string>> {
 /**
  * 候補を per-key insert し、付与できたぶんだけ通知を1件ずつ作る（実績1件＝通知1件）。
  *
- * 実績の imageId と通知の imageId を分けて受けるのは、リアクション起点の実績では
- * 「きっかけ写真」が他人の写真になり得るため。画像詳細ページの「この投稿がきっかけで獲得した実績」は
- * imageId だけで引く（所有者で絞らない）ので、他人の写真に自分の実績を紐づけてはいけない。
- * 通知のサムネイル・遷移先としては他人の写真でも問題ない。
+ * 実績の imageId と通知の imageId を分けて受けるのは、リアクション起点の実績が
+ * 「その写真を投稿したから獲得した実績」ではないため。画像詳細ページの
+ * 「この投稿で獲得した実績」は imageId だけで引くので、リアクション起点の実績には
+ * 一切 imageId を残さない（他人の写真に自分の実績が紐づく／自分の写真でも投稿と無関係な
+ * 実績が並ぶ）。通知のサムネイル・遷移先としては当該写真でよい。
  */
 async function grantAll(
   userId: string,
@@ -148,17 +149,22 @@ async function grantAll(
 /**
  * live 用: リアクションが動いた後に呼び、新規付与した実績を返す。
  * 呼び出し側（リアクションAPI・お気に入り同期）は reactionTriggers.ts 経由で使う。
+ *
+ * 実績側の imageId は常に null。リアクション起点の実績は「押した／獲得した」の累計で決まり、
+ * どの写真を投稿したかとは無関係なので、画像詳細ページの「この投稿で獲得した実績」に混ぜない。
  */
 export async function evaluateAndGrantReaction(opts: {
   userId: string;
-  achievementImageId: string | null;
   notificationImageId: string | null;
 }): Promise<GrantedAchievement[]> {
   const owned = await ownedKeysOf(opts.userId);
   const stats = await collectReactionStats(opts.userId);
   const candidates = selectNewlyGrantedReaction(stats, owned);
   if (candidates.length === 0) return [];
-  return grantAll(opts.userId, candidates, opts);
+  return grantAll(opts.userId, candidates, {
+    achievementImageId: null,
+    notificationImageId: opts.notificationImageId,
+  });
 }
 
 /**
