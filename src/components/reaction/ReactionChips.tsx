@@ -85,7 +85,9 @@ export function ReactionChips({
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
-            className="inline-flex items-center rounded-full bg-muted/60 px-3 py-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            // 地の色は隣のチップ（ReactionChipPopover）と揃える（muted ではなく foreground の半透明。
+            // 理由はそちらのコメント参照）。
+            className="inline-flex items-center rounded-full bg-foreground/10 px-3 py-1.5 text-muted-foreground transition-colors hover:bg-foreground/20 hover:text-foreground"
             title="リアクションする"
             aria-label="リアクションする"
           >

@@ -13,6 +13,7 @@ import {
   SHAMEZO_EMOJI_HOST,
   toDisplayEmoji,
   toMisskeyReaction,
+  viewerReactBlockedReason,
 } from "./emojiKey";
 
 describe("normalizeReactionKey", () => {
@@ -177,6 +178,38 @@ describe("canViewerReactWith", () => {
   it("絵文字として不正な文字列は送れない", () => {
     expect(canViewerReactWith("あ", "mastodon", "mstdn.example")).toBe(false);
     expect(canViewerReactWith("あ", "misskey", "misskey.io")).toBe(false);
+  });
+});
+
+describe("viewerReactBlockedReason", () => {
+  it("送れる絵文字なら理由は無い", () => {
+    expect(viewerReactBlockedReason("👍", "mastodon", "mstdn.example")).toBeNull();
+    expect(
+      viewerReactBlockedReason(shamezoEmojiKey("wktk"), "mastodon", "mstdn.example")
+    ).toBeNull();
+    expect(viewerReactBlockedReason(":ai@misskey.io:", "misskey", "misskey.io")).toBeNull();
+  });
+
+  it("他サーバーのカスタム絵文字はホスト名を添えて理由を返す", () => {
+    expect(viewerReactBlockedReason(":ai@misskey.io:", "misskey", "example.com")).toBe(
+      "misskey.io専用のカスタム絵文字のため利用できません"
+    );
+    // Mastodon は自サーバーのカスタム絵文字も連合上送れない
+    expect(
+      viewerReactBlockedReason(":ai@mstdn.example:", "mastodon", "mstdn.example")
+    ).toBe("mstdn.example専用のカスタム絵文字のため利用できません");
+  });
+
+  it("SHAMEZO絵文字を送れないのはMisskeyだけなので、その旨を返す", () => {
+    expect(
+      viewerReactBlockedReason(shamezoEmojiKey("wktk"), "misskey", "misskey.io")
+    ).toBe("Mastodon用のカスタム絵文字のため、Misskeyアカウントからは利用できません");
+  });
+
+  it("絵文字として扱えないキーは汎用の理由を返す", () => {
+    expect(viewerReactBlockedReason("あ", "misskey", "misskey.io")).toBe(
+      "この絵文字はリアクションに使えません"
+    );
   });
 });
 

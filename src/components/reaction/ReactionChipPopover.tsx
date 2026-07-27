@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { ArrowLeftRight, Plus, X } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { RetryImg } from "@/components/RetryImg";
 import { ReactionEmojiView } from "./ReactionEmojiView";
-import { canViewerReactWith } from "@/lib/reactions/emojiKey";
+import {
+  canViewerReactWith,
+  viewerReactBlockedReason,
+} from "@/lib/reactions/emojiKey";
 import type { ReactionChipInfo, ReactionUserInfo } from "./reactionSync";
 
 /**
@@ -50,18 +53,29 @@ export function ReactionChipPopover({
     !!viewerDomain &&
     canViewerReactWith(chip.emoji, viewerType, viewerDomain);
 
+  // 押せない理由。導線を出さないだけだと不具合に見えるので一言添える。ただし絵文字のせいで
+  // 押せないケースに限る（未ログイン・投稿削除ずみ等は絵文字の問題ではないので何も出さない）。
+  const blockedReason =
+    canReact && viewerType && viewerDomain
+      ? viewerReactBlockedReason(chip.emoji, viewerType, viewerDomain)
+      : null;
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          // 自分が付けたチップは primary で塗りつぶす。他のチップ（薄いグレー地に muted 文字）とは
+          // 自分が付けたチップは primary で塗りつぶす。他のチップ（グレー地に muted 文字）とは
           // 地と文字が反転する関係になるので、絵文字を読まなくても一目で自分のものが分かる。
           // brand（ピンク）は主役CTA専用なので、こういう状態表示には使わない。
+          //
+          // 他人のチップの地は muted ではなく foreground の半透明にする。ライトの --muted(0.97) は
+          // 背景の白(1.0)とほぼ同色で、地が無いのと同じ＝淡い色のカスタム絵文字が沈むため。
+          // foreground 基準なら明暗どちらでも背景から一定量ずれる（ダークでの見えかたは従来と同等）。
           className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition-colors ${
             chip.reactedByViewer
               ? "bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
-              : "bg-muted/60 text-muted-foreground hover:bg-muted"
+              : "bg-foreground/10 text-muted-foreground hover:bg-foreground/20"
           }`}
           title="リアクションした人を見る"
         >
@@ -70,7 +84,21 @@ export function ReactionChipPopover({
         </button>
       </PopoverTrigger>
 
-      <PopoverContent align="start" className="w-60 p-2">
+      {/* Radix は開いた直後、中の最初のタブ可能要素（＝末尾の「取り消す／変更する」ボタン。
+          プロフィールURLが無いユーザーはリンクが href 無し＝タブ不可のため先頭になりやすい）へ
+          フォーカスを移す。iOS Safari はそこに既定のフォーカス枠を描き、押下待ちのように見えてしまう
+          （Chrome は :focus-visible の判定が異なり出ない）。フォーカス自体はコンテナへ移しておく
+          ことで、枠は出さずにキーボードから Tab で中の項目へ入れる状態は保つ
+          （コンテナは popover.tsx 側で outline-hidden 済み）。 */}
+      <PopoverContent
+        align="start"
+        className="w-60 p-2"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          const content = event.currentTarget;
+          if (content instanceof HTMLElement) content.focus();
+        }}
+      >
         <ul className="max-h-[240px] space-y-0.5 overflow-y-auto">
           {users.map((user) => (
             <li key={user.acct}>
@@ -118,24 +146,35 @@ export function ReactionChipPopover({
               リアクションを取り消す
             </button>
           )
-        ) : (
-          // 他人のリアクション。送れる絵文字のときだけ導線を出す（送れないケース
-          // ＝他サーバーのカスタム絵文字／Mastodonからのカスタム絵文字などは何も出さない）。
-          // ピッカーは開かず、このチップと同じ絵文字をそのまま送る。自分が別の絵文字で
-          // 付けていれば「変更」、未リアクションなら「同じリアクション」。
-          canReactSame && (
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                onReactSame();
-              }}
-              className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <ReactionEmojiView emoji={chip.emoji} imageUrl={chip.imageUrl} className="text-[15px]" />
-              {hasReacted ? "このリアクションに変更する" : "同じリアクションをする"}
-            </button>
+        ) : !canReactSame ? (
+          // 送れない絵文字（他サーバーのカスタム絵文字／Mastodonからのカスタム絵文字など）は
+          // 導線の代わりに理由を出す。何も出さないと押せないことが不具合に見えるため。
+          blockedReason && (
+            <p className="mt-1.5 px-1 text-[11px] leading-snug text-muted-foreground/80">
+              {blockedReason}
+            </p>
           )
+        ) : (
+          // 他人のリアクションで、かつ送れる絵文字。ピッカーは開かず、このチップと同じ絵文字を
+          // そのまま送る。自分が別の絵文字で付けていれば「変更」、未リアクションなら「同じリアクション」。
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              onReactSame();
+            }}
+            // ポップオーバー内の主たる操作なので primary の塗りボタンにする（枠線のみの
+            // 「取り消す」より前に出す）。brand はCTA専用なのでここでは使わない。
+            className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-md bg-primary px-2 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            {/* どの絵文字かは真上のチップに出ているので、ここは操作の種類（付け替え／追加）だけ示す。 */}
+            {hasReacted ? (
+              <ArrowLeftRight className="h-3.5 w-3.5" />
+            ) : (
+              <Plus className="h-3.5 w-3.5" />
+            )}
+            {hasReacted ? "このリアクションに変更する" : "このリアクションをする"}
+          </button>
         )}
       </PopoverContent>
     </Popover>

@@ -166,3 +166,25 @@ export function canViewerReactWith(
   // SHAMEZO 絵文字は連合送信できないため Misskey では押せない（自サーバー絵文字のみ）。
   return custom.host === viewerDomain.toLowerCase();
 }
+
+/**
+ * 閲覧者がこの絵文字を送れない理由（チップのポップオーバーに出す短い説明）。送れるなら null。
+ *
+ * 「押せないから導線を出さない」だけだと理由が分からず不具合に見えるため、代わりに一言添える。
+ * 判定は canViewerReactWith に委ね、分岐の意味づけだけをここで文言に落とす（両者は対で保つこと）。
+ */
+export function viewerReactBlockedReason(
+  emoji: string,
+  viewerType: "mastodon" | "misskey",
+  viewerDomain: string
+): string | null {
+  if (canViewerReactWith(emoji, viewerType, viewerDomain)) return null;
+  const custom = parseCustomEmojiKey(emoji);
+  // カスタム絵文字以外で弾かれるのは、絵文字1個として扱えないキー（複数文字など）のみ。
+  if (!custom) return "この絵文字はリアクションに使えません";
+  // ここに来る SHAMEZO 絵文字の閲覧者は必ず Misskey（Mastodon は SHAMEZO 絵文字を選べる）。
+  if (custom.host === SHAMEZO_EMOJI_HOST) {
+    return "Mastodon用のカスタム絵文字のため、Misskeyアカウントからは利用できません";
+  }
+  return `${custom.host}専用のカスタム絵文字のため利用できません`;
+}
