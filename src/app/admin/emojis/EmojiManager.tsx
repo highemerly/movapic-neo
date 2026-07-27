@@ -44,6 +44,13 @@ const FILTER_UNCATEGORIZED = "none";
 const categoryFilterValue = (category: string) => `c:${category}`;
 const UNCATEGORIZED_LABEL = "その他";
 
+// 有効/無効の絞り込み。無効（soft-disable）はピッカー・公開カタログから外れるだけで行は残る。
+// 普段の管理対象は有効なものなので既定は「有効のみ」＝一覧から行が隠れるため、
+// セレクトは常時表示にする（隠れていることに気付けないのを防ぐ）。
+const STATUS_ALL = "all";
+const STATUS_ENABLED = "enabled";
+const STATUS_DISABLED = "disabled";
+
 // ファイル名からショートコードの許可文字（英数字・_ + -）だけを残した候補を作る
 function shortcodeFromFileName(fileName: string): string {
   const base = fileName.replace(/\.[^.]+$/, "");
@@ -70,6 +77,7 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
   // 一覧の絞り込み（カテゴリ・ショートコード検索）。登録フォームの候補（datalist）は
   // 絞り込みの影響を受けないよう常に全件から作る（既存カテゴリが候補から消えるのを防ぐ）。
   const [categoryFilter, setCategoryFilter] = useState<string>(FILTER_ALL);
+  const [statusFilter, setStatusFilter] = useState<string>(STATUS_ENABLED);
   const [query, setQuery] = useState("");
 
   // 既存カテゴリ（プルダウン候補）。手入力も許すため datalist で提示する
@@ -101,6 +109,7 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
           : categoryFilterValue(category) === activeFilter;
     return (
       matchesCategory &&
+      (statusFilter === STATUS_ALL || e.enabled === (statusFilter === STATUS_ENABLED)) &&
       (normalizedQuery === "" || e.name.toLowerCase().includes(normalizedQuery))
     );
   });
@@ -350,6 +359,16 @@ export function EmojiManager({ initial }: { initial: AdminEmoji[] }) {
                 )}
               </NativeSelect>
             )}
+            <NativeSelect
+              value={statusFilter}
+              onChange={(ev) => setStatusFilter(ev.target.value)}
+              aria-label="有効・無効で絞り込み"
+              className="h-9"
+            >
+              <option value={STATUS_ALL}>すべて</option>
+              <option value={STATUS_ENABLED}>有効のみ</option>
+              <option value={STATUS_DISABLED}>無効のみ</option>
+            </NativeSelect>
             <div className="relative min-w-40 flex-1">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
