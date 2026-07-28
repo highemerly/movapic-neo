@@ -40,17 +40,16 @@ export function SiteHeader({ user }: SiteHeaderProps = {}) {
             <div className="flex items-center gap-2">
               {/* 未ログイン時の主要動線。「ログイン」という語は新規ユーザーへの訴求が弱い
                   （本サービスは独自登録がなく既存 Fediverse アカウントで連携する）ため、
-                  行動訴求の「投稿をはじめる」にする。トップのログインフォームへ飛ばし、
-                  returnTo=/create でログイン後に投稿ページへ自動遷移する
-                  （create/page.tsx の login_required と同じ経路）。
-                  ロゴ＋ハンバーガーと並ぶため、狭幅では「はじめる」に短縮して横はみ出しを防ぐ。 */}
+                  行動訴求の「投稿をはじめる」にする。/create はゲストでもプレビューまで試せる
+                  ようになったので、ログインへ迂回させず投稿ページへ直行する（ログインは投稿時に
+                  モーダルで求める）。ロゴ＋ハンバーガーと並ぶため、狭幅では「はじめる」に短縮する。 */}
               {!user && (
                 <Button
                   asChild
                   size="sm"
                   className="bg-brand text-brand-foreground hover:bg-brand/90"
                 >
-                  <Link href="/?reason=login_required&returnTo=%2Fcreate">
+                  <Link href="/create">
                     <LogIn className="h-4 w-4" />
                     {/* ラベルは1つの span にまとめる。直下に置くと flex の gap が
                         「投稿を」と「はじめる」の間に入り不自然な空きになるため。 */}
