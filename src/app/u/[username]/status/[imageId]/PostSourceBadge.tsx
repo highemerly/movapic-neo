@@ -193,8 +193,11 @@ export function PostSourceBadge({
                 </p>
                 <p className="text-xs text-muted-foreground">
                   あなたのメールアドレスは{" "}
-                  <Link href="/dashboard" className="underline hover:text-foreground">
-                    ダッシュボード
+                  <Link
+                    href="/settings#defaults"
+                    className="underline hover:text-foreground"
+                  >
+                    設定
                   </Link>{" "}
                   で確認してください。
                 </p>
