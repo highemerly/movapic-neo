@@ -36,7 +36,12 @@ import { getInstanceEmojiCatalog } from "@/lib/fediverse/emojis";
 import { enqueueFavoriteSync } from "@/lib/queue";
 import { reconcileFavoriteNotificationSafely } from "@/lib/notifications/favoriteNotifications";
 import { onReactionGiven, onReactionsReceived } from "@/lib/achievements/reactionTriggers";
-import { mergeReactions, toMergedFavoriters } from "@/lib/reactions/merge";
+import {
+  filterMergedReactions,
+  mergeReactions,
+  toMergedFavoriters,
+} from "@/lib/reactions/merge";
+import { getMutedAuthorKeys } from "@/lib/mutes";
 import { clearReaction, loadStoredReactions, setReaction } from "@/lib/reactions/store";
 import {
   isSelectableUnicodeEmoji,
@@ -152,6 +157,14 @@ async function findImage(imageId: string) {
   });
 }
 
+/** 閲覧者がミュートしている相手の acct 集合（未ログインは空）。リアクション表示から隠すのに使う。 */
+async function mutedAcctsOf(
+  viewerId: string | null | undefined
+): Promise<ReadonlySet<string>> {
+  if (!viewerId) return new Set();
+  return new Set(await getMutedAuthorKeys(viewerId));
+}
+
 /** 現在のキャッシュ（同期済みならその結果）と Reaction テーブルから表示用の状態を組む */
 async function buildMerged(
   image: ImageForFavorite,
@@ -206,6 +219,8 @@ export async function GET(
       synced,
       currentUser ? viewerAcctOf(currentUser) : null
     );
+    // ミュートした相手のリアクションは自分の視界から隠す（件数もその分減らす）。
+    const visible = filterMergedReactions(merged, await mutedAcctsOf(currentUser?.id));
 
     return NextResponse.json(
       {
@@ -213,7 +228,7 @@ export async function GET(
         // 公開画像ならlocal投稿でもリアクションできる（記録先がDBにあるため）
         reactable: true,
         fediverseSendable: sendable,
-        ...toClientPayload(merged),
+        ...toClientPayload(visible),
         lastSyncedAt: lastSyncedAt?.toISOString() ?? null,
         syncError: favoriteErrorMessage(errorReason),
       },
@@ -388,11 +403,15 @@ async function handleWrite(
     });
   }
 
+  // DB更新・通知生成には非フィルタの merged を使い（保存件数は閲覧者非依存）、
+  // レスポンスだけ操作者のミュート相手を隠す。
+  const visible = filterMergedReactions(merged, await mutedAcctsOf(viewer.id));
+
   return NextResponse.json({
     success: true,
     reactable: true,
     fediverseSendable: sendable,
-    ...toClientPayload(merged),
+    ...toClientPayload(visible),
     syncError: favoriteErrorMessage(synced?.errorReason ?? null),
   });
 }

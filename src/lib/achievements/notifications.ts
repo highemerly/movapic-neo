@@ -7,6 +7,8 @@ import prisma from "@/lib/db";
 import { userPathSegment } from "@/lib/userHandle";
 import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { getAvatarUrl, getEmojiImageUrl } from "@/lib/avatar";
+import { getMutedAuthorKeys } from "@/lib/mutes";
+import { filterFavoriteFeedByMuted } from "@/lib/notifications/muteFilter";
 import type { FavoriteNotificationData } from "@/lib/notifications/favoriteNotifications";
 
 export const NOTIFICATION_WINDOW_DAYS = 90;
@@ -76,21 +78,41 @@ export async function getRecentNotifications(
   });
 
   const base = publicBase();
-  return rows.map((r) => ({
-    id: r.id,
-    type: r.type,
-    achievementKey: r.achievementKey,
-    createdAt: r.createdAt,
-    recipientUsername: userPathSegment(r.user.username, r.user.instance.domain, getHomeServer()),
-    image: r.image
-      ? {
-          id: r.image.id,
-          pageUrl: `/u/${userPathSegment(r.image.user.username, r.image.user.instance.domain, getHomeServer())}/status/${r.image.id}`,
-          thumbnailUrl: `${base}/${r.image.thumbnailKey || r.image.storageKey}`,
-        }
-      : null,
-    favorite: r.type === "favorite" ? toFavoriteFeedData(r.data) : null,
-  }));
+  // ミュートした相手からのお気に入り／リアクション通知は出さない（未読の赤ドットにも数えない
+  // ＝このAPIが未読判定の元データを兼ねるため、ここで除けば赤ドットも点かない）。
+  const mutedAccts = new Set(await getMutedAuthorKeys(userId));
+
+  const items: NotificationFeedItem[] = [];
+  for (const r of rows) {
+    let favorite: FavoriteFeedData | null = null;
+    if (r.type === "favorite") {
+      const raw = toFavoriteFeedData(r.data);
+      const filtered = raw ? filterFavoriteFeedByMuted(raw, mutedAccts) : raw;
+      // 完全にミュート相手のみの通知（filtered=null）は通知ごと隠す。
+      if (raw && !filtered) continue;
+      favorite = filtered;
+    }
+    items.push({
+      id: r.id,
+      type: r.type,
+      achievementKey: r.achievementKey,
+      createdAt: r.createdAt,
+      recipientUsername: userPathSegment(
+        r.user.username,
+        r.user.instance.domain,
+        getHomeServer()
+      ),
+      image: r.image
+        ? {
+            id: r.image.id,
+            pageUrl: `/u/${userPathSegment(r.image.user.username, r.image.user.instance.domain, getHomeServer())}/status/${r.image.id}`,
+            thumbnailUrl: `${base}/${r.image.thumbnailKey || r.image.storageKey}`,
+          }
+        : null,
+      favorite,
+    });
+  }
+  return items;
 }
 
 // Notification.data（type="favorite"）を表示用に整形。画像URLはプロキシ経由に変換。

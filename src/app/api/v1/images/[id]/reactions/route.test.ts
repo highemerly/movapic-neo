@@ -19,6 +19,9 @@ vi.mock("@/lib/avatar", () => ({
   getReactionEmojiImageUrl: vi.fn((_emoji: string, u: string | null) => u),
 }));
 vi.mock("@/lib/reactions/customEmoji", () => ({ findShamezoEmoji: vi.fn() }));
+vi.mock("@/lib/mutes", () => ({
+  getMutedAuthorKeys: vi.fn(() => Promise.resolve([])),
+}));
 vi.mock("@/lib/fediverse/favoriteSync", () => ({
   readCache: vi.fn(() => []),
   readTotalsCache: vi.fn(() => null),

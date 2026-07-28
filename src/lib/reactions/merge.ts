@@ -148,6 +148,38 @@ export function mergeReactions(input: MergeReactionsInput): MergedReactions {
 }
 
 /**
+ * 閲覧者がミュートしている相手を、表示用のマージ結果から取り除く純粋関数。
+ *
+ * ミュートは「自分の視界から隠す」ため、アバターを消すだけでなく件数もその分だけ減らす
+ * （アバターだけ消して「N人」の数字と食い違う状態を作らない）。連合の総数には含まれるが
+ * 上位40件のキャッシュに載っていないミュート相手は acct で識別できないため件数を減らせない
+ * ＝識別できた分だけ隠す。ミュート相手だけのチップは丸ごと落とす。
+ *
+ * 閲覧者依存の変換なので、sync 時の favoriteCount 再計算（保存件数＝閲覧者非依存）には
+ * 絶対に通さない。読み取り・表示経路でだけ使う。
+ */
+export function filterMergedReactions(
+  merged: MergedReactions,
+  mutedAccts: ReadonlySet<string>
+): MergedReactions {
+  if (mutedAccts.size === 0) return merged;
+
+  const chips: ReactionChip[] = [];
+  const usersByEmoji: Record<string, ReactionUser[]> = {};
+  for (const chip of merged.chips) {
+    const original = merged.usersByEmoji[chip.emoji] ?? [];
+    const kept = original.filter((u) => !mutedAccts.has(u.acct));
+    const count = Math.max(0, chip.count - (original.length - kept.length));
+    if (count === 0) continue;
+    chips.push({ ...chip, count });
+    usersByEmoji[chip.emoji] = kept;
+  }
+  const total = chips.reduce((sum, c) => sum + c.count, 0);
+  // viewerEmoji は閲覧者自身のリアクション＝ミュート対象になり得ないためそのまま。
+  return { total, chips, usersByEmoji, viewerEmoji: merged.viewerEmoji };
+}
+
+/**
  * マージ結果を「リアクションした人」のフラットな一覧に直す。
  * 通知の差分計算（誰が新しくリアクションしたか）は連合キャッシュだけでは足りず、
  * SHAMEZO 上のリアクションも含めた集合で見る必要があるため。

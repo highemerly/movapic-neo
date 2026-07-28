@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "@/components/Link";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
-import { isMutedByViewer } from "@/lib/mutes";
+import { getMutedAuthorKeys, isMutedByViewer } from "@/lib/mutes";
 import { getAvatarUrl } from "@/lib/avatar";
 import { ChevronRight, ImagePlus } from "lucide-react";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -18,7 +18,11 @@ import { userPageRobotsMetadata } from "@/lib/crawlers";
 import { buildOgImage, DEFAULT_OG_IMAGE } from "@/lib/ogImage";
 import { ProfileFeedCard, type ProfileFeedImage } from "@/components/user/ProfileFeedCard";
 import type { CachedFavoriter, ReactionTotalsCache } from "@/lib/reactions/types";
-import { mergeReactions, toMergedFavoriters } from "@/lib/reactions/merge";
+import {
+  filterMergedReactions,
+  mergeReactions,
+  toMergedFavoriters,
+} from "@/lib/reactions/merge";
 import { loadStoredReactionsByImage } from "@/lib/reactions/store";
 
 // フィードカードのアバター行に渡す上限（描画は FavoriterAvatars が実幅で更に絞る）。
@@ -124,6 +128,10 @@ export default async function UserHomePage({ params, searchParams }: UserHomePag
   const { deleted, server } = await searchParams;
   const deleteFlash = buildDeleteFlash(deleted, server);
   const currentUser = await getCurrentUser();
+  // ミュートした相手は概要カードのリアクションアバターからも隠す。
+  const mutedReactorAccts = currentUser
+    ? new Set(await getMutedAuthorKeys(currentUser.id))
+    : new Set<string>();
 
   // username@domain を分解（ホームインスタンスのみ domain 省略可）
   const parsed = parseUserHandle(username, getHomeServer());
@@ -240,13 +248,16 @@ export default async function UserHomePage({ params, searchParams }: UserHomePag
     // リアクションした人のアイコンは、連合キャッシュと SHAMEZO 上のリアクションをマージして出す。
     // 概要カードは読み取り専用なので閲覧者の状態（viewerAcct）は見ない。
     reactors: toMergedFavoriters(
-      mergeReactions({
-        fediverseCount: img.fediverseCount,
-        totalsCache: (img.reactionTotalsCache as ReactionTotalsCache | null) ?? null,
-        cachedFavoriters: (img.favoritersCache as CachedFavoriter[] | null) ?? [],
-        storedReactions: storedReactions.get(img.id) ?? [],
-        viewerAcct: null,
-      })
+      filterMergedReactions(
+        mergeReactions({
+          fediverseCount: img.fediverseCount,
+          totalsCache: (img.reactionTotalsCache as ReactionTotalsCache | null) ?? null,
+          cachedFavoriters: (img.favoritersCache as CachedFavoriter[] | null) ?? [],
+          storedReactions: storedReactions.get(img.id) ?? [],
+          viewerAcct: null,
+        }),
+        mutedReactorAccts
+      )
     )
       .slice(0, MAX_FEED_REACTORS)
       .map((user) => ({

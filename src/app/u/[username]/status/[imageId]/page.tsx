@@ -6,7 +6,7 @@ import { buildOgImage } from "@/lib/ogImage";
 import prisma from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/session";
-import { isMutedByViewer } from "@/lib/mutes";
+import { getMutedAuthorKeys, isMutedByViewer } from "@/lib/mutes";
 import { DeleteLocationButton } from "./DeleteLocationButton";
 import { ImageNavigation } from "./ImageNavigation";
 import { FontLicenseBadge } from "./FontLicenseBadge";
@@ -21,7 +21,7 @@ import { BackLink } from "@/components/BackLink";
 import { PageContainer } from "@/components/PageContainer";
 import { classifyPostStatus, favoriteErrorMessage } from "@/lib/fediverse/favorite";
 import { readCache, readTotalsCache } from "@/lib/fediverse/favoriteSync";
-import { mergeReactions } from "@/lib/reactions/merge";
+import { filterMergedReactions, mergeReactions } from "@/lib/reactions/merge";
 import { loadStoredReactions } from "@/lib/reactions/store";
 import { Footer } from "@/components/Footer";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
@@ -249,13 +249,17 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
 
   // 連合キャッシュと SHAMEZO 上のリアクションをマージして初期表示を作る。
   // マウント後にクライアントが同じ内容を API から取り直す（TTL切れならその時に同期される）。
-  const merged = mergeReactions({
-    fediverseCount: image.fediverseCount,
-    totalsCache: readTotalsCache(image),
-    cachedFavoriters: readCache(image),
-    storedReactions: await loadStoredReactions(imageId),
-    viewerAcct,
-  });
+  const merged = filterMergedReactions(
+    mergeReactions({
+      fediverseCount: image.fediverseCount,
+      totalsCache: readTotalsCache(image),
+      cachedFavoriters: readCache(image),
+      storedReactions: await loadStoredReactions(imageId),
+      viewerAcct,
+    }),
+    // ミュートした相手のリアクションは自分の視界から隠す。
+    currentUser ? new Set(await getMutedAuthorKeys(currentUser.id)) : new Set()
+  );
   const initialReactionSnapshot = {
     total: merged.total,
     chips: merged.chips.map((chip) => ({

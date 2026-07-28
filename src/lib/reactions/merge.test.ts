@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { mergeReactions, type MergeReactionsInput } from "./merge";
+import {
+  filterMergedReactions,
+  mergeReactions,
+  type MergeReactionsInput,
+} from "./merge";
 import type { CachedFavoriter, StoredReaction } from "./types";
 
 function cached(acct: string, emoji?: string | null): CachedFavoriter {
@@ -228,5 +232,62 @@ describe("mergeReactions", () => {
       ["🎉", 1],
     ]);
     expect(result.total).toBe(2);
+  });
+});
+
+describe("filterMergedReactions", () => {
+  it("ミュートが空なら同じ参照をそのまま返す", () => {
+    const merged = mergeReactions(
+      input({ fediverseCount: 2, cachedFavoriters: [cached("a@ex.com"), cached("b@ex.com")] })
+    );
+    expect(filterMergedReactions(merged, new Set())).toBe(merged);
+  });
+
+  it("ミュート相手を一覧から除き、件数もその分減らす", () => {
+    const merged = mergeReactions(
+      input({ fediverseCount: 3, cachedFavoriters: [cached("a@ex.com"), cached("b@ex.com"), cached("c@ex.com")] })
+    );
+    const filtered = filterMergedReactions(merged, new Set(["b@ex.com"]));
+    expect(filtered.total).toBe(2);
+    expect(filtered.chips).toEqual([
+      { emoji: "❤", imageUrl: null, count: 2, reactedByViewer: false },
+    ]);
+    expect(filtered.usersByEmoji["❤"].map((u) => u.acct)).toEqual(["a@ex.com", "c@ex.com"]);
+  });
+
+  it("ミュート相手だけのチップは丸ごと落とす", () => {
+    const merged = mergeReactions(
+      input({
+        totalsCache: { totals: { "👍": 1, "🎉": 1 } },
+        cachedFavoriters: [cached("a@ex.com", "👍"), cached("b@ex.com", "🎉")],
+      })
+    );
+    const filtered = filterMergedReactions(merged, new Set(["b@ex.com"]));
+    expect(filtered.chips.map((c) => c.emoji)).toEqual(["👍"]);
+    expect(filtered.usersByEmoji["🎉"]).toBeUndefined();
+    expect(filtered.total).toBe(1);
+  });
+
+  it("上位40件外のミュート相手は識別できないため件数を減らさない", () => {
+    // fediverseCount=5 だがキャッシュには1人しか載っていない（残り4人は匿名の総数）
+    const merged = mergeReactions(
+      input({ fediverseCount: 5, cachedFavoriters: [cached("m@ex.com")] })
+    );
+    const filtered = filterMergedReactions(merged, new Set(["m@ex.com"]));
+    // 識別できた1人分だけ減る
+    expect(filtered.total).toBe(4);
+    expect(filtered.usersByEmoji["❤"]).toEqual([]);
+  });
+
+  it("閲覧者自身のリアクション(viewerEmoji)は保持される", () => {
+    const merged = mergeReactions(
+      input({
+        totalsCache: { totals: { "👍": 1 } },
+        cachedFavoriters: [cached("me@ex.com", "👍")],
+        viewerAcct: "me@ex.com",
+      })
+    );
+    const filtered = filterMergedReactions(merged, new Set(["other@ex.com"]));
+    expect(filtered.viewerEmoji).toBe("👍");
   });
 });
