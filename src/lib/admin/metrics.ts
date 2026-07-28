@@ -10,6 +10,8 @@ import prisma from "@/lib/db";
 export interface MainMetrics {
   /** 総ユーザー数 */
   userCount: number;
+  /** アクティブユーザー数（直近7日間に1件以上投稿したユーザー） */
+  activeUserCount: number;
   /** ユーザーが1人以上いる連携サーバー数 */
   serverCount: number;
   /** 総投稿数 */
@@ -26,9 +28,11 @@ export interface MainMetrics {
    * 直近7日間（ローリング）の各メトリクスの純増減。
    * user/server/image/storage は新規作成分（＝実質の増加、削除は追跡しない）、
    * openReports は「新規通報 − 期間内に対応済みへ移行した数」の純増減（負にもなる）。
+   * activeUserCount は指標自体が7日窓なので、その1つ前の7日窓との差（前週比）。
    */
   deltas7d: {
     userCount: number;
+    activeUserCount: number;
     serverCount: number;
     imageCount: number;
     storageApproxBytes: number;
@@ -39,6 +43,8 @@ export interface MainMetrics {
 export async function getMainMetrics(): Promise<MainMetrics> {
   // 直近7日間のローリングウィンドウ（暦日ではないのでJST補正は不要）。
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  // アクティブユーザーの前週比を出すための、1つ前の7日窓（prevCutoff 〜 cutoff）。
+  const prevCutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
 
   const [
     userCount,
@@ -48,6 +54,8 @@ export async function getMainMetrics(): Promise<MainMetrics> {
     bySourceRaw,
     openReports,
     favUnsynced,
+    activeUsersRaw,
+    prevActiveUsersRaw,
     newUsers,
     newServers,
     newImages,
@@ -71,6 +79,12 @@ export async function getMainMetrics(): Promise<MainMetrics> {
         favoritesSyncedAt: null,
       },
     }),
+    // アクティブユーザー＝直近7日間に投稿したユーザー（投稿者の distinct 数）
+    prisma.image.groupBy({ by: ["userId"], where: { createdAt: { gte: cutoff } } }),
+    prisma.image.groupBy({
+      by: ["userId"],
+      where: { createdAt: { gte: prevCutoff, lt: cutoff } },
+    }),
     // ── 直近7日間の増減 ──
     prisma.user.count({ where: { createdAt: { gte: cutoff } } }),
     // 期間内に「初めてユーザーが付いた」サーバー（全ユーザーが7日以内に参加）
@@ -91,8 +105,11 @@ export async function getMainMetrics(): Promise<MainMetrics> {
     .map((r) => ({ source: r.source, count: r._count._all }))
     .sort((a, b) => b.count - a.count);
 
+  const activeUserCount = activeUsersRaw.length;
+
   return {
     userCount,
+    activeUserCount,
     serverCount,
     imageCount,
     storageApproxBytes: storageAgg._sum.fileSize ?? 0,
@@ -101,6 +118,7 @@ export async function getMainMetrics(): Promise<MainMetrics> {
     favUnsynced,
     deltas7d: {
       userCount: newUsers,
+      activeUserCount: activeUserCount - prevActiveUsersRaw.length,
       serverCount: newServers,
       imageCount: newImages,
       storageApproxBytes: newStorageAgg._sum.fileSize ?? 0,

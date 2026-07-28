@@ -77,6 +77,12 @@ export default async function AdminStatsPage({
           href="/admin/accounts"
         />
         <StatCard
+          label="アクティブユーザー数"
+          value={metrics.activeUserCount}
+          delta={countDelta(metrics.deltas7d.activeUserCount)}
+          href="/admin/accounts?sort=lastpost_desc"
+        />
+        <StatCard
           label="ユニークサーバー数"
           value={metrics.serverCount}
           delta={countDelta(metrics.deltas7d.serverCount)}
