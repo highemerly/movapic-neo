@@ -1,15 +1,6 @@
 import { userPathSegment } from "@/lib/userHandle";
 import { getHomeServer } from "@/lib/auth/serverPolicy";
-
-/**
- * 「特定ページへ戻る指定がない（＝既定）」を表すセンチネル。
- *
- * かつては `/dashboard` を流用していたが、実在ページだと「ダッシュボードへ戻る明示指定」と
- * 見分けが付かず、ページ廃止でリンク切れにもなるため、実在しないパスに変更した。
- * `sanitizeRedirectUrl` を素通りする形（先頭 `/`・`..` や制御文字を含まない）を保つこと
- * ＝素通りしないと OAuth state に載せて往復した値が別物になる。
- */
-export const LOGIN_REDIRECT_DEFAULT = "/__default__";
+import { LOGIN_REDIRECT_DEFAULT } from "@/lib/auth/redirectUrl";
 
 /**
  * ログイン成功後の遷移先を決める。

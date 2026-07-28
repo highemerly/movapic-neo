@@ -56,7 +56,7 @@ vi.mock("@/lib/auth/mastodonApp", () => ({
 
 import { POST } from "./route";
 import { decryptOAuthSession, verifyOAuthState, verifyMiAuthSignature } from "@/lib/auth/crypto";
-import { LOGIN_REDIRECT_DEFAULT } from "@/lib/auth/loginRedirect";
+import { LOGIN_REDIRECT_DEFAULT } from "@/lib/auth/redirectUrl";
 import { AppError } from "@/lib/errors/AppError";
 import { ErrorCodes } from "@/lib/errors/codes";
 

@@ -4,7 +4,7 @@
  */
 
 import { createCipheriv, createDecipheriv, randomBytes, createHash, createHmac, timingSafeEqual } from "crypto";
-import { LOGIN_REDIRECT_DEFAULT } from "./loginRedirect";
+import { LOGIN_REDIRECT_DEFAULT } from "./redirectUrl";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
@@ -211,10 +211,6 @@ export function verifyMiAuthSignature(
 }
 
 /**
- * リダイレクトURLを検証し、安全なパスを返す
- * 外部URLや不正なパスの場合はデフォルトにフォールバック
- */
-/**
  * リクエスト署名を生成（HMAC-SHA256）
  * Cloudflare Worker等の内部サービスからのリクエスト認証に使用
  */
@@ -264,53 +260,4 @@ export function verifyRequestSignature(
  */
 export function hashRequestBody(body: Buffer | Uint8Array): string {
   return createHash("sha256").update(body).digest("hex");
-}
-
-export function sanitizeRedirectUrl(
-  url: string | null | undefined,
-  defaultPath: string = LOGIN_REDIRECT_DEFAULT
-): string {
-  if (!url) {
-    return defaultPath;
-  }
-
-  // 空白をトリム
-  const trimmed = url.trim();
-
-  // 空文字の場合
-  if (!trimmed) {
-    return defaultPath;
-  }
-
-  // プロトコル付きURL（http://, https://, // など）は拒否
-  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed) || trimmed.startsWith("//")) {
-    return defaultPath;
-  }
-
-  // スラッシュで始まらない場合は拒否（相対パス攻撃防止）
-  if (!trimmed.startsWith("/")) {
-    return defaultPath;
-  }
-
-  // バックスラッシュを含む場合は拒否（Windows形式のパス）
-  if (trimmed.includes("\\")) {
-    return defaultPath;
-  }
-
-  // 連続スラッシュで始まる場合は拒否（プロトコル相対URL）
-  if (trimmed.startsWith("//")) {
-    return defaultPath;
-  }
-
-  // パストラバーサル攻撃を防止（../ や /../ など）
-  if (trimmed.includes("..")) {
-    return defaultPath;
-  }
-
-  // 制御文字やnull byteを含む場合は拒否
-  if (/[\x00-\x1f\x7f]/.test(trimmed)) {
-    return defaultPath;
-  }
-
-  return trimmed;
 }

@@ -13,9 +13,9 @@ import {
 import {
   decryptOAuthSession,
   verifyOAuthState,
-  sanitizeRedirectUrl,
 } from "@/lib/auth/crypto";
-import { resolveLoginRedirect, LOGIN_REDIRECT_DEFAULT } from "@/lib/auth/loginRedirect";
+import { sanitizeRedirectUrl, LOGIN_REDIRECT_DEFAULT } from "@/lib/auth/redirectUrl";
+import { resolveLoginRedirect } from "@/lib/auth/loginRedirect";
 import { encryptToken } from "@/lib/auth/tokens";
 import { clearMastodonAppCredentials } from "@/lib/auth/mastodonApp";
 import { createSession, getCurrentUser } from "@/lib/auth/session";

@@ -1,5 +1,6 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
-import { resolveLoginRedirect, LOGIN_REDIRECT_DEFAULT } from "./loginRedirect";
+import { resolveLoginRedirect } from "./loginRedirect";
+import { LOGIN_REDIRECT_DEFAULT } from "./redirectUrl";
 
 afterEach(() => {
   vi.unstubAllEnvs();

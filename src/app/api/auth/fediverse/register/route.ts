@@ -22,7 +22,7 @@ import {
   generateMiAuthSignature,
   type OAuthSessionData,
 } from "@/lib/auth/crypto";
-import { LOGIN_REDIRECT_DEFAULT } from "@/lib/auth/loginRedirect";
+import { LOGIN_REDIRECT_DEFAULT } from "@/lib/auth/redirectUrl";
 import { ErrorCodes, errorResponse, handleAppError, handleUnknownError } from "@/lib/errors";
 import { AppError } from "@/lib/errors/AppError";
 import {

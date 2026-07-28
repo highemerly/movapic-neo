@@ -9,10 +9,9 @@ import {
   verifyMiAuthSignature,
   verifyRequestSignature,
   hashRequestBody,
-  sanitizeRedirectUrl,
   type OAuthSessionData,
 } from "./crypto";
-import { LOGIN_REDIRECT_DEFAULT } from "./loginRedirect";
+import { LOGIN_REDIRECT_DEFAULT } from "./redirectUrl";
 
 const SECRET = "test-jwt-secret-value";
 
@@ -156,53 +155,5 @@ describe("hashRequestBody", () => {
     expect(hashRequestBody(Buffer.from("abc"))).toBe(
       "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     );
-  });
-});
-
-describe("sanitizeRedirectUrl（オープンリダイレクト防止）", () => {
-  it("安全な相対パスはそのまま（前後空白はトリム）", () => {
-    expect(sanitizeRedirectUrl("/create")).toBe("/create");
-    expect(sanitizeRedirectUrl("/u/alice?tab=posts#top")).toBe("/u/alice?tab=posts#top");
-    expect(sanitizeRedirectUrl("  /foo  ")).toBe("/foo");
-  });
-
-  // 既定センチネルは OAuth state に載って往復するので、ここを素通りしないと別の値になり
-  // resolveLoginRedirect が「戻り先の明示指定」と誤認する
-  it("既定センチネルはそのまま通す", () => {
-    expect(sanitizeRedirectUrl(LOGIN_REDIRECT_DEFAULT)).toBe(LOGIN_REDIRECT_DEFAULT);
-  });
-
-  it("null/undefined/空は既定パスへ", () => {
-    expect(sanitizeRedirectUrl(null)).toBe(LOGIN_REDIRECT_DEFAULT);
-    expect(sanitizeRedirectUrl(undefined)).toBe(LOGIN_REDIRECT_DEFAULT);
-    expect(sanitizeRedirectUrl("")).toBe(LOGIN_REDIRECT_DEFAULT);
-    expect(sanitizeRedirectUrl("   ")).toBe(LOGIN_REDIRECT_DEFAULT);
-  });
-
-  it("外部URL・プロトコル・プロトコル相対を拒否", () => {
-    for (const bad of [
-      "http://evil.com",
-      "https://evil.com",
-      "//evil.com",
-      "javascript:alert(1)",
-      "mailto:a@b.com",
-      "data:text/html,x",
-    ]) {
-      expect(sanitizeRedirectUrl(bad)).toBe(LOGIN_REDIRECT_DEFAULT);
-    }
-  });
-
-  it("スラッシュ始まりでない・バックスラッシュ・パストラバーサル・制御文字を拒否", () => {
-    expect(sanitizeRedirectUrl("settings")).toBe(LOGIN_REDIRECT_DEFAULT);
-    expect(sanitizeRedirectUrl("/foo\\bar")).toBe(LOGIN_REDIRECT_DEFAULT);
-    expect(sanitizeRedirectUrl("/../etc/passwd")).toBe(LOGIN_REDIRECT_DEFAULT);
-    expect(sanitizeRedirectUrl("/foo/../../bar")).toBe(LOGIN_REDIRECT_DEFAULT);
-    expect(sanitizeRedirectUrl("/foo\x00bar")).toBe(LOGIN_REDIRECT_DEFAULT);
-    expect(sanitizeRedirectUrl("/foo\nbar")).toBe(LOGIN_REDIRECT_DEFAULT);
-  });
-
-  it("既定パスは差し替え可能", () => {
-    expect(sanitizeRedirectUrl(null, "/")).toBe("/");
-    expect(sanitizeRedirectUrl("http://x", "/login")).toBe("/login");
   });
 });

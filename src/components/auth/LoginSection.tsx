@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Lock, AlertCircle } from "lucide-react";
 import { LoginButton } from "./LoginButton";
 import { LoginPrompt } from "./LoginPrompt";
+import { parseReturnTo } from "@/lib/auth/redirectUrl";
 import { AboutShamezo } from "@/components/onboarding/AboutShamezo";
 
 interface LoginSectionProps {
@@ -44,20 +45,13 @@ function getErrorMessage(code: string): string {
   }
 }
 
-function sanitizeReturnTo(value: string | null): string | undefined {
-  if (!value) return undefined;
-  if (!value.startsWith("/")) return undefined;
-  if (value.startsWith("//")) return undefined;
-  if (value.includes("\\")) return undefined;
-  if (value.includes("..")) return undefined;
-  return value;
-}
-
 export function LoginSection({ allowedServers, initialIsLoggedIn, loggedInHref }: LoginSectionProps) {
   const params = useSearchParams();
   const reason = params.get("reason");
   const errorCode = params.get("error");
-  const returnTo = sanitizeReturnTo(params.get("returnTo"));
+  // 判定はサーバーのコールバックと同じ規則（@/lib/auth/redirectUrl）に委ねる。
+  // ここに手書きのコピーを置くと、片方だけ直したときに無言でずれる。
+  const returnTo = parseReturnTo(params.get("returnTo"));
   const showLoginRequired = reason === "login_required" && !!returnTo;
   // 上部に警告バナー（エラー／ログイン必須）が出るときは「今すぐログイン…」の見出しは冗長なので消す。
   const hasBanner = !!errorCode || showLoginRequired;

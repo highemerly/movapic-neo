@@ -82,7 +82,7 @@ vi.mock("@/lib/db", () => ({
 
 import { GET } from "./route";
 import { encryptOAuthSession, generateOAuthState } from "@/lib/auth/crypto";
-import { LOGIN_REDIRECT_DEFAULT } from "@/lib/auth/loginRedirect";
+import { LOGIN_REDIRECT_DEFAULT } from "@/lib/auth/redirectUrl";
 import { decryptToken } from "@/lib/auth/tokens";
 
 const BASE_URL = "https://shamezo.example";
