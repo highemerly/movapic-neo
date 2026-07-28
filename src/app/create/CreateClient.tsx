@@ -32,6 +32,7 @@ import {
   saveGuestDraft as persistGuestDraft,
   loadGuestDraft,
   clearGuestDraft,
+  purgeExpiredGuestDraft,
 } from "@/lib/guestDraft";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
@@ -474,6 +475,16 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
       cancelled = true;
     };
   }, [handleImageSelect, router]);
+
+  // 期限切れのゲスト下書きを掃除する。退避したままログインをやめると、写真（最大20MB）が
+  // IndexedDB に残り続けて共用端末では次の人に見えてしまう。/create は下書きの唯一の書き込み元
+  // なので、ここをゲスト・ログイン済みの両方で通る掃除場所にしている（復元経路とは独立）。
+  useEffect(() => {
+    purgeExpiredGuestDraft().catch((e) => {
+      // 掃除に失敗しても投稿導線は止めない（次回の /create 訪問でやり直す）。
+      console.error("下書きの掃除に失敗しました:", e);
+    });
+  }, []);
 
   // ゲストが「ログインして投稿」で退避した下書きを、ログイン後の /create?restore=1 で復元する。
   // IndexedDB から写真＋設定を取り出し、通常アップロードと同じ handleImageSelect に流す
