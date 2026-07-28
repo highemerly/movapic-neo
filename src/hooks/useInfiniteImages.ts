@@ -294,11 +294,15 @@ export function useInfiniteImages<T extends { id: string }>({
       page: InfiniteImagesPage<T>
     ): { added: number; changed: boolean } => {
       const prevImages = imagesRef.current;
+      // 重なり判定には表示フィルタ前の id を渡す。フィルタ後だけで判定すると、最新ページの
+      // 大半がミュート相手のときに「穴あき」と誤判定して読み込み済みの tail を捨ててしまう。
+      const rawPageIds = new Set(page.images.map((img) => img.id));
       const res = reconcileTimeline(
         prevImages,
         keep(page.images),
         page.hasMore,
-        page.nextCursor
+        page.nextCursor,
+        rawPageIds
       );
       markScroll();
       setImages(res.images);

@@ -160,4 +160,47 @@ describe("reconcileTimeline", () => {
     expect(res.keepCursor).toBe(false);
     expect(res.cursor).toBeNull();
   });
+
+  // ── rawPageIds（表示フィルタ前の id）を渡すケース ──
+  // ミュート除外後の incoming だけで重なりを判定すると tail を捨ててしまう回帰の防止。
+
+  it("最新ページの大半がミュート相手でも、生ページに重なりがあれば tail を維持する", () => {
+    // prev の b,c,d,e に対し最新ページは b,c,x。b,c はミュート相手で incoming からは消える。
+    const prev = items("d", "e");
+    const res = reconcileTimeline(prev, items("x"), true, "cursorNew", new Set(["b", "c", "x", "d"]));
+    // 生ページに d が居る＝窓は prev と重なっている。e（窓より古い）は残す。
+    expect(ids(res.images)).toEqual(["x", "e"]);
+    expect(res.keepCursor).toBe(true);
+    expect([...res.newIds]).toEqual(["x"]);
+  });
+
+  it("最新ページが全件ミュート相手（incoming が空）でも tail を捨てない", () => {
+    const prev = items("c", "d", "e");
+    const res = reconcileTimeline(prev, [], true, "cursorNew", new Set(["c", "d"]));
+    expect(ids(res.images)).toEqual(["e"]);
+    expect(res.keepCursor).toBe(true);
+    expect([...res.newIds]).toEqual([]);
+  });
+
+  it("生ページにも重なりが無ければ従来どおり全差し替え（本当の穴あき）", () => {
+    const prev = items("d", "e", "f");
+    const res = reconcileTimeline(prev, items("x"), true, "cursorNew", new Set(["x", "y", "z"]));
+    expect(ids(res.images)).toEqual(["x"]);
+    expect(res.keepCursor).toBe(false);
+    expect(res.cursor).toBe("cursorNew");
+  });
+
+  it("新たにミュートした相手が窓の中に居れば tail からも消える", () => {
+    // prev の d は今回ミュートされ incoming からは落ちるが、生ページには載っている。
+    const prev = items("c", "d", "e");
+    const res = reconcileTimeline(prev, items("c"), true, "cursorNew", new Set(["c", "d"]));
+    expect(ids(res.images)).toEqual(["c", "e"]);
+    expect(res.keepCursor).toBe(true);
+  });
+
+  it("ミュートで隠れた新着は newIds に入れない（新着ピルを水増ししない）", () => {
+    const prev = items("b", "c");
+    const res = reconcileTimeline(prev, items("b", "c"), true, "cursorNew", new Set(["m", "b", "c"]));
+    expect([...res.newIds]).toEqual([]);
+  });
 });

@@ -86,15 +86,24 @@ export function sliceSincePage<T extends { id: string }>(
  *
  * keepCursor=true のとき呼び出し側は nextCursor を変更しない（tail 末尾が不変のため）。
  * newIds は「今まで表示に無かった＝新規」要素の id（入場アニメ用）。
+ *
+ * rawPageIds は表示フィルタを掛ける**前**の最新ページの id 集合。省略時は incoming の id を使う。
+ * pitfall: 重なり判定をフィルタ後の id でやると、最新ページの大半がミュート相手のときに prev と
+ * 重ならず「穴あき」と誤判定し、読み込み済みの tail を丸ごと捨てて一覧が数件（最悪ゼロ件）へ縮む。
+ * ミュートで見えなくなった要素も「その時間窓がサーバから返ってきた」証拠としては有効なので、
+ * 窓の重なり判定と tail の重複除去だけは常に生の id で行う。
  */
 export function reconcileTimeline<T extends { id: string }>(
   prev: T[],
   incoming: T[],
   hasMore: boolean,
-  nextCursor: string | null
+  nextCursor: string | null,
+  rawPageIds?: ReadonlySet<string>
 ): { images: T[]; cursor: string | null; keepCursor: boolean; newIds: Set<string> } {
-  const freshIds = new Set(incoming.map((img) => img.id));
+  const pageIds = rawPageIds ?? new Set(incoming.map((img) => img.id));
   const prevIds = new Set(prev.map((img) => img.id));
+  // newIds は入場アニメ・「N件の新着」ピル用なので、表示に出る分だけ数える
+  // （ミュートで隠した投稿は利用者にとって新着ではない）。
   const newIds = new Set(
     incoming.filter((img) => !prevIds.has(img.id)).map((img) => img.id)
   );
@@ -107,7 +116,7 @@ export function reconcileTimeline<T extends { id: string }>(
   // prev 側で最新ページと重なる最古の位置を探す。そこより後ろ（古い）を tail として残す。
   let cut = -1;
   for (let i = prev.length - 1; i >= 0; i--) {
-    if (freshIds.has(prev[i].id)) {
+    if (pageIds.has(prev[i].id)) {
       cut = i;
       break;
     }
@@ -116,6 +125,8 @@ export function reconcileTimeline<T extends { id: string }>(
     return { images: incoming, cursor: freshCursor, keepCursor: false, newIds };
   }
 
-  const tail = prev.slice(cut + 1).filter((img) => !freshIds.has(img.id));
+  // 生ページに載っている要素は tail から落とす。head との重複除去に加え、新たにミュートした
+  // 相手が窓の中に居るとき（incoming からは消えるが prev には残っている）の掃除も兼ねる。
+  const tail = prev.slice(cut + 1).filter((img) => !pageIds.has(img.id));
   return { images: [...incoming, ...tail], cursor: null, keepCursor: true, newIds };
 }
