@@ -11,6 +11,14 @@ import { VisibilityPicker } from "@/components/VisibilityPicker";
 import { SegmentControl } from "@/components/SegmentControl";
 import { SeasonToggle } from "./SeasonToggle";
 import { AltTextDialog } from "@/components/AltTextDialog";
+import { LoginButton } from "@/components/auth/LoginButton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { SaveDefaultsSection } from "@/components/SaveDefaultsSection";
 import { OtherPostMethods } from "@/components/OtherPostMethods";
 import { ActionButtons } from "@/components/ActionButtons";
@@ -20,6 +28,11 @@ import {
 } from "@/components/PostVisibilityNotice";
 import { useStickyVisible } from "@/hooks/useStickyVisible";
 import { CACHE_NAMES, SESSION_KEYS, SHARED_IMAGE_CACHE_KEY } from "@/lib/storageKeys";
+import {
+  saveGuestDraft as persistGuestDraft,
+  loadGuestDraft,
+  clearGuestDraft,
+} from "@/lib/guestDraft";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { ResultDetails } from "@/components/ResultDetails";
@@ -134,6 +147,13 @@ export interface CreateClientProps {
     emailPrefix: string;
     emailDomain: string | null;
   };
+  /** 未ログイン（ゲスト）表示。プレビューまで開放し、投稿は「ログインして投稿」で下書きを
+      退避→ログイン往復→復元する。撮影情報/公開範囲/設定保存など認証・連携先が要る機能は隠す。
+      user は空のセンチネル、preferences は全 null で渡される。 */
+  guest?: boolean;
+  /** ゲストのログインモーダルに渡す許可サーバー（単一なら入力欄なしのワンクリックログイン）。
+      トップの LoginSection と同じ getAllowedServers() の値。 */
+  allowedServers?: string[];
 }
 
 // インスタンス種別から出力形式を自動決定
@@ -214,15 +234,16 @@ const UNREADABLE_FILE_ERROR = {
   suggestion: "クラウド上の写真は、端末に保存してから選び直してください",
 };
 
-export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn, firstTime = false, showWelcome = false, postMethods }: CreateClientProps) {
+export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn, firstTime = false, showWelcome = false, postMethods, guest = false, allowedServers }: CreateClientProps) {
   const router = useRouter();
   const homeServer = useHomeServer();
   // 初回投稿者は③以降（色・位置などの詳細オプション）を折りたたんで最初は隠す。
   // 既定はデフォルト値で投稿できるので、写真→コメント→投稿の最短動線を邪魔しない。
   // 2回目以降のユーザーは従来どおり最初から開いておく。
   const [optionsOpen, setOptionsOpen] = useState(!firstTime);
-  // 出力形式は連携インスタンスの種別から自動決定
-  const autoOutput = outputFromInstanceType(user.instance.type);
+  // 出力形式は連携インスタンスの種別から自動決定。ゲストは連携先が未確定なので JPEG(none) で
+  // プレビューし、ログイン後の投稿時に連携先の形式（AVIF等）で再生成する。
+  const autoOutput = guest ? "none" : outputFromInstanceType(user.instance.type);
   // フォーム初期値はユーザー設定（preferences）で seed（output は instance.type を優先）。
   // 遅延初期化なので useEffect 不要・初回描画でフラッシュなし。
   const [formState, setFormState] = useState<GenerateFormState>(() => ({
@@ -258,6 +279,8 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
   // 投稿時（handlePost）の FormData にだけ相乗りさせる。画像を変えたら破棄する。
   const [altText, setAltText] = useState("");
   const [altDialogOpen, setAltDialogOpen] = useState(false);
+  // ゲストの「ログインして投稿」モーダル（プレビュー画面上に出す。トップには飛ばさない）。
+  const [loginOpen, setLoginOpen] = useState(false);
   const [isSavingDefaults, setIsSavingDefaults] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [exif, setExif] = useState<ExtractedExif | null>(null);
@@ -388,9 +411,10 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
       }
       // GPSの無い画像だけ、手動選択用に過去の投稿地を1回取得する。
       // GPSがある画像は従来どおり座標から逆引きするので取得不要。
+      // ゲストは撮影地の手動選択UI自体を出さない＝認証が要る /me/locations も叩かない。
       const hasGps =
         extracted?.gpsLatitude != null && extracted?.gpsLongitude != null;
-      if (!hasGps) {
+      if (!hasGps && !guest) {
         setIsLoadingLocations(true);
         try {
           const res = await fetch("/api/v1/me/locations");
@@ -409,7 +433,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
         }
       }
     },
-    [preferences.cameraOption, showError],
+    [preferences.cameraOption, showError, guest],
   );
 
   // PWA の Web Share Target 経由で共有された画像を受け取る。
@@ -451,9 +475,66 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
     };
   }, [handleImageSelect, router]);
 
+  // ゲストが「ログインして投稿」で退避した下書きを、ログイン後の /create?restore=1 で復元する。
+  // IndexedDB から写真＋設定を取り出し、通常アップロードと同じ handleImageSelect に流す
+  // （EXIF抽出・撮影地候補の取得もここで復活）。復元できたら破棄する。
+  // ゲスト表示中（未ログイン）は復元しない＝ログイン済みで戻ってきたときだけ動く。
+  const restoreConsumedRef = useRef(false);
+  useEffect(() => {
+    if (guest) return;
+    if (restoreConsumedRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("restore") !== "1") return;
+    restoreConsumedRef.current = true;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const draft = await loadGuestDraft();
+        if (draft && !cancelled) {
+          const file = new File([draft.imageBlob], draft.imageName || "photo", {
+            type: draft.imageType || draft.imageBlob.type || "image/jpeg",
+          });
+          const preview = URL.createObjectURL(file);
+          // handleImageSelect は altText を空にリセットするので、設定の反映はこの後に行う。
+          await handleImageSelect(file, preview);
+          const s = draft.settings;
+          if (s && !cancelled) {
+            setFormState((prev) => ({
+              ...prev,
+              text: s.text ?? prev.text,
+              position: s.position ?? prev.position,
+              font: s.font ?? prev.font,
+              color: s.color ?? prev.color,
+              size: s.size ?? prev.size,
+              arrangement: s.arrangement ?? prev.arrangement,
+              // シーズンは今アクティブなキーと一致するときだけ復元（往復中に期限切れした場合を弾く）。
+              season:
+                s.season && activeSeason && s.season === activeSeason.key
+                  ? s.season
+                  : null,
+              // output はここでは触らない＝ログイン済みの autoOutput（連携先形式）を維持。
+            }));
+            if (typeof s.altText === "string") setAltText(s.altText);
+          }
+        }
+        await clearGuestDraft();
+      } catch (e) {
+        console.error("下書きの復元に失敗しました:", e);
+      } finally {
+        // リロードで再処理されないよう ?restore=1 を消す
+        router.replace("/create");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [guest, handleImageSelect, router, activeSeason]);
+
   const handleReset = useCallback(() => {
-    // 出力形式はインスタンス種別の自動値を保持
-    const resetOutput = outputFromInstanceType(user.instance.type);
+    // 出力形式はインスタンス種別の自動値を保持（ゲストは連携先未確定なので JPEG(none)）
+    const resetOutput = guest ? "none" : outputFromInstanceType(user.instance.type);
     setFormState({ ...initialState, output: resetOutput });
     setHasGenerated(false);
     setLastGeneratedState(null);
@@ -471,7 +552,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
       setResultUrl(null);
     }
     toast.dismiss();
-  }, [resultUrl, user.instance.type]);
+  }, [resultUrl, user.instance.type, guest]);
 
   // 生成APIを呼び出してblob・MIMEタイプ・元画像情報を返す（UI状態は更新しない）
   const callGenerate = async (): Promise<GenerateResult | null> => {
@@ -646,6 +727,49 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
       document.body.scrollTop = 0;
     }
     setIsLoading(false);
+  };
+
+  // ゲストの下書きを退避する。ログイン往復（外部サーバーへ全面遷移）でメモリ上の画像・設定は
+  // 消えるため、写真＋設定を IndexedDB に逃がしておき /create?restore=1 で復元する。
+  // output は連携先未確定なので退避しない（復元先で連携先形式に決まる）。撮影情報/公開範囲はゲストで未設定。
+  const stashGuestDraft = async () => {
+    if (!formState.imageFile) return;
+    try {
+      await persistGuestDraft({
+        imageBlob: formState.imageFile,
+        imageName: formState.imageFile.name,
+        imageType: formState.imageFile.type || "application/octet-stream",
+        settings: {
+          text: formState.text,
+          position: formState.position,
+          font: formState.font,
+          color: formState.color,
+          size: formState.size,
+          arrangement: formState.arrangement,
+          season: formState.season,
+          altText,
+        },
+      });
+    } catch (e) {
+      // 退避に失敗しても投稿導線は止めない（ログイン後に画像を選び直せば済む）。
+      console.error("下書きの退避に失敗しました:", e);
+    }
+  };
+
+  // ゲストの「ログインして投稿」: 下書きを退避してから、プレビュー画面上にログインモーダルを開く。
+  // トップページには飛ばさない（作業中の画面のままログインできる）。モーダル内の LoginButton が
+  // callbackUrl=/create?restore=1 で認証を開始し、ログイン後は /create?restore=1 に戻って復元される。
+  const handleGuestLogin = async () => {
+    if (!formState.imageFile) {
+      showError({ message: "画像を選択してください" });
+      return;
+    }
+    if (!formState.text.trim()) {
+      showError({ message: "テキストを入力してください" });
+      return;
+    }
+    await stashGuestDraft();
+    setLoginOpen(true);
   };
 
   // 投稿ボタン: プレビュー済みならその画像を、未プレビュー/変更ありなら生成してから投稿
@@ -921,6 +1045,9 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
     onGenerate: handleGenerate,
     onPost: handlePost,
     includesLocation: locationOption !== "none",
+    // ゲストは投稿ボタンを「ログインして投稿」に差し替え（下書きを退避してログインへ）
+    guestMode: guest,
+    onLogin: handleGuestLogin,
   };
 
   // 撮影場所の表示ラベル（注意文用）。GPSありは逆引き結果、GPSなしは手動選択値を使う。
@@ -957,7 +1084,15 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
         progress={uploadPhase === "uploading" ? uploadPct : undefined}
       />
       <SiteHeader
-        user={{ username: user.username, instanceDomain: user.instance.domain, avatarUrl: user.avatarUrl }}
+        user={
+          guest
+            ? null
+            : {
+                username: user.username,
+                instanceDomain: user.instance.domain,
+                avatarUrl: user.avatarUrl,
+              }
+        }
       />
 
 
@@ -966,7 +1101,23 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
           formState.imageFile ? "max-w-md lg:max-w-6xl" : "max-w-md"
         } ${showSticky ? "pb-28" : ""}`}
       >
-        <h1 className="mb-3 text-xl font-bold">新しい写真を投稿する</h1>
+        <h1 className="mb-3 text-xl font-bold">
+          {guest ? "写真に文字を入れてみる" : "新しい写真を投稿する"}
+        </h1>
+
+        {/* 未ログイン（ゲスト）向けの案内。ログイン不要でプレビューまで試せること、投稿には
+            ログインが要ることを先に伝えて期待値を合わせる。 */}
+        {guest && (
+          <div className="mb-4 flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+            <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <div className="space-y-1">
+              <p className="text-sm font-bold">ログインなしで試せます</p>
+              <p className="text-xs text-muted-foreground">
+                写真を選んで、入れたいひとことを書くだけ。気に入ったら「ログインして投稿」で、写真をそのまま Mastodon / Misskey に投稿できます。
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* 初回ログイン直後の歓迎バナー（?welcome=1）。写真＋コメントだけで投稿できることを伝える。 */}
         {showWelcome && (
@@ -1017,7 +1168,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
               {/* 他の投稿方法（Fediverse／メール）。写真アップロードの代替手段として、
                   カメラ撮影ボタンと同じ「または」区切り＋破線ボタンでアップロード直下に並べる。
                   写真を選ぶと非表示。初回投稿者にはまず1枚目に集中してもらうため出さない。 */}
-              {!firstTime && !formState.imageFile && (
+              {!guest && !firstTime && !formState.imageFile && (
                 <OtherPostMethods
                   botAcct={postMethods.botAcct}
                   emailPrefix={postMethods.emailPrefix}
@@ -1029,8 +1180,9 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
             </div>
 
             {/* 注意事項（公開範囲と撮影場所に応じて動的に変化）。写真アップロード前は
-                「みんなの写真に表示されます」等が空振りするため、アップロード後のみ表示。 */}
-            {formState.imageFile && (
+                「みんなの写真に表示されます」等が空振りするため、アップロード後のみ表示。
+                ゲストは公開範囲/撮影地の選択自体を出さないので注意事項も出さない。 */}
+            {!guest && formState.imageFile && (
               <div className="space-y-2">
                 <PostVisibilityNotice
                   visibility={visibility}
@@ -1147,6 +1299,10 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                   )}
                 </div>
 
+                {/* ③④⑤（撮影情報・公開範囲・設定保存）は認証/連携先が前提なのでゲストでは非表示。
+                    ゲストは①コメント＋②スタイルだけで「プレビュー」→「ログインして投稿」に進む。 */}
+                {!guest && (
+                <>
                 {/* ④ 投稿する情報を追加（EXIF撮影情報）
                   カメラ機種名と撮影場所を独立したセグメントで毎回選ぶ。共通の
                   SegmentControl（ラベルが長いので size="xs"＋truncate）を使う。位置情報の
@@ -1390,6 +1546,8 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                     />
                   )}
                 </div>
+                </>
+                )}
               </div>
               )}
             </div>
@@ -1439,6 +1597,26 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
         onSave={setAltText}
         onClose={() => setAltDialogOpen(false)}
       />
+
+      {/* ゲストのログインモーダル。プレビュー画面上に重ねて出し、トップに飛ばさずここで
+          ログインを開始する。認証後は /create?restore=1 に戻り、退避した下書きを復元して投稿できる。 */}
+      {guest && (
+        <Dialog open={loginOpen} onOpenChange={setLoginOpen}>
+          <DialogContent className="top-4 max-h-[calc(100dvh-2rem)] translate-y-0 overflow-y-auto sm:top-1/2 sm:-translate-y-1/2">
+            <DialogHeader>
+              <DialogTitle>ログインして投稿</DialogTitle>
+              <DialogDescription>
+                いま作った写真とコメントはそのまま保持されます。ログインすると、この一枚をそのまま投稿できます。
+              </DialogDescription>
+            </DialogHeader>
+            <LoginButton
+              allowedServers={allowedServers}
+              callbackUrl="/create?restore=1"
+              initialIsLoggedIn={false}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

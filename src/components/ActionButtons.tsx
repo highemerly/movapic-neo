@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ActionButtonsProps {
@@ -12,6 +12,10 @@ interface ActionButtonsProps {
   onPost: () => void;
   // 位置情報を含む選択中は投稿ボタンの文言で明示する
   includesLocation?: boolean;
+  // 未ログイン（ゲスト）モード: 投稿ボタンの代わりに「ログインして投稿」を出す。
+  // 押すと下書きを退避してログインへ誘導し、ログイン後に復元して投稿できる。
+  guestMode?: boolean;
+  onLogin?: () => void;
 }
 
 export function ActionButtons({
@@ -22,6 +26,8 @@ export function ActionButtons({
   onGenerate,
   onPost,
   includesLocation = false,
+  guestMode = false,
+  onLogin,
 }: ActionButtonsProps) {
   // プレビューボタン: 未プレビュー or 変更ありのときのみ活性
   const previewDisabled = isLoading || isPosting || !canGenerate || hasPreview;
@@ -51,29 +57,48 @@ export function ActionButtons({
         )}
       </Button>
 
-      {/* 投稿ボタン */}
-      <Button
-        onClick={onPost}
-        disabled={postDisabled}
-        variant={postDisabled ? "outline" : "default"}
-        className={`h-12 ${
-          postDisabled
-            ? "text-muted-foreground"
-            : "bg-brand text-brand-foreground hover:bg-brand/90"
-        }`}
-        size="lg"
-      >
-        {isPosting ? (
+      {/* 投稿ボタン（ゲストはログイン誘導ボタンに差し替え） */}
+      {guestMode ? (
+        <Button
+          onClick={onLogin}
+          disabled={!canGenerate || isLoading}
+          variant={!canGenerate || isLoading ? "outline" : "default"}
+          className={`h-12 ${
+            !canGenerate || isLoading
+              ? "text-muted-foreground"
+              : "bg-brand text-brand-foreground hover:bg-brand/90"
+          }`}
+          size="lg"
+        >
           <span className="flex items-center gap-1.5">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            投稿中...
+            <LogIn className="h-4 w-4" />
+            ログインして投稿
           </span>
-        ) : includesLocation ? (
-          "📍付きで投稿"
-        ) : (
-          "投稿"
-        )}
-      </Button>
+        </Button>
+      ) : (
+        <Button
+          onClick={onPost}
+          disabled={postDisabled}
+          variant={postDisabled ? "outline" : "default"}
+          className={`h-12 ${
+            postDisabled
+              ? "text-muted-foreground"
+              : "bg-brand text-brand-foreground hover:bg-brand/90"
+          }`}
+          size="lg"
+        >
+          {isPosting ? (
+            <span className="flex items-center gap-1.5">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              投稿中...
+            </span>
+          ) : includesLocation ? (
+            "📍付きで投稿"
+          ) : (
+            "投稿"
+          )}
+        </Button>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
 import { getCurrentUserWithPreferences } from "@/lib/auth/session";
+import { getAllowedServers } from "@/lib/auth/serverPolicy";
 import { getAvatarUrl } from "@/lib/avatar";
 import { getActiveSeason, seasonPeriodLabel } from "@/lib/seasons/catalog";
 import { getBotAcct, getEmailDomain } from "@/lib/postMethods";
@@ -28,10 +28,6 @@ export default async function CreatePage({
 }) {
   const user = await getCurrentUserWithPreferences();
 
-  if (!user) {
-    redirect("/?reason=login_required&returnTo=%2Fcreate");
-  }
-
   // シーズン（期間限定）: 現在アクティブなシーズンだけをトグル用に渡す（無ければ非表示）。
   // ハイドレーション不整合を避けるためサーバーで判定して props で渡す。
   const active = getActiveSeason(new Date());
@@ -42,6 +38,49 @@ export default async function CreatePage({
   const sp = await searchParams;
   const requestedSeason = typeof sp.season === "string" ? sp.season : undefined;
   const defaultSeasonOn = active != null && requestedSeason === active.key;
+
+  const activeSeasonProps = active
+    ? {
+        key: active.key,
+        label: active.label,
+        description: active.description,
+        period: seasonPeriodLabel(active),
+      }
+    : null;
+
+  // 未ログインでもプレビューまでは試せるようにする（生成APIは認証不要）。
+  // 投稿だけはログインが要るので「ログインして投稿」で下書きを退避→ログイン往復→
+  // /create?restore=1 で復元し、手動で投稿する導線に流す（CreateClient 側で実装）。
+  // 撮影情報/公開範囲/設定保存など認証・連携先が要る機能はゲストでは非表示。
+  if (!user) {
+    return (
+      <CreateClient
+        guest
+        allowedServers={getAllowedServers()}
+        // ゲストは「まだ投稿したことがない人」なので、初回ユーザーと同じ簡素化UIを適用する
+        // （②以降は「文字の色や位置を変える」ボタンの奥に畳み、写真→コメント→プレビューの最短動線に）。
+        firstTime={true}
+        showWelcome={false}
+        defaultSeasonOn={defaultSeasonOn}
+        activeSeason={activeSeasonProps}
+        user={{
+          username: "",
+          instance: { domain: "", type: "" },
+          avatarUrl: null,
+        }}
+        postMethods={{ botAcct: null, emailPrefix: "", emailDomain: null }}
+        preferences={{
+          position: null,
+          font: null,
+          color: null,
+          size: null,
+          arrangement: null,
+          visibility: null,
+          cameraOption: null,
+        }}
+      />
+    );
+  }
 
   // 初回投稿者向けのやさしいUI用フラグ。
   // - firstTime: これまで1枚も投稿していない（公開/非公開/local問わず全件で判定）
@@ -55,16 +94,7 @@ export default async function CreatePage({
       firstTime={firstTime}
       showWelcome={showWelcome}
       defaultSeasonOn={defaultSeasonOn}
-      activeSeason={
-        active
-          ? {
-              key: active.key,
-              label: active.label,
-              description: active.description,
-              period: seasonPeriodLabel(active),
-            }
-          : null
-      }
+      activeSeason={activeSeasonProps}
       user={{
         username: user.username,
         instance: { domain: user.instanceDomain, type: user.instanceType },
