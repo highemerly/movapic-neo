@@ -22,6 +22,7 @@ import {
   generateMiAuthSignature,
   type OAuthSessionData,
 } from "@/lib/auth/crypto";
+import { LOGIN_REDIRECT_DEFAULT } from "@/lib/auth/loginRedirect";
 import { ErrorCodes, errorResponse, handleAppError, handleUnknownError } from "@/lib/errors";
 import { AppError } from "@/lib/errors/AppError";
 import {
@@ -113,7 +114,7 @@ export async function POST(request: NextRequest) {
       const encryptedSession = encryptOAuthSession(sessionData);
 
       // Stateパラメータを生成
-      const state = generateOAuthState(callbackUrl || "/dashboard");
+      const state = generateOAuthState(callbackUrl || LOGIN_REDIRECT_DEFAULT);
 
       // クッキーに保存
       cookieStore.set(OAUTH_SESSION_COOKIE, encryptedSession, {
@@ -168,7 +169,7 @@ export async function POST(request: NextRequest) {
         session: sessionId,
         ts: timestamp.toString(),
         sig: signature,
-        redirect: callbackUrl || "/dashboard",
+        redirect: callbackUrl || LOGIN_REDIRECT_DEFAULT,
       });
       const miAuthCallback = `${baseUrl}/api/auth/fediverse/callback/misskey?${callbackParams.toString()}`;
 

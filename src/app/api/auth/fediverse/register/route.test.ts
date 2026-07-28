@@ -56,6 +56,7 @@ vi.mock("@/lib/auth/mastodonApp", () => ({
 
 import { POST } from "./route";
 import { decryptOAuthSession, verifyOAuthState, verifyMiAuthSignature } from "@/lib/auth/crypto";
+import { LOGIN_REDIRECT_DEFAULT } from "@/lib/auth/loginRedirect";
 import { AppError } from "@/lib/errors/AppError";
 import { ErrorCodes } from "@/lib/errors/codes";
 
@@ -222,11 +223,11 @@ describe("POST /api/auth/fediverse/register Mastodon", () => {
     expect(verifyOAuthState(state)?.callbackUrl).toBe("/create");
   });
 
-  it("callbackUrl 未指定なら既定センチネル /dashboard", async () => {
+  it("callbackUrl 未指定なら既定センチネルが載る", async () => {
     const res = await POST(req({ server: MASTODON }));
     const state = new URL((await json(res)).url!).searchParams.get("state")!;
 
-    expect(verifyOAuthState(state)?.callbackUrl).toBe("/dashboard");
+    expect(verifyOAuthState(state)?.callbackUrl).toBe(LOGIN_REDIRECT_DEFAULT);
   });
 
   it("clientSecret は暗号化して cookie に入れる（平文で置かない）", async () => {

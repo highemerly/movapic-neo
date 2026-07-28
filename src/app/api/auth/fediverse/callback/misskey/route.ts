@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
       extractLoginRequestInfo(request)
     );
 
-    // 遷移先が既定（/dashboard センチネル）のときは、初回ログインなら /create?welcome=1、
+    // 遷移先が既定センチネルのときは、初回ログインなら /create?welcome=1、
     // 既存ユーザーなら自分のユーザーページへ。明示的な returnTo はそのまま尊重する。
     const finalRedirect = resolveLoginRedirect(redirectTo, {
       isNewUser,

@@ -15,7 +15,7 @@ import {
   verifyOAuthState,
   sanitizeRedirectUrl,
 } from "@/lib/auth/crypto";
-import { resolveLoginRedirect } from "@/lib/auth/loginRedirect";
+import { resolveLoginRedirect, LOGIN_REDIRECT_DEFAULT } from "@/lib/auth/loginRedirect";
 import { encryptToken } from "@/lib/auth/tokens";
 import { clearMastodonAppCredentials } from "@/lib/auth/mastodonApp";
 import { createSession, getCurrentUser } from "@/lib/auth/session";
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
         const stateData = verifyOAuthState(state);
         const sanitized = stateData
           ? sanitizeRedirectUrl(stateData.callbackUrl)
-          : "/dashboard";
+          : LOGIN_REDIRECT_DEFAULT;
         const dupRedirect = resolveLoginRedirect(sanitized, {
           isNewUser: false,
           username: existingUser.username,
@@ -196,8 +196,8 @@ export async function GET(request: NextRequest) {
       extractLoginRequestInfo(request)
     );
 
-    // コールバックURLにリダイレクト（安全なパスのみ許可）。遷移先が既定（/dashboard センチネル
-    // ＝特定ページへ戻る指定ではない）のときは、初回ログインなら /create?welcome=1、既存ユーザーなら
+    // コールバックURLにリダイレクト（安全なパスのみ許可）。遷移先が既定センチネル
+    // （＝特定ページへ戻る指定ではない）のときは、初回ログインなら /create?welcome=1、既存ユーザーなら
     // 自分のユーザーページへ。明示的な returnTo はそのまま尊重する。
     const sanitized = sanitizeRedirectUrl(stateData.callbackUrl);
     const redirectTo = resolveLoginRedirect(sanitized, {

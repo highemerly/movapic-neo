@@ -1,14 +1,14 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
-import { resolveLoginRedirect } from "./loginRedirect";
+import { resolveLoginRedirect, LOGIN_REDIRECT_DEFAULT } from "./loginRedirect";
 
 afterEach(() => {
   vi.unstubAllEnvs();
 });
 
 describe("resolveLoginRedirect", () => {
-  it("既定センチネル(/dashboard)＋新規ユーザーは初回投稿へ送る", () => {
+  it("既定センチネル＋新規ユーザーは初回投稿へ送る", () => {
     expect(
-      resolveLoginRedirect("/dashboard", {
+      resolveLoginRedirect(LOGIN_REDIRECT_DEFAULT, {
         isNewUser: true,
         username: "alice",
         instanceDomain: "handon.club",
@@ -19,7 +19,7 @@ describe("resolveLoginRedirect", () => {
   it("既定センチネル＋既存ユーザーは自分のユーザーページへ送る（ホームインスタンスは素のusername）", () => {
     vi.stubEnv("HOME_SERVER", "handon.club");
     expect(
-      resolveLoginRedirect("/dashboard", {
+      resolveLoginRedirect(LOGIN_REDIRECT_DEFAULT, {
         isNewUser: false,
         username: "alice",
         instanceDomain: "handon.club",
@@ -30,7 +30,7 @@ describe("resolveLoginRedirect", () => {
   it("ホームインスタンス以外は username@domain 形式のパスになる", () => {
     vi.stubEnv("HOME_SERVER", "handon.club");
     expect(
-      resolveLoginRedirect("/dashboard", {
+      resolveLoginRedirect(LOGIN_REDIRECT_DEFAULT, {
         isNewUser: false,
         username: "bob",
         instanceDomain: "misskey.io",
@@ -40,7 +40,7 @@ describe("resolveLoginRedirect", () => {
 
   it("HOME_SERVER 未設定なら常に username@domain 形式のパスになる", () => {
     expect(
-      resolveLoginRedirect("/dashboard", {
+      resolveLoginRedirect(LOGIN_REDIRECT_DEFAULT, {
         isNewUser: false,
         username: "alice",
         instanceDomain: "handon.club",

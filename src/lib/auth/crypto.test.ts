@@ -12,6 +12,7 @@ import {
   sanitizeRedirectUrl,
   type OAuthSessionData,
 } from "./crypto";
+import { LOGIN_REDIRECT_DEFAULT } from "./loginRedirect";
 
 const SECRET = "test-jwt-secret-value";
 
@@ -54,8 +55,8 @@ describe("generateOAuthState / verifyOAuthState", () => {
     expect(typeof st?.timestamp).toBe("number");
   });
 
-  it("callbackUrl 既定は /dashboard", () => {
-    expect(verifyOAuthState(generateOAuthState())?.callbackUrl).toBe("/dashboard");
+  it("callbackUrl 既定は既定センチネル", () => {
+    expect(verifyOAuthState(generateOAuthState())?.callbackUrl).toBe(LOGIN_REDIRECT_DEFAULT);
   });
 
   it("署名を改竄すると null（HMAC不一致）", () => {
@@ -165,11 +166,17 @@ describe("sanitizeRedirectUrl（オープンリダイレクト防止）", () => 
     expect(sanitizeRedirectUrl("  /foo  ")).toBe("/foo");
   });
 
+  // 既定センチネルは OAuth state に載って往復するので、ここを素通りしないと別の値になり
+  // resolveLoginRedirect が「戻り先の明示指定」と誤認する
+  it("既定センチネルはそのまま通す", () => {
+    expect(sanitizeRedirectUrl(LOGIN_REDIRECT_DEFAULT)).toBe(LOGIN_REDIRECT_DEFAULT);
+  });
+
   it("null/undefined/空は既定パスへ", () => {
-    expect(sanitizeRedirectUrl(null)).toBe("/dashboard");
-    expect(sanitizeRedirectUrl(undefined)).toBe("/dashboard");
-    expect(sanitizeRedirectUrl("")).toBe("/dashboard");
-    expect(sanitizeRedirectUrl("   ")).toBe("/dashboard");
+    expect(sanitizeRedirectUrl(null)).toBe(LOGIN_REDIRECT_DEFAULT);
+    expect(sanitizeRedirectUrl(undefined)).toBe(LOGIN_REDIRECT_DEFAULT);
+    expect(sanitizeRedirectUrl("")).toBe(LOGIN_REDIRECT_DEFAULT);
+    expect(sanitizeRedirectUrl("   ")).toBe(LOGIN_REDIRECT_DEFAULT);
   });
 
   it("外部URL・プロトコル・プロトコル相対を拒否", () => {
@@ -181,17 +188,17 @@ describe("sanitizeRedirectUrl（オープンリダイレクト防止）", () => 
       "mailto:a@b.com",
       "data:text/html,x",
     ]) {
-      expect(sanitizeRedirectUrl(bad)).toBe("/dashboard");
+      expect(sanitizeRedirectUrl(bad)).toBe(LOGIN_REDIRECT_DEFAULT);
     }
   });
 
   it("スラッシュ始まりでない・バックスラッシュ・パストラバーサル・制御文字を拒否", () => {
-    expect(sanitizeRedirectUrl("dashboard")).toBe("/dashboard");
-    expect(sanitizeRedirectUrl("/foo\\bar")).toBe("/dashboard");
-    expect(sanitizeRedirectUrl("/../etc/passwd")).toBe("/dashboard");
-    expect(sanitizeRedirectUrl("/foo/../../bar")).toBe("/dashboard");
-    expect(sanitizeRedirectUrl("/foo\x00bar")).toBe("/dashboard");
-    expect(sanitizeRedirectUrl("/foo\nbar")).toBe("/dashboard");
+    expect(sanitizeRedirectUrl("settings")).toBe(LOGIN_REDIRECT_DEFAULT);
+    expect(sanitizeRedirectUrl("/foo\\bar")).toBe(LOGIN_REDIRECT_DEFAULT);
+    expect(sanitizeRedirectUrl("/../etc/passwd")).toBe(LOGIN_REDIRECT_DEFAULT);
+    expect(sanitizeRedirectUrl("/foo/../../bar")).toBe(LOGIN_REDIRECT_DEFAULT);
+    expect(sanitizeRedirectUrl("/foo\x00bar")).toBe(LOGIN_REDIRECT_DEFAULT);
+    expect(sanitizeRedirectUrl("/foo\nbar")).toBe(LOGIN_REDIRECT_DEFAULT);
   });
 
   it("既定パスは差し替え可能", () => {

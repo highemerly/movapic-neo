@@ -82,6 +82,7 @@ vi.mock("@/lib/db", () => ({
 
 import { GET } from "./route";
 import { encryptOAuthSession, generateOAuthState } from "@/lib/auth/crypto";
+import { LOGIN_REDIRECT_DEFAULT } from "@/lib/auth/loginRedirect";
 import { decryptToken } from "@/lib/auth/tokens";
 
 const BASE_URL = "https://shamezo.example";
@@ -140,7 +141,7 @@ function validSessionCookie(overrides: Partial<Parameters<typeof encryptOAuthSes
 }
 
 /** state / oauth_session cookie を揃えた「正常に流れる」前提を作る */
-function primeCookies(callbackUrl = "/dashboard"): string {
+function primeCookies(callbackUrl = LOGIN_REDIRECT_DEFAULT): string {
   const state = generateOAuthState(callbackUrl);
   jar.values.set("oauth_state", state);
   jar.values.set("oauth_session", validSessionCookie());
@@ -197,7 +198,7 @@ describe("GET /api/auth/fediverse/callback/mastodon state検証（ログインCS
 
   it("state の署名が壊れていれば expired_state（cookie と一致していても通さない）", async () => {
     const tampered = Buffer.from(
-      JSON.stringify({ payload: JSON.stringify({ csrf: "x", timestamp: Date.now(), callbackUrl: "/dashboard" }), signature: "deadbeef" })
+      JSON.stringify({ payload: JSON.stringify({ csrf: "x", timestamp: Date.now(), callbackUrl: LOGIN_REDIRECT_DEFAULT }), signature: "deadbeef" })
     ).toString("base64url");
     jar.values.set("oauth_state", tampered);
     jar.values.set("oauth_session", validSessionCookie());

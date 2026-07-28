@@ -4,6 +4,7 @@
  */
 
 import { createCipheriv, createDecipheriv, randomBytes, createHash, createHmac, timingSafeEqual } from "crypto";
+import { LOGIN_REDIRECT_DEFAULT } from "./loginRedirect";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
@@ -111,7 +112,7 @@ function signStatePayload(payload: string): string {
 /**
  * Stateパラメータを生成（HMAC署名付き）
  */
-export function generateOAuthState(callbackUrl: string = "/dashboard"): string {
+export function generateOAuthState(callbackUrl: string = LOGIN_REDIRECT_DEFAULT): string {
   const payload: OAuthState = {
     csrf: randomBytes(16).toString("hex"),
     timestamp: Date.now(),
@@ -267,7 +268,7 @@ export function hashRequestBody(body: Buffer | Uint8Array): string {
 
 export function sanitizeRedirectUrl(
   url: string | null | undefined,
-  defaultPath: string = "/dashboard"
+  defaultPath: string = LOGIN_REDIRECT_DEFAULT
 ): string {
   if (!url) {
     return defaultPath;

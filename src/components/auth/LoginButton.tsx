@@ -33,7 +33,7 @@ interface LoginButtonProps {
    */
   allowedServers?: string[];
   /**
-   * ログイン成功後の遷移先パス（省略時は既定センチネル /dashboard）。
+   * ログイン成功後の遷移先パス（省略時は「指定なし」＝サーバー側の既定センチネル扱い）。
    * 未ログインユーザーの認証開始時に register へ渡され、コールバック側が新規/既存で振り分ける。
    */
   callbackUrl?: string;
@@ -51,11 +51,8 @@ interface LoginButtonProps {
 }
 
 export function LoginButton({ allowedServers, callbackUrl, loggedInHref, initialIsLoggedIn }: LoginButtonProps) {
-  // 認証開始時に register へ渡すコールバック（既定センチネル /dashboard）。
-  // コールバックルートがこのセンチネルを見て、新規は初回投稿・既存は自分のページへ振り分ける。
-  const registerCallbackUrl = callbackUrl || "/dashboard";
-  // 既にログイン済みで押した場合の遷移先。明示 returnTo > 自分のページ > 既定 の順。
-  const loggedInTarget = callbackUrl || loggedInHref || "/dashboard";
+  // 既にログイン済みで押した場合の遷移先。明示 returnTo > 自分のページ > トップ の順。
+  const loggedInTarget = callbackUrl || loggedInHref || "/";
   const router = useRouter();
   const [server, setServer] = useState(
     allowedServers?.length === 1 ? allowedServers[0] : ""
@@ -143,9 +140,11 @@ export function LoginButton({ allowedServers, callbackUrl, loggedInHref, initial
         headers: {
           "Content-Type": "application/json",
         },
+        // callbackUrl 未指定のまま送る＝「戻り先の指定なし」。既定センチネルの値は
+        // サーバー側（register / コールバック）だけが知っていればよいのでクライアントには持たせない。
         body: JSON.stringify({
           server: targetServer,
-          callbackUrl: registerCallbackUrl,
+          callbackUrl,
         }),
       });
 
