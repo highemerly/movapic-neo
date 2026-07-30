@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifyComputeApiKey } from "@/lib/compute/internalAuth";
+import { isValidFont } from "@/types";
 import type { CalendarCollageSpec } from "@/lib/calendar/collageTypes";
 
 function isValidSpec(spec: unknown): spec is CalendarCollageSpec {
@@ -27,6 +28,7 @@ function isValidSpec(spec: unknown): spec is CalendarCollageSpec {
     typeof s.isPerfect === "boolean" &&
     Array.isArray(s.holidays) &&
     (s.theme === undefined || s.theme === "light" || s.theme === "dark") &&
+    (s.font === undefined || isValidFont(s.font)) &&
     Array.isArray(s.cells)
   );
 }

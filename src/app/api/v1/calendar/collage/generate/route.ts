@@ -20,6 +20,7 @@ import {
 import { getImage } from "@/lib/storage/storage";
 import { renderCalendarCollage } from "@/lib/compute/client";
 import { isJapaneseHoliday } from "@/lib/holidays";
+import { isValidFont, type FontFamily } from "@/types";
 import type { CalendarCell, CollageTheme } from "@/lib/calendar/collageTypes";
 
 export async function POST(request: NextRequest) {
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
     }
 
-    let body: { year?: unknown; month?: unknown; theme?: unknown };
+    let body: { year?: unknown; month?: unknown; theme?: unknown; font?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -42,6 +43,8 @@ export async function POST(request: NextRequest) {
     }
     // 配色テーマ（未指定・不正値は light）。
     const theme: CollageTheme = body.theme === "dark" ? "dark" : "light";
+    // 書体（未指定・不正値・シーズン限定フォントはふい字）。
+    const font: FontFamily = isValidFont(body.font) ? body.font : "hui-font";
 
     const images = await fetchCalendarImages(user.id, year, month);
     const resolved = resolveCalendarMonth({
@@ -147,6 +150,7 @@ export async function POST(request: NextRequest) {
         isPerfect: resolved.isPerfectAttendance,
         holidays,
         theme,
+        font,
         cells,
       },
       thumbnails,

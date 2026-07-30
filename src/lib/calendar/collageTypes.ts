@@ -5,6 +5,8 @@
  * skia/sharp に依存しない純粋な型だけをここに置く。
  */
 
+import type { FontFamily } from "@/types";
+
 /** 配色テーマ。light=温かみのある紙色 / dark=暗い紙色。未指定は light 相当。 */
 export type CollageTheme = "light" | "dark";
 
@@ -35,5 +37,7 @@ export interface CalendarCollageSpec {
   holidays: number[];
   /** 配色テーマ（未指定は light）。 */
   theme?: CollageTheme;
+  /** 全テキストの書体（未指定はふい字）。シーズン限定の horror-mincho は選べない（VALID_FONTS）。 */
+  font?: FontFamily;
   cells: CalendarCell[];
 }

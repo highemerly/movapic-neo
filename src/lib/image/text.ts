@@ -21,12 +21,36 @@ export const MONOSPACE_FONTS: Set<FontFamily> = new Set([
 // skia-canvas のグリフ単位フォールバックで絵文字だけこのフォントから拾う。
 export const EMOJI_FONT_FAMILY = "Noto Emoji";
 
+// フォント名のマッピング（skia-canvasはフォントファイル内のフォント名を使用）。
+// 文字入れ（overlay）とカレンダー画像（calendarCollage）の両方が引くのでここに置く。
+export const CANVAS_FONT_NAMES: Record<FontFamily, string> = {
+  "hui-font": "HuiFont",
+  "noto-sans-jp": "Noto Sans CJK JP",
+  "light-novel-pop": "LightNovelPopV2",
+  // OTF 内部のファミリ名（skia はこの名前でフォントを引く。和名は "07ふぉんとうは怖い明朝体"）。
+  "horror-mincho": "07ReallyScaryMinchotai",
+};
+
 /**
  * skia-canvas 用のフォント指定文字列を組み立てる。
  * 末尾に絵文字フォントを足して絵文字を描画可能にする。
  */
 export function fontStack(fontSize: number, fontName: string): string {
   return `${fontSize}px "${fontName}", "${EMOJI_FONT_FAMILY}"`;
+}
+
+/**
+ * カレンダー画像用のフォント指定文字列。
+ * 選択フォントに無いグリフ（ユーザー名の特殊文字など）を Noto Sans CJK JP で拾ってから
+ * 絵文字（👑・📱）へ落とす。fontStack と違い和文フォールバックを挟むのは、カレンダーには
+ * ユーザー名やドメインなど「入力を選べない文字列」が載るため。
+ */
+export function calendarFontStack(fontSize: number, font: FontFamily): string {
+  const jp = CANVAS_FONT_NAMES["noto-sans-jp"];
+  const name = CANVAS_FONT_NAMES[font];
+  return name === jp
+    ? `${fontSize}px "${jp}", "${EMOJI_FONT_FAMILY}"`
+    : `${fontSize}px "${name}", "${jp}", "${EMOJI_FONT_FAMILY}"`;
 }
 
 /**

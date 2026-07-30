@@ -17,57 +17,25 @@ import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { SegmentControl } from "@/components/SegmentControl";
+import { FONT_LABELS, VALID_FONTS, type FontFamily } from "@/types";
 
 type Visibility = "public" | "unlisted" | "followers";
 type Destination = "server" | "device";
 type CollageTheme = "light" | "dark";
 
-const VISIBILITY_OPTIONS: { value: Visibility; label: string }[] = [
-  { value: "public", label: "公開" },
-  { value: "unlisted", label: "非収載" },
-  { value: "followers", label: "フォロワー限定" },
-];
+const VISIBILITY_OPTIONS: Visibility[] = ["public", "unlisted", "followers"];
+const VISIBILITY_LABELS: Record<Visibility, string> = {
+  public: "公開",
+  unlisted: "非収載",
+  followers: "フォロワー限定",
+};
 
-const THEME_OPTIONS: { value: CollageTheme; label: React.ReactNode }[] = [
-  { value: "light", label: <><Sun className="h-4 w-4" />ライト</> },
-  { value: "dark", label: <><Moon className="h-4 w-4" />ダーク</> },
-];
-
-/** OptionsPanel（文字合成オプション）と同じ見た目のセグメント選択。 */
-function SegmentControl<T extends string>({
-  value,
-  options,
-  onChange,
-  disabled,
-}: {
-  value: T;
-  options: { value: T; label: React.ReactNode }[];
-  onChange: (value: T) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div className="flex gap-1 rounded-lg border bg-muted p-1">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onChange(o.value)}
-          disabled={disabled}
-          className={cn(
-            "flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium transition-colors",
-            value === o.value
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-            disabled && "cursor-not-allowed opacity-50",
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
+const THEME_OPTIONS: CollageTheme[] = ["light", "dark"];
+const THEME_LABELS: Record<CollageTheme, React.ReactNode> = {
+  light: <><Sun className="h-4 w-4" />ライト</>,
+  dark: <><Moon className="h-4 w-4" />ダーク</>,
+};
 
 /**
  * カレンダー画像（コラージュ）の共有ダイアログ。
@@ -92,6 +60,7 @@ export function CollageShareDialog({
   const [generating, setGenerating] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [theme, setTheme] = useState<CollageTheme>("light");
+  const [font, setFont] = useState<FontFamily>("hui-font");
   const [destination, setDestination] = useState<Destination>("server");
   const [visibility, setVisibility] = useState<Visibility>("public");
   const [posting, setPosting] = useState(false);
@@ -135,7 +104,7 @@ export function CollageShareDialog({
       const res = await fetch("/api/v1/calendar/collage/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ year, month, theme }),
+        body: JSON.stringify({ year, month, theme, font }),
       });
       if (!res.ok) {
         toast.error(formatErrorMessage(await parseApiError(res)));
@@ -152,11 +121,10 @@ export function CollageShareDialog({
     } finally {
       setGenerating(false);
     }
-  }, [year, month, theme, generating]);
+  }, [year, month, theme, font, generating]);
 
-  // テーマ変更時は生成済みプレビューを破棄して再生成を促す（テーマは生成時に焼き込むため）。
-  const handleThemeChange = useCallback((next: CollageTheme) => {
-    setTheme(next);
+  // 配色・書体は生成時に焼き込むため、変えたら生成済みプレビューを捨てて再生成を促す。
+  const discardPreview = useCallback(() => {
     setBlobUrl((prev) => {
       if (prev) {
         blobRef.current = null;
@@ -168,6 +136,22 @@ export function CollageShareDialog({
       return null;
     });
   }, []);
+
+  const handleThemeChange = useCallback(
+    (next: CollageTheme) => {
+      setTheme(next);
+      discardPreview();
+    },
+    [discardPreview]
+  );
+
+  const handleFontChange = useCallback(
+    (next: FontFamily) => {
+      setFont(next);
+      discardPreview();
+    },
+    [discardPreview]
+  );
 
   const handlePostServer = useCallback(async () => {
     if (!blobRef.current || posting) return;
@@ -223,24 +207,26 @@ export function CollageShareDialog({
     }
   }, [year, month]);
 
-  const destinationOptions: { value: Destination; label: React.ReactNode }[] = [
-    {
-      value: "server",
-      label: (
-        <>
-          {instanceType === "misskey" ? (
-            <MisskeyIcon className="h-4 w-4 text-[#86b300]" />
-          ) : (
-            <MastodonIcon className="h-4 w-4 text-[#6364ff]" />
-          )}
-          投稿する
-        </>
-      ),
-    },
-    ...(canShareFiles
-      ? [{ value: "device" as Destination, label: <><Download className="h-4 w-4" />画像を書き出す</> }]
-      : []),
-  ];
+  const destinationOptions: Destination[] = canShareFiles
+    ? ["server", "device"]
+    : ["server"];
+
+  const renderDestination = (d: Destination) =>
+    d === "server" ? (
+      <>
+        {instanceType === "misskey" ? (
+          <MisskeyIcon className="h-4 w-4 text-[#86b300]" />
+        ) : (
+          <MastodonIcon className="h-4 w-4 text-[#6364ff]" />
+        )}
+        投稿する
+      </>
+    ) : (
+      <>
+        <Download className="h-4 w-4" />
+        画像を書き出す
+      </>
+    );
 
   return (
     <div
@@ -265,16 +251,41 @@ export function CollageShareDialog({
           </button>
         </div>
 
-        {/* 配色テーマ（生成前に選択・変更するとプレビューを破棄して再生成を促す） */}
+        {/* 見た目のオプション（生成前に選択・変更するとプレビューを破棄して再生成を促す） */}
         {postedUrl === null && (
-          <div className="mb-3 space-y-2">
-            <Label>配色</Label>
-            <SegmentControl
-              value={theme}
-              options={THEME_OPTIONS}
-              onChange={handleThemeChange}
-              disabled={generating || posting}
-            />
+          <div className="mb-3 space-y-3">
+            <div className="space-y-2">
+              <Label>配色</Label>
+              <SegmentControl
+                value={theme}
+                options={THEME_OPTIONS}
+                onChange={handleThemeChange}
+                disabled={generating || posting}
+                renderOption={(t) => (
+                  <span className="flex items-center justify-center gap-1.5">
+                    {THEME_LABELS[t]}
+                  </span>
+                )}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>書体</Label>
+              <SegmentControl
+                value={font}
+                options={VALID_FONTS}
+                onChange={handleFontChange}
+                disabled={generating || posting}
+                renderOption={(f) => (
+                  // 見本画像は OptionsPanel（文字入れオプション）と共用。
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={`/fonts/${f}.png`}
+                    alt={FONT_LABELS[f]}
+                    className="mx-auto h-5 object-contain dark:invert"
+                  />
+                )}
+              />
+            </div>
           </div>
         )}
 
@@ -336,6 +347,11 @@ export function CollageShareDialog({
                 options={destinationOptions}
                 onChange={setDestination}
                 disabled={posting}
+                renderOption={(d) => (
+                  <span className="flex items-center justify-center gap-1.5">
+                    {renderDestination(d)}
+                  </span>
+                )}
               />
             </div>
 
@@ -349,6 +365,8 @@ export function CollageShareDialog({
                     options={VISIBILITY_OPTIONS}
                     onChange={setVisibility}
                     disabled={posting}
+                    size="xs"
+                    renderOption={(v) => VISIBILITY_LABELS[v]}
                   />
                 </div>
 

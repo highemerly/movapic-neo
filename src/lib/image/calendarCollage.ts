@@ -13,6 +13,7 @@
 import sharp from "sharp";
 import { Canvas, CanvasRenderingContext2D, loadImage } from "skia-canvas";
 import { ensureFontsLoaded } from "./fonts";
+import { CANVAS_FONT_NAMES, calendarFontStack } from "./text";
 import type { CalendarCollageSpec } from "@/lib/calendar/collageTypes";
 
 // 出力解像度の倍率。レイアウト定数は論理pxのまま据え置き、Canvas だけ SCALE 倍で確保して
@@ -70,13 +71,8 @@ const OUTLINE = "rgba(80,80,80,0.65)";
 
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 
-/**
- * 全テキストをふい字に統一。ふい字に無いグリフ（ユーザー名の特殊文字）は
- * Noto Sans CJK JP、絵文字（👑・📱）は Noto Emoji にグリフ単位でフォールバックする。
- */
-function huiFont(size: number): string {
-  return `${size}px "HuiFont", "Noto Sans CJK JP", "Noto Emoji"`;
-}
+/** サイズを渡すと ctx.font 用の文字列を返す関数（選択フォントを閉じ込めたもの）。 */
+type FontOf = (size: number) => string;
 
 /** その月1日の曜日(0=日)。タイムゾーン非依存に UTC 正午で判定する。 */
 function firstWeekdayOf(year: number, month: number): number {
@@ -168,6 +164,7 @@ function dayColor(
  */
 function drawDayNumber(
   ctx: Ctx,
+  font: FontOf,
   day: number,
   x: number,
   y: number,
@@ -179,7 +176,7 @@ function drawDayNumber(
 ): void {
   const color = dayColor(col, isHoliday, onPhoto, pal);
   const size = 22;
-  ctx.font = huiFont(size);
+  ctx.font = font(size);
   ctx.textBaseline = "alphabetic";
   const baseY = y + CELL - 9; // 中央下（下端から少し上）
 
@@ -238,6 +235,8 @@ export async function renderCalendarCollage(
 
   const { year, month } = spec;
   const pal = paletteOf(spec.theme);
+  // 全テキスト共通の書体（未指定はふい字＝従来の見た目）。
+  const font: FontOf = (size) => calendarFontStack(size, spec.font ?? "hui-font");
   const holidays = new Set(spec.holidays);
   const fw = firstWeekdayOf(year, month);
   const dim = daysInMonthOf(year, month);
@@ -266,27 +265,27 @@ export async function renderCalendarCollage(
   ctx.fillStyle = pal.ink;
   if (spec.isPerfect) {
     ctx.textAlign = "left";
-    ctx.font = huiFont(56);
+    ctx.font = font(56);
     const titleW = ctx.measureText(title).width;
     const crown = "👑";
-    ctx.font = huiFont(44);
+    ctx.font = font(44);
     const crownW = ctx.measureText(crown).width;
     const gap = 14;
     const startX = centerX - (titleW + gap + crownW) / 2;
-    ctx.font = huiFont(56);
+    ctx.font = font(56);
     ctx.fillStyle = pal.ink;
     ctx.fillText(title, startX, headerY);
-    ctx.font = huiFont(44);
+    ctx.font = font(44);
     ctx.fillText(crown, startX + titleW + gap, headerY);
   } else {
     ctx.textAlign = "center";
-    ctx.font = huiFont(56);
+    ctx.font = font(56);
     ctx.fillText(title, centerX, headerY);
   }
 
   // 曜日ラベル（日=赤・土=青）
   const weekdayTop = PAD + HEADER_H;
-  ctx.font = huiFont(20);
+  ctx.font = font(20);
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   for (let c = 0; c < COLS; c++) {
@@ -323,6 +322,7 @@ export async function renderCalendarCollage(
       ctx.restore();
       drawDayNumber(
         ctx,
+        font,
         day,
         x,
         y,
@@ -335,7 +335,7 @@ export async function renderCalendarCollage(
     } else {
       ctx.fillStyle = pal.cellEmptyBg;
       ctx.fill();
-      drawDayNumber(ctx, day, x, y, col, isHoliday, false, pal);
+      drawDayNumber(ctx, font, day, x, y, col, isHoliday, false, pal);
     }
   }
 
@@ -345,37 +345,38 @@ export async function renderCalendarCollage(
   ctx.textBaseline = "middle";
   // 1行目: 📱 SHAMEZO（大きめ）＋ドメインを併記
   const brandY = footerTop + FOOTER_H * 0.38;
-  ctx.font = huiFont(34);
+  ctx.font = font(34);
   const brand = `📱${spec.serviceName}`;
   const brandW = ctx.measureText(brand).width;
-  ctx.font = huiFont(20);
+  ctx.font = font(20);
   const domainStr = spec.appDomain ? `  ${spec.appDomain}` : "";
   const domainW = domainStr ? ctx.measureText(domainStr).width : 0;
   const line1Start = centerX - (brandW + domainW) / 2;
   ctx.textAlign = "left";
-  ctx.font = huiFont(34);
+  ctx.font = font(34);
   ctx.fillStyle = pal.ink;
   ctx.fillText(brand, line1Start, brandY);
   if (domainStr) {
-    ctx.font = huiFont(20);
+    ctx.font = font(20);
     ctx.fillStyle = pal.subInk;
     ctx.fillText(domainStr, line1Start + brandW, brandY + 4);
   }
-  // 2行目: © (ふい字は © グリフが空なので Noto から拾う) ＋ ハンドル(ふい字)
+  // 2行目: © ＋ ハンドル。© だけは常に Noto で描く（ふい字は © グリフが空のため。
+  // 他の書体も持っている保証が無く、記号1文字なので書体差はほぼ出ない）。
   const crSize = 19;
   const crY = footerTop + FOOTER_H * 0.78;
   const sym = "©";
   ctx.textAlign = "left";
   ctx.fillStyle = pal.subInk;
-  ctx.font = `${crSize}px "Noto Sans CJK JP"`;
+  ctx.font = `${crSize}px "${CANVAS_FONT_NAMES["noto-sans-jp"]}"`;
   const symW = ctx.measureText(sym).width;
   const crGap = 5;
-  ctx.font = huiFont(crSize);
+  ctx.font = font(crSize);
   const handleW = ctx.measureText(spec.authorHandle).width;
   const crStart = centerX - (symW + crGap + handleW) / 2;
-  ctx.font = `${crSize}px "Noto Sans CJK JP"`;
+  ctx.font = `${crSize}px "${CANVAS_FONT_NAMES["noto-sans-jp"]}"`;
   ctx.fillText(sym, crStart, crY);
-  ctx.font = huiFont(crSize);
+  ctx.font = font(crSize);
   ctx.fillText(spec.authorHandle, crStart + symW + crGap, crY);
   ctx.textAlign = "center";
 

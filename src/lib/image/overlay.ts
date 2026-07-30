@@ -11,6 +11,7 @@ import {
   drawTextWithStroke,
   getMonospaceCharWidth,
   fontStack,
+  CANVAS_FONT_NAMES,
 } from "./text";
 import { splitGraphemes, isEmojiGrapheme } from "@/lib/text/grapheme";
 import { drawStampText } from "./stamp";
@@ -21,14 +22,9 @@ import { getSeasonByKey } from "@/lib/seasons/catalog";
 // フォントを登録（overlay/collage 共通のローダーで1回だけ実行）
 ensureFontsLoaded();
 
-// フォント名のマッピング（skia-canvasはフォントファイル内のフォント名を使用）
-export const CANVAS_FONT_NAMES: Record<FontFamily, string> = {
-  "hui-font": "HuiFont",
-  "noto-sans-jp": "Noto Sans CJK JP",
-  "light-novel-pop": "LightNovelPopV2",
-  // OTF 内部のファミリ名（skia はこの名前でフォントを引く。和名は "07ふぉんとうは怖い明朝体"）。
-  "horror-mincho": "07ReallyScaryMinchotai",
-};
+// フォント名のマッピングは text.ts（skia 非依存）に置いてある。従来どおり
+// overlay 経由でも引けるよう再エクスポートする（src/lib/image/index.ts が公開）。
+export { CANVAS_FONT_NAMES };
 
 /**
  * 等幅セル（幅 cellWidth）の中で絵文字を中央寄せするためのX補正。

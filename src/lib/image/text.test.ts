@@ -5,6 +5,7 @@ import {
   isHalfWidthChar,
   hexToRgb,
   fontStack,
+  calendarFontStack,
   getMonospaceCharWidth,
   splitTextIntoLines,
   splitTextIntoColumns,
@@ -105,6 +106,20 @@ describe("hexToRgb", () => {
 describe("fontStack", () => {
   it("本文フォント＋末尾に絵文字フォントを並べる", () => {
     expect(fontStack(48, "HuiFont")).toBe('48px "HuiFont", "Noto Emoji"');
+  });
+});
+
+describe("calendarFontStack", () => {
+  it("選択フォント→和文フォールバック→絵文字の順に並べる", () => {
+    expect(calendarFontStack(56, "hui-font")).toBe(
+      '56px "HuiFont", "Noto Sans CJK JP", "Noto Emoji"'
+    );
+  });
+
+  it("Noto を選んだときは同じフォントを二重に並べない", () => {
+    expect(calendarFontStack(20, "noto-sans-jp")).toBe(
+      '20px "Noto Sans CJK JP", "Noto Emoji"'
+    );
   });
 });
 
