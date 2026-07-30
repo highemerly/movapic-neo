@@ -14,6 +14,26 @@ import {
 
 let s3Client: S3Client | null = null;
 
+// HTTPタイムアウト。
+// pitfall: AWS SDK v3 の既定は connectionTimeout / requestTimeout / socketTimeout すべて 0＝無効。
+// keep-alive で再利用したソケットを相手側やNATが黙って捨てていると、リクエストを投げたまま
+// 永久に応答を待ち続け、エラーにもならないのでSDKのリトライも走らない（＝呼び出し元の
+// await が解決しない）。カレンダー画像生成のように1リクエストで最大31本のGETを並列発行する
+// 経路では、1本刺さるだけで Promise.all が固まりHTTPレスポンスが永遠に返らなくなる。
+// TimeoutError は SDK の TRANSIENT_ERROR_CODES に含まれるため、上限に達すれば新しい接続で
+// 自動リトライされる。
+const S3_TIMEOUTS = {
+  // 新規接続の確立まで。
+  connectionTimeout: 3000,
+  // リクエスト送信〜レスポンスヘッダ受信まで（PUTは本文送信を含む）。
+  requestTimeout: 15000,
+  // requestTimeout はヘッダ受信で解除されるため、GETの本文ストリーミング中の停止は
+  // ソケット無通信タイムアウトで拾う（無通信の判定なので低速回線でも誤発火しない）。
+  socketTimeout: 15000,
+  // これが無いと requestTimeout 超過は警告ログだけで、実際には待ち続ける。
+  throwOnRequestTimeout: true,
+} as const;
+
 function resolveEndpoint(): string {
   const endpoint = process.env.S3_ENDPOINT;
   if (endpoint) {
@@ -50,6 +70,7 @@ function getS3Client(): S3Client {
       accessKeyId,
       secretAccessKey,
     },
+    requestHandler: S3_TIMEOUTS,
   });
 
   return s3Client;
