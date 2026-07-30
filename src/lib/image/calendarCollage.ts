@@ -15,7 +15,13 @@ import { Canvas, CanvasRenderingContext2D, loadImage } from "skia-canvas";
 import { ensureFontsLoaded } from "./fonts";
 import type { CalendarCollageSpec } from "@/lib/calendar/collageTypes";
 
-// レイアウト定数（128px サムネをそのまま使う＝軽量・非拡大）。
+// 出力解像度の倍率。レイアウト定数は論理pxのまま据え置き、Canvas だけ SCALE 倍で確保して
+// ctx.scale で拡大する（描画コードは論理座標で書ける）。等倍だと出力が約988px幅しかなく、
+// Fediverse のタイムラインや HiDPI 端末では引き伸ばされて眠く見えるため。
+// セル写真は 128px サムネ由来なので拡大分の情報は増えないが、文字・罫線・日付は鮮明になる。
+const SCALE = 2;
+
+// レイアウト定数（論理px。セルは 128px サムネの原寸に合わせる）。
 const CELL = 128;
 const GAP = 6;
 const PAD = 28;
@@ -242,8 +248,11 @@ export async function renderCalendarCollage(
   const width = PAD * 2 + gridW;
   const height = PAD + HEADER_H + WEEKDAY_H + gridH + FOOTER_H + PAD;
 
-  const canvas = new Canvas(width, height);
+  const canvas = new Canvas(width * SCALE, height * SCALE);
   const ctx = canvas.getContext("2d");
+  ctx.scale(SCALE, SCALE);
+  // サムネを論理px以上に拡大するため、補間品質を上げておく。
+  ctx.imageSmoothingQuality = "high";
   const centerX = width / 2;
 
   // 背景
@@ -376,5 +385,6 @@ export async function renderCalendarCollage(
     .jpeg({ quality: 88, chromaSubsampling: "4:2:0" })
     .toBuffer();
 
-  return { buffer, contentType: "image/jpeg", width, height };
+  // 返す寸法は実ピクセル（論理サイズではない）。
+  return { buffer, contentType: "image/jpeg", width: width * SCALE, height: height * SCALE };
 }
