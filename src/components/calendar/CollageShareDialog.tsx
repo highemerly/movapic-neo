@@ -70,7 +70,7 @@ function SegmentControl<T extends string>({
 }
 
 /**
- * カレンダー画像（コラージュ）の共有ダイアログ（ベータ）。
+ * カレンダー画像（コラージュ）の共有ダイアログ。
  * プレビュー枠をタップして画像を生成 → 投稿先（自分のサーバー / 他のサーバー / 端末）を選ぶ。
  * 生成済み Blob を保持し、サーバー投稿・OS共有へ回す（他のサーバーは anypost.dev/share を開く）。
  */
@@ -255,9 +255,6 @@ export function CollageShareDialog({
           <h3 className="flex items-center gap-1.5 text-sm font-bold">
             <Share2 className="h-4 w-4" />
             カレンダー画像をシェア
-            <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400">
-              ベータ
-            </span>
           </h3>
           <button
             onClick={onClose}
