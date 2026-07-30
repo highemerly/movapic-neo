@@ -65,6 +65,15 @@ import { SESSION_KEYS } from "@/lib/storageKeys";
  * 各UIで個別装飾）。
  */
 
+/**
+ * ログインアイコンは lucide の LogIn を左右反転して使う。
+ * 素の LogIn（枠は右・矢印は右向き）と LogOut（枠は左・矢印は右向き）は矢印の向きが同じで、
+ * 違いが枠の左右だけ＝PCレールの折りたたみ時（ラベルが消えてアイコンのみ）に区別できず、
+ * 未ログインなのにログアウトボタンが出ていると誤読された。反転すると「枠は左・矢印は左向き
+ * （＝入る）」となり、LogOut と枠位置が揃って矢印の向きだけが逆になる＝一目で対だと分かる。
+ */
+const LOGIN_ICON_CLASS = "h-5 w-5 -scale-x-100";
+
 type MenuNav = {
   isLoggedIn: boolean;
   /** 管理者（ADMIN_ACCTS 該当）か。true のとき管理者向け導線（/admin/stats）を出す。 */
@@ -497,7 +506,7 @@ function AppMenuSheet({
               onClick={close}
               className="flex items-center justify-center gap-2 rounded-md border px-4 py-3 text-base font-semibold transition-colors hover:bg-accent"
             >
-              <LogIn className="h-5 w-5" />
+              <LogIn className={LOGIN_ICON_CLASS} />
               ログイン
             </Link>
           </SheetFooter>
@@ -805,7 +814,7 @@ function AppRail({ nav }: { nav: MenuNav }) {
               href="/"
               label="ログイン"
               expanded={expanded}
-              icon={<LogIn className="h-5 w-5" />}
+              icon={<LogIn className={LOGIN_ICON_CLASS} />}
             />
           </div>
         )}
