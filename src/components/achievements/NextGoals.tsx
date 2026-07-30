@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { AchievementIcon } from "./AchievementIcon";
 import { SectionTitle } from "./SectionTitle";
 import { ladderNextGoals, type NextGoal } from "@/lib/achievements/nextGoals";
+import { coveredDays } from "@/lib/achievements/perfectMonth";
 import type { CurrentMonthPerfect } from "@/lib/achievements/stats";
 
 const MAX_LADDER_GOALS = 2; // 皆勤カード1枚 + ラダー2枚
@@ -72,17 +73,23 @@ function GoalCard({
   );
 }
 
-/** 当月皆勤カードの表示内容を状況から決める。 */
+/**
+ * 当月皆勤カードの表示内容を状況から決める。
+ * 日数はすべて covered（投稿日＋穴埋め済みの日）基準で出す。穴埋めした日はカレンダー上も
+ * 埋まって見えるため、実投稿日数で出すと「毎日埋めているのに 29/31」と食い違う。
+ */
 function perfectCardProps(p: CurrentMonthPerfect): {
   remain: string;
   remainMuted: boolean;
   ratio: number;
   sub: string;
 } {
-  const ratio = p.daysInMonth > 0 ? p.distinctDays / p.daysInMonth : 0;
-  const daysLeft = Math.max(0, p.daysInMonth - p.todayDayNum);
+  const covered = coveredDays(p.distinctDays, p.status);
+  const ratio = p.daysInMonth > 0 ? covered / p.daysInMonth : 0;
+  // 残りは「まだ押さえていない日数」＝ 今日を含む未投稿日（月末までの日数ではない）。
+  const daysLeft = Math.max(0, p.daysInMonth - covered);
   if (p.achieved) {
-    return { remain: "達成 🎉", remainMuted: true, ratio: 1, sub: `${p.distinctDays} / ${p.daysInMonth}日 投稿` };
+    return { remain: "達成 🎉", remainMuted: true, ratio: 1, sub: `${covered} / ${p.daysInMonth}日 投稿` };
   }
   if (!p.status.stillAchievable) {
     return {
@@ -98,14 +105,14 @@ function perfectCardProps(p: CurrentMonthPerfect): {
       remain: `穴埋め ${p.status.unfilled}日`,
       remainMuted: false,
       ratio,
-      sub: `${p.distinctDays}/${p.daysInMonth}日 ・ 2枚投稿で穴埋めしよう`,
+      sub: `${covered}/${p.daysInMonth}日 ・ 2枚投稿で穴埋めしよう`,
     };
   }
   return {
     remain: daysLeft > 0 ? `あと${daysLeft}日` : "あと少し",
     remainMuted: false,
     ratio,
-    sub: `${p.distinctDays} / ${p.daysInMonth}日投稿 ・ このまま毎日投稿しよう！`,
+    sub: `${covered} / ${p.daysInMonth}日投稿 ・ このまま毎日投稿しよう！`,
   };
 }
 

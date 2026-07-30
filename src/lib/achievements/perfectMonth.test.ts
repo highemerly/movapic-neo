@@ -19,6 +19,7 @@ import {
   assignMonthMakeups,
   isPerfectMonth,
   currentMonthMakeupStatus,
+  coveredDays,
   shouldRemindMakeup,
   MAKEUP_REMINDER_MAX_SKIPPED,
 } from "./perfectMonth";
@@ -343,6 +344,47 @@ describe("currentMonthMakeupStatus - 当月の進捗", () => {
       grace,
     });
     expect(s.skippedSoFar).toBe(1); // day2 のみ
+  });
+});
+
+describe("coveredDays - 進捗表示用の押さえた日数", () => {
+  /** 7月30日時点で day5 を忘れ、day10 のダブル投稿で穴埋め済み（＝29日投稿 + 穴埋め1日）。 */
+  const perDay = Array.from({ length: 30 }, (_, i) => (i + 1 === 5 ? 0 : i + 1 === 10 ? 2 : 1));
+
+  it("穴埋め済みの日を合算する（29日投稿 + 穴埋め1日 = 30日）", () => {
+    const dayCounts = dc(perDay);
+    const status = currentMonthMakeupStatus({
+      daysInMonth: 31,
+      todayDayNum: 30,
+      dayCounts,
+      filledHoleDays: [5],
+      grace: 3,
+    });
+    expect(coveredDays(29, status)).toBe(30);
+  });
+
+  it("未充填の穴は合算しない", () => {
+    const dayCounts = dc(perDay);
+    const status = currentMonthMakeupStatus({
+      daysInMonth: 31,
+      todayDayNum: 30,
+      dayCounts,
+      filledHoleDays: [],
+      grace: 3,
+    });
+    expect(coveredDays(29, status)).toBe(29);
+  });
+
+  it("穴が無ければ投稿日数そのまま", () => {
+    const dayCounts = dc(Array.from({ length: 30 }, () => 1));
+    const status = currentMonthMakeupStatus({
+      daysInMonth: 31,
+      todayDayNum: 30,
+      dayCounts,
+      filledHoleDays: [],
+      grace: 3,
+    });
+    expect(coveredDays(30, status)).toBe(30);
   });
 });
 

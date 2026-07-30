@@ -226,6 +226,15 @@ export function currentMonthMakeupStatus(args: {
 }
 
 /**
+ * 進捗表示用の「押さえた日数」＝ 投稿した日数 + 穴埋め済みの空き日数（純粋）。
+ * カレンダーでは穴埋め済みの日も donor 画像で埋まって見えるため、合算しないと
+ * 「毎日埋まっているのに 29/31日投稿」と表示が食い違う。
+ */
+export function coveredDays(distinctDays: number, status: CurrentMonthMakeupStatus): number {
+  return distinctDays + Math.max(0, status.skippedSoFar - status.unfilled);
+}
+
+/**
  * 穴埋め推奨通知を送るべきか（純粋）。
  * - 1日以上の未投稿がある（skippedSoFar >= 1）
  * - まだ埋まっていない穴がある（unfilled > 0）
