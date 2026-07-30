@@ -115,7 +115,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const caption = buildCollageCaption(year, month, resolved.isPerfectAttendance);
+    const caption = buildCollageCaption({
+      year,
+      month,
+      dayCounts: resolved.dayCounts,
+      isPerfect: resolved.isPerfectAttendance,
+    });
 
     // ウォーターマーク: アプリのURL（scheme付き・末尾スラッシュ無し。例: https://pic.handon.club）と
     // 著作権（© username@domain）。

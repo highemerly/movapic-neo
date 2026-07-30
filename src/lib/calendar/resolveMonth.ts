@@ -67,15 +67,23 @@ export interface ResolvedCalendarMonth {
 }
 
 /**
- * カレンダー画像の投稿本文（キャプション）。「○年○月 #shamezo」＋皆勤月は👑。
+ * カレンダー画像の投稿本文（キャプション）。皆勤月は👑を添える。
  * カレンダーページURLは投稿関数の imageUrl（本文末尾）に別途付与する。
+ *
+ * 枚数は dayCounts の合計＝その月の投稿数（1日に複数投稿した分も数える。ALT の
+ * 「◯日投稿しました」は日数なので単位が違う）。プレビューと投稿でズレないよう、
+ * 合計はここでだけ計算する。
  */
-export function buildCollageCaption(
-  year: number,
-  month: number,
-  isPerfect: boolean
-): string {
-  return `${year}年${month}月${isPerfect ? " 👑" : ""} #shamezo`;
+export function buildCollageCaption(args: {
+  year: number;
+  month: number;
+  /** 日(1-31) → その日の投稿数。 */
+  dayCounts: Record<number, number>;
+  isPerfect: boolean;
+}): string {
+  const { year, month, dayCounts, isPerfect } = args;
+  const photos = Object.values(dayCounts).reduce((sum, n) => sum + n, 0);
+  return `${year}年${month}月はSHAMEZOに${photos}枚の写真を投稿しました！${isPerfect ? " 👑" : ""} #shamezo`;
 }
 
 /**

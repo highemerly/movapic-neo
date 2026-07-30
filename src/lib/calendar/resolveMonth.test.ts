@@ -35,11 +35,15 @@ const resolve = (images: CalendarImageRow[], now: Date, domain: string | null = 
 const PAST_NOW = new Date("2024-07-01T03:00:00Z"); // JST 2024-07-01（対象月は過去）
 
 describe("buildCollageCaption", () => {
-  it("通常月はハッシュタグつき", () => {
-    expect(buildCollageCaption(2024, 6, false)).toBe("2024年6月 #shamezo");
+  it("通常月は枚数とハッシュタグつき", () => {
+    expect(
+      buildCollageCaption({ year: 2024, month: 6, dayCounts: { 1: 1, 2: 2 }, isPerfect: false })
+    ).toBe("2024年6月はSHAMEZOに3枚の写真を投稿しました！ #shamezo");
   });
   it("皆勤月は👑を挟む", () => {
-    expect(buildCollageCaption(2024, 6, true)).toBe("2024年6月 👑 #shamezo");
+    expect(
+      buildCollageCaption({ year: 2024, month: 6, dayCounts: { 1: 1 }, isPerfect: true })
+    ).toBe("2024年6月はSHAMEZOに1枚の写真を投稿しました！ 👑 #shamezo");
   });
 });
 

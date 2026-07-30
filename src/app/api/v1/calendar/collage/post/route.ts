@@ -99,7 +99,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "未来の月は投稿できません" }, { status: 400 });
     }
 
-    const caption = buildCollageCaption(year, month, resolved.isPerfectAttendance);
+    const caption = buildCollageCaption({
+      year,
+      month,
+      dayCounts: resolved.dayCounts,
+      isPerfect: resolved.isPerfectAttendance,
+    });
     // 「◯日投稿しました」なので穴埋めセルは数えない（その日に投稿した事実は無いため）。
     const altText = buildCollageAltText({
       year,
