@@ -83,7 +83,12 @@ export function MasonryGrid<T>({
           {col.map((item) => (
             <div
               key={getKey(item)}
-              className={itemClassName?.(item)}
+              // min-h-0 必須（Safari）: WebKit は flex アイテムの自動最小サイズ
+              // （min-height:auto）を子孫の height:100% から算出してしまい、その値を
+              // aspect-ratio 経由で幅にも転写する。縦長ほど転写量が大きく、カードだけ
+              // 列幅を数px超えて右隣の列の画像に重なっていた（Safari限定・Chrome/Firefox は
+              // 自動最小サイズが0で無害）。自動最小サイズを切ると幅・高さとも比率どおりに戻る。
+              className={`min-h-0 ${itemClassName?.(item) ?? ""}`}
               style={{ aspectRatio: clampAspect(aspect(item)) }}
             >
               {renderItem(item)}
