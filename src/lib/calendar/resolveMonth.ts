@@ -79,6 +79,30 @@ export function buildCollageCaption(
 }
 
 /**
+ * カレンダー画像の代替テキスト(ALT)。
+ *
+ * 「何月の・何の一覧か」「カレンダー形式であること」「その月に何日投稿したか」まで。
+ * 王冠や穴埋めの打ち消し線といった記号の説明は、読み上げが長くなる割に本題ではないので入れない。
+ * 個々の写真の内容も説明できないので触れない（本文末尾のカレンダーURLが受け皿）。
+ */
+export function buildCollageAltText(args: {
+  year: number;
+  month: number;
+  daysInMonth: number;
+  /** 実際に投稿した日数（穴埋めで写真が入っただけの日は含めない）。 */
+  postedDays: number;
+}): string {
+  const { year, month, daysInMonth, postedDays } = args;
+  return (
+    `${year}年${month}月に私がSHAMEZOに投稿した写真の一覧です。` +
+    "カレンダー形式で、各日にその日の写真が1枚ずつ並んでいます。" +
+    (postedDays >= daysInMonth
+      ? `${daysInMonth}日すべて投稿しました。`
+      : `${daysInMonth}日のうち${postedDays}日投稿しました。`)
+  );
+}
+
+/**
  * 指定月の開始・終了（JST基準・UTC Date）。createdAt は UTC 保存なので JST 00:00 を UTC-9h で表す。
  */
 export function calendarMonthRange(

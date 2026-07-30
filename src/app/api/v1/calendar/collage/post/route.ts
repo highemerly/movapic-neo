@@ -21,6 +21,7 @@ import {
   fetchCalendarImages,
   resolveCalendarMonth,
   buildCollageCaption,
+  buildCollageAltText,
 } from "@/lib/calendar/resolveMonth";
 import {
   postToMastodon,
@@ -99,7 +100,13 @@ export async function POST(request: NextRequest) {
     }
 
     const caption = buildCollageCaption(year, month, resolved.isPerfectAttendance);
-    const altText = `${year}年${month}月のSHAMEZOカレンダー`;
+    // 「◯日投稿しました」なので穴埋めセルは数えない（その日に投稿した事実は無いため）。
+    const altText = buildCollageAltText({
+      year,
+      month,
+      daysInMonth: resolved.daysInMonth,
+      postedDays: Object.keys(resolved.days).length,
+    });
     const buffer = Buffer.from(await imageBlob.arrayBuffer());
     const ext = contentType === "image/webp" ? "webp" : "jpg";
     const filename = `shamezo-calendar-${year}-${String(month).padStart(2, "0")}.${ext}`;

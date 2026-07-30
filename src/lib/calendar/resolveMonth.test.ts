@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildCollageAltText,
   buildCollageCaption,
   calendarMonthRange,
   resolveCalendarMonth,
@@ -39,6 +40,24 @@ describe("buildCollageCaption", () => {
   });
   it("皆勤月は👑を挟む", () => {
     expect(buildCollageCaption(2024, 6, true)).toBe("2024年6月 👑 #shamezo");
+  });
+});
+
+describe("buildCollageAltText", () => {
+  const base = { year: 2024, month: 6, daysInMonth: 30 };
+
+  it("投稿した日数を添える", () => {
+    expect(buildCollageAltText({ ...base, postedDays: 6 })).toBe(
+      "2024年6月に私がSHAMEZOに投稿した写真の一覧です。" +
+        "カレンダー形式で、各日にその日の写真が1枚ずつ並んでいます。" +
+        "30日のうち6日投稿しました。"
+    );
+  });
+
+  it("全日投稿した月は「すべて」と言い切る", () => {
+    expect(buildCollageAltText({ ...base, postedDays: 30 })).toContain(
+      "30日すべて投稿しました。"
+    );
   });
 });
 
