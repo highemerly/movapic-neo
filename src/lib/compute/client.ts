@@ -37,11 +37,19 @@ function computeApiKey(): string {
   return key;
 }
 
+/** compute からの応答。本文は読み切った状態で返す（下の pitfall 参照）。 */
+interface ComputeResponse {
+  ok: boolean;
+  status: number;
+  headers: Headers;
+  body: Buffer;
+}
+
 async function computeFetch(
   path: string,
   form: FormData,
   externalSignal?: AbortSignal,
-): Promise<Response> {
+): Promise<ComputeResponse> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), COMPUTE_TIMEOUT_MS);
   // クライアントが諦めて接続を切ると Next が request.signal を abort する。
@@ -52,12 +60,17 @@ async function computeFetch(
     else externalSignal.addEventListener("abort", onExternalAbort);
   }
   try {
-    return await fetch(`${computeBase()}${path}`, {
+    const res = await fetch(`${computeBase()}${path}`, {
       method: "POST",
       headers: { "X-API-Key": computeApiKey() },
       body: form,
       signal: controller.signal,
     });
+    // pitfall: fetch の await は「ヘッダ受信」で解決する。Response をそのまま返して呼び出し側で
+    // 本文を読むと、その時点で timer は finally で解除済み＝本文受信が無制限になり、compute が
+    // 途中で黙ると呼び出し元が永久に待つ。ここで読み切ってからタイマーを止める。
+    const body = Buffer.from(await res.arrayBuffer());
+    return { ok: res.ok, status: res.status, headers: res.headers, body };
   } finally {
     clearTimeout(timer);
     if (externalSignal) externalSignal.removeEventListener("abort", onExternalAbort);
@@ -106,13 +119,11 @@ export async function renderImage(
 
   const res = await computeFetch("/api/internal/render", form, p.signal);
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`compute render failed: ${res.status} ${body}`);
+    throw new Error(`compute render failed: ${res.status} ${res.body.toString("utf8")}`);
   }
 
-  const buffer = Buffer.from(await res.arrayBuffer());
   return {
-    buffer,
+    buffer: res.body,
     contentType: res.headers.get("Content-Type") ?? "application/octet-stream",
     extension: res.headers.get("X-Extension") ?? "jpg",
     originalWidth: parseInt(res.headers.get("X-Original-Width") ?? "0", 10),
@@ -154,13 +165,13 @@ export async function renderCalendarCollage(
 
   const res = await computeFetch("/api/internal/render-calendar", form, signal);
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`compute render-calendar failed: ${res.status} ${body}`);
+    throw new Error(
+      `compute render-calendar failed: ${res.status} ${res.body.toString("utf8")}`
+    );
   }
 
-  const buffer = Buffer.from(await res.arrayBuffer());
   return {
-    buffer,
+    buffer: res.body,
     contentType: res.headers.get("Content-Type") ?? "image/jpeg",
     width: parseInt(res.headers.get("X-Width") ?? "0", 10),
     height: parseInt(res.headers.get("X-Height") ?? "0", 10),
@@ -178,14 +189,12 @@ export async function finalizeImage(
 
   const res = await computeFetch("/api/internal/finalize", form);
   if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`compute finalize failed: ${res.status} ${body}`);
+    throw new Error(`compute finalize failed: ${res.status} ${res.body.toString("utf8")}`);
   }
 
-  const thumbnail = Buffer.from(await res.arrayBuffer());
   const detected = res.headers.get("X-Detected-Mime") ?? "";
   return {
-    thumbnail,
+    thumbnail: res.body,
     detectedMime: detected || undefined,
     width: parseInt(res.headers.get("X-Width") ?? "0", 10),
     height: parseInt(res.headers.get("X-Height") ?? "0", 10),

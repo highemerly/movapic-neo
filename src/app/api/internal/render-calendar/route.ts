@@ -34,6 +34,7 @@ function isValidSpec(spec: unknown): spec is CalendarCollageSpec {
 }
 
 export async function POST(request: NextRequest) {
+  const t0 = Date.now();
   if (!verifyComputeApiKey(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("[internal/render-calendar] failed:", error);
+    console.error(`[internal/render-calendar] failed ${Date.now() - t0}ms:`, error);
     return NextResponse.json({ error: "render failed" }, { status: 500 });
   }
 }

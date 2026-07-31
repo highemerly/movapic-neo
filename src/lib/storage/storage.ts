@@ -22,17 +22,28 @@ let s3Client: S3Client | null = null;
 // 経路では、1本刺さるだけで Promise.all が固まりHTTPレスポンスが永遠に返らなくなる。
 // TimeoutError は SDK の TRANSIENT_ERROR_CODES に含まれるため、上限に達すれば新しい接続で
 // 自動リトライされる。
+// 実測のヘッダ受信は 25〜140ms。下の値はその数十倍で、正常系を切らずに異常だけ落とす幅。
 const S3_TIMEOUTS = {
-  // 新規接続の確立まで。
-  connectionTimeout: 3000,
-  // リクエスト送信〜レスポンスヘッダ受信まで（PUTは本文送信を含む）。
-  requestTimeout: 15000,
-  // requestTimeout はヘッダ受信で解除されるため、GETの本文ストリーミング中の停止は
-  // ソケット無通信タイムアウトで拾う（無通信の判定なので低速回線でも誤発火しない）。
-  socketTimeout: 15000,
+  // 新規接続の確立（TCP+TLS）まで。
+  connectionTimeout: 2000,
+  // 1試行あたりのリクエスト送信〜レスポンスヘッダ受信まで。
+  // 超過は TimeoutError＝SDK の TRANSIENT_ERROR_CODES なので、新しい接続で自動リトライされる。
+  requestTimeout: 4000,
   // これが無いと requestTimeout 超過は警告ログだけで、実際には待ち続ける。
   throwOnRequestTimeout: true,
 } as const;
+
+// アップロードだけは requestTimeout に本文送信が含まれるので、送信ごとに上書きして長めに取る
+// （数MBの画像を載せるため、ヘッダ待ちと同じ尺では足りない）。
+const S3_PUT_TIMEOUT_MS = 15000;
+
+// GET の「送信〜本文読み切り」全体（リトライ込み）の上限。
+// pitfall: 上記 requestTimeout / socketTimeout は **レスポンスヘッダ受信時点で全て解除される**
+// （NodeHttpHandler が resolve 時に clearTimeouts する）ため、ヘッダだけ返って本文が永久に
+// 来ないオブジェクトを掴むと await が解けない。実際に「HEADは成功しContentLengthも返るのに
+// GETの本文が来ない」壊れたサムネが検証環境にあり、カレンダー画像生成が無応答になった。
+// AbortSignal は本文ストリーミング中も有効なので、取得操作全体の上限にはこちらを使う。
+const S3_GET_TIMEOUT_MS = 10000;
 
 function resolveEndpoint(): string {
   const endpoint = process.env.S3_ENDPOINT;
@@ -137,7 +148,8 @@ export async function uploadImage(
       Body: buffer,
       ContentType: contentType,
       CacheControl: "public, max-age=31536000, immutable",
-    })
+    }),
+    { requestTimeout: S3_PUT_TIMEOUT_MS }
   );
 }
 
@@ -168,7 +180,8 @@ export async function getImage(storageKey: string): Promise<Buffer | null> {
       new GetObjectCommand({
         Bucket: bucketName,
         Key: storageKey,
-      })
+      }),
+      { abortSignal: AbortSignal.timeout(S3_GET_TIMEOUT_MS) }
     );
 
     if (!response.Body) {
