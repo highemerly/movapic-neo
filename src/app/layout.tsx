@@ -16,6 +16,7 @@ import { LEGACY_LOCAL_KEY_MIGRATIONS } from "@/lib/storageKeys";
 import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { HomeServerProvider } from "@/components/HomeServerProvider";
 import { getAvatarUrl } from "@/lib/avatar";
+import { getRumBeaconUrl } from "@/lib/rum";
 import { DEFAULT_OG_IMAGE } from "@/lib/ogImage";
 import "./globals.css";
 
@@ -111,6 +112,8 @@ export default async function RootLayout({
   const isAdminUser = isAdmin(
     claims ? `${claims.username}@${claims.instanceDomain}` : null
   );
+  // RUMビーコン（RUM_ORIGIN 未設定なら null＝配信しない）。CSPの緩和も同じ値を見ている（rum.ts）。
+  const rumBeaconUrl = getRumBeaconUrl();
 
   return (
     <html
@@ -133,6 +136,11 @@ export default async function RootLayout({
           id="legacy-storage-migration"
           dangerouslySetInnerHTML={{ __html: LEGACY_STORAGE_MIGRATION_SCRIPT }}
         />
+        {/* RUMビーコン。service / path_group はコレクタ側の rum-config.json で解決するため属性は不要。
+            next/script を使わないのは afterInteractive だと PerformanceObserver の登録が
+            計測開始に間に合わないため（素の <script async src> は React 19 が <head> へホイストする）。
+            GPC 有効ブラウザでは beacon.js 自身が即 return するのでオプトアウト実装は不要。 */}
+        {rumBeaconUrl && <script async src={rumBeaconUrl} />}
         <HomeServerProvider value={homeServer}>
         <ThemeProvider
           attribute="class"

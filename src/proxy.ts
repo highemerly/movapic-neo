@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { maybeSlideSession } from "@/lib/auth/slidingSession";
+import { getRumOrigin } from "@/lib/rum";
 
 // 状態変更を伴うHTTPメソッド（CSRF検証の対象）
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -117,13 +118,16 @@ export async function proxy(request: NextRequest) {
   const mediaProxyOrigin = process.env.MEDIA_PROXY_BASE_URL ?? "";
   const storagePublicOrigin = (process.env.S3_PUBLIC_URL ?? "").replace(/\/$/, "");
   const isDev = process.env.NODE_ENV === "development";
+  // RUM: beacon.js 本体と、そこから動的 import される web-vitals.js の読み込み元。
+  // 未設定（RUM無効）なら緩和しない。
+  const rumOrigin = getRumOrigin();
   const csp = [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`, // dev時のみReactデバッグ用にunsafe-eval許可
+    `script-src 'self' 'unsafe-inline'${rumOrigin ? ` ${rumOrigin}` : ""}${isDev ? " 'unsafe-eval'" : ""}`, // dev時のみReactデバッグ用にunsafe-eval許可
     "style-src 'self' 'unsafe-inline'", // Tailwind等で必要
     `img-src 'self' data: blob: ${mediaProxyOrigin} ${storagePublicOrigin}`, // 画像: アバターproxy・投稿画像
     "font-src 'self'",
-    "connect-src 'self' https:", // Fediverseインスタンスは任意のため https: を維持
+    "connect-src 'self' https:", // Fediverseインスタンスは任意のため https: を維持（RUMのrum-config.json取得・sendBeaconもここで許可されている。絞るときはRUM_ORIGINを明示的に残すこと）
     "object-src 'none'", // <object>/<embed>/<applet> 系プラグイン埋め込みを封じる（default-srcより厳格に明示）
     "frame-ancestors 'none'", // iframe埋め込み禁止
     "base-uri 'self'",
