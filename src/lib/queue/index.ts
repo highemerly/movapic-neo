@@ -50,7 +50,13 @@ function getConnectionString(): string {
 
 let workerUtilsPromise: Promise<WorkerUtils> | null = null;
 
-/** enqueue 用の WorkerUtils（プロセス内シングルトン）。初回接続時に graphile_worker スキーマを migrate する。 */
+/**
+ * enqueue 用の WorkerUtils（プロセス内シングルトン）。
+ *
+ * migrate はしない（`utils.migrate()` を呼んで初めて走る）。graphile_worker スキーマを
+ * 作る・更新するのは run() を呼ぶ worker-front だけ＝producer 側は既存スキーマに
+ * add_job するだけなので、worker と producer のバージョンがずれていても enqueue は通る。
+ */
 function getWorkerUtils(): Promise<WorkerUtils> {
   if (!workerUtilsPromise) {
     workerUtilsPromise = makeWorkerUtils({

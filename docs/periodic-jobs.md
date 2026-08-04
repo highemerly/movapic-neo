@@ -10,5 +10,10 @@
 - `favorite-sync`: リアクションのフォールバック同期。画像詳細ページが一度も開かれない投稿は閲覧時（GET）の同期に乗らないため、ここで拾う。オーナー側で取り消されたリアクションの反映（`reconcileRemovals`）も兼ねる。発火条件・バックオフ・停止条件は入り組んでいるので [リアクション仕様](./favorite.md) を正とする。
 - `mute-cleanup`: 期限切れミュート行の削除（`expiresAt=null` の無期は残す）。表示・除外は期限切れ行が残っていても正しく動くので、肥大防止のための掃除。
 
+## graphile-worker のスキーマ更新
+`graphile_worker` スキーマを作る・更新するのは **`run()` を呼ぶ worker-front だけ**。producer（web）が使う `makeWorkerUtils` は migrate せず、既存スキーマへ `add_job` するだけなので、producer 側のバージョンがずれていても enqueue は通る。
+
+**破壊的マイグレーションを含むメジャー更新（例: 0.16→0.17 の `000019`）では、新旧のランナーを重ねてはいけない。** 適用後は旧バージョンが `Database is using Graphile Worker schema revision ... It would be unsafe to continue` で起動を拒否する。worker-front の Deployment は既定の RollingUpdate だと `replicas: 1` でも新Podが先に立ち上がって一瞬2重になるため、この種の更新時は **worker-front を 0 に落としてからデプロイする**（または `strategy: Recreate`）。
+
 ## 追加予定（未実装）
 定期判定でのみ付与できる実績。`periodicJobs` 配列に1要素足すだけ。
