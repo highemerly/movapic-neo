@@ -13,7 +13,16 @@
 ## graphile-worker のスキーマ更新
 `graphile_worker` スキーマを作る・更新するのは **`run()` を呼ぶ worker-front だけ**。producer（web）が使う `makeWorkerUtils` は migrate せず、既存スキーマへ `add_job` するだけなので、producer 側のバージョンがずれていても enqueue は通る。
 
-**破壊的マイグレーションを含むメジャー更新（例: 0.16→0.17 の `000019`）では、新旧のランナーを重ねてはいけない。** 適用後は旧バージョンが `Database is using Graphile Worker schema revision ... It would be unsafe to continue` で起動を拒否する。worker-front の Deployment は既定の RollingUpdate だと `replicas: 1` でも新Podが先に立ち上がって一瞬2重になるため、この種の更新時は **worker-front を 0 に落としてからデプロイする**（または `strategy: Recreate`）。
+メジャー更新には破壊的マイグレーションが入りうる（0.16→0.17 の `000019`）。適用後は旧バージョンが `Database is using Graphile Worker schema revision ... It would be unsafe to continue` で**起動を拒否する**ため、取り残しは無言では壊れず必ず表面化する。
+
+worker-front の Deployment は既定の RollingUpdate だと `replicas: 1` でも新Podが先に立ち上がって一瞬2重になるが、**通常のローリングアップデートで進めてよい**。新旧ランナーが重なっても壊れないことは 0.16→0.17 で確認済み:
+
+- ロック回収は時間ベース（`locked_at < now() - interval '4 hours'`）のみで、「相手のプールが死んでいそうだから奪う」経路が無い＝数十秒の重なりで二重実行は起きない。
+- cron の発火は `_private_known_crontabs` の `last_execution` で DB 排他され、`returning` で行を受け取ったプールだけが enqueue する＝Podが2つでも `periodic` は二重に積まれない。
+- SIGTERM は graphile-worker 自身が拾って `gracefulShutdown` する＝旧Podの処理中ジョブは解放され新Podがリトライする。
+- producer は migrate もバージョンチェックもしないので、web 側が旧バージョンのままでも enqueue は通り続ける。
+
+ただしこれは**スキーマ自体が変わらなかった場合の結論**。次のメジャー更新では移行SQLの中身（`node_modules/graphile-worker/sql/` の新規ファイル）を必ず読み、実体のある DDL が入るなら worker-front を 0 に落としてからデプロイする。
 
 ## 追加予定（未実装）
 定期判定でのみ付与できる実績。`periodicJobs` 配列に1要素足すだけ。
