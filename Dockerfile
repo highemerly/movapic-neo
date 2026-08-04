@@ -4,11 +4,18 @@ FROM node:22-alpine AS base
 FROM base AS deps
 # システム libvips（>=8.17.3, vips-dev）+ HEVC デコーダ（libheif-dev/libde265-dev）。
 # prebuilt の @img/sharp-* は HEVC を内蔵せず HEIC を読めないため、これらに対して
-# sharp をソースビルドする（.npmrc の omit=optional で prebuilt を排除）。
-# pkgconf: ビルド時に vips-cpp を pkg-config で検出するため。
+# sharp をソースビルドする（npm ci は optional dependency の prebuilt を入れるので、
+# postinstall が事後に除去する。--omit=optional は @next/swc-* 等ビルド必須の
+# ネイティブまで落とすため使えない）。
+# pkgconf: ビルド時に vips-cpp を pkg-config で検出するため。postinstall の検証でも使う。
 # python3/make/g++: node-gyp による sharp のネイティブビルドに必要（ビルドステージのみ）。
 RUN apk add --no-cache libc6-compat vips-dev libheif-dev libde265-dev pkgconf python3 make g++
 WORKDIR /app
+
+# ソースビルドに失敗したら postinstall を非ゼロ終了させ、イメージビルドを止める。
+# prebuilt が残っても sharp は起動しヘルスも通るため、これが無いと HEIC だけ死んだ
+# イメージが無言で出荷される。
+ENV REQUIRE_SYSTEM_LIBVIPS=1
 
 COPY package.json package-lock.json ./
 # postinstall(scripts/use-system-libvips.mjs)が prebuilt の @img/sharp を除去し、

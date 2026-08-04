@@ -20,6 +20,15 @@ prebuilt の `@img/sharp-*` は HEVC（HEIC）非対応のため、**system libv
 - デコード処理（iref 制限の `unlimited`・HEIF→JPEG化）: [rotate.ts](../src/lib/image/rotate.ts)
 - ソースビルドsharpは runtime に vips-cpp 必須。欠けると compute 起動不能（`ERR_DLOPEN_FAILED`）。
 
+### ビルドを止める条件（`REQUIRE_SYSTEM_LIBVIPS`）
+[Dockerfile](../Dockerfile) の deps ステージが `REQUIRE_SYSTEM_LIBVIPS=1` を立て、postinstall はソースビルド失敗時に**非ゼロ終了してイメージビルドを止める**。未設定のローカル（mac）は従来どおり警告のみで継続する（HEIC は読めないが他機能は動く）。
+
+止める理由: prebuilt が残っても sharp は正常に起動しヘルスチェックも通るため、**HEIC 投稿だけが死んだイメージが無言で本番へ出ていく**。iPhone ユーザーの投稿が壊れて初めて気づくことになる。
+
+postinstall は `npm rebuild` の終了コードだけでなく、prebuilt 除去後に sharp を実際に読み込んで検証する（`sharp.versions.vips` が `pkg-config --modversion vips` と一致するか・HEIF ローダーがあるか）。`sharp.format.heif.input` は prebuilt でも true を返す（HEVC が引けないだけ）ので、単独では prebuilt を見分けられない。
+
+本番で実際に使われている libvips は `/admin` のヘルス表示で確認できる（[health.ts](../src/lib/admin/health.ts) が compute の `sharp.versions` を返す）。
+
 ### やってはいけない
 - `.npmrc` の `omit=optional` で prebuilt を消す（lightningcss 等の native optional も巻き込み dev/build が壊れる）。sharp の `@img` だけ postinstall で除去する。
 - `heic-convert` の再導入（純JS/WASMで遅く生成が504タイムアウトしたため廃止。commit `aec8325`）。
