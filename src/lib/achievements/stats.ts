@@ -4,7 +4,7 @@
  */
 
 import prisma from "@/lib/db";
-import { calculateStreak, toJstDateString } from "@/lib/streak";
+import { calculateStreak, toJstDateString, toJstHour } from "@/lib/streak";
 import type { AchStats, PostFacts, ReactionStats } from "./catalog";
 import {
   summarizeDayCounts,
@@ -82,6 +82,10 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
     dateRows.filter((r) => toJstDateString(r.createdAt) === postDay).map((r) => r.source)
   );
 
+  // 通算で投稿した月（YYYY-MM）と時間帯（0-23時）の種類数。どちらも JST 基準。
+  const postMonths = new Set(jstDays.map((d) => d.slice(0, 7)));
+  const postHours = new Set(dateRows.map((r) => toJstHour(r.createdAt)));
+
   return {
     totalPosts: dateRows.length,
     currentStreak: calculateStreak(dateRows.map((r) => r.createdAt)),
@@ -89,6 +93,8 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
     distinctDaysInPostMonth: monthSummary.distinctDays,
     postMonthDayCounts,
     filledHoleDays,
+    distinctPostMonths: postMonths.size,
+    distinctPostHours: postHours.size,
     featureCounts: { neon, stamp, xlarge, vertical },
     distinctFonts: fontGroups.length,
     distinctColors: colorGroups.length,
@@ -109,9 +115,16 @@ const CUSTOM_EMOJI_PREFIX = ":";
 
 /** リアクション由来の集計値（live）。押した瞬間・受け取った瞬間に呼ぶ。 */
 export async function collectReactionStats(userId: string): Promise<ReactionStats> {
-  const [given, givenCustomEmoji, received] = await prisma.$transaction([
+  const [given, givenCustomEmoji, ownerGroups, received] = await prisma.$transaction([
     prisma.reaction.count({ where: { userId } }),
     prisma.reaction.count({ where: { userId, emoji: { startsWith: CUSTOM_EMOJI_PREFIX } } }),
+    // 応援した人数: 自分がリアクションした写真の投稿者を Image 側でグルーピングして数える
+    // （Reaction には投稿者が無く groupBy はリレーション列を跨げないため）。自分の写真は除く。
+    prisma.image.groupBy({
+      by: ["userId"],
+      where: { userId: { not: userId }, reactions: { some: { userId } } },
+      orderBy: { userId: "asc" },
+    }),
     // favoriteCount は連合キャッシュと Reaction をマージ済みの表示用合計（同期のたびに更新される）。
     // 画面に出ている件数と実績の数え方を一致させるため、これを総和する。
     prisma.image.aggregate({ where: { userId }, _sum: { favoriteCount: true } }),
@@ -120,6 +133,7 @@ export async function collectReactionStats(userId: string): Promise<ReactionStat
   return {
     given,
     givenCustomEmoji,
+    givenDistinctOwners: ownerGroups.length,
     received: received._sum.favoriteCount ?? 0,
   };
 }
@@ -163,6 +177,7 @@ export async function collectLadderValues(userId: string): Promise<Record<string
   return {
     "post-count": dateRows.length,
     streak: calculateStreak(dateRows.map((r) => r.createdAt)),
+    months: new Set(jstDays.map((d) => d.slice(0, 7))).size,
     daily: jstDays.filter((d) => d === todayStr).length,
     "feature:neon": neon,
     "feature:stamp": stamp,
@@ -172,6 +187,7 @@ export async function collectLadderValues(userId: string): Promise<Record<string
     prefectures: prefGroups.length,
     colors: colorGroups.length,
     "reaction-custom": reactionStats.givenCustomEmoji,
+    "reaction-users": reactionStats.givenDistinctOwners,
     "reaction-received": reactionStats.received,
   };
 }

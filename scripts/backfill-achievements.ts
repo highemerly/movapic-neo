@@ -22,11 +22,14 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
-import { toJstDateString } from "@/lib/streak";
+import { toJstDateString, toJstHour } from "@/lib/streak";
 import {
   CATALOG,
   evaluatePerfectMonth,
   evaluateSeason,
+  isPostAchievement,
+  isProfileAchievement,
+  isReactionAchievement,
   PERFECT_MONTH_CATEGORY,
   SEASON_CATEGORY,
   type AchStats,
@@ -105,6 +108,9 @@ function replayUser(userId: string, images: ReplayImage[], grace: number): Grant
   // ym -> その月で永続化された穴埋め割当（makeupTargetDay）が指す空き日。皆勤賞判定の単一ソース。
   // live=collectStats（DBから当月分を読む）と同形式。backfill は時系列リプレイで running に積む。
   const monthFilledHoles = new Map<string, number[]>();
+  // 通算で投稿した月（YYYY-MM）と時間帯（0-23時）。live=collectStats と同じ JST 基準。
+  const postMonths = new Set<string>();
+  const postHours = new Set<number>();
   const featureCounts = { neon: 0, stamp: 0, xlarge: 0, vertical: 0 };
   const fonts = new Set<string>();
   const colors = new Set<string>();
@@ -119,6 +125,8 @@ function replayUser(userId: string, images: ReplayImage[], grace: number): Grant
 
     totalPosts += 1;
     allDays.add(day);
+    postMonths.add(ym);
+    postHours.add(toJstHour(img.createdAt));
     dayCounts.set(day, (dayCounts.get(day) ?? 0) + 1);
     if (!daySources.has(day)) daySources.set(day, new Set());
     daySources.get(day)!.add(img.source);
@@ -162,6 +170,8 @@ function replayUser(userId: string, images: ReplayImage[], grace: number): Grant
       distinctDaysInPostMonth: monthSummary.distinctDays,
       postMonthDayCounts,
       filledHoleDays: monthFilledHoles.get(ym) ?? [],
+      distinctPostMonths: postMonths.size,
+      distinctPostHours: postHours.size,
       featureCounts: { ...featureCounts },
       distinctFonts: fonts.size,
       distinctColors: colors.size,
@@ -187,9 +197,9 @@ function replayUser(userId: string, images: ReplayImage[], grace: number): Grant
       createdAt: img.createdAt,
     };
 
-    // 固定実績（リアクション起点は投稿では確定しないので replayReactions 側で扱う）
+    // 固定実績（リアクション/プロフィール起点は投稿では確定しないので別経路で扱う）
     for (const def of CATALOG) {
-      if (def.trigger === "reaction") continue;
+      if (!isPostAchievement(def)) continue;
       if (grantedKeys.has(def.key)) continue;
       if (def.evaluate(stats, post)) {
         grantedKeys.add(def.key);
@@ -244,7 +254,7 @@ function isCustomEmojiKey(emoji: string): boolean {
  */
 function replayReactions(
   userId: string,
-  reactions: { emoji: string; createdAt: Date }[],
+  reactions: { emoji: string; createdAt: Date; image: { userId: string } }[],
   received: number,
   now: Date
 ): GrantRow[] {
@@ -252,7 +262,7 @@ function replayReactions(
   const grantedKeys = new Set<string>();
   const evaluate = (stats: ReactionStats, grantedAt: Date) => {
     for (const def of CATALOG) {
-      if (def.trigger !== "reaction") continue;
+      if (!isReactionAchievement(def)) continue;
       if (grantedKeys.has(def.key)) continue;
       if (def.evaluate(stats)) {
         grantedKeys.add(def.key);
@@ -263,13 +273,34 @@ function replayReactions(
 
   let given = 0;
   let givenCustomEmoji = 0;
+  // 応援した人数（自分の写真は数えない。live=collectReactionStats の userId 除外と同期）
+  const owners = new Set<string>();
   for (const r of reactions) {
     given += 1;
     if (isCustomEmojiKey(r.emoji)) givenCustomEmoji += 1;
-    evaluate({ given, givenCustomEmoji, received: 0 }, r.createdAt);
+    if (r.image.userId !== userId) owners.add(r.image.userId);
+    evaluate(
+      { given, givenCustomEmoji, givenDistinctOwners: owners.size, received: 0 },
+      r.createdAt
+    );
   }
-  evaluate({ given, givenCustomEmoji, received }, now);
+  evaluate({ given, givenCustomEmoji, givenDistinctOwners: owners.size, received }, now);
 
+  return grants;
+}
+
+/**
+ * プロフィール起点の実績を付与する。
+ * 自己紹介をいつ入力したかの履歴は無いため現在値で判定し、獲得日はスクリプト実行時刻にする
+ * （受け取ったリアクションと同じ扱い＝通知もその日付で作られるためベルが光る）。
+ */
+function replayProfile(userId: string, bio: string | null, now: Date): GrantRow[] {
+  const grants: GrantRow[] = [];
+  for (const def of CATALOG) {
+    if (!isProfileAchievement(def)) continue;
+    if (!def.evaluate({ bio })) continue;
+    grants.push({ userId, key: def.key, category: def.category, imageId: null, grantedAt: now });
+  }
   return grants;
 }
 
@@ -282,6 +313,7 @@ async function main() {
     select: {
       id: true,
       username: true,
+      bio: true,
       createdAt: true,
       instance: { select: { domain: true } },
     },
@@ -347,7 +379,7 @@ async function main() {
       prisma.reaction.findMany({
         where: { userId: user.id },
         orderBy: { createdAt: "asc" },
-        select: { emoji: true, createdAt: true },
+        select: { emoji: true, createdAt: true, image: { select: { userId: true } } },
       }),
       prisma.image.aggregate({ where: { userId: user.id }, _sum: { favoriteCount: true } }),
     ]);
@@ -360,6 +392,17 @@ async function main() {
     if (reactionGrants.length > 0) {
       const result = await prisma.achievement.createMany({
         data: reactionGrants,
+        skipDuplicates: true,
+      });
+      grantedCount += result.count;
+      totalGranted += result.count;
+    }
+
+    // 1.6 プロフィール起点の実績付与（投稿・リアクションが0件のユーザーにも付き得る）
+    const profileGrants = replayProfile(user.id, user.bio, new Date());
+    if (profileGrants.length > 0) {
+      const result = await prisma.achievement.createMany({
+        data: profileGrants,
         skipDuplicates: true,
       });
       grantedCount += result.count;

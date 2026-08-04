@@ -12,6 +12,7 @@ import { revalidateTag } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/session";
 import prisma from "@/lib/db";
 import { ROBOTS_BLOCKLIST_TAG } from "@/lib/crawlers";
+import { onProfileUpdated } from "@/lib/achievements/profileTriggers";
 
 /**
  * 認証済みユーザー向けレスポンス用ヘルパー。
@@ -155,6 +156,12 @@ export async function PATCH(request: NextRequest) {
     // robots.txt のブロックリストキャッシュを即時破棄（検証用にも即反映）
     if (updateData.blockCrawlers !== undefined) {
       revalidateTag(ROBOTS_BLOCKLIST_TAG, "max");
+    }
+
+    // 自己紹介の実績（bio-set）。ここが bio の唯一の書き込み経路＝唯一の評価タイミング。
+    // 保存後の値（DBを正）で判定し、失敗してもプロフィール更新は成功させる。
+    if (updateData.bio !== undefined) {
+      await onProfileUpdated({ userId: sessionUser.id, bio: updatedUser.bio });
     }
 
     return jsonNoStore({

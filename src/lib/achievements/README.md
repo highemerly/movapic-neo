@@ -10,17 +10,21 @@
 | `perfectMonth.ts` | **皆勤賞ロジックの単一ソース**。しきい値（`perfectMonthGrace(domain)` ＝ ホーム handon.club は4・その他は3 / `MAKEUP_REMINDER_MAX_SKIPPED`）・穴埋め割当の貪欲決定（`pickMakeupHole`＝投稿1件ぶん / `assignMonthMakeups`＝月一括）・達成判定（`isPerfectMonth`）・当月進捗（`currentMonthMakeupStatus`）・穴埋め通知ゲート（`shouldRemindMakeup`）・日別集計（`summarizeDayCounts`）。catalog 同様 React/サーバー専用APIを入れない。**穴埋め割当は Image.makeupTargetDay に永続化し、表示（カレンダー）も判定（皆勤賞）も同じ永続値を読む**＝表示と👑が食い違わない。判定は `filledHoleDays`（永続割当が指す空き日）を数える（貪欲の再計算はしない） |
 | `makeupAssign.ts` | 穴埋め割当を DB に書く side（サーバー専用）。`assignMakeupForNewPost`（投稿時に autoMakeup=true なら1件割当）/ `recomputeMonthMakeups`（削除後の自己修復で月を再割当）。純粋な割当規則は perfectMonth.ts に集約し、ここは橋渡しだけ |
 | `stats.ts` | live 用。投稿後に DB から集計（`collectStats`）して `AchStats` を作る。リアクション起点の集計（`collectReactionStats`＝`ReactionStats`）もここ |
-| `engine.ts` | live 用。`evaluateAndGrant`（投稿起点）/ `evaluateAndGrantReaction`（リアクション起点）が新規付与＋通知作成。`selectNewlyGranted` / `selectNewlyGrantedReaction` は純粋関数で live/backfill 共有 |
+| `engine.ts` | live 用。`evaluateAndGrant`（投稿起点）/ `evaluateAndGrantReaction`（リアクション起点）/ `evaluateAndGrantProfile`（プロフィール起点）が新規付与＋通知作成。`selectNewlyGranted*` は純粋関数で live/backfill 共有 |
 | `reactionTriggers.ts` | リアクション起点のフック（`onReactionGiven` / `onReactionsReceived`）。例外を握り潰してリアクション操作・同期を止めない |
+| `profileTriggers.ts` | プロフィール起点のフック（`onProfileUpdated`）。例外を握り潰してプロフィール保存を止めない |
 | `notifications.ts` | 通知フィード取得（直近90日の `Notification` をサムネ・リンク付きで返す） |
 | `../publish/publishImage.ts` | 3経路（web/email/mention）すべての投稿後フック。`result.imageId` がある時だけ評価し、try/catch で投稿を止めない |
 | `scripts/backfill-achievements.ts` | 既存ユーザーの過去投稿を**時系列リプレイ**して付与＋通知補填（メモリ集計版の stats） |
 | `components/achievements/AchievementsView.tsx` | 実績タブの表示（`ACHIEVEMENT_LAYOUT` 駆動） |
 | `components/achievements/AchievementIcon.tsx` | アイコン名 → lucide コンポーネントのマップ |
 
-評価タイミングは2系統ある（実績定義の `trigger` で区別。既定は `"post"`）。しきい値はすべて **`>=`（到達で付与）**。一度付与した実績は**永続**（要件を満たさなくなっても剥奪しない）。
+評価タイミングは3系統ある（実績定義の `trigger` で区別。既定は `"post"`）。しきい値はすべて **`>=`（到達で付与）**。一度付与した実績は**永続**（要件を満たさなくなっても剥奪しない）。
 - **投稿起点（`trigger` 省略）**: 「ユーザー自身が投稿した瞬間」に確定する条件のみ。集計は `AchStats`・投稿の属性は `PostFacts`。
 - **リアクション起点（`trigger: "reaction"`）**: リアクションは投稿と無関係に増減するため、**リアクションが実際に動いた瞬間**に評価する。集計は `ReactionStats` のみ（`PostFacts` は無い）。
+- **プロフィール起点（`trigger: "profile"`）**: 自己紹介は投稿にもリアクションにも紐づかないため、**プロフィールを保存した瞬間**に評価する。渡すのは保存後の実値 `ProfileFacts`（集計値ではない）。
+
+各系統の評価ループは必ず型ガード（`isPostAchievement` / `isReactionAchievement` / `isProfileAchievement`）で絞る。「自分の系統以外を continue」で書くと、**trigger を増やしたとき既存ループへ漏れ込み、別の型の引数で `evaluate` が呼ばれる**。
 **例外（皆勤賞のみ）**: カレンダー編集モードの終了時にも皆勤賞だけ再判定する（`POST /api/v1/me/calendar/reevaluate`・**付与のみ・剥奪なし**）。これは「③自動穴埋めOFFのユーザーが後から手動で穴を埋めて皆勤を成立させた」ケースを拾うため。③ON（貪欲最適）では投稿時に判定済みなので新規付与は起きない。
 
 ## 不変条件（壊すと既存データが壊れる）
@@ -87,6 +91,12 @@
 - 解除（DELETE）では評価しない（件数が減るだけで、実績は剥奪しない）。
 - **リアクション起点の実績には「きっかけ写真」を紐づけない**（`Achievement.imageId` は押した側・受け取った側とも常に `null`。`evaluateAndGrantReaction` が強制）。画像詳細ページの「この投稿で獲得した実績」は `imageId` だけで引く（所有者で絞らない）ので、押した側だと他人の写真に自分の実績が並び、受け取った側でも「その写真を投稿したから獲得した実績」ではないものが投稿の実績として並んでしまう。通知の `imageId`（サムネ・遷移先）には当該写真を使ってよい。
 - `ReactionStats` はいずれも**現在値**（リアクションは取り消し・付け替えができ履歴が無いため累計は復元できない）。実績は永続なので、一度到達すれば以後値が下がっても保持される。
+
+## 手順C-3: プロフィール起点の実績を追加する
+
+自己紹介（`User.bio`）のようにプロフィール保存でしか動かない条件は、定義を `catalog.ts` に **`trigger: "profile"` 付き**で書き、`evaluate` は `ProfileFacts`（保存後の実値）だけを受ける（型は `ProfileAchievementDef`）。あとは手順A と同じ（`ACHIEVEMENT_LAYOUT` への追加を忘れない）。
+
+評価される瞬間は **`PATCH /api/v1/me`（bio の唯一の書き込み経路）だけ**。`onProfileUpdated` を経由し、例外はフック内で握り潰してプロフィール保存を止めない。バックフィルは履歴が無いため現在値で一括判定し、**grantedAt はスクリプト実行時刻**（受け取ったリアクションと同じ扱い＝通知はその日付で作られる）。
 
 ## 手順D: 既存ユーザーへ反映（バックフィル）
 

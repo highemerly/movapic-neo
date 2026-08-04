@@ -8,7 +8,7 @@
  * 動的にキーが増える皆勤賞だけはカタログ配列に入れず evaluatePerfectMonth で扱う。
  */
 
-import { toJstDateString } from "@/lib/streak";
+import { toJstDateString, toJstHour } from "@/lib/streak";
 import { seasonLabel } from "@/lib/seasons/catalog";
 import { countGraphemes } from "@/lib/text/grapheme";
 import {
@@ -52,6 +52,10 @@ export interface AchStats {
    * ③ON既存ユーザーは貪欲割当と一致するため判定は従来と不変。
    */
   filledHoleDays: number[];
+  /** 投稿した月（JST の YYYY-MM）の通算種類数。連続と違い休止を挟んでも積み上がる。 */
+  distinctPostMonths: number;
+  /** 投稿した時間帯（JST の 0-23 時）の通算種類数。24 で時計を一周したことになる。 */
+  distinctPostHours: number;
   /** 機能別の累計利用回数 */
   featureCounts: { neon: number; stamp: number; xlarge: number; vertical: number };
   /** 使ったフォントの種類数 */
@@ -84,6 +88,8 @@ export interface ReactionStats {
   given: number;
   /** うちカスタム絵文字（`:name@host:`）で押している件数 */
   givenCustomEmoji: number;
+  /** 自分がリアクションしている写真の投稿者の人数（自分自身の写真は数えない） */
+  givenDistinctOwners: number;
   /** 自分の投稿が獲得したリアクションの総数（表示合計＝Image.favoriteCount の総和） */
   received: number;
 }
@@ -104,6 +110,18 @@ export interface PostFacts {
   /** 公開範囲。"local" は連携サーバーへ同時投稿しない（Fediverse未投稿） */
   visibility: string; // "public" | "unlisted" | "local"
   createdAt: Date;
+}
+
+/**
+ * プロフィール（自己紹介）の現在値。
+ *
+ * 投稿にもリアクションにも紐づかず、プロフィールを保存した瞬間にしか動かないため、
+ * AchStats / ReactionStats とは別立てにする（評価は engine.ts の selectNewlyGrantedProfile）。
+ * 集計値ではなく保存後の実値そのもの＝ライターが1箇所（PATCH /api/v1/me）しかないため。
+ */
+export interface ProfileFacts {
+  /** 保存後の自己紹介。null または空文字＝未設定 */
+  bio: string | null;
 }
 
 /** 実績のランク（難易度）。段階実績は段ごとに割り当てる。 */
@@ -148,12 +166,41 @@ export type ReactionAchievementDef = AchievementMeta & {
   evaluate: (s: ReactionStats) => boolean;
 };
 
-export type AchievementDef = PostAchievementDef | ReactionAchievementDef;
+/**
+ * プロフィールを保存した瞬間に評価する実績。
+ * 投稿もリアクションも経由しないため、PATCH /api/v1/me からだけ評価する
+ * （src/lib/achievements/profileTriggers.ts）。
+ */
+export type ProfileAchievementDef = AchievementMeta & {
+  trigger: "profile";
+  evaluate: (p: ProfileFacts) => boolean;
+};
+
+export type AchievementDef =
+  | PostAchievementDef
+  | ReactionAchievementDef
+  | ProfileAchievementDef;
+
+/**
+ * trigger 別の絞り込み。評価ループは必ずこれを通す。
+ * 「自分の系統以外を continue」ではなく「自分の系統だけを通す」形にしないと、
+ * trigger を増やしたときに既存ループへ漏れ込み、別の型の引数で evaluate が呼ばれる。
+ */
+export function isPostAchievement(d: AchievementDef): d is PostAchievementDef {
+  return d.trigger === undefined || d.trigger === "post";
+}
+export function isReactionAchievement(d: AchievementDef): d is ReactionAchievementDef {
+  return d.trigger === "reaction";
+}
+export function isProfileAchievement(d: AchievementDef): d is ProfileAchievementDef {
+  return d.trigger === "profile";
+}
 
 // ラダー（段階実績）のまとめ表示用メタ。ladderKey で引く。
 export const LADDER_META: Record<string, { label: string; unit: string }> = {
   "post-count": { label: "投稿数", unit: "投稿" },
   streak: { label: "連続投稿", unit: "日連続" },
+  months: { label: "投稿した月数", unit: "ヶ月" },
   daily: { label: "1日の投稿数", unit: "枚/日" },
   "feature:neon": { label: "ネオンの利用", unit: "回" },
   "feature:stamp": { label: "ハンコの利用", unit: "回" },
@@ -163,6 +210,7 @@ export const LADDER_META: Record<string, { label: string; unit: string }> = {
   prefectures: { label: "都道府県", unit: "都道府県" },
   colors: { label: "文字色", unit: "色" },
   "reaction-custom": { label: "カスタム絵文字リアクション", unit: "件" },
+  "reaction-users": { label: "応援した人数", unit: "人" },
   "reaction-received": { label: "獲得したリアクション", unit: "件" },
 };
 
@@ -179,7 +227,6 @@ export const SECTIONS = [
 // 文字数は書記素（grapheme）ベースで数える。入力バリデーション（UI/各API）と同一の
 // 数え方に統一し、絵文字1個＝1文字として実績条件（1文字 / 130文字以上）を判定する。
 const cp = (s: string) => countGraphemes(s);
-const jstHour = (d: Date) => new Date(d.getTime() + 9 * 60 * 60 * 1000).getUTCHours(); // JSTの時(0-23)
 
 // --- 累計投稿数（文字入れ師の段位） ---
 const POST_COUNT_TITLES: Record<number, string> = {
@@ -192,8 +239,9 @@ const POST_COUNT_TITLES: Record<number, string> = {
   200: "表現の鉄人",
   300: "言の葉の仙人",
   500: "SHAMEZOの神",
+  1000: "神をこえた者",
 };
-const postCount: PostAchievementDef[] = [5, 10, 20, 30, 50, 100, 200, 300, 500].map((n) => ({
+const postCount: PostAchievementDef[] = [5, 10, 20, 30, 50, 100, 200, 300, 500, 1000].map((n) => ({
   key: `posts:${n}`,
   category: "post-count",
   rank: n >= 100 ? "gold" : "silver",
@@ -227,6 +275,26 @@ const streak: PostAchievementDef[] = [2, 7, 20, 50, 100].map((n) => ({
   evaluate: (s) => s.currentStreak >= n,
 }));
 
+// --- 投稿した月数（歯抜けでも積み上がる「歴」。連続投稿が途切れても進む軸） ---
+const MONTHS_TITLES: Record<number, string> = {
+  6: "半年もの",
+  12: "一年もの",
+  24: "二年の常連",
+  36: "三年の主",
+};
+const postMonths: PostAchievementDef[] = [6, 12, 24, 36].map((n) => ({
+  key: `months:${n}`,
+  category: "post-months",
+  rank: n >= 24 ? "gold" : "silver",
+  section: "投稿数",
+  ladderKey: "months",
+  tier: n,
+  title: MONTHS_TITLES[n],
+  description: `投稿した月が通算${n}ヶ月になりました`,
+  icon: "CalendarDays",
+  evaluate: (s) => s.distinctPostMonths >= n,
+}));
+
 // --- 1日の投稿数 ---
 const DAILY_TITLES: Record<number, string> = {
   3: "連投スイッチ",
@@ -254,9 +322,27 @@ const FEATURES: {
   tiers: number[];
   titles: Record<number, string>;
 }[] = [
-  { f: "neon", label: "ネオン", icon: "Sparkles", tiers: [5, 30], titles: { 5: "ネオンの灯", 30: "ネオンマスター" } },
-  { f: "stamp", label: "ハンコ", icon: "Stamp", tiers: [5, 30], titles: { 5: "スタンプラリー", 30: "判子奉行" } },
-  { f: "xlarge", label: "特大文字", icon: "ALargeSmall", tiers: [5, 30], titles: { 5: "主張強め", 30: "声が大きいです" } },
+  {
+    f: "neon",
+    label: "ネオン",
+    icon: "Sparkles",
+    tiers: [5, 30, 100],
+    titles: { 5: "ネオンの灯", 30: "ネオンマスター", 100: "不夜城" },
+  },
+  {
+    f: "stamp",
+    label: "ハンコ",
+    icon: "Stamp",
+    tiers: [5, 30, 100],
+    titles: { 5: "スタンプラリー", 30: "判子奉行", 100: "押しも押されぬ" },
+  },
+  {
+    f: "xlarge",
+    label: "特大文字",
+    icon: "ALargeSmall",
+    tiers: [5, 30, 100],
+    titles: { 5: "主張強め", 30: "声が大きいです", 100: "もう聞こえてます" },
+  },
   {
     f: "vertical",
     label: "縦書き",
@@ -358,6 +444,28 @@ const customEmojiReactions: ReactionAchievementDef[] = [5, 30, 100, 300].map((n)
   evaluate: (s) => s.givenCustomEmoji >= n,
 }));
 
+// --- 応援した人数（自分がリアクションした写真の投稿者数。件数ではなく「広さ」の軸） ---
+const SUPPORTED_USER_TITLES: Record<number, string> = {
+  10: "みんなの味方",
+  20: "顔が広い",
+  30: "応援部員",
+  50: "応援団長",
+  100: "友達100人できるかな",
+};
+const supportedUsers: ReactionAchievementDef[] = [10, 20, 30, 50, 100].map((n) => ({
+  key: `reaction:users:${n}`,
+  category: "reaction-users",
+  rank: n >= 30 ? "gold" : "silver",
+  section: "リアクション",
+  ladderKey: "reaction-users",
+  tier: n,
+  trigger: "reaction",
+  title: SUPPORTED_USER_TITLES[n],
+  description: `${n}人の写真にリアクションしました`,
+  icon: "Users",
+  evaluate: (s) => s.givenDistinctOwners >= n,
+}));
+
 // --- 獲得したリアクション総数（自分の投稿が受け取った側） ---
 const RECEIVED_REACTION_TITLES: Record<number, string> = {
   10: "線香花火",
@@ -392,6 +500,23 @@ const reactionSingletons: ReactionAchievementDef[] = [
     description: "SHAMEZOからはじめてリアクションをしました",
     icon: "SmilePlus",
     evaluate: (s) => s.given >= 1,
+  },
+];
+
+// --- 単発実績（プロフィール起点） ---
+const profileSingletons: ProfileAchievementDef[] = [
+  {
+    key: "bio-set",
+    category: "bio-set",
+    rank: "silver",
+    section: "デビュー",
+    trigger: "profile",
+    title: "はじめまして",
+    description: "プロフィールに自己紹介を入力しました",
+    icon: "IdCard",
+    // 空文字は API 側で null に正規化されるが、判定はここでも空を弾いておく
+    // （このカタログは live/backfill 双方から呼ばれ、後者は DB の生値を渡すため）。
+    evaluate: (p) => p.bio != null && p.bio.length > 0,
   },
 ];
 
@@ -528,7 +653,7 @@ const singletons: PostAchievementDef[] = [
     description: "朝5〜7時台に投稿しました",
     icon: "Sunrise",
     evaluate: (_s, p) => {
-      const h = jstHour(p.createdAt);
+      const h = toJstHour(p.createdAt);
       return h >= 5 && h <= 7;
     },
   },
@@ -542,9 +667,20 @@ const singletons: PostAchievementDef[] = [
     description: "深夜0〜3時台に投稿しました",
     icon: "Moon",
     evaluate: (_s, p) => {
-      const h = jstHour(p.createdAt);
+      const h = toJstHour(p.createdAt);
       return h >= 0 && h <= 3;
     },
+  },
+  {
+    key: "all-hours",
+    category: "all-hours",
+    rank: "gold",
+    section: "シークレット",
+    secret: true,
+    title: "時計をひとまわり",
+    description: "0時から23時まで、24すべての時間帯に投稿しました",
+    icon: "Clock",
+    evaluate: (s) => s.distinctPostHours >= 24,
   },
   {
     // 投稿では付与しない。バックフィルスクリプトが登録日を見て一括配布する一度きりの記念実績。
@@ -562,6 +698,7 @@ const singletons: PostAchievementDef[] = [
 export const CATALOG: AchievementDef[] = [
   ...postCount,
   ...streak,
+  ...postMonths,
   ...dailyBurst,
   ...featureUsage,
   ...cameras,
@@ -569,8 +706,10 @@ export const CATALOG: AchievementDef[] = [
   ...colors,
   ...singletons,
   ...customEmojiReactions,
+  ...supportedUsers,
   ...receivedReactions,
   ...reactionSingletons,
+  ...profileSingletons,
 ];
 
 /** key → 定義の逆引き（固定実績のみ） */
@@ -600,6 +739,7 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
       { kind: "single", key: "first-mention" },
       { kind: "single", key: "local-only" },
       { kind: "single", key: "first-reaction" },
+      { kind: "single", key: "bio-set" },
     ],
   },
   {
@@ -608,6 +748,7 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
       { kind: "ladder", ladderKey: "post-count" },
       { kind: "ladder", ladderKey: "daily" },
       { kind: "ladder", ladderKey: "streak" },
+      { kind: "ladder", ladderKey: "months" },
       { kind: "perfectMonth" },
     ],
   },
@@ -629,6 +770,7 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
     title: "リアクション",
     blocks: [
       { kind: "ladder", ladderKey: "reaction-custom" },
+      { kind: "ladder", ladderKey: "reaction-users" },
       { kind: "ladder", ladderKey: "reaction-received" },
     ],
   },
@@ -648,6 +790,7 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
       { kind: "single", key: "new-year-writing" },
       { kind: "single", key: "early-bird" },
       { kind: "single", key: "night-owl" },
+      { kind: "single", key: "all-hours" },
     ],
   },
 ];

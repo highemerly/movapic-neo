@@ -14,10 +14,14 @@ import {
   CATALOG,
   evaluatePerfectMonth,
   evaluateSeason,
+  isPostAchievement,
+  isProfileAchievement,
+  isReactionAchievement,
   PERFECT_MONTH_CATEGORY,
   SEASON_CATEGORY,
   type AchStats,
   type PostFacts,
+  type ProfileFacts,
   type ReactionStats,
 } from "./catalog";
 import {
@@ -62,8 +66,8 @@ export function selectNewlyGranted(
 ): GrantCandidate[] {
   const out: GrantCandidate[] = [];
   for (const def of CATALOG) {
-    // リアクション起点の実績は投稿では確定しない（selectNewlyGrantedReaction 側で評価する）
-    if (def.trigger === "reaction") continue;
+    // 他系統（リアクション・プロフィール）は投稿では確定しない＝それぞれの select 側で評価する
+    if (!isPostAchievement(def)) continue;
     if (ownedKeys.has(def.key)) continue;
     if (def.evaluate(stats, post)) {
       out.push({ key: def.key, category: def.category });
@@ -91,9 +95,28 @@ export function selectNewlyGrantedReaction(
 ): GrantCandidate[] {
   const out: GrantCandidate[] = [];
   for (const def of CATALOG) {
-    if (def.trigger !== "reaction") continue;
+    if (!isReactionAchievement(def)) continue;
     if (ownedKeys.has(def.key)) continue;
     if (def.evaluate(stats)) {
+      out.push({ key: def.key, category: def.category });
+    }
+  }
+  return out;
+}
+
+/**
+ * プロフィール起点の実績から新規付与すべきものを選ぶ純粋関数（DBアクセスなし）。
+ * 自己紹介は投稿・リアクションのどちらでも動かないため、保存した瞬間にだけ評価する。
+ */
+export function selectNewlyGrantedProfile(
+  facts: ProfileFacts,
+  ownedKeys: Set<string>
+): GrantCandidate[] {
+  const out: GrantCandidate[] = [];
+  for (const def of CATALOG) {
+    if (!isProfileAchievement(def)) continue;
+    if (ownedKeys.has(def.key)) continue;
+    if (def.evaluate(facts)) {
       out.push({ key: def.key, category: def.category });
     }
   }
@@ -164,6 +187,25 @@ export async function evaluateAndGrantReaction(opts: {
   return grantAll(opts.userId, candidates, {
     achievementImageId: null,
     notificationImageId: opts.notificationImageId,
+  });
+}
+
+/**
+ * live 用: プロフィールを保存した後に呼び、新規付与した実績を返す。
+ * 呼び出し側（PATCH /api/v1/me）は profileTriggers.ts 経由で使う。
+ *
+ * 実績・通知とも imageId は常に null（自己紹介はどの写真とも関係が無い）。
+ */
+export async function evaluateAndGrantProfile(opts: {
+  userId: string;
+  bio: string | null;
+}): Promise<GrantedAchievement[]> {
+  const owned = await ownedKeysOf(opts.userId);
+  const candidates = selectNewlyGrantedProfile({ bio: opts.bio }, owned);
+  if (candidates.length === 0) return [];
+  return grantAll(opts.userId, candidates, {
+    achievementImageId: null,
+    notificationImageId: null,
   });
 }
 

@@ -30,6 +30,10 @@ import {
   Heart,
   Sticker,
   SmilePlus,
+  CalendarDays,
+  Clock,
+  Users,
+  IdCard,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { cn } from "@/lib/utils";
@@ -88,6 +92,10 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   Heart,
   Sticker,
   SmilePlus,
+  CalendarDays,
+  Clock,
+  Users,
+  IdCard,
   SoccerBall,
 };
 

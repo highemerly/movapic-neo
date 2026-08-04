@@ -3,6 +3,11 @@ export function toJstDateString(d: Date): string {
   return new Date(d.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+// JSTの時 (0-23) を返す
+export function toJstHour(d: Date): number {
+  return new Date(d.getTime() + 9 * 60 * 60 * 1000).getUTCHours();
+}
+
 // 投稿日のリストから現在の連続投稿日数を計算（JST基準）
 // 今日または昨日に投稿があれば、そこから過去に向かって連続している日数を返す
 export function calculateStreak(dates: Date[]): number {

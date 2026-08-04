@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { selectNewlyGranted, selectNewlyGrantedReaction } from "./engine";
+import {
+  selectNewlyGranted,
+  selectNewlyGrantedProfile,
+  selectNewlyGrantedReaction,
+} from "./engine";
 import {
   PERFECT_MONTH_CATEGORY,
   SEASON_CATEGORY,
@@ -24,6 +28,8 @@ function stats(overrides: Partial<AchStats> = {}): AchStats {
     distinctDaysInPostMonth: 1,
     postMonthDayCounts: { 15: 1 },
     filledHoleDays: [],
+    distinctPostMonths: 1,
+    distinctPostHours: 1,
     featureCounts: { neon: 0, stamp: 0, xlarge: 0, vertical: 0 },
     distinctFonts: 1,
     distinctColors: 1,
@@ -88,6 +94,12 @@ describe("selectNewlyGranted: しきい値は >= で到達時に付与", () => {
     expect(keysOf(stats({ currentStreak: 1 }), post())).not.toContain("streak:2");
   });
 
+  it("投稿した月数は到達した段まで立つ（連続でなくてよい）", () => {
+    const got = keysOf(stats({ distinctPostMonths: 12 }), post());
+    expect(got.filter((k) => k.startsWith("months:"))).toEqual(["months:6", "months:12"]);
+    expect(keysOf(stats({ distinctPostMonths: 5 }), post())).not.toContain("months:6");
+  });
+
   it("機能利用（縦書きは tier1 から、ネオンは5から）", () => {
     expect(keysOf(stats({ featureCounts: { neon: 0, stamp: 0, xlarge: 0, vertical: 1 } }), post())).toContain(
       "feature:vertical:1"
@@ -125,6 +137,11 @@ describe("selectNewlyGranted: 単発・シークレット述語", () => {
     expect(keysOf(stats(), post({ createdAt: new Date("2026-06-14T21:00:00Z") }))).toContain("early-bird");
   });
 
+  it("24時間すべてに投稿していれば all-hours（23時間では立たない）", () => {
+    expect(keysOf(stats({ distinctPostHours: 24 }), post())).toContain("all-hours");
+    expect(keysOf(stats({ distinctPostHours: 23 }), post())).not.toContain("all-hours");
+  });
+
   it("early-adopter は投稿では絶対に付与されない（evaluate=false）", () => {
     expect(keysOf(stats({ totalPosts: 999 }), post())).not.toContain("early-adopter");
   });
@@ -158,7 +175,7 @@ describe("selectNewlyGranted: 動的キー（皆勤賞・シーズン）", () =>
 
 // --- リアクション起点（押した瞬間・受け取った瞬間にしか確定しない実績） ---
 function rstats(overrides: Partial<ReactionStats> = {}): ReactionStats {
-  return { given: 0, givenCustomEmoji: 0, received: 0, ...overrides };
+  return { given: 0, givenCustomEmoji: 0, givenDistinctOwners: 0, received: 0, ...overrides };
 }
 const reactionKeysOf = (s: ReactionStats, owned: Set<string> = new Set()) =>
   selectNewlyGrantedReaction(s, owned).map((c) => c.key);
@@ -189,6 +206,17 @@ describe("selectNewlyGrantedReaction: リアクション起点の実績", () => 
     ]);
   });
 
+  it("応援した人数は件数ではなく人数で立つ（大量に押しても人数が足りなければ立たない）", () => {
+    expect(reactionKeysOf(rstats({ given: 100, givenDistinctOwners: 20 }))).toEqual([
+      "reaction:users:10",
+      "reaction:users:20",
+      "first-reaction",
+    ]);
+    expect(reactionKeysOf(rstats({ given: 100, givenDistinctOwners: 9 }))).toEqual([
+      "first-reaction",
+    ]);
+  });
+
   it("投稿起点の実績は混ざらない（評価タイミングが違う）", () => {
     const keys = reactionKeysOf(rstats({ given: 100, givenCustomEmoji: 100, received: 1000 }));
     expect(keys).not.toContain("first-post");
@@ -199,5 +227,29 @@ describe("selectNewlyGrantedReaction: リアクション起点の実績", () => 
     const keys = keysOf(stats({ totalPosts: 500 }), post());
     expect(keys).not.toContain("first-reaction");
     expect(keys.some((k) => k.startsWith("reaction:"))).toBe(false);
+  });
+});
+
+// --- プロフィール起点（自己紹介を保存した瞬間にしか確定しない実績） ---
+const profileKeysOf = (bio: string | null, owned: Set<string> = new Set()) =>
+  selectNewlyGrantedProfile({ bio }, owned).map((c) => c.key);
+
+describe("selectNewlyGrantedProfile: プロフィール起点の実績", () => {
+  it("自己紹介を入力していれば bio-set が立つ", () => {
+    expect(profileKeysOf("ねこがすきです")).toEqual(["bio-set"]);
+  });
+
+  it("未設定（null / 空文字）では立たない", () => {
+    expect(profileKeysOf(null)).toEqual([]);
+    expect(profileKeysOf("")).toEqual([]);
+  });
+
+  it("取得済みなら重複しない（消しても剥奪はしない＝再付与もしない）", () => {
+    expect(profileKeysOf("ねこ", new Set(["bio-set"]))).toEqual([]);
+  });
+
+  it("投稿・リアクションの評価では絶対に立たない（評価タイミングが違う）", () => {
+    expect(keysOf(stats({ totalPosts: 500 }), post())).not.toContain("bio-set");
+    expect(reactionKeysOf(rstats({ given: 100, received: 1000 }))).not.toContain("bio-set");
   });
 });
