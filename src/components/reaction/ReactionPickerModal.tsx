@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search, Clock } from "lucide-react";
 import {
   Dialog,
@@ -61,6 +61,16 @@ export function ReactionPickerModal({
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
 
+  // 選択→クローズを1本にまとめ、かつ identity を安定させる（下の EmojiButton は memo 済みで、
+  // ここが毎回変わると数千個ぶんの memo が効かなくなる）。
+  const handlePick = useCallback(
+    (emoji: string, imageUrl: string | null) => {
+      onPick(emoji, imageUrl);
+      onOpenChange(false);
+    },
+    [onPick, onOpenChange]
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       {/* 中身は開いている間だけマウントされる（開閉ごとに効くエフェクトを持たなくて済む）。 */}
@@ -80,10 +90,7 @@ export function ReactionPickerModal({
           sendsToFediverse={sendsToFediverse}
           viewerType={viewerType}
           viewerDomain={viewerDomain}
-          onPick={(emoji, imageUrl) => {
-            onPick(emoji, imageUrl);
-            onOpenChange(false);
-          }}
+          onPick={handlePick}
         />
       </DialogContent>
     </Dialog>
@@ -164,10 +171,15 @@ function PickerBody({
     return () => clearTimeout(timer);
   }, [query, runSearch]);
 
-  const pick = (emoji: string, imageUrl: string | null) => {
-    setRecent(pushRecentReaction({ emoji, imageUrl }));
-    onPick(emoji, imageUrl);
-  };
+  // EmojiButton は memo 済み。ここが毎レンダー作り直されると数千個ぶんの memo が無効になるので
+  // identity を保つ（絵文字を選んだ瞬間に親が再レンダーされる＝その重さが押した瞬間の応答に乗る）。
+  const pick = useCallback(
+    (emoji: string, imageUrl: string | null) => {
+      setRecent(pushRecentReaction({ emoji, imageUrl }));
+      onPick(emoji, imageUrl);
+    },
+    [onPick]
+  );
 
   const jumpTo = (id: string) => {
     const el = sectionRefs.current.get(id);
@@ -181,22 +193,23 @@ function PickerBody({
 
   const searching = query.trim() !== "";
 
-  // 「最近使った」を先頭セクションとして合成（localStorage 由来）
-  const recentSection: PaletteSection | null =
-    recent.length > 0
-      ? {
-          id: RECENT_ID,
-          label: "最近使った",
-          icon: null,
-          iconUrl: null,
-          emojis: recent.map((item) => ({
-            key: item.emoji,
-            imageUrl: item.imageUrl,
-            label: item.emoji,
-          })),
-        }
-      : null;
-  const allSections = recentSection ? [recentSection, ...sections] : sections;
+  // 「最近使った」を先頭セクションとして合成（localStorage 由来）。
+  // 中の item は EmojiButton の memo 判定に使うので、毎レンダー作り直さない。
+  const allSections = useMemo(() => {
+    if (recent.length === 0) return sections;
+    const recentSection: PaletteSection = {
+      id: RECENT_ID,
+      label: "最近使った",
+      icon: null,
+      iconUrl: null,
+      emojis: recent.map((item) => ({
+        key: item.emoji,
+        imageUrl: item.imageUrl,
+        label: item.emoji,
+      })),
+    };
+    return [recentSection, ...sections];
+  }, [recent, sections]);
 
   return (
     <>
@@ -233,7 +246,7 @@ function PickerBody({
                     key={item.key}
                     item={item}
                     selected={item.key === currentEmoji}
-                    onClick={() => pick(item.key, item.imageUrl)}
+                    onSelect={pick}
                   />
                 ))}
               </EmojiGrid>
@@ -384,7 +397,7 @@ function LazyEmojiSection({
               key={item.key}
               item={item}
               selected={item.key === currentEmoji}
-              onClick={() => onPick(item.key, item.imageUrl)}
+              onSelect={onPick}
             />
           ))}
         </EmojiGrid>
@@ -415,19 +428,25 @@ function EmojiGrid({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-wrap gap-0.5">{children}</div>;
 }
 
-function EmojiButton({
+/**
+ * 絵文字1個のボタン。ピッカーには数千個並ぶので memo で包み、選択が変わった2個だけを再レンダーに
+ * 留める（押した瞬間に親のリアクション状態が変わり、閉じる前のピッカーが再レンダーされるため。
+ * 全部を描き直すとその時間がそのまま押下の応答時間＝INPになる）。
+ * memo を効かせるため、ハンドラは item を引数に取る安定した関数を受け取る（インラインで包まない）。
+ */
+const EmojiButton = memo(function EmojiButton({
   item,
   selected,
-  onClick,
+  onSelect,
 }: {
   item: PaletteItem;
   selected: boolean;
-  onClick: () => void;
+  onSelect: (emoji: string, imageUrl: string | null) => void;
 }) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => onSelect(item.key, item.imageUrl)}
       title={item.label}
       aria-pressed={selected}
       // 選択中の枠は内側に描く（inset-ring）。外向きの ring だとボタンの箱の外側に出るため、
@@ -440,4 +459,4 @@ function EmojiButton({
       <ReactionEmojiView emoji={item.key} imageUrl={item.imageUrl} />
     </button>
   );
-}
+});

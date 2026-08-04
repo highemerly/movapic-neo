@@ -74,7 +74,8 @@ Misskey ユーザーは自サーバーのカスタム絵文字を使えるが、
 | [`src/lib/reactions/customEmoji.ts`](../src/lib/reactions/customEmoji.ts) | SHAMEZO独自絵文字（`CustomEmoji`）のカタログ取得・検索・実在検証・アップロード制約定数 |
 | [`src/app/api/v1/admin/emojis/`](../src/app/api/v1/admin/emojis/) | 管理者用の登録/一覧/enable切替/後編集（カテゴリ・エイリアス・ライセンス）/削除API。UIは [`/admin/emojis`](../src/app/admin/emojis/) |
 | [`src/lib/fediverse/emojis.ts`](../src/lib/fediverse/emojis.ts) | Misskey 自サーバーのカスタム絵文字カタログ取得・検索・カテゴリ分け |
-| [`src/components/reaction/`](../src/components/reaction/) | 詳細ページUI（チップ＋ポップオーバー＋ピッカー・[useReactionActions](../src/components/reaction/useReactionActions.ts) に操作集約） |
+| [`src/lib/reactions/optimistic.ts`](../src/lib/reactions/optimistic.ts) | `applyViewerReaction()`。押した瞬間の表示を確定値を待たずに組む純粋関数（§11） |
+| [`src/components/reaction/`](../src/components/reaction/) | 詳細ページUI（チップ＋ポップオーバー＋ピッカー・[useReactionActions](../src/components/reaction/useReactionActions.tsx) に操作集約） |
 
 ## 4. エラー分類
 
@@ -229,7 +230,20 @@ SHAMEZO 上のリアクションは押した本人のトークンで Fediverse �
 - 定期は加えて**投稿から16日超で恒久停止**（`FALLBACK_MAX_AGE_MS`）。
 - 成功後の通常運用は GET=経過時間ベース、定期=12時間。
 
-## 11. 変更時のチェックリスト
+## 11. UI の即時反映（楽観更新）
+
+書き込み（PUT/DELETE）は「Fediverse へ送信 → DB記録 → オーナー側キャッシュ同期」と外部への往復を含むため、
+応答まで数百ms〜数秒かかる。応答を待って描くと押しても無反応に見えるので、表示は先に進める。
+
+- 押した瞬間に [`applyViewerReaction`](../src/lib/reactions/optimistic.ts) で表示を差し替え、APIレスポンスが返ったら確定値へ置き換える（[useReactionActions](../src/components/reaction/useReactionActions.tsx)）。
+- **楽観表示の組み立て規則は [`mergeReactions`](../src/lib/reactions/merge.ts) と一致させる**（件数降順・同数は既存の並び・`total` はチップ件数の総和・自分は一覧の末尾）。ズレると確定値に入れ替わった瞬間に並びが飛ぶ。片方を変えたら必ず両方直す。
+- 失敗したら最後の確定値（直近のAPIレスポンス）へ巻き戻し、エラー文言を出す。どこまで相手サーバーに届いたか分からないので、失敗後に溜まっていた操作は追撃せず捨てる。
+- 送信中の追加操作は**最後の意図だけを保持して直列に送る**（Fediverse への二重送信を避けるため並行させない）。送信中もボタンは押せる。
+- マウント時の GET は、送信中・送信待ちがあるときは結果を捨てる（楽観表示を古い値で上書きしないため）。
+- 楽観更新でリアクション一覧に自分を差し込むため、閲覧者の表示情報（`acct`/`displayName`/`avatarUrl`/`profileUrl`）を詳細ページから props で渡す。形は `Reaction` テーブル由来の行（[store.ts](../src/lib/reactions/store.ts)）と揃える。
+- INP: リアクション状態が変わるとピッカー（絵文字が数千個）も再レンダー対象になる。`handlePick` の identity を安定させ `EmojiButton` を `memo` で包んであるので、**ピッカーへ渡すハンドラをインラインで作り直さないこと**（memo が丸ごと無効になり、押下の応答時間に乗る）。
+
+## 12. 変更時のチェックリスト
 - `computeCacheTtl` / `isFavoriteSyncDue` を変えたら [`favoritePolicy.test.ts`](../src/lib/fediverse/favoritePolicy.test.ts) を更新（境界値を必ず含める）。
 - 定期の発火条件を変えたら、`isFavoriteSyncDue`（TS・正）と `FAVORITE_SYNC_WHERE`（SQL・前段フィルタ）を**両方**直す。SQL は TS の**スーパーセット**であること（TS が拾う行を SQL が取りこぼさない）。
 - 停止条件（14日マーク）は GET（Infinity）と定期（fire2）で**一致**させる。

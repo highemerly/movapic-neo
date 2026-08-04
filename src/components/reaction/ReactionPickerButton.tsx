@@ -5,6 +5,7 @@ import { Check, SmilePlus } from "lucide-react";
 import { ReactionPickerModal } from "./ReactionPickerModal";
 import { useReactionActions } from "./useReactionActions";
 import type { ReactionSnapshot } from "./reactionSync";
+import type { ReactionUser } from "@/lib/reactions/types";
 
 /**
  * リアクションを付ける「＋」ボタン（画像詳細のモバイル用フローティングバー）。
@@ -17,6 +18,7 @@ export function ReactionPickerButton({
   initialSnapshot,
   canReact,
   sendsToFediverse,
+  viewer,
   viewerType,
   viewerDomain,
   disabledReason,
@@ -26,13 +28,15 @@ export function ReactionPickerButton({
   canReact: boolean;
   /** この投稿へのリアクションが Fediverse にも送られるか（ピッカーの注釈に使う） */
   sendsToFediverse: boolean;
+  /** 閲覧者自身の表示情報。押した直後の楽観表示で一覧へ差し込む（未ログインは null） */
+  viewer: ReactionUser | null;
   /** 閲覧者のインスタンス種別／ドメイン。ピッカーの注釈の文言に使う（未ログインは null） */
   viewerType: "mastodon" | "misskey" | null;
   viewerDomain: string | null;
   disabledReason?: string;
 }) {
-  const { isLoading, errorMessage, viewerEmoji, handlePick, removeWithConfirm } =
-    useReactionActions(imageId, initialSnapshot);
+  const { errorMessage, viewerEmoji, handlePick, removeWithConfirm } =
+    useReactionActions(imageId, initialSnapshot, viewer);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // ボタン押下: 未リアクションならピッカーを開く。リアクション済みなら、確認のうえ取り消す
@@ -50,7 +54,9 @@ export function ReactionPickerButton({
       <button
         type="button"
         onClick={() => void handleButtonClick()}
-        disabled={!canReact || isLoading}
+        // 送信中も押せるままにする（表示は楽観更新で先に進んでおり、続けて付け替えたくなる。
+        // 実際の送信はフック側で直列化されるので二重送信にはならない）。
+        disabled={!canReact}
         // 塗り＋角丸（rounded-lg＝ページ内のカードと同じ角）のはっきりしたボタン。未リアクションは
         // primary で押下を促し、リアクション済みは secondary に落として「もう付けた」状態を控えめに
         // 見せる。下のコンテンツを隠しすぎないよう強めに透過させ、輪郭は枠線ではなく影と backdrop-blur

@@ -12,25 +12,15 @@
 // ページを跨いだ永続同期ではなく“同一ページ内の兄弟同期”が目的なので、ストア等は持たず window の
 // CustomEvent で十分（SSR ではイベントを張らない）。
 
-export interface ReactionUserInfo {
-  acct: string;
-  displayName: string | null;
-  avatarUrl: string | null;
-  profileUrl: string | null;
-}
+// 形はサーバー側のマージ結果（MergedReactions）と同一。楽観更新（applyViewerReaction）へ
+// そのまま渡せるよう、独自定義を持たずに型を共有する（lib/reactions は型のみの依存で client 安全）。
+import type { MergedReactions, ReactionChip, ReactionUser } from "@/lib/reactions/types";
 
-export interface ReactionChipInfo {
-  emoji: string;
-  imageUrl: string | null;
-  count: number;
-  reactedByViewer: boolean;
-}
+export type ReactionUserInfo = ReactionUser;
+export type ReactionChipInfo = ReactionChip;
 
-export interface ReactionSnapshot {
-  total: number;
-  chips: ReactionChipInfo[];
-  usersByEmoji: Record<string, ReactionUserInfo[]>;
-  viewerEmoji: string | null;
+export interface ReactionSnapshot extends MergedReactions {
+  /** 同期エラー等の注記。表示用でマージ結果には含まれない */
   statusMessage: string | null;
 }
 

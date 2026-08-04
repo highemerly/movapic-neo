@@ -275,6 +275,17 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     viewerEmoji: merged.viewerEmoji,
     statusMessage: favoriteErrorMessage(persistedReason),
   };
+  // 押した瞬間の楽観表示で「リアクションした人」に自分を差し込むための表示情報。
+  // 形は Reaction テーブル由来の行（reactions/store.ts）と揃える（確定値と入れ替わっても見た目が変わらない）。
+  const reactionViewer =
+    currentUser && viewerAcct
+      ? {
+          acct: viewerAcct,
+          displayName: currentUser.displayName,
+          avatarUrl: getAvatarUrl(currentUser.avatarUrl),
+          profileUrl: `https://${currentUser.instance.domain}/@${currentUser.username}`,
+        }
+      : null;
 
   // 前後の画像を取得
   // 公開TLからの場合: 全ユーザーの公開画像を対象
@@ -599,6 +610,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           initialSnapshot={initialReactionSnapshot}
           canReact={canReact}
           sendsToFediverse={fediverseSendable}
+          viewer={reactionViewer}
           viewerType={viewerType}
           viewerDomain={viewerDomain}
         />
@@ -800,6 +812,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               initialSnapshot={initialReactionSnapshot}
               canReact={canReact}
               sendsToFediverse={fediverseSendable}
+              viewer={reactionViewer}
               viewerType={viewerType}
               viewerDomain={viewerDomain}
               disabledReason={

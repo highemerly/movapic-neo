@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
+import { applyViewerReaction, type ViewerReactionTarget } from "@/lib/reactions/optimistic";
+import type { ReactionUser } from "@/lib/reactions/types";
 import { ReactionEmojiView } from "./ReactionEmojiView";
 import {
   emitReaction,
@@ -17,32 +19,78 @@ import {
  * チップ末尾の＋・チップのポップオーバー内）。それぞれが同じ操作ロジックを持つと重複するため1本に集約する。
  * 各インスタンスは自分の snapshot を持ち、成功時に reactionSync 経由で兄弟へ配って同期する
  * （source of truth は各ローカル state のまま。詳細は reactionSync.ts）。
+ *
+ * 表示は楽観更新（applyViewerReaction）で押した瞬間に差し替え、APIレスポンスが返ったら確定値へ
+ * 置き換える。書き込みは Fediverse 送信＋オーナー側キャッシュ同期を伴い数秒かかることがあり、
+ * 応答を待って描くと押しても無反応に見えるため。失敗したら最後の確定値へ巻き戻す。
  */
 export function useReactionActions(
   imageId: string,
-  initialSnapshot: ReactionSnapshot
+  initialSnapshot: ReactionSnapshot,
+  /** 楽観更新でリアクション一覧へ差し込む閲覧者自身。未ログインは null（操作もできない） */
+  viewer: ReactionUser | null
 ) {
-  const [snapshot, setSnapshot] = useState<ReactionSnapshot>(initialSnapshot);
+  const [snapshot, setSnapshotState] = useState<ReactionSnapshot>(initialSnapshot);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const confirm = useConfirm();
 
-  // 他インスタンス（別の＋ボタン等）の操作結果を受信（受信側は emit しない＝echo防止）
-  useEffect(() => subscribeReaction(imageId, setSnapshot), [imageId]);
+  // 表示中の状態（楽観更新を含む）。同一フレームでの連続操作でも最新から積み上げるため ref で持つ。
+  const snapshotRef = useRef(initialSnapshot);
+  // サーバーが最後に返した確定状態。送信に失敗したときの巻き戻し先。
+  const confirmedRef = useRef(initialSnapshot);
+  // 送信待ちの意図（最後の1つだけ保持＝途中の操作は送らずに畳む）。null は「無し」。
+  const pendingRef = useRef<{ target: ViewerReactionTarget | null } | null>(null);
+  const runningRef = useRef(false);
 
-  const submit = useCallback(
-    async (emoji: string | null) => {
-      if (isLoading) return;
-      setIsLoading(true);
-      setErrorMessage(null);
+  const show = useCallback(
+    (
+      next: ReactionSnapshot,
+      options: { confirmed?: boolean; broadcast?: boolean } = {}
+    ) => {
+      snapshotRef.current = next;
+      if (options.confirmed) confirmedRef.current = next;
+      setSnapshotState(next);
+      // 受信側は emit しない（echo防止）。配るのは自分が変更した側だけ。
+      if (options.broadcast) emitReaction(imageId, next);
+    },
+    [imageId]
+  );
+
+  // 他インスタンス（別の＋ボタン等）の操作結果を受信
+  useEffect(
+    () => subscribeReaction(imageId, (next) => show(next, { confirmed: true })),
+    [imageId, show]
+  );
+
+  /** 最新状態（GET結果）を反映する。送信中は楽観表示を古い値で上書きしないよう捨てる。 */
+  const syncSnapshot = useCallback(
+    (next: ReactionSnapshot) => {
+      if (runningRef.current || pendingRef.current) return;
+      show(next, { confirmed: true, broadcast: true });
+    },
+    [show]
+  );
+
+  /** 同期エラー等の注記だけを差し替える（件数・チップには触らない）。 */
+  const setStatusMessage = useCallback(
+    (message: string | null) => {
+      show({ ...snapshotRef.current, statusMessage: message });
+    },
+    [show]
+  );
+
+  /** 1件送る。成功なら確定値を取り込んで true。 */
+  const send = useCallback(
+    async (target: ViewerReactionTarget | null): Promise<boolean> => {
       try {
         const response = await fetch(`/api/v1/images/${imageId}/reactions`, {
-          method: emoji === null ? "DELETE" : "PUT",
-          ...(emoji === null
+          method: target === null ? "DELETE" : "PUT",
+          ...(target === null
             ? {}
             : {
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ emoji }),
+                body: JSON.stringify({ emoji: target.emoji }),
               }),
         });
         if (!response.ok) {
@@ -50,29 +98,74 @@ export function useReactionActions(
           const message = body?.error?.message ?? "リアクションに失敗しました";
           const suggestion = body?.error?.suggestion;
           setErrorMessage(suggestion ? `${message}（${suggestion}）` : message);
-          return;
+          return false;
         }
         const next = toSnapshot(await response.json());
-        setSnapshot(next);
-        // 成功時のみ配信（失敗は自インスタンス内で完結し、他インスタンスは元々未変更）
-        emitReaction(imageId, next);
+        confirmedRef.current = next;
+        // 後続の意図が積まれている間に確定値を描くと、直前の楽観表示が一瞬前の状態へ戻って
+        // ちらつく。まだ送るものがあるときは楽観表示のままにして、最後の確定値だけを描く。
+        if (!pendingRef.current) show(next, { confirmed: true, broadcast: true });
+        return true;
       } catch {
         setErrorMessage("リアクション中にエラーが発生しました");
-      } finally {
-        setIsLoading(false);
+        return false;
       }
     },
-    [imageId, isLoading]
+    [imageId, show]
+  );
+
+  /** 溜まった意図を1件ずつ直列に送る（Fediverseへの二重送信を避けるため並行させない）。 */
+  const drain = useCallback(async () => {
+    if (runningRef.current) return;
+    runningRef.current = true;
+    setIsLoading(true);
+    try {
+      let pending = pendingRef.current;
+      while (pending) {
+        pendingRef.current = null;
+        if (!(await send(pending.target))) {
+          // 失敗。どこまで相手サーバーに届いたか分からない状態で追撃はせず、確定値へ戻す。
+          pendingRef.current = null;
+          show(confirmedRef.current, { broadcast: true });
+          break;
+        }
+        pending = pendingRef.current;
+      }
+    } finally {
+      runningRef.current = false;
+      setIsLoading(false);
+    }
+  }, [send, show]);
+
+  const submit = useCallback(
+    (target: ViewerReactionTarget | null) => {
+      if (!viewer) return;
+      setErrorMessage(null);
+      const current = snapshotRef.current;
+      show(
+        {
+          ...applyViewerReaction(current, viewer, target),
+          statusMessage: current.statusMessage,
+        },
+        { broadcast: true }
+      );
+      pendingRef.current = { target };
+      void drain();
+    },
+    [viewer, show, drain]
   );
 
   const viewerEmoji = snapshot.viewerEmoji;
 
   const handlePick = useCallback(
-    (emoji: string) => {
-      // 既に付いている絵文字をもう一度選んだら解除（Misskey と同じ操作感）
-      void submit(emoji === viewerEmoji ? null : emoji);
+    (emoji: string, imageUrl: string | null = null) => {
+      // 既に付いている絵文字をもう一度選んだら解除（Misskey と同じ操作感）。
+      // 判定は state ではなく ref から読む。この関数はピッカー（絵文字が数千個）へ渡るので、
+      // リアクションのたびに identity が変わると閉じる直前のピッカーが丸ごと再レンダーされ、
+      // そのフレーム＝押した瞬間の応答（INP）に乗ってしまうため。
+      submit(emoji === snapshotRef.current.viewerEmoji ? null : { emoji, imageUrl });
     },
-    [submit, viewerEmoji]
+    [submit]
   );
 
   const removeWithConfirm = useCallback(async () => {
@@ -109,12 +202,13 @@ export function useReactionActions(
       confirmText: "取り消す",
       destructive: true,
     });
-    if (ok) void submit(null);
+    if (ok) submit(null);
   }, [confirm, submit, viewerEmoji, snapshot.chips]);
 
   return {
     snapshot,
-    setSnapshot,
+    syncSnapshot,
+    setStatusMessage,
     isLoading,
     errorMessage,
     viewerEmoji,

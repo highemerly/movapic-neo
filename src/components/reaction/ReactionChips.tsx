@@ -5,7 +5,8 @@ import { Plus } from "lucide-react";
 import { ReactionChipPopover } from "./ReactionChipPopover";
 import { ReactionPickerModal } from "./ReactionPickerModal";
 import { useReactionActions } from "./useReactionActions";
-import { emitReaction, toSnapshot, type ReactionSnapshot } from "./reactionSync";
+import { toSnapshot, type ReactionSnapshot } from "./reactionSync";
+import type { ReactionUser } from "@/lib/reactions/types";
 
 /**
  * 画像詳細のリアクション一覧（絵文字＋件数）。実績チップの上に並べる。
@@ -21,6 +22,7 @@ export function ReactionChips({
   initialSnapshot,
   canReact,
   sendsToFediverse,
+  viewer,
   viewerType,
   viewerDomain,
 }: {
@@ -29,12 +31,14 @@ export function ReactionChips({
   canReact: boolean;
   /** この投稿へのリアクションが Fediverse にも送られるか（ピッカーの注釈に使う） */
   sendsToFediverse: boolean;
+  /** 閲覧者自身の表示情報。押した直後の楽観表示で一覧へ差し込む（未ログインは null） */
+  viewer: ReactionUser | null;
   /** 閲覧者のインスタンス種別／ドメイン。チップと同じ絵文字を送れるかの厳密判定に使う（未ログインは null） */
   viewerType: "mastodon" | "misskey" | null;
   viewerDomain: string | null;
 }) {
-  const { snapshot, setSnapshot, viewerEmoji, handlePick, removeWithConfirm } =
-    useReactionActions(imageId, initialSnapshot);
+  const { snapshot, syncSnapshot, setStatusMessage, viewerEmoji, handlePick, removeWithConfirm } =
+    useReactionActions(imageId, initialSnapshot, viewer);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   // マウント時に最新状態へ同期（サーバー側でTTL切れ時のみオーナーへアクセスする）
@@ -46,17 +50,12 @@ export function ReactionChips({
       try {
         const response = await fetch(`/api/v1/images/${imageId}/reactions`);
         if (!response.ok) return;
-        const next = toSnapshot(await response.json());
-        setSnapshot(next);
-        emitReaction(imageId, next);
+        syncSnapshot(toSnapshot(await response.json()));
       } catch {
-        setSnapshot((prev) => ({
-          ...prev,
-          statusMessage: "リアクションの同期に失敗しました",
-        }));
+        setStatusMessage("リアクションの同期に失敗しました");
       }
     })();
-  }, [imageId, setSnapshot]);
+  }, [imageId, syncSnapshot, setStatusMessage]);
 
   // リアクションが無く、追加もできない（未ログイン等）なら何も出さない
   if (snapshot.chips.length === 0 && !canReact) {
@@ -77,7 +76,7 @@ export function ReactionChips({
             hasReacted={!!viewerEmoji}
             viewerType={viewerType}
             viewerDomain={viewerDomain}
-            onReactSame={() => handlePick(chip.emoji)}
+            onReactSame={() => handlePick(chip.emoji, chip.imageUrl)}
             onRemove={() => void removeWithConfirm()}
           />
         ))}
