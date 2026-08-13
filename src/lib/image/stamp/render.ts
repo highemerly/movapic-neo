@@ -288,6 +288,14 @@ function haloLayer(source: Canvas, color: string, radius: number): Canvas {
   return canvas;
 }
 
+export interface StampOptions {
+  /**
+   * 傾けるか（既定 true）。UI のアレンジ選択に出すプレビュー画像のように、
+   * 「その都度変わる傾き」ではなく印影の質感だけを見せたい場合に false。
+   */
+  tilt?: boolean;
+}
+
 /**
  * ハンコ効果で文字を描画する。
  */
@@ -301,7 +309,8 @@ export function drawStampText(
   margin: number,
   textColor: string,
   fontName: string,
-  fontFamily: FontFamily
+  fontFamily: FontFamily,
+  options: StampOptions = {}
 ): void {
   const layout = computeStampLayout(ctx, {
     text,
@@ -362,14 +371,17 @@ export function drawStampText(
 
   const centerX = layout.frameX + layout.frameWidth / 2;
   const centerY = layout.frameY + layout.frameHeight / 2;
+  // 傾けない場合も角度は計算しておく（乱数の消費順を変えないため。同じ入力なら
+  // 傾きの有無にかかわらずかすれが一致する）。
   const tilt = computeStampTilt(rng, layout, width, height);
+  const appliedTilt = options.tilt === false ? 0 : tilt;
 
   const destX = layout.frameX - layout.border / 2 - bleed;
   const destY = layout.frameY - layout.border / 2 - bleed;
 
   ctx.save();
   ctx.translate(centerX, centerY);
-  ctx.rotate(tilt);
+  ctx.rotate(appliedTilt);
   ctx.translate(-centerX, -centerY);
 
   // 可読性のためのハロー（反対色）。最下層に敷く。

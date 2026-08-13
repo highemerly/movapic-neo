@@ -1,1 +1,1 @@
-export { drawStampText } from "./render";
+export { drawStampText, type StampOptions } from "./render";
