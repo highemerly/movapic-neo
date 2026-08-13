@@ -1,0 +1,1 @@
+export { drawStampText } from "./render";

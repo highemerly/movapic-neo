@@ -188,6 +188,9 @@ export function calculateFontSize(
 
 /**
  * テキストを行に分割
+ *
+ * advanceOf を渡すと送り幅の求め方を差し替えられる（useProportional / useHalfWidth より優先）。
+ * 「等幅だが絵文字だけ実測」のような、既存の3モードでは表せない配置のため。
  */
 export function splitTextIntoLines(
   ctx: CanvasRenderingContext2D,
@@ -196,7 +199,8 @@ export function splitTextIntoLines(
   useProportional: boolean,
   fontSize: number,
   fontName: string,
-  useHalfWidth: boolean = false
+  useHalfWidth: boolean = false,
+  advanceOf?: (grapheme: string) => number
 ): string[] {
   const lines: string[] = [];
   const paragraphs = text.split("\n");
@@ -207,7 +211,25 @@ export function splitTextIntoLines(
       continue;
     }
 
-    if (useProportional) {
+    if (advanceOf) {
+      let currentLine = "";
+      let currentWidth = 0;
+
+      for (const char of splitGraphemes(paragraph)) {
+        const charWidth = advanceOf(char);
+        if (currentWidth + charWidth > maxWidth && currentLine !== "") {
+          lines.push(currentLine);
+          currentLine = char;
+          currentWidth = charWidth;
+        } else {
+          currentLine += char;
+          currentWidth += charWidth;
+        }
+      }
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+    } else if (useProportional) {
       // プロポーショナル: 文字幅を累積して改行判定
       let currentLine = "";
       let currentWidth = 0;

@@ -48,8 +48,12 @@ const CASES: Case[] = [
   { name: "extra-large", width: 400, height: 400, text: "大", position: "top", color: "red", size: "extra-large", font: "hui-font", arrangement: "none" },
   { name: "shadow-dark", width: 400, height: 400, text: "青は白影", position: "top", color: "blue", size: "large", font: "hui-font", arrangement: "none" },
   { name: "neon", width: 400, height: 400, text: "ネオン", position: "top", color: "green", size: "large", font: "hui-font", arrangement: "neon" },
-  // 注: アレンジ "stamp"（ハンコ）は手描き風の枠を Math.random() で毎回ゆらがせる意図的な非決定的描画のため、
-  // ピクセル比較のゴールデンには載せられない（描画ロジックは image/text の単体テスト側で担保）。
+  // ハンコ: かすれ・押し圧・傾きは入力から導いた seed の擬似乱数なので決定的（stamp/rng.ts）。
+  // 短文（正方形寄り）と長文（縦横比の補正が効く）、縦書き、色の印肉化をそれぞれ見る。
+  { name: "stamp-short", width: 400, height: 400, text: "極上", position: "top", color: "red", size: "extra-large", font: "hui-font", arrangement: "stamp" },
+  { name: "stamp-wrap", width: 400, height: 400, text: "今日はいい天気だったので散歩した", position: "bottom", color: "red", size: "medium", font: "hui-font", arrangement: "stamp" },
+  { name: "stamp-vertical", width: 400, height: 600, text: "承認", position: "right", color: "blue", size: "large", font: "hui-font", arrangement: "stamp" },
+  { name: "stamp-ink-color", width: 400, height: 400, text: "黄も印肉", position: "top", color: "yellow", size: "large", font: "noto-sans-jp", arrangement: "stamp" },
   { name: "gothic-proportional", width: 500, height: 300, text: "Proportional な字詰め ABC", position: "top", color: "white", size: "medium", font: "noto-sans-jp", arrangement: "none" },
   { name: "emoji", width: 400, height: 400, text: "絵文字😀🎉", position: "top", color: "white", size: "large", font: "hui-font", arrangement: "none" },
   // BMP の絵文字（☀☁❤）はふい字が cmap に持ちながら中身が空グリフ＝本文フォント優先だと無言で消える。
