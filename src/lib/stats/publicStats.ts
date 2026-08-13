@@ -237,6 +237,29 @@ export interface DistributionBreakdown {
   items: OptionCount[];
 }
 
+/** バケット境界。1 は「その指標を持つ」下限として必ず含める。 */
+function bucketEdges(tiers: number[]): number[] {
+  return [...new Set([1, ...tiers])].sort((a, b) => a - b);
+}
+
+/**
+ * 値が入るバケットのキー。最小境界未満（＝その指標を持たない）は null。
+ * 全体のヒストグラムと閲覧者本人の位置判定でこの1本を共有する（判定のズレ防止）。
+ */
+export function bucketKey(value: number, tiers: number[]): string | null {
+  const edges = bucketEdges(tiers);
+  const v = Number(value);
+  if (!Number.isFinite(v) || v < edges[0]) return null;
+  let lo = edges[0];
+  for (let i = edges.length - 1; i >= 0; i--) {
+    if (v >= edges[i]) {
+      lo = edges[i];
+      break;
+    }
+  }
+  return `b${lo}`;
+}
+
 /**
  * 実際の数値でユーザーをバケットに振り分けたヒストグラム1行分。
  * バケット境界はラダー実績のしきい値（catalog と一致）から作る。
@@ -248,19 +271,11 @@ function histogram(
   tiers: number[],
   unit: string,
 ): DistributionBreakdown {
-  const edges = [...new Set([1, ...tiers])].sort((a, b) => a - b);
-  const counts = new Array(edges.length).fill(0);
+  const edges = bucketEdges(tiers);
+  const counts = new Map<string, number>();
   for (const raw of values) {
-    const v = Number(raw);
-    if (!Number.isFinite(v) || v < edges[0]) continue;
-    let idx = 0;
-    for (let i = edges.length - 1; i >= 0; i--) {
-      if (v >= edges[i]) {
-        idx = i;
-        break;
-      }
-    }
-    counts[idx]++;
+    const key = bucketKey(Number(raw), tiers);
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   const items: OptionCount[] = edges.map((lo, i) => {
     const hi = edges[i + 1];
@@ -269,9 +284,9 @@ function histogram(
         ? `${lo}${unit}`
         : `${lo}〜${hi - 1}${unit}`
       : `${lo}${unit}〜`;
-    return { key: `b${lo}`, label, count: counts[i] };
+    return { key: `b${lo}`, label, count: counts.get(`b${lo}`) ?? 0 };
   });
-  return { title, total: counts.reduce((a, c) => a + c, 0), items };
+  return { title, total: items.reduce((a, c) => a + c.count, 0), items };
 }
 
 /** $queryRaw の bigint/number を安全に数値配列へ。 */
@@ -283,18 +298,51 @@ const PUBLIC_SQL = Prisma.sql`is_public = true AND is_disabled = false`;
 // JST 日付（UTC とみなして Asia/Tokyo へ変換 → date）。timeseries.ts と同一 idiom。
 const JST_DATE = Prisma.sql`(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Tokyo')::date`;
 
+/** ヒストグラムの取得元（生SQL 1本＝1ソース）。 */
+type DistributionSource = "main" | "daily" | "streak" | "reaction";
+
+interface DistributionDef {
+  title: string;
+  source: DistributionSource;
+  /** 取得元行のカラム名 */
+  field: string;
+  /** バケット境界（ラダー実績のしきい値と一致） */
+  tiers: number[];
+  unit: string;
+}
+
+/** サーバー種別分布（カテゴリ）の見出し。閲覧者の位置合わせでも参照する。 */
+export const SERVER_TYPE_TITLE = "サーバーの種類";
+
 /**
- * ラダー系指標の「実際の数値」によるユーザー分布（ヒストグラム）。
+ * ヒストグラム分布の定義。全体集計と閲覧者本人のバケット判定で同じ定義を使うため、
+ * 指標（取得元・カラム・境界）はここ1箇所にだけ書く。
+ */
+const DISTRIBUTION_DEFS: DistributionDef[] = [
+  { title: "投稿数", source: "main", field: "posts", tiers: [5, 10, 20, 30, 50, 100, 200, 300, 500], unit: "" },
+  { title: "1日の最多投稿数", source: "daily", field: "daily", tiers: [3, 5, 10], unit: "" },
+  { title: "連続投稿（最長）", source: "streak", field: "streak", tiers: [2, 7, 20, 50, 100], unit: "日" },
+  { title: "使った文字色数", source: "main", field: "colors", tiers: [4, 8], unit: "色" },
+  { title: "カメラ機種数", source: "main", field: "cameras", tiers: [2, 5], unit: "機種" },
+  { title: "都道府県数", source: "main", field: "prefectures", tiers: [2, 5, 15, 30, 47], unit: "都道府県" },
+  { title: "ネオンの利用回数", source: "main", field: "neon", tiers: [5, 30], unit: "回" },
+  { title: "ハンコの利用回数", source: "main", field: "stamp", tiers: [5, 30], unit: "回" },
+  { title: "特大文字の利用回数", source: "main", field: "xlarge", tiers: [5, 30], unit: "回" },
+  { title: "縦書きの利用回数", source: "main", field: "vertical", tiers: [1, 5, 30, 100], unit: "回" },
+  { title: "カスタム絵文字リアクション数", source: "reaction", field: "custom_reactions", tiers: [5, 30, 100, 300], unit: "件" },
+  { title: "獲得したリアクション数", source: "main", field: "received_reactions", tiers: [10, 50, 100, 300, 1000], unit: "件" },
+];
+
+/**
+ * 分布集計の生SQL（ユーザー1人=1行）。userId を渡すとその1人だけに絞る。
+ * 全体集計と閲覧者本人で同じSQLを使うことで、集計定義のズレを防ぐ。
  * スタイル由来（色・ネオン等）はシーズン投稿を除外（ユーザーが選んだ分だけ）。
  */
-async function getDistributionStats(): Promise<DistributionBreakdown[]> {
-  const [instanceRows, main, dailyRows, streakRows, reactionRows] = await Promise.all([
-    // サーバー種別（Mastodon/Misskey）ごとのユーザー数
-    prisma.instance.findMany({
-      select: { type: true, _count: { select: { users: true } } },
-    }),
-    // ユーザー1人=1行の各種カウント
-    prisma.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+function distributionSql(userId?: string): Record<DistributionSource, Prisma.Sql> {
+  const imageUser = userId ? Prisma.sql`AND user_id = ${userId}` : Prisma.empty;
+  const reactionUser = userId ? Prisma.sql`WHERE user_id = ${userId}` : Prisma.empty;
+  return {
+    main: Prisma.sql`
       SELECT
         COUNT(*)::int AS posts,
         COUNT(*) FILTER (WHERE arrangement = 'neon' AND season IS NULL)::int AS neon,
@@ -307,22 +355,22 @@ async function getDistributionStats(): Promise<DistributionBreakdown[]> {
         -- favorite_count は連合キャッシュと Reaction をマージ済みの表示用合計（実績と同じ数え方）
         COALESCE(SUM(favorite_count), 0)::int AS received_reactions
       FROM images
-      WHERE ${PUBLIC_SQL}
+      WHERE ${PUBLIC_SQL} ${imageUser}
       GROUP BY user_id
-    `),
+    `,
     // 1日の最多投稿数（JST 日単位でのユーザーごとの最大件数）
-    prisma.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+    daily: Prisma.sql`
       SELECT MAX(c)::int AS daily FROM (
         SELECT user_id, ${JST_DATE} AS d, COUNT(*) AS c
-        FROM images WHERE ${PUBLIC_SQL}
+        FROM images WHERE ${PUBLIC_SQL} ${imageUser}
         GROUP BY user_id, d
       ) t GROUP BY user_id
-    `),
+    `,
     // 最長連続投稿日数（gaps-and-islands・JST）
-    prisma.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+    streak: Prisma.sql`
       WITH days AS (
         SELECT DISTINCT user_id, ${JST_DATE} AS d
-        FROM images WHERE ${PUBLIC_SQL}
+        FROM images WHERE ${PUBLIC_SQL} ${imageUser}
       ),
       grp AS (
         SELECT user_id, d,
@@ -332,13 +380,41 @@ async function getDistributionStats(): Promise<DistributionBreakdown[]> {
       SELECT MAX(cnt)::int AS streak FROM (
         SELECT user_id, g, COUNT(*)::int AS cnt FROM grp GROUP BY user_id, g
       ) t GROUP BY user_id
-    `),
+    `,
     // カスタム絵文字で押したリアクション数（キーは ":name@host:"＝先頭が ":" のもの）
-    prisma.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
+    reaction: Prisma.sql`
       SELECT COUNT(*) FILTER (WHERE emoji LIKE ':%')::int AS custom_reactions
       FROM reactions
+      ${reactionUser}
       GROUP BY user_id
-    `),
+    `,
+  };
+}
+
+/** 分布集計の生SQL 4本をまとめて実行する。 */
+async function runDistributionSql(
+  userId?: string
+): Promise<Record<DistributionSource, Record<string, unknown>[]>> {
+  const sql = distributionSql(userId);
+  const [main, daily, streak, reaction] = await Promise.all([
+    prisma.$queryRaw<Record<string, unknown>[]>(sql.main),
+    prisma.$queryRaw<Record<string, unknown>[]>(sql.daily),
+    prisma.$queryRaw<Record<string, unknown>[]>(sql.streak),
+    prisma.$queryRaw<Record<string, unknown>[]>(sql.reaction),
+  ]);
+  return { main, daily, streak, reaction };
+}
+
+/**
+ * ラダー系指標の「実際の数値」によるユーザー分布（ヒストグラム）。
+ */
+async function getDistributionStats(): Promise<DistributionBreakdown[]> {
+  const [instanceRows, rows] = await Promise.all([
+    // サーバー種別（Mastodon/Misskey）ごとのユーザー数
+    prisma.instance.findMany({
+      select: { type: true, _count: { select: { users: true } } },
+    }),
+    runDistributionSql(),
   ]);
 
   // サーバー種別分布（カテゴリ。件数降順）
@@ -347,7 +423,7 @@ async function getDistributionStats(): Promise<DistributionBreakdown[]> {
     byType.set(r.type, (byType.get(r.type) ?? 0) + r._count.users);
   }
   const serverType: DistributionBreakdown = {
-    title: "サーバーの種類",
+    title: SERVER_TYPE_TITLE,
     total: [...byType.values()].reduce((a, c) => a + c, 0),
     items: [...byType.entries()]
       .map(([k, c]) => ({ key: k, label: SERVER_TYPE_LABELS[k] ?? k, count: c }))
@@ -356,30 +432,40 @@ async function getDistributionStats(): Promise<DistributionBreakdown[]> {
 
   return [
     serverType,
-    histogram("投稿数", column(main, "posts"), [5, 10, 20, 30, 50, 100, 200, 300, 500], ""),
-    histogram("1日の最多投稿数", column(dailyRows, "daily"), [3, 5, 10], ""),
-    histogram("連続投稿（最長）", column(streakRows, "streak"), [2, 7, 20, 50, 100], "日"),
-    histogram("使った文字色数", column(main, "colors"), [4, 8], "色"),
-    histogram("カメラ機種数", column(main, "cameras"), [2, 5], "機種"),
-    histogram("都道府県数", column(main, "prefectures"), [2, 5, 15, 30, 47], "都道府県"),
-    histogram("ネオンの利用回数", column(main, "neon"), [5, 30], "回"),
-    histogram("ハンコの利用回数", column(main, "stamp"), [5, 30], "回"),
-    histogram("特大文字の利用回数", column(main, "xlarge"), [5, 30], "回"),
-    histogram("縦書きの利用回数", column(main, "vertical"), [1, 5, 30, 100], "回"),
-    histogram(
-      "カスタム絵文字リアクション数",
-      column(reactionRows, "custom_reactions"),
-      [5, 30, 100, 300],
-      "件"
-    ),
-    histogram(
-      "獲得したリアクション数",
-      column(main, "received_reactions"),
-      [10, 50, 100, 300, 1000],
-      "件"
+    ...DISTRIBUTION_DEFS.map((d) =>
+      histogram(d.title, column(rows[d.source], d.field), d.tiers, d.unit)
     ),
   ];
 }
+
+/** 分布タイトル → 閲覧者本人が該当する行のキー（該当なしの指標は持たない）。 */
+export type ViewerDistribution = Record<string, string>;
+
+/**
+ * 閲覧者本人が各分布のどこに入るかを、全体集計と同じ定義（同じSQL・同じ境界）で求める。
+ * 全体統計（getCachedStats）はユーザー非依存で全訪問者共有のため、本人の値だけ別に引く。
+ */
+async function computeViewerDistribution(
+  userId: string,
+  instanceType: string
+): Promise<ViewerDistribution> {
+  const rows = await runDistributionSql(userId);
+  const found: ViewerDistribution = { [SERVER_TYPE_TITLE]: instanceType };
+  for (const d of DISTRIBUTION_DEFS) {
+    // 公開投稿が無いユーザーは行自体が返らない（＝どのバケットにも入らない）。
+    const row = rows[d.source][0];
+    const key = row ? bucketKey(Number(row[d.field]), d.tiers) : null;
+    if (key) found[d.title] = key;
+  }
+  return found;
+}
+
+/** 本人の分布位置も全体統計と同じ間隔でキャッシュする（引数がキャッシュキーに入る）。 */
+export const getViewerDistribution = unstable_cache(
+  computeViewerDistribution,
+  ["viewer-distribution"],
+  { revalidate: 300, tags: ["public-stats"] },
+);
 
 /**
  * 統計データ一式（ログインユーザー非依存）を 5 分キャッシュして全訪問者で共有する。

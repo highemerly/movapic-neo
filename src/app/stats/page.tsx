@@ -12,7 +12,7 @@ import { getAvatarUrl } from "@/lib/avatar";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { BarList } from "./_components/BarList";
-import { getCachedStats } from "@/lib/stats/publicStats";
+import { getCachedStats, getViewerDistribution } from "@/lib/stats/publicStats";
 import { BackLink } from "@/components/BackLink";
 import { PageContainer } from "@/components/PageContainer";
 
@@ -38,6 +38,11 @@ export default async function StatsPage() {
   ]);
   const { optionStats, postingStats, distributionStats, achievementStats } =
     stats;
+  // 自分がどのバケットに入るかはログイン中のみ。全体統計（全訪問者共有キャッシュ）とは
+  // 別に本人分だけを引く。
+  const viewerDistribution = currentUser
+    ? await getViewerDistribution(currentUser.id, currentUser.instance.type)
+    : null;
 
   return (
     <>
@@ -104,7 +109,12 @@ export default async function StatsPage() {
                     {b.total.toLocaleString("ja-JP")} 人
                   </span>
                 </div>
-                <BarList rows={b.items} total={b.total} emptyText="データなし" />
+                <BarList
+                  rows={b.items}
+                  total={b.total}
+                  emptyText="データなし"
+                  highlightKey={viewerDistribution?.[b.title]}
+                />
               </div>
             ))}
           </div>
