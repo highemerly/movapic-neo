@@ -5,7 +5,11 @@ import {
   isHalfWidthChar,
   hexToRgb,
   fontStack,
+  emojiFontStack,
   calendarFontStack,
+  withGraphemeFont,
+  measureGrapheme,
+  measureLineWidth,
   getMonospaceCharWidth,
   splitTextIntoLines,
   splitTextIntoColumns,
@@ -13,13 +17,16 @@ import {
 import { STROKE_COLORS, SIZE_MULTIPLIERS } from "@/types";
 
 /**
- * splitTextIntoLines / getMonospaceCharWidth は ctx.measureText しか使わないため、
+ * splitTextIntoLines / getMonospaceCharWidth は ctx.measureText と ctx.font しか使わないため、
  * 幅を決め打ちできる偽 ctx を渡せば skia-canvas 無しで折り返しロジックを検証できる。
+ * measure には計測時の font も渡し、書記素ごとのフォント切り替えを観測できるようにする。
  */
-function fakeCtx(measure: (char: string) => number): CanvasRenderingContext2D {
-  return {
-    measureText: (char: string) => ({ width: measure(char) }),
-  } as unknown as CanvasRenderingContext2D;
+function fakeCtx(measure: (char: string, font: string) => number): CanvasRenderingContext2D {
+  const ctx = {
+    font: "",
+    measureText: (char: string) => ({ width: measure(char, ctx.font) }),
+  };
+  return ctx as unknown as CanvasRenderingContext2D;
 }
 
 describe("calculateFontSize", () => {
@@ -109,6 +116,48 @@ describe("fontStack", () => {
   });
 });
 
+describe("emojiFontStack", () => {
+  it("絵文字フォントを本文フォントより前に置く", () => {
+    expect(emojiFontStack(48, "HuiFont")).toBe('48px "Noto Emoji", "HuiFont"');
+  });
+});
+
+describe("withGraphemeFont", () => {
+  it("絵文字のあいだだけ絵文字優先のフォントに切り替え、終わったら本文フォントへ戻す", () => {
+    const ctx = fakeCtx(() => 0);
+    ctx.font = fontStack(20, "HuiFont");
+
+    const seen = withGraphemeFont(ctx, "☀️", 20, "HuiFont", () => ctx.font);
+    expect(seen).toBe('20px "Noto Emoji", "HuiFont"');
+    expect(ctx.font).toBe('20px "HuiFont", "Noto Emoji"');
+  });
+
+  it("絵文字以外はフォントを触らない", () => {
+    const ctx = fakeCtx(() => 0);
+    ctx.font = "sentinel";
+    expect(withGraphemeFont(ctx, "あ", 20, "HuiFont", () => ctx.font)).toBe("sentinel");
+    expect(ctx.font).toBe("sentinel");
+  });
+});
+
+describe("measureGrapheme / measureLineWidth", () => {
+  // ふい字は ☀ の cmap を持つが中身が空グリフ（送り幅は全角セル）。
+  // 絵文字フォントで測れば実寸（ここでは30）になる、という状況を模す。
+  const ctx = fakeCtx((char, font) => {
+    if (char === "☀️") return font.startsWith('20px "Noto Emoji"') ? 30 : 20;
+    return 10;
+  });
+
+  it("絵文字は絵文字フォントで計測する", () => {
+    expect(measureGrapheme(ctx, "☀️", 20, "HuiFont")).toBe(30);
+    expect(measureGrapheme(ctx, "あ", 20, "HuiFont")).toBe(10);
+  });
+
+  it("行幅は書記素ごとに計測して合算する", () => {
+    expect(measureLineWidth(ctx, "あ☀️い", 20, "HuiFont")).toBe(50);
+  });
+});
+
 describe("calendarFontStack", () => {
   it("選択フォント→和文フォールバック→絵文字の順に並べる", () => {
     expect(calendarFontStack(56, "hui-font")).toBe(
@@ -127,12 +176,22 @@ describe("getMonospaceCharWidth", () => {
   const ctx = fakeCtx(() => 99); // 絵文字の実測送り幅を99に固定
 
   it("半角は fontSize*0.5、全角は fontSize", () => {
-    expect(getMonospaceCharWidth(ctx, "A", 20)).toBe(10);
-    expect(getMonospaceCharWidth(ctx, "あ", 20)).toBe(20);
+    expect(getMonospaceCharWidth(ctx, "A", 20, "HuiFont")).toBe(10);
+    expect(getMonospaceCharWidth(ctx, "あ", 20, "HuiFont")).toBe(20);
   });
 
   it("絵文字は measureText の実測値を使う", () => {
-    expect(getMonospaceCharWidth(ctx, "😀", 20)).toBe(99);
+    expect(getMonospaceCharWidth(ctx, "😀", 20, "HuiFont")).toBe(99);
+  });
+
+  it("絵文字の計測は絵文字フォントで行う（本文フォントの空グリフを拾わない）", () => {
+    const fonts: string[] = [];
+    const spy = fakeCtx((_char, font) => {
+      fonts.push(font);
+      return 99;
+    });
+    getMonospaceCharWidth(spy, "☀️", 20, "HuiFont");
+    expect(fonts).toEqual(['20px "Noto Emoji", "HuiFont"']);
   });
 });
 
@@ -140,31 +199,31 @@ describe("splitTextIntoLines", () => {
   it("プロポーショナル: 累積幅が maxWidth を超えたら改行", () => {
     // 各文字10px、maxWidth=25
     const ctx = fakeCtx(() => 10);
-    const lines = splitTextIntoLines(ctx, "abcde", 25, true, 20);
+    const lines = splitTextIntoLines(ctx, "abcde", 25, true, 20, "HuiFont");
     expect(lines).toEqual(["ab", "cd", "e"]);
   });
 
   it("等幅（半角対応）: 半角0.5幅・全角1.0幅で改行判定", () => {
     // fontSize=20 → 全角20px/半角10px、maxWidth=40
     const ctx = fakeCtx(() => 0); // 非絵文字は measureText を使わない
-    expect(splitTextIntoLines(ctx, "ＡＢＣ", 40, false, 20, true)).toEqual(["ＡＢ", "Ｃ"]);
-    expect(splitTextIntoLines(ctx, "abcd", 25, false, 20, true)).toEqual(["ab", "cd"]);
+    expect(splitTextIntoLines(ctx, "ＡＢＣ", 40, false, 20, "HuiFont", true)).toEqual(["ＡＢ", "Ｃ"]);
+    expect(splitTextIntoLines(ctx, "abcd", 25, false, 20, "HuiFont", true)).toEqual(["ab", "cd"]);
   });
 
   it("等幅（半角非対応）: 固定文字数 floor(maxWidth/fontSize) で分割", () => {
     const ctx = fakeCtx(() => 0);
     // fontSize=20, maxWidth=50 → 2文字/行
-    expect(splitTextIntoLines(ctx, "abcde", 50, false, 20)).toEqual(["ab", "cd", "e"]);
+    expect(splitTextIntoLines(ctx, "abcde", 50, false, 20, "HuiFont")).toEqual(["ab", "cd", "e"]);
   });
 
   it("等幅（半角非対応）: maxWidth < fontSize でも最低1文字/行", () => {
     const ctx = fakeCtx(() => 0);
-    expect(splitTextIntoLines(ctx, "abc", 5, false, 20)).toEqual(["a", "b", "c"]);
+    expect(splitTextIntoLines(ctx, "abc", 5, false, 20, "HuiFont")).toEqual(["a", "b", "c"]);
   });
 
   it("改行を段落として保持し、空行は空文字列で残す", () => {
     const ctx = fakeCtx(() => 10);
-    expect(splitTextIntoLines(ctx, "a\n\nb", 100, true, 20)).toEqual(["a", "", "b"]);
+    expect(splitTextIntoLines(ctx, "a\n\nb", 100, true, 20, "HuiFont")).toEqual(["a", "", "b"]);
   });
 });
 

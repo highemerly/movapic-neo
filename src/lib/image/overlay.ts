@@ -10,6 +10,8 @@ import {
   splitTextIntoColumns,
   drawTextWithStroke,
   getMonospaceCharWidth,
+  measureGrapheme,
+  withGraphemeFont,
   fontStack,
   CANVAS_FONT_NAMES,
 } from "./text";
@@ -27,7 +29,7 @@ ensureFontsLoaded();
 export { CANVAS_FONT_NAMES };
 
 /**
- * 等幅セル（幅 cellWidth）の中で絵文字を中央寄せするためのX補正。
+ * 等幅セル（幅＝fontSize）の中で絵文字を中央寄せするためのX補正。
  * 絵文字グリフの送り幅は本文の全角セルより広いため、左端揃えのままだと
  * 右にずれて見える。送り幅の差の半分だけ左へ寄せてセル中心に合わせる。
  * 絵文字以外・プロポーショナル配置では 0（補正なし）。
@@ -35,10 +37,11 @@ export { CANVAS_FONT_NAMES };
 function emojiCellOffsetX(
   ctx: CanvasRenderingContext2D,
   char: string,
-  cellWidth: number
+  fontSize: number,
+  fontName: string
 ): number {
   if (!isEmojiGrapheme(char)) return 0;
-  return (cellWidth - ctx.measureText(char).width) / 2;
+  return (fontSize - measureGrapheme(ctx, char, fontSize, fontName)) / 2;
 }
 
 /**
@@ -178,13 +181,22 @@ function drawHorizontalText(
   const lineHeight = fontSize * 1.4;
   const useProportional = PROPORTIONAL_FONTS.has(fontFamily);
   const useHalfWidth = MONOSPACE_FONTS.has(fontFamily);
+  const fontName = CANVAS_FONT_NAMES[fontFamily];
 
   // Xスタート: 先頭文字の左端を margin に揃える
   // → Y方向の上端余白（margin）と同じにし、かつフォントサイズに依存しない
   const startX = margin;
 
   // 行分割（プロポーショナル/等幅対応）
-  const lines = splitTextIntoLines(ctx, text, maxWidth, useProportional, fontSize, useHalfWidth);
+  const lines = splitTextIntoLines(
+    ctx,
+    text,
+    maxWidth,
+    useProportional,
+    fontSize,
+    fontName,
+    useHalfWidth
+  );
 
   // Y開始位置（先頭行の中心。baseline=middle）
   let startY: number;
@@ -205,12 +217,15 @@ function drawHorizontalText(
       // プロポーショナル: 累積幅で配置（xは文字の左端）
       let currentX = startX;
       lineChars.forEach((char) => {
-        const charWidth = ctx.measureText(char).width;
-        if (arrangement === "neon") {
-          drawNeonText(ctx, char, currentX, y, fontSize, textColor);
-        } else {
-          drawTextWithStroke(ctx, char, currentX, y, textColor, strokeColor, strokeWidth);
-        }
+        const charWidth = measureGrapheme(ctx, char, fontSize, fontName);
+        const drawX = currentX;
+        withGraphemeFont(ctx, char, fontSize, fontName, () => {
+          if (arrangement === "neon") {
+            drawNeonText(ctx, char, drawX, y, fontSize, textColor);
+          } else {
+            drawTextWithStroke(ctx, char, drawX, y, textColor, strokeColor, strokeWidth);
+          }
+        });
         currentX += charWidth;
       });
     } else if (useHalfWidth) {
@@ -218,24 +233,29 @@ function drawHorizontalText(
       // 絵文字は実測送り幅で左端揃え、それ以外は半角/全角の等幅セル
       let currentX = startX;
       lineChars.forEach((char) => {
-        const charWidth = getMonospaceCharWidth(ctx, char, fontSize);
-        if (arrangement === "neon") {
-          drawNeonText(ctx, char, currentX, y, fontSize, textColor);
-        } else {
-          drawTextWithStroke(ctx, char, currentX, y, textColor, strokeColor, strokeWidth);
-        }
+        const charWidth = getMonospaceCharWidth(ctx, char, fontSize, fontName);
+        const drawX = currentX;
+        withGraphemeFont(ctx, char, fontSize, fontName, () => {
+          if (arrangement === "neon") {
+            drawNeonText(ctx, char, drawX, y, fontSize, textColor);
+          } else {
+            drawTextWithStroke(ctx, char, drawX, y, textColor, strokeColor, strokeWidth);
+          }
+        });
         currentX += charWidth;
       });
     } else {
       // 等幅（半角非対応）: 固定幅で配置
       lineChars.forEach((char, charIndex) => {
         const x = startX + charIndex * fontSize;
-        const drawX = x + emojiCellOffsetX(ctx, char, fontSize);
-        if (arrangement === "neon") {
-          drawNeonText(ctx, char, drawX, y, fontSize, textColor);
-        } else {
-          drawTextWithStroke(ctx, char, drawX, y, textColor, strokeColor, strokeWidth);
-        }
+        const drawX = x + emojiCellOffsetX(ctx, char, fontSize, fontName);
+        withGraphemeFont(ctx, char, fontSize, fontName, () => {
+          if (arrangement === "neon") {
+            drawNeonText(ctx, char, drawX, y, fontSize, textColor);
+          } else {
+            drawTextWithStroke(ctx, char, drawX, y, textColor, strokeColor, strokeWidth);
+          }
+        });
       });
     }
   });
@@ -265,6 +285,7 @@ function drawVerticalText(
   const charsPerColumn = Math.max(1, Math.floor(maxHeight / lineHeight));
   const columnWidth = fontSize * 1.5;
   const useHalfWidth = MONOSPACE_FONTS.has(fontFamily);
+  const fontName = CANVAS_FONT_NAMES[fontFamily];
 
   // 改行で分割し、各段落を高さに応じてさらに列に分割（純粋関数へ切り出し済み）
   const columns = splitTextIntoColumns(text, charsPerColumn, useHalfWidth);
@@ -293,31 +314,33 @@ function drawVerticalText(
       // 半角文字はX位置を中央に寄せる（全角の中心に揃える）
       const halfXOffset = isHalf ? fontSize * 0.25 : 0;
       // 絵文字は送り幅が全角セルより広いため、セル中心へ寄せる補正
-      const emojiOffset = emojiCellOffsetX(ctx, char, fontSize);
+      const emojiOffset = emojiCellOffsetX(ctx, char, fontSize, fontName);
 
       // 句読点は右上に配置
       const charX = isPunctuation ? x + fontSize * 0.3 : x + halfXOffset + emojiOffset;
       const charY = isPunctuation ? baseY - fontSize * 0.3 : baseY;
 
-      if (shouldRotate) {
-        // 回転する文字は文字セルの中心を基準に回転
-        // 通常文字は左端基準で描画されるため、中心位置に調整
-        const centerX = x + fontSize / 2;
-        ctx.save();
-        ctx.translate(centerX, charY);
-        ctx.rotate(Math.PI / 2);
-        ctx.textAlign = "center";
-        if (arrangement === "neon") {
-          drawNeonText(ctx, char, 0, 0, fontSize, textColor);
+      withGraphemeFont(ctx, char, fontSize, fontName, () => {
+        if (shouldRotate) {
+          // 回転する文字は文字セルの中心を基準に回転
+          // 通常文字は左端基準で描画されるため、中心位置に調整
+          const centerX = x + fontSize / 2;
+          ctx.save();
+          ctx.translate(centerX, charY);
+          ctx.rotate(Math.PI / 2);
+          ctx.textAlign = "center";
+          if (arrangement === "neon") {
+            drawNeonText(ctx, char, 0, 0, fontSize, textColor);
+          } else {
+            drawTextWithStroke(ctx, char, 0, 0, textColor, strokeColor, strokeWidth);
+          }
+          ctx.restore();
+        } else if (arrangement === "neon") {
+          drawNeonText(ctx, char, charX, charY, fontSize, textColor);
         } else {
-          drawTextWithStroke(ctx, char, 0, 0, textColor, strokeColor, strokeWidth);
+          drawTextWithStroke(ctx, char, charX, charY, textColor, strokeColor, strokeWidth);
         }
-        ctx.restore();
-      } else if (arrangement === "neon") {
-        drawNeonText(ctx, char, charX, charY, fontSize, textColor);
-      } else {
-        drawTextWithStroke(ctx, char, charX, charY, textColor, strokeColor, strokeWidth);
-      }
+      });
     });
   });
 }

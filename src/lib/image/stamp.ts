@@ -6,6 +6,9 @@ import {
   splitTextIntoLines,
   hexToRgb,
   fontStack,
+  measureGrapheme,
+  measureLineWidth,
+  withGraphemeFont,
 } from "./text";
 import { splitGraphemes } from "@/lib/text/grapheme";
 
@@ -60,10 +63,10 @@ export function drawStampText(
   } else {
     // 横書き: 行ごとに分割
     const maxWidth = width - margin * 2 - margin * 2;
-    lines = splitTextIntoLines(ctx, text, maxWidth, useProportional, fontSize);
+    lines = splitTextIntoLines(ctx, text, maxWidth, useProportional, fontSize, fontName);
 
     if (useProportional) {
-      lineWidths = lines.map((line) => ctx.measureText(line).width);
+      lineWidths = lines.map((line) => measureLineWidth(ctx, line, fontSize, fontName));
       textWidth = Math.max(...lineWidths, 0);
     } else {
       const maxCharsInLine = Math.max(...lines.map((l) => splitGraphemes(l).length), 0);
@@ -136,13 +139,13 @@ export function drawStampText(
   if (isVertical) {
     drawVerticalStampChars(
       ctx, columns, boxX, boxY, boxWidth, padding,
-      verticalColumnWidth, verticalLineHeight, fontSize,
+      verticalColumnWidth, verticalLineHeight, fontSize, fontName,
       textStrokeWidth, rgb, getInkAlpha
     );
   } else {
     drawHorizontalStampChars(
       ctx, lines, boxX, boxY, padding,
-      horizontalLineHeight, fontSize, textStrokeWidth,
+      horizontalLineHeight, fontSize, fontName, textStrokeWidth,
       rgb, useProportional, getInkAlpha
     );
   }
@@ -332,6 +335,7 @@ function drawVerticalStampChars(
   columnWidth: number,
   lineHeight: number,
   fontSize: number,
+  fontName: string,
   strokeWidth: number,
   rgb: { r: number; g: number; b: number },
   getInkAlpha: (x: number, y: number) => number
@@ -353,18 +357,20 @@ function drawVerticalStampChars(
       const x = firstColumnCenterX - colIndex * columnWidth + offsetX;
       const y = firstCharCenterY + charIndex * lineHeight + offsetY;
 
-      ctx.save();
-      ctx.translate(x, y);
-      // 縦書き用回転（括弧・長音記号など）+ かすれ用の微小回転
-      ctx.rotate(baseRotation + (shouldRotate ? Math.PI / 2 : 0));
+      withGraphemeFont(ctx, char, fontSize, fontName, () => {
+        ctx.save();
+        ctx.translate(x, y);
+        // 縦書き用回転（括弧・長音記号など）+ かすれ用の微小回転
+        ctx.rotate(baseRotation + (shouldRotate ? Math.PI / 2 : 0));
 
-      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
-      ctx.lineWidth = strokeWidth;
-      ctx.strokeText(char, 0, 0);
-      ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
-      ctx.fillText(char, 0, 0);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
+        ctx.lineWidth = strokeWidth;
+        ctx.strokeText(char, 0, 0);
+        ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+        ctx.fillText(char, 0, 0);
 
-      ctx.restore();
+        ctx.restore();
+      });
     });
   });
 }
@@ -377,6 +383,7 @@ function drawHorizontalStampChars(
   padding: number,
   lineHeight: number,
   fontSize: number,
+  fontName: string,
   strokeWidth: number,
   rgb: { r: number; g: number; b: number },
   useProportional: boolean,
@@ -391,7 +398,7 @@ function drawHorizontalStampChars(
     if (useProportional) {
       let currentX = boxX + padding;
       lineChars.forEach((char, charIndex) => {
-        const charWidth = ctx.measureText(char).width;
+        const charWidth = measureGrapheme(ctx, char, fontSize, fontName);
         const offsetX = (Math.random() - 0.5) * fontSize * 0.15;
         const offsetY = (Math.random() - 0.5) * fontSize * 0.15;
         const rotation = (Math.random() - 0.5) * 0.1;
@@ -402,17 +409,19 @@ function drawHorizontalStampChars(
 
         const x = currentX + charWidth / 2 + offsetX;
 
-        ctx.save();
-        ctx.translate(x, y + offsetY);
-        ctx.rotate(rotation);
+        withGraphemeFont(ctx, char, fontSize, fontName, () => {
+          ctx.save();
+          ctx.translate(x, y + offsetY);
+          ctx.rotate(rotation);
 
-        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
-        ctx.lineWidth = strokeWidth;
-        ctx.strokeText(char, 0, 0);
-        ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
-        ctx.fillText(char, 0, 0);
+          ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
+          ctx.lineWidth = strokeWidth;
+          ctx.strokeText(char, 0, 0);
+          ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+          ctx.fillText(char, 0, 0);
 
-        ctx.restore();
+          ctx.restore();
+        });
         currentX += charWidth;
       });
     } else {
@@ -428,17 +437,19 @@ function drawHorizontalStampChars(
 
         const x = firstCharCenterX + charIndex * fontSize + offsetX;
 
-        ctx.save();
-        ctx.translate(x, y + offsetY);
-        ctx.rotate(rotation);
+        withGraphemeFont(ctx, char, fontSize, fontName, () => {
+          ctx.save();
+          ctx.translate(x, y + offsetY);
+          ctx.rotate(rotation);
 
-        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
-        ctx.lineWidth = strokeWidth;
-        ctx.strokeText(char, 0, 0);
-        ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
-        ctx.fillText(char, 0, 0);
+          ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
+          ctx.lineWidth = strokeWidth;
+          ctx.strokeText(char, 0, 0);
+          ctx.fillStyle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`;
+          ctx.fillText(char, 0, 0);
 
-        ctx.restore();
+          ctx.restore();
+        });
       });
     }
   });

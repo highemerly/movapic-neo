@@ -52,6 +52,10 @@ const CASES: Case[] = [
   // ピクセル比較のゴールデンには載せられない（描画ロジックは image/text の単体テスト側で担保）。
   { name: "gothic-proportional", width: 500, height: 300, text: "Proportional な字詰め ABC", position: "top", color: "white", size: "medium", font: "noto-sans-jp", arrangement: "none" },
   { name: "emoji", width: 400, height: 400, text: "絵文字😀🎉", position: "top", color: "white", size: "large", font: "hui-font", arrangement: "none" },
+  // BMP の絵文字（☀☁❤）はふい字が cmap に持ちながら中身が空グリフ＝本文フォント優先だと無言で消える。
+  // 絵文字フォントを先頭に置く分岐（emojiFontStack）の退行検出用。縦書きも列送りの補正込みで見る。
+  { name: "emoji-bmp", width: 400, height: 400, text: "今日は☀️だね❤️", position: "top", color: "white", size: "medium", font: "hui-font", arrangement: "none" },
+  { name: "emoji-bmp-vertical", width: 400, height: 600, text: "☀️と☁️", position: "right", color: "white", size: "medium", font: "hui-font", arrangement: "none" },
 ];
 
 async function renderCase(c: Case): Promise<Buffer> {

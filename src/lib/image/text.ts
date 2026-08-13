@@ -40,6 +40,65 @@ export function fontStack(fontSize: number, fontName: string): string {
 }
 
 /**
+ * 絵文字を描くためのフォント指定文字列（絵文字フォントを本文フォントより前に置く）。
+ *
+ * pitfall: ふい字などの本文フォントは ☀☁❤♨✈ 等の絵文字コードポイントを cmap に持ちながら
+ * 中身が空グリフ（ふい字で73字・怖い明朝で8字）。フォントスタック末尾のフォールバックは
+ * 「cmap に無い」ときしか効かないため、本文フォントを先頭に置いたままだと空グリフが採用され、
+ * 絵文字が無言で消える（☀️ が出ない不具合の原因）。カレンダーの © を Noto 固定にしているのと同じ理由。
+ * 絵文字フォントが持たない文字（★♪ など）は後段の本文フォントへ落ちるので巻き込みは起きない。
+ */
+export function emojiFontStack(fontSize: number, fontName: string): string {
+  return `${fontSize}px "${EMOJI_FONT_FAMILY}", "${fontName}"`;
+}
+
+/**
+ * 書記素1つを、その書記素に適したフォントで計測/描画する。
+ * 絵文字のあいだだけ ctx.font を絵文字優先に差し替え、終わったら本文フォントへ戻す。
+ * 「1書記素ごとの measureText / fillText は必ずこれを通す」のが不変条件。
+ */
+export function withGraphemeFont<T>(
+  ctx: CanvasRenderingContext2D,
+  grapheme: string,
+  fontSize: number,
+  fontName: string,
+  fn: () => T
+): T {
+  if (!isEmojiGrapheme(grapheme)) return fn();
+  ctx.font = emojiFontStack(fontSize, fontName);
+  try {
+    return fn();
+  } finally {
+    ctx.font = fontStack(fontSize, fontName);
+  }
+}
+
+/** 書記素1つの送り幅（絵文字は絵文字フォントで計測）。 */
+export function measureGrapheme(
+  ctx: CanvasRenderingContext2D,
+  grapheme: string,
+  fontSize: number,
+  fontName: string
+): number {
+  return withGraphemeFont(ctx, grapheme, fontSize, fontName, () => ctx.measureText(grapheme).width);
+}
+
+/**
+ * 1行ぶんの送り幅。書記素ごとに計測して合算する（描画も書記素ごとに送るため合わせる）。
+ */
+export function measureLineWidth(
+  ctx: CanvasRenderingContext2D,
+  line: string,
+  fontSize: number,
+  fontName: string
+): number {
+  return splitGraphemes(line).reduce(
+    (width, grapheme) => width + measureGrapheme(ctx, grapheme, fontSize, fontName),
+    0
+  );
+}
+
+/**
  * カレンダー画像用のフォント指定文字列。
  * 選択フォントに無いグリフ（ユーザー名の特殊文字など）を Noto Sans CJK JP で拾ってから
  * 絵文字（👑・📱）へ落とす。fontStack と違い和文フォールバックを挟むのは、カレンダーには
@@ -78,9 +137,10 @@ export function isHalfWidthChar(char: string): boolean {
 export function getMonospaceCharWidth(
   ctx: CanvasRenderingContext2D,
   char: string,
-  fontSize: number
+  fontSize: number,
+  fontName: string
 ): number {
-  if (isEmojiGrapheme(char)) return ctx.measureText(char).width;
+  if (isEmojiGrapheme(char)) return measureGrapheme(ctx, char, fontSize, fontName);
   return isHalfWidthChar(char) ? fontSize * 0.5 : fontSize;
 }
 
@@ -135,6 +195,7 @@ export function splitTextIntoLines(
   maxWidth: number,
   useProportional: boolean,
   fontSize: number,
+  fontName: string,
   useHalfWidth: boolean = false
 ): string[] {
   const lines: string[] = [];
@@ -152,7 +213,7 @@ export function splitTextIntoLines(
       let currentWidth = 0;
 
       for (const char of splitGraphemes(paragraph)) {
-        const charWidth = ctx.measureText(char).width;
+        const charWidth = measureGrapheme(ctx, char, fontSize, fontName);
         if (currentWidth + charWidth > maxWidth && currentLine !== "") {
           lines.push(currentLine);
           currentLine = char;
@@ -171,7 +232,7 @@ export function splitTextIntoLines(
       let currentWidth = 0;
 
       for (const char of splitGraphemes(paragraph)) {
-        const charWidth = getMonospaceCharWidth(ctx, char, fontSize);
+        const charWidth = getMonospaceCharWidth(ctx, char, fontSize, fontName);
         if (currentWidth + charWidth > maxWidth && currentLine !== "") {
           lines.push(currentLine);
           currentLine = char;
