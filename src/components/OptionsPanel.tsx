@@ -134,10 +134,12 @@ export function OptionsPanel({
           onChange={onFontChange}
           disabled={disabled}
           renderOption={(f) => (
+            // プレビューは字の外接矩形に切り抜いてあるので、ラベルが長いフォントほど横長になる。
+            // max-w-full が無いとボタン幅を越えてセグメント自体が広がってしまう。
             <img
               src={`/fonts/${f}.png`}
               alt={FONT_LABELS[f]}
-              className="h-5 mx-auto object-contain dark:invert"
+              className="h-3.5 max-w-full mx-auto object-contain dark:invert"
             />
           )}
         />
@@ -158,7 +160,7 @@ export function OptionsPanel({
               <img
                 src={`/arrangements/${a}.png`}
                 alt={ARRANGEMENT_LABELS[a]}
-                className="h-5 mx-auto object-contain"
+                className="h-6 max-w-full mx-auto object-contain"
               />
             )
           }
