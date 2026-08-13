@@ -11,6 +11,7 @@
 | `local` | このサービスのみ | ❌ | ✅ | ✅ |
 
 - Mastodon: `public`/`unlisted` をそのまま使用。Misskey: `unlisted` → `home`（非収載相当）。
+- UIラベルは連携先の用語に合わせて出し分ける（`visibilityLabels()` @ [src/types/index.ts](../src/types/index.ts)）。Mastodon は「公開投稿／非収載投稿」、Misskey は「公開／ホーム」（Misskey に「非収載」という公開範囲は無い）。
 
 ## メール投稿機能
 - **Cloudflare Email Worker** (`workers/email-forwarder/`): メールを受信しraw dataをAPIへ転送。

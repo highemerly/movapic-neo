@@ -37,11 +37,13 @@ interface DefaultsEditorProps {
     mentionKeep: boolean;
   };
   instanceDomain: string;
+  /** 連携先の種別（"mastodon" | "misskey"）。公開範囲ラベルの用語を合わせる。 */
+  instanceType: string;
 }
 
 const SAVE_DEBOUNCE_MS = 400;
 
-export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps) {
+export function DefaultsEditor({ initial, instanceDomain, instanceType }: DefaultsEditorProps) {
   const router = useRouter();
   const confirm = useConfirm();
   const [position, setPosition] = useState<Position>(initial.position ?? DEFAULT_POSITION);
@@ -251,7 +253,11 @@ export function DefaultsEditor({ initial, instanceDomain }: DefaultsEditorProps)
 
             <div className="space-y-2">
               <Label>{instanceDomain} への同時投稿</Label>
-              <VisibilityPicker value={visibility} onChange={setVisibility} />
+              <VisibilityPicker
+                value={visibility}
+                onChange={setVisibility}
+                instanceType={instanceType}
+              />
             </div>
 
             <div className="space-y-2">

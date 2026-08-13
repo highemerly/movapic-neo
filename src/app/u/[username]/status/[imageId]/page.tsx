@@ -511,6 +511,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
       initialIsPinned={!!image.pinnedAt}
       repostable={repostable}
       instanceDomain={image.user.instance.domain}
+      instanceType={image.user.instance.type}
       defaultVisibility={
         image.user.defaultVisibility === "unlisted" ? "unlisted" : "public"
       }

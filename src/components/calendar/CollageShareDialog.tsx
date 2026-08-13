@@ -31,6 +31,13 @@ const VISIBILITY_LABELS: Record<Visibility, string> = {
   followers: "フォロワー限定",
 };
 
+/** Misskey に「非収載」は無く「ホーム」が相当（送る値は unlisted のまま）。 */
+function visibilityLabel(v: Visibility, instanceType: string): string {
+  return v === "unlisted" && instanceType === "misskey"
+    ? "ホーム"
+    : VISIBILITY_LABELS[v];
+}
+
 const THEME_OPTIONS: CollageTheme[] = ["light", "dark"];
 const THEME_LABELS: Record<CollageTheme, React.ReactNode> = {
   light: <><Sun className="h-4 w-4" />ライト</>,
@@ -366,7 +373,7 @@ export function CollageShareDialog({
                     onChange={setVisibility}
                     disabled={posting}
                     size="xs"
-                    renderOption={(v) => VISIBILITY_LABELS[v]}
+                    renderOption={(v) => visibilityLabel(v, instanceType)}
                   />
                 </div>
 

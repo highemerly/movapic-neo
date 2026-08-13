@@ -168,11 +168,28 @@ export interface UserPreferences {
 // 公開範囲
 export type Visibility = "public" | "unlisted" | "local";
 
-export const VISIBILITY_LABELS: Record<Visibility, string> = {
+const MASTODON_VISIBILITY_LABELS: Record<Visibility, string> = {
   public: "公開投稿",
   unlisted: "非収載投稿",
   local: "なし",
 };
+
+// Misskey に「非収載」という公開範囲は無く、相当するのは「ホーム」。
+// 値（unlisted）は共通で、投稿時に toMisskeyVisibility() が home へ変換する。
+const MISSKEY_VISIBILITY_LABELS: Record<Visibility, string> = {
+  public: "公開",
+  unlisted: "ホーム",
+  local: "なし",
+};
+
+/** 連携先の用語に合わせた公開範囲ラベル（表示だけの出し分け）。 */
+export function visibilityLabels(
+  instanceType?: string | null
+): Record<Visibility, string> {
+  return instanceType === "misskey"
+    ? MISSKEY_VISIBILITY_LABELS
+    : MASTODON_VISIBILITY_LABELS;
+}
 
 export const MAX_TEXT_LENGTH = 140;
 export const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB

@@ -1198,6 +1198,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                 <PostVisibilityNotice
                   visibility={visibility}
                   instanceDomain={user.instance.domain}
+                  instanceType={user.instance.type}
                 />
                 {locationDisplayLabel && (
                   <PostLocationNotice locationLabel={locationDisplayLabel} />
@@ -1540,6 +1541,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
                     value={visibility}
                     onChange={setVisibility}
                     disabled={isLoading || isPosting}
+                    instanceType={user.instance.type}
                   />
                 </div>
 

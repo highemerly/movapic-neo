@@ -153,6 +153,7 @@ export default async function SettingsPage() {
               mentionKeep: preferences?.mentionKeep ?? false,
             }}
             instanceDomain={user.instance.domain}
+            instanceType={user.instance.type}
           />
           {/* カレンダーの自動穴埋めも投稿時の挙動なので投稿系に置く */}
           <AutoMakeupToggle

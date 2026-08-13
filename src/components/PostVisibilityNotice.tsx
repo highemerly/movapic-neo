@@ -7,13 +7,18 @@ import { Visibility } from "@/types";
 interface PostVisibilityNoticeProps {
   visibility: Visibility;
   instanceDomain?: string;
+  /** 連携先の種別（"mastodon" | "misskey"）。公開範囲の用語を合わせる。 */
+  instanceType?: string;
 }
 
 export function PostVisibilityNotice({
   visibility,
   instanceDomain,
+  instanceType,
 }: PostVisibilityNoticeProps) {
   const domain = instanceDomain || "連携サーバー";
+  // Misskey に「非収載」は無く「ホーム」が相当（値は unlisted のまま）。
+  const unlistedTerm = instanceType === "misskey" ? "ホーム投稿" : "非収載投稿";
 
   return (
     <div className="flex items-start gap-1.5 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
@@ -34,7 +39,7 @@ export function PostVisibilityNotice({
             <Link href="/public" className="underline hover:text-foreground">
               みんなの写真
             </Link>
-            に表示されます。{domain} では非収載投稿となります
+            に表示されます。{domain} では{unlistedTerm}となります
           </>
         )}
         {visibility === "local" && (

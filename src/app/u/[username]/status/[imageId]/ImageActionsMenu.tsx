@@ -42,7 +42,7 @@ import {
   COLOR_LABELS,
   SIZE_LABELS,
   ARRANGEMENT_LABELS,
-  VISIBILITY_LABELS,
+  visibilityLabels,
   type Position,
   type Color,
   type Size,
@@ -77,6 +77,8 @@ interface ImageActionsMenuProps {
   repostable: boolean;
   /** 投稿先の連携サーバードメイン（ラベル・トースト・モーダルに表示）。 */
   instanceDomain: string;
+  /** 投稿先の連携サーバー種別（"mastodon" | "misskey"）。公開範囲ラベルの用語を合わせる。 */
+  instanceType: string;
   /** 再投稿ダイアログの公開範囲の初期値。 */
   defaultVisibility: RepostVisibility;
   /** 通報可能か（ログイン済み かつ 自分の画像でない） */
@@ -178,6 +180,7 @@ export function ImageActionsMenu({
   initialIsPinned,
   repostable,
   instanceDomain,
+  instanceType,
   defaultVisibility,
   canReport,
   canMute,
@@ -757,7 +760,7 @@ export function ImageActionsMenu({
               options={REPOST_VISIBILITIES}
               onChange={setRepostVisibility}
               disabled={isReposting}
-              renderOption={(v) => VISIBILITY_LABELS[v]}
+              renderOption={(v) => visibilityLabels(instanceType)[v]}
             />
             <Button
               onClick={handleRepost}
