@@ -51,10 +51,22 @@ const RENDER = {
   inkAlpha: 0.93,
   /** 文字の線を太らせる量（印章の線幅は均一で太い）。 */
   charStroke: 0.05,
-  /** 枠の角丸半径。石に彫った角の僅かな丸み。 */
-  cornerRadius: 0.06,
+  /**
+   * 枠の角丸半径。石に彫った角の丸み。
+   * 枠線の太さ（`STAMP_GEOM.border`）より小さいと刃が回りきらない彫り跡として不自然で、
+   * 角だけ機械的にシャープに見える。線幅を上回る値にする。
+   */
+  cornerRadius: 0.14,
   /** 枠の辺のゆらぎ幅（低周波のみ＝手彫りの微妙な不均一）。 */
   frameWobble: 0.016,
+  /**
+   * かすれの削り量の上限（枠と文字で分ける）。
+   * 枠が欠けるのは印影らしさになるが、文字は抜けると画数が減って別の字に見えたり読めなくなる。
+   * 文字のかすれは「インクが薄い」までに留め、最低 1-charMaxCut のインクを必ず残す。
+   * 枠は完全な抜けだけ僅かに抑える（文字と差が開きすぎると枠だけ別の質感に見える）。
+   */
+  frameMaxCut: 0.9,
+  charMaxCut: 0.55,
 } as const;
 
 /** 周期的な 1D value noise。枠の一周でつながるよう端をラップする。 */
@@ -189,16 +201,18 @@ function drawChars(
   });
 }
 
-/** かすれマスクを destination-out で印影から削る。 */
-function applyInkMask(
-  ctx: CanvasRenderingContext2D,
+/**
+ * かすれマスク（RGB=0・A=削る量）を印面サイズ1枚に合成して返す。
+ *
+ * 層ごとに destination-out を掛けるのではなく1枚にまとめるのは、枠と文字に「同じかすれ」を
+ * 別の強さで掛けるため（層ごとに強さを絞ると、層の重なりで削り量の上限が保証できない）。
+ */
+function buildInkMask(
   rng: () => number,
-  destX: number,
-  destY: number,
   destWidth: number,
   destHeight: number,
   border: number
-): void {
+): Canvas {
   // 枠線の帯を外周とみなす（縁が欠けるのは当たりの弱い枠線から）。
   const edgeBandX = clamp((border * 1.6) / destWidth, 0.01, 0.2);
   const edgeBandY = clamp((border * 1.6) / destHeight, 0.01, 0.2);
@@ -242,17 +256,35 @@ function applyInkMask(
     },
   ];
 
+  const mask = new Canvas(Math.ceil(destWidth), Math.ceil(destHeight));
+  const maskCtx = mask.getContext("2d");
+  for (const layer of layers) {
+    const data = createInkMask(rng, layer);
+    const layerCanvas = new Canvas(layer.width, layer.height);
+    const layerCtx = layerCanvas.getContext("2d");
+    const image = layerCtx.createImageData(layer.width, layer.height);
+    image.data.set(data);
+    layerCtx.putImageData(image, 0, 0);
+    // source-over で重ねたアルファ 1-(1-a1)(1-a2) は destination-out を順に掛けた結果と一致する。
+    maskCtx.drawImage(layerCanvas, 0, 0, destWidth, destHeight);
+  }
+  return mask;
+}
+
+/** かすれマスクで削る。maxCut は削り量の上限（1 で完全に抜ける）。 */
+function applyInkMask(
+  ctx: CanvasRenderingContext2D,
+  mask: Canvas,
+  destX: number,
+  destY: number,
+  destWidth: number,
+  destHeight: number,
+  maxCut: number
+): void {
   ctx.save();
   ctx.globalCompositeOperation = "destination-out";
-  for (const layer of layers) {
-    const mask = createInkMask(rng, layer);
-    const maskCanvas = new Canvas(layer.width, layer.height);
-    const maskCtx = maskCanvas.getContext("2d");
-    const image = maskCtx.createImageData(layer.width, layer.height);
-    image.data.set(mask);
-    maskCtx.putImageData(image, 0, 0);
-    ctx.drawImage(maskCanvas, destX, destY, destWidth, destHeight);
-  }
+  ctx.globalAlpha = maxCut;
+  ctx.drawImage(mask, destX, destY, destWidth, destHeight);
   ctx.restore();
 }
 
@@ -358,8 +390,14 @@ export function drawStampText(
   );
   off.stroke();
 
+  // 文字は枠と削り量が違うので別レイヤーに描く（同じ面に描くと1回の destination-out で
+  // 枠と文字に同じ抜けが入り、文字だけ欠けさせない指定ができない）。
+  const charLayer = new Canvas(canvas.width, canvas.height);
+  const charCtx = charLayer.getContext("2d");
+  charCtx.strokeStyle = inkStyle;
+  charCtx.fillStyle = inkStyle;
   drawChars(
-    off,
+    charCtx,
     layout,
     fx + (layout.contentX - layout.frameX),
     fy + (layout.contentY - layout.frameY),
@@ -367,7 +405,10 @@ export function drawStampText(
     fontName
   );
 
-  applyInkMask(off, rng, bleed, bleed, outerW, outerH, layout.border);
+  const inkMask = buildInkMask(rng, outerW, outerH, layout.border);
+  applyInkMask(off, inkMask, bleed, bleed, outerW, outerH, RENDER.frameMaxCut);
+  applyInkMask(charCtx, inkMask, bleed, bleed, outerW, outerH, RENDER.charMaxCut);
+  off.drawImage(charLayer, 0, 0);
 
   const centerX = layout.frameX + layout.frameWidth / 2;
   const centerY = layout.frameY + layout.frameHeight / 2;
