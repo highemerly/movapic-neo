@@ -5,15 +5,15 @@ import { periodRange, periodRangeText } from "./periods";
 const NOW = new Date("2026-08-17T12:34:00+09:00");
 
 describe("periodRange", () => {
-  it("直近7日は7日前のJST 0:00から始まる（先頭日が半端な部分日にならない）", () => {
+  it("直近7日は今日を含む7暦日（6日前のJST 0:00から）＝先頭日が半端な部分日にならない", () => {
     const r = periodRange("7d", NOW)!;
-    expect(r.from.toISOString()).toBe(new Date("2026-08-10T00:00:00+09:00").toISOString());
+    expect(r.from.toISOString()).toBe(new Date("2026-08-11T00:00:00+09:00").toISOString());
     expect(r.to).toEqual(NOW);
   });
 
-  it("直近31日も31日前のJST 0:00から始まる", () => {
+  it("直近31日も今日を含む31暦日（30日前のJST 0:00から）", () => {
     const r = periodRange("31d", NOW)!;
-    expect(r.from.toISOString()).toBe(new Date("2026-07-17T00:00:00+09:00").toISOString());
+    expect(r.from.toISOString()).toBe(new Date("2026-07-18T00:00:00+09:00").toISOString());
   });
 
   it("時次のローリング窓は暦日に丸めず now からの経過時間で切る", () => {
@@ -38,6 +38,6 @@ describe("periodRange", () => {
 
 describe("periodRangeText", () => {
   it("直近7日は先頭の暦日から今日までを日付で示す", () => {
-    expect(periodRangeText("7d", NOW)).toBe("2026/08/10 〜 2026/08/17");
+    expect(periodRangeText("7d", NOW)).toBe("2026/08/11 〜 2026/08/17");
   });
 });

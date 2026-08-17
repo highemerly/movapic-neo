@@ -3,7 +3,7 @@
  *
  * 期間は「絶対レンジ [from, to)」に正規化する（to は排他終端）。
  *   - ローリング窓（時次: 直近N時間）: to = now、from = now - N時間。
- *   - ローリング窓（日次: 直近N日）: to = now、from = JST の N日前 0:00。
+ *   - ローリング窓（日次: 直近N日）: to = now、from = JST の (N-1)日前 0:00（＝今日を含むN暦日）。
  *     from を now - N日 にすると先頭の暦日が「now の時刻以降」だけの半端な日になり、
  *     日次グラフでその日だけ極端に少なく見える（例: 8/17 12:00 なら 8/10 は12時間分だけ）。
  *     暦日境界に丸めて先頭日を丸ごと含める（末尾の今日だけが進行中の部分日になる）。
@@ -81,9 +81,9 @@ export function periodRange(p: Period, now: Date): PeriodRange | null {
     case "72h":
       return { from: new Date(now.getTime() - 72 * HOUR), to: now };
     case "7d":
-      return { from: new Date(jstMidnightToday(now).getTime() - 7 * DAY), to: now };
+      return { from: new Date(jstMidnightToday(now).getTime() - 6 * DAY), to: now };
     case "31d":
-      return { from: new Date(jstMidnightToday(now).getTime() - 31 * DAY), to: now };
+      return { from: new Date(jstMidnightToday(now).getTime() - 30 * DAY), to: now };
     case "yesterday": {
       const today0 = jstMidnightToday(now);
       return { from: new Date(today0.getTime() - DAY), to: today0 };
