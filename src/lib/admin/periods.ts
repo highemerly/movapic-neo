@@ -2,7 +2,11 @@
  * admin の期間ピッカー共通定義（/admin/stats・/admin/favorites 共用）。
  *
  * 期間は「絶対レンジ [from, to)」に正規化する（to は排他終端）。
- *   - ローリング窓（直近N）: to = now、from = now - N。
+ *   - ローリング窓（時次: 直近N時間）: to = now、from = now - N時間。
+ *   - ローリング窓（日次: 直近N日）: to = now、from = JST の N日前 0:00。
+ *     from を now - N日 にすると先頭の暦日が「now の時刻以降」だけの半端な日になり、
+ *     日次グラフでその日だけ極端に少なく見える（例: 8/17 12:00 なら 8/10 は12時間分だけ）。
+ *     暦日境界に丸めて先頭日を丸ごと含める（末尾の今日だけが進行中の部分日になる）。
  *   - カレンダー期間（先月/先週/昨日）: JST の暦境界。週は日曜始まり（カレンダー機能に合わせる）。
  *   - 全期間（all）: null（下流が DB の最古〜現在に委ねる）。
  * すべて JST 基準。JST は UTC+9 固定なので +9h シフトで壁時計を作って暦計算する。
@@ -77,9 +81,9 @@ export function periodRange(p: Period, now: Date): PeriodRange | null {
     case "72h":
       return { from: new Date(now.getTime() - 72 * HOUR), to: now };
     case "7d":
-      return { from: new Date(now.getTime() - 7 * DAY), to: now };
+      return { from: new Date(jstMidnightToday(now).getTime() - 7 * DAY), to: now };
     case "31d":
-      return { from: new Date(now.getTime() - 31 * DAY), to: now };
+      return { from: new Date(jstMidnightToday(now).getTime() - 31 * DAY), to: now };
     case "yesterday": {
       const today0 = jstMidnightToday(now);
       return { from: new Date(today0.getTime() - DAY), to: today0 };
