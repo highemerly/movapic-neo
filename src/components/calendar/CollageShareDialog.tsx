@@ -17,6 +17,7 @@ import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { SegmentControl } from "@/components/SegmentControl";
 import { FONT_LABELS, VALID_FONTS, type FontFamily } from "@/types";
 
@@ -64,6 +65,7 @@ export function CollageShareDialog({
   instanceType: string;
   onClose: () => void;
 }) {
+  const confirm = useConfirm();
   const [generating, setGenerating] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [theme, setTheme] = useState<CollageTheme>("light");
@@ -144,20 +146,39 @@ export function CollageShareDialog({
     });
   }, []);
 
+  // 生成前は確認不要（捨てるものが無い）。生成後は黙って消えると作り直しに気づけないため確認する。
+  const confirmDiscard = useCallback(async () => {
+    if (!blobRef.current) return true;
+    return confirm({
+      title: "画像を作り直しますか？",
+      description:
+        "配色・書体は画像に焼き込まれるため、変更すると生成済みの画像は破棄されます。",
+      confirmText: "作り直す",
+    });
+  }, [confirm]);
+
   const handleThemeChange = useCallback(
     (next: CollageTheme) => {
-      setTheme(next);
-      discardPreview();
+      if (next === theme) return;
+      void (async () => {
+        if (!(await confirmDiscard())) return;
+        setTheme(next);
+        discardPreview();
+      })();
     },
-    [discardPreview]
+    [theme, confirmDiscard, discardPreview]
   );
 
   const handleFontChange = useCallback(
     (next: FontFamily) => {
-      setFont(next);
-      discardPreview();
+      if (next === font) return;
+      void (async () => {
+        if (!(await confirmDiscard())) return;
+        setFont(next);
+        discardPreview();
+      })();
     },
-    [discardPreview]
+    [font, confirmDiscard, discardPreview]
   );
 
   const handlePostServer = useCallback(async () => {
