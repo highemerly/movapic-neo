@@ -260,7 +260,7 @@ export function CollageShareDialog({
 
         {/* 見た目のオプション（生成前に選択・変更するとプレビューを破棄して再生成を促す） */}
         {postedUrl === null && (
-          <div className="mb-3 space-y-3">
+          <div className="mb-5 space-y-3">
             <div className="space-y-2">
               <Label>配色</Label>
               <SegmentControl
