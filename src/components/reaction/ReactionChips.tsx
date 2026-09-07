@@ -15,7 +15,7 @@ import type { ReactionUser } from "@/lib/reactions/types";
  * 見せる（ReactionChipPopover）。末尾の＋からはピッカーを開いてこの画面からリアクションできる。
  *
  * このページで唯一 API から最新状態を取りに行くインスタンスで、取得結果は reactionSync 経由で
- * モバイルのフローティングバーの＋ボタン（ReactionPickerButton）にも配る。
+ * モバイルのフローティングバーのミートボール（ImageActionsMenu のリアクション項目）にも配る。
  */
 export function ReactionChips({
   imageId,

@@ -11,11 +11,10 @@ import { DeleteLocationButton } from "./DeleteLocationButton";
 import { ImageNavigation } from "./ImageNavigation";
 import { FontLicenseBadge } from "./FontLicenseBadge";
 import { hasEmoji, hasNonEmojiText } from "@/lib/text/grapheme";
-import { ImageActionsMenu } from "./ImageActionsMenu";
+import { ImageActionsMenu, type ReactionMenuData } from "./ImageActionsMenu";
 import { isImageRepostable } from "@/lib/publish/repostImage";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { ReactionChips } from "@/components/reaction/ReactionChips";
-import { ReactionPickerButton } from "@/components/reaction/ReactionPickerButton";
 import { ExpandableDetailImage } from "./ExpandableDetailImage";
 import { BackLink } from "@/components/BackLink";
 import { PageContainer } from "@/components/PageContainer";
@@ -59,8 +58,8 @@ const IMAGE_MAX_VH = 72;
 const NAV_OFFSET = "bottom-[calc(3.5rem+env(safe-area-inset-bottom))]";
 
 // モバイルのフローティングバーのミートボールメニューに付ける装飾。塗り＋影のはっきりしたボタンに
-// する。主役はリアクション（未リアクション時 primary）なので、メニューは常に secondary（薄い塗り）に
-// 落として階層をつける。下のコンテンツを隠しすぎないよう強めに透過させ、輪郭は枠線ではなく影と
+// する。写真の上に常時重なる操作なので、塗りは secondary（薄い塗り）に落として主張を抑える。
+// 下のコンテンツを隠しすぎないよう強めに透過させ、輪郭は枠線ではなく影と
 // backdrop-blur で出す（強い透過に枠線を足すと線だけが浮いて見えるため付けない）。影は既定色
 // （黒10%前後）だと写真の上で消えるので shadow-black/30 まで濃くして輪郭を成立させる。
 // ダークテーマでは黒い影が暗い背景に沈んで輪郭にならないため、白のリング（縁のハイライト）で
@@ -503,6 +502,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   const actionsMenu = (opts: {
     triggerVariant?: "boxed" | "plain" | "card";
     triggerClassName?: string;
+    reaction?: ReactionMenuData;
   }) => (
     <ImageActionsMenu
       imageId={imageId}
@@ -545,6 +545,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
       }}
       triggerVariant={opts.triggerVariant}
       triggerClassName={opts.triggerClassName}
+      reaction={opts.reaction}
     />
   );
 
@@ -792,38 +793,33 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         {currentUser && <div aria-hidden className="md:hidden h-[104px]" />}
       </PageContainer>
 
-      {/* モバイル(<md)かつログイン時だけの、リアクション＋ミートボールメニューのフローティングバー。
-          画像を邪魔しないよう2ボタンに絞る（他の操作はミートボール内）。
-          画像のアスペクト比で本文位置が上下しても操作系を画面下部の同じ位置に固定する。帯は敷かず各
+      {/* モバイル(<md)かつログイン時だけの、ミートボールメニューのフローティングバー。
+          画像のアスペクト比で本文位置が上下しても操作系を画面下部の同じ位置に固定する。帯は敷かず
           ボタンだけ背景を持たせ、コンテナは pointer-events-none で隙間から下の画面が見え・クリックも
-          透過する（各ボタンは pointer-events-auto）。リアクションの内訳は本文内のチップ行に出す。
+          透過する（ボタンは pointer-events-auto）。
           PC には同じ操作をインラインで並べたバーがあったが、右上のミートボールで用が足り
-          （ミートボール自体も BackLink の trailing と二重に出ていた）、リアクションも本文下の
-          チップ行末尾の＋から付けられるため撤去した。写真より下の導線は投稿者カード右端の
-          ミートボール（card variant・PC のみ）が担う。 */}
+          （ミートボール自体も BackLink の trailing と二重に出ていた）ため撤去した。写真より下の
+          導線は投稿者カード右端のミートボール（card variant・PC のみ）が担う。
+          左端にはリアクションの＋ボタンも並べていたが、画像に被って邪魔なので撤去し、代わりに
+          このメニューの中へ項目として入れた（PC は本文下のチップ行末尾の＋が担う）。 */}
       {currentUser && (
         <div
           className={`md:hidden pointer-events-none fixed inset-x-0 z-30 ${NAV_OFFSET}`}
         >
-          <div className="mx-auto flex max-w-2xl flex-wrap items-center justify-start gap-3 px-4 py-2">
-            {/* リアクションを付ける＋ボタン（内訳のチップは本文の下に出す）。
-                local投稿もDBに記録できるので、公開画像なら常に出す。 */}
-            <ReactionPickerButton
-              imageId={imageId}
-              initialSnapshot={initialReactionSnapshot}
-              canReact={canReact}
-              sendsToFediverse={fediverseSendable}
-              viewer={reactionViewer}
-              viewerType={viewerType}
-              viewerDomain={viewerDomain}
-              disabledReason={
-                persistedReason === "deleted"
-                  ? "この投稿は削除されているため操作できません"
-                  : "リアクションはMastodon・Misskeyアカウントで利用できます"
-              }
-            />
-            {/* ミートボールは常に右端へ寄せる（左の余白を ml-auto で吸わせる）。 */}
-            {actionsMenu({ triggerClassName: `${PILL} ml-auto` })}
+          <div className="mx-auto flex max-w-2xl items-center justify-end px-4 py-2">
+            {actionsMenu({
+              triggerClassName: PILL,
+              // リアクション項目はこのメニューにだけ出す（上部の戻る行のミートボールにも
+              // 出すと同じ導線が同じ画面に二重に並ぶ）。
+              reaction: {
+                initialSnapshot: initialReactionSnapshot,
+                canReact,
+                sendsToFediverse: fediverseSendable,
+                viewer: reactionViewer,
+                viewerType,
+                viewerDomain,
+              },
+            })}
           </div>
         </div>
       )}

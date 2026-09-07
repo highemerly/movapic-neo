@@ -20,6 +20,7 @@ import {
   Settings2,
   VolumeX,
   Send,
+  SmilePlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -66,7 +67,38 @@ import { ExifDetailDialog, type ExifDetailData } from "./ExifDetailDialog";
 import { useMisskeyOpen } from "./useMisskeyOpen";
 import { useDeleteLocation } from "./useDeleteLocation";
 import { emitPinned, subscribePinned } from "./pinSync";
+import { ReactionPickerModal } from "@/components/reaction/ReactionPickerModal";
+import { useReactionActions } from "@/components/reaction/useReactionActions";
+import type { ReactionSnapshot } from "@/components/reaction/reactionSync";
+import type { ReactionUser } from "@/lib/reactions/types";
 import { PrefectureScrollLink } from "@/components/ScrollIntoViewOnSelect";
+
+/**
+ * メニューに「リアクションを付ける／変更する」を出すための一式。
+ * 渡した場合だけ項目が出るので、モバイルのフローティングバーの1つにだけ渡す
+ * （上部の戻る行にも出すと、同じ導線が同じ画面に二重に並ぶ）。
+ */
+export interface ReactionMenuData {
+  initialSnapshot: ReactionSnapshot;
+  /** リアクション可能か（未ログイン・削除済み等では項目を出さない）。 */
+  canReact: boolean;
+  /** この投稿へのリアクションが Fediverse にも送られるか（ピッカーの注釈に使う）。 */
+  sendsToFediverse: boolean;
+  /** 閲覧者自身の表示情報。押した直後の楽観表示で一覧へ差し込む（未ログインは null）。 */
+  viewer: ReactionUser | null;
+  /** 閲覧者のインスタンス種別／ドメイン。ピッカーの注釈の文言に使う（未ログインは null）。 */
+  viewerType: "mastodon" | "misskey" | null;
+  viewerDomain: string | null;
+}
+
+/** reaction 未指定インスタンス用の初期値（項目を出さないので中身は使われない）。 */
+const EMPTY_REACTIONS: ReactionSnapshot = {
+  total: 0,
+  chips: [],
+  usersByEmoji: {},
+  viewerEmoji: null,
+  statusMessage: null,
+};
 
 interface ImageActionsMenuProps {
   imageId: string;
@@ -138,6 +170,8 @@ interface ImageActionsMenuProps {
    * 使われないため、フォント欄に本文フォントのバッジを出さない。
    */
   hasNonEmojiText?: boolean;
+  /** リアクション項目を出すときだけ渡す（詳細は ReactionMenuData）。 */
+  reaction?: ReactionMenuData;
 }
 
 /**
@@ -166,7 +200,8 @@ function InteractIcons() {
 
 /**
  * 画像詳細ページの「その他」操作メニュー（ミートボール）。誰にでも表示する。
- * 項目は3グループに分ける（区切り線で分割）:
+ * 先頭に「リアクションを付ける／変更する」（reaction を渡したインスタンスのみ＝モバイルの
+ * フローティングバー）を置き、区切り線のあとに以下の3グループを並べる:
  *   1. 閲覧・共有系（コメント設定/EXIF/各サーバーで開く/リンク投稿/共有）— 誰でも
  *   2. 対他者（ミュート/通報）— ログイン済み かつ 非オーナー
  *   3. オーナー操作（再投稿/サムネ/位置削除/ピン/削除）— オーナーのみ
@@ -199,6 +234,7 @@ export function ImageActionsMenu({
   options,
   hasEmoji = false,
   hasNonEmojiText = true,
+  reaction,
 }: ImageActionsMenuProps) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -210,6 +246,15 @@ export function ImageActionsMenu({
   const misskey = useMisskeyOpen(misskeyOpenPostUrl ?? "");
   // 位置情報の削除（オーナー かつ 位置情報ありのときのみ項目を出す）。
   const locationDelete = useDeleteLocation(imageId, locationLabel ?? "");
+  // リアクションの状態・操作。最新状態の取得は本文下のチップ行（ReactionChips）に任せ、こちらは
+  // reactionSync 経由で受け取る（操作結果はフック側が emit してチップ行へ配る）。
+  // フックは常に呼ぶ（reaction 未指定インスタンスは空の初期値。項目自体を出さない）。
+  const reactions = useReactionActions(
+    imageId,
+    reaction?.initialSnapshot ?? EMPTY_REACTIONS,
+    reaction?.viewer ?? null
+  );
+  const [reactionPickerOpen, setReactionPickerOpen] = useState(false);
   const [isPinned, setIsPinned] = useState(initialIsPinned);
   const [isPinning, setIsPinning] = useState(false);
   // 同ページの他のミートボール（上部の戻る行・投稿者カード・フローティングバー）と表示を揃える。
@@ -458,7 +503,7 @@ export function ImageActionsMenu({
           title="その他"
         >
           {/* アイコンもトリガーの寸法に比例させる。card は隣に並ぶギャラリー/カレンダーアイコン
-              （h-5 w-5）に、boxed はフローティングのリアクションボタンの絵文字に合わせる。 */}
+              （h-5 w-5）に合わせ、boxed（フローティングバー）は一段大きくして押しやすくする。 */}
           <MoreHorizontal
             className={
               triggerVariant === "plain"
@@ -471,6 +516,24 @@ export function ImageActionsMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[180px]">
+        {/* --- リアクション（渡された1インスタンスだけ。実質モバイル） ---
+            付け替え・取り消しもピッカー内で完結する（同じ絵文字を選び直すと外れる）ので項目は1つ。
+            他の項目と毛色が違うので区切り線で分ける。 */}
+        {reaction?.canReact && (
+          <>
+            <DropdownMenuItem
+              onSelect={() => {
+                // preventDefault しない＝選択でミートボールを閉じ、ピッカーだけを開く。
+                setReactionPickerOpen(true);
+              }}
+            >
+              <SmilePlus className="mr-2 h-4 w-4" />
+              {reactions.viewerEmoji ? "リアクションを変更する" : "リアクションを付ける"}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+
         {/* --- グループ1: 閲覧・共有系（誰でも） --- */}
         <DropdownMenuItem
           onSelect={() => {
@@ -649,6 +712,19 @@ export function ImageActionsMenu({
           </>
         )}
       </DropdownMenuContent>
+      {/* ピッカーはメニューの外に置く。DropdownMenuContent の中だと、項目を選んでメニューが
+          閉じた時点で一緒にアンマウントされて開けない。 */}
+      {reaction?.canReact && (
+        <ReactionPickerModal
+          open={reactionPickerOpen}
+          onOpenChange={setReactionPickerOpen}
+          onPick={reactions.handlePick}
+          currentEmoji={reactions.viewerEmoji}
+          sendsToFediverse={reaction.sendsToFediverse}
+          viewerType={reaction.viewerType}
+          viewerDomain={reaction.viewerDomain}
+        />
+      )}
       {canReport && (
         <ReportDialog
           imageId={imageId}
