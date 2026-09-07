@@ -16,7 +16,7 @@
 import type { Position, Color, Size, FontFamily } from "@/types";
 
 /** compute のレンダラ分岐キー（装飾の種類） */
-export type SeasonDecoration = "tanzaku" | "obake" | "hagaki";
+export type SeasonDecoration = "tanzaku" | "obake" | "hagaki" | "tsukimi";
 
 export interface SeasonDef {
   /** 永続キー。例: "tanabata-2026"（実績キーになるためリネーム禁止） */
@@ -101,6 +101,23 @@ export const SEASONS: SeasonDef[] = [
     },
     decoration: "hagaki", // 絵はがき風（白フチ＋切手＋消印。文字背景は無し）
     description: "縦書き・絵はがき風の残暑見舞い限定デコレーション",
+  },
+  {
+    key: "tsukimi-2026",
+    label: "お月見",
+    // 2026年の中秋の名月は9/25、満月は9/26。新月（9/11）の前から始めて、満ちきった翌日まで。
+    start: "2026-09-10T00:00:00+09:00",
+    end: "2026-09-27T23:59:59+09:00",
+    preset: {
+      position: "left", // 縦書き（左）＝既存シーズンは全て右なので構図を反転させる
+      color: "white", // DB列用（描画は月光色＝下の textColorHex で上書き）
+      size: "medium",
+      font: "hui-font", // ふい字（手書きの風情）
+      textColorHex: "#f7ecc4", // 月あかりの淡い金
+      strokeColorHex: "rgba(16, 22, 50, 0.85)", // 宵の紺。明るい写真でも読める
+    },
+    decoration: "tsukimi", // 宵の色被り＋名月（月相つき）＋薄雲＋すすき＋月見団子
+    description: "縦書き・名月と月見団子のお月見限定デコレーション",
   },
 ];
 

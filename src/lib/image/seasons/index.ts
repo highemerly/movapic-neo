@@ -19,6 +19,7 @@ import type { SeasonDecoration } from "@/lib/seasons/catalog";
 import { drawTanabata } from "./tanabata";
 import { drawObake } from "./obake";
 import { drawHagaki } from "./hagaki";
+import { drawTsukimi } from "./tsukimi";
 
 /** 装飾種別ごとに背景を描く。テキストより先に呼ぶこと。topInset=上部（穴）の余白。 */
 export function drawSeasonBackground(
@@ -40,6 +41,9 @@ export function drawSeasonBackground(
       return;
     case "hagaki":
       drawHagaki(ctx, width, height, fontSize);
+      return;
+    case "tsukimi":
+      drawTsukimi(ctx, text, width, height, fontSize, margin, topInset);
       return;
   }
 }

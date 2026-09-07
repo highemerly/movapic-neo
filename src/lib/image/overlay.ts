@@ -76,7 +76,7 @@ export async function createTextOverlay(
   const seasonDef = season ? getSeasonByKey(season) : undefined;
   if (seasonDef) {
     const vpos: "left" | "right" = seasonDef.preset.position === "left" ? "left" : "right";
-    // tanzaku は上部に「穴＋紐」のための余白が要る。obake は不要（0）。
+    // tanzaku だけが上部に「穴＋紐」のぶんの余白を要る（他の装飾は 0）。
     const topInset = seasonDef.decoration === "tanzaku" ? fontSize * 1.7 : 0;
     drawSeasonBackground(ctx, seasonDef.decoration, text, width, height, fontSize, margin, topInset);
     if (seasonDef.decoration === "obake") {
@@ -91,6 +91,12 @@ export async function createTextOverlay(
       ctx.shadowBlur = Math.max(1.5, fontSize * 0.05);
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 0;
+    } else if (seasonDef.decoration === "tsukimi") {
+      // お月見: 宵に沈めた写真の上で、淡い金の文字を月あかりのように滲ませる紺の影。
+      ctx.shadowColor = "rgba(10, 16, 40, 0.75)";
+      ctx.shadowBlur = Math.max(2, fontSize * 0.28);
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = Math.max(1, fontSize * 0.05);
     }
     // 残暑見舞い(hagaki): 影の上書きなし＝通常どおり白文字＋黒縁取りで写真の上に直接描く。
     drawVerticalText(

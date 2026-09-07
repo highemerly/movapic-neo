@@ -46,9 +46,10 @@ export function starPath(
 }
 
 /**
- * 縦書き（右起点・右→左へ列が伸びる）テキストが占める領域を見積もる。
- * overlay.ts の drawVerticalText と同じ幾何（charsPerColumn / columnWidth）を使う。
- * 縦書き系シーズンの背景サイズ決定に使える共通ヘルパー。
+ * 縦書きテキストが占める領域を見積もる。列は常に右→左へ伸び、position はその起点
+ * （"right"=右端揃え／"left"=最左列を margin に揃える）を決める。
+ * overlay.ts の drawVerticalText と同じ幾何（charsPerColumn / columnWidth / startX）を使う。
+ * 縦書き系シーズンの背景サイズ・装飾位置の決定に使える共通ヘルパー。
  */
 export function estimateVerticalTextBox(
   text: string,
@@ -56,7 +57,8 @@ export function estimateVerticalTextBox(
   height: number,
   fontSize: number,
   margin: number,
-  topInset = 0
+  topInset = 0,
+  position: "left" | "right" = "right"
 ): { left: number; right: number; top: number; bottom: number } {
   const maxHeight = height - margin * 2 - topInset;
   const lineHeight = fontSize * 1.2;
@@ -70,7 +72,10 @@ export function estimateVerticalTextBox(
   }
   columns = Math.max(1, columns);
 
-  const rightColumnLeft = width - margin - fontSize;
+  const rightColumnLeft =
+    position === "right"
+      ? width - margin - fontSize
+      : margin + (columns - 1) * columnWidth;
   const right = rightColumnLeft + fontSize;
   const left = rightColumnLeft - (columns - 1) * columnWidth;
   return { left, right, top: margin + topInset, bottom: height - margin };
