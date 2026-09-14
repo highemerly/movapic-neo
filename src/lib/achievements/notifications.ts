@@ -49,6 +49,10 @@ function publicBase(): string {
 
 /**
  * 直近90日の通知を新しい順に返す。limit 未指定なら全件（通知ページ用）。
+ *
+ * pitfall: 「未指定＝全件」の判定は falsy ではなく undefined で見る。falsy だと limit=0 が
+ * 未指定と同じ扱いになり、上限が無言で外れて全件返る（呼び出し側の limit 正規化が壊れたとき
+ * 一番重いクエリへ落ちる）。
  */
 export async function getRecentNotifications(
   userId: string,
@@ -58,7 +62,7 @@ export async function getRecentNotifications(
   const rows = await prisma.notification.findMany({
     where: { userId, createdAt: { gte: since } },
     orderBy: { createdAt: "desc" },
-    ...(limit ? { take: limit } : {}),
+    ...(limit === undefined ? {} : { take: limit }),
     select: {
       id: true,
       type: true,
