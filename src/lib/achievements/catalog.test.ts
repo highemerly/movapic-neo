@@ -4,6 +4,7 @@ import {
   CATALOG_BY_KEY,
   LADDER_META,
   ACHIEVEMENT_LAYOUT,
+  SECTIONS,
   resolveAchievement,
   countRanks,
   evaluateSeason,
@@ -144,6 +145,16 @@ describe("カタログ構造の不変条件（key の永続性・参照整合）
           expect(ladderKeys.has(block.ladderKey), block.ladderKey).toBe(true);
         }
       }
+    }
+  });
+
+  // SECTIONS は /stats の並び順の単一ソース。ここに無いセクションは末尾送りになる。
+  it("resolveAchievement が返すセクションは全て SECTIONS に載っている", () => {
+    const known = new Set<string>(SECTIONS);
+    for (const d of CATALOG) expect(known.has(d.section), d.key).toBe(true);
+    // 動的キー（皆勤賞・シーズン）と未知キーのフォールバックも並べる対象になる。
+    for (const key of ["perfect-month:2026-06", "season:tanabata-2026", "mystery-key"]) {
+      expect(known.has(resolveAchievement(key).section), key).toBe(true);
     }
   });
 

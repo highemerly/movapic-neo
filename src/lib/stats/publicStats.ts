@@ -28,6 +28,7 @@ import {
 import {
   CATALOG,
   CATALOG_BY_KEY,
+  SECTIONS,
   resolveAchievement,
   type AchievementRank,
 } from "@/lib/achievements/catalog";
@@ -165,18 +166,6 @@ export interface AchievementStats {
   sections: AchievementSection[];
 }
 
-// セクション表示順（catalog の SECTIONS ＋ 動的キー分を追加）
-const SECTION_ORDER = [
-  "デビュー",
-  "投稿数",
-  "使いこなし",
-  "リアクション",
-  "期間限定",
-  "皆勤賞",
-  "シークレット",
-  "その他",
-] as const;
-
 /** 実績の取得状況（サービス全体・key ごとの保有ユーザー数）。 */
 async function getAchievementStats(): Promise<AchievementStats> {
   const [totalUsers, grouped] = await Promise.all([
@@ -215,8 +204,8 @@ async function getAchievementStats(): Promise<AchievementStats> {
   }
 
   const order = (s: string) => {
-    const i = SECTION_ORDER.indexOf(s as (typeof SECTION_ORDER)[number]);
-    return i === -1 ? SECTION_ORDER.length : i;
+    const i = SECTIONS.indexOf(s as (typeof SECTIONS)[number]);
+    return i === -1 ? SECTIONS.length : i;
   };
 
   const sections: AchievementSection[] = [...bySection.entries()]
