@@ -133,17 +133,15 @@ export function CollageShareDialog({
   }, [year, month, theme, font, generating]);
 
   // 配色・書体は生成時に焼き込むため、変えたら生成済みプレビューを捨てて再生成を促す。
+  // 破棄（revoke・ref のクリア）は setBlobUrl の updater ではなくここで行う。updater は純粋
+  // でなければならず、StrictMode では二重実行されるため副作用を置くと revoke が2回走る。
   const discardPreview = useCallback(() => {
-    setBlobUrl((prev) => {
-      if (prev) {
-        blobRef.current = null;
-        if (objectUrlRef.current) {
-          URL.revokeObjectURL(objectUrlRef.current);
-          objectUrlRef.current = null;
-        }
-      }
-      return null;
-    });
+    blobRef.current = null;
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current);
+      objectUrlRef.current = null;
+    }
+    setBlobUrl(null);
   }, []);
 
   // 生成前は確認不要（捨てるものが無い）。生成後は黙って消えると作り直しに気づけないため確認する。
