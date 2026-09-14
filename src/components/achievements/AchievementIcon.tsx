@@ -34,6 +34,7 @@ import {
   Clock,
   Users,
   IdCard,
+  Newspaper,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { cn } from "@/lib/utils";
@@ -96,6 +97,7 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   Clock,
   Users,
   IdCard,
+  Newspaper,
   SoccerBall,
 };
 

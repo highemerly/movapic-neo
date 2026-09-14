@@ -239,9 +239,11 @@ const POST_COUNT_TITLES: Record<number, string> = {
   200: "表現の鉄人",
   300: "言の葉の仙人",
   500: "SHAMEZOの神",
+  700: "創世の神",
   1000: "神をこえた者",
+  1500: "不滅",
 };
-const postCount: PostAchievementDef[] = [5, 10, 20, 30, 50, 100, 200, 300, 500, 1000].map((n) => ({
+const postCount: PostAchievementDef[] = [5, 10, 20, 30, 50, 100, 200, 300, 500, 700, 1000, 1500].map((n) => ({
   key: `posts:${n}`,
   category: "post-count",
   rank: n >= 100 ? "gold" : "silver",
@@ -370,8 +372,9 @@ const featureUsage: PostAchievementDef[] = FEATURES.flatMap(({ f, label, icon, t
 const CAMERA_TITLES: Record<number, string> = {
   2: "二刀流カメラマン",
   5: "カメラコレクター",
+  10: "カメラ沼",
 };
-const cameras: PostAchievementDef[] = [2, 5].map((n) => ({
+const cameras: PostAchievementDef[] = [2, 5, 10].map((n) => ({
   key: `cameras:${n}`,
   category: "camera-models",
   rank: n >= 5 ? "gold" : "silver",
@@ -387,12 +390,19 @@ const cameras: PostAchievementDef[] = [2, 5].map((n) => ({
 // --- 都道府県（位置情報付き投稿の異なる都道府県数・旅人の道） ---
 const PREFECTURE_TITLES: Record<number, string> = {
   2: "旅のはじまり",
+  3: "三県めぐり",
   5: "旅人",
+  7: "旅慣れた人",
+  10: "二桁の旅人",
   15: "行脚の人",
+  20: "各地の常連",
+  25: "折り返し地点",
   30: "全国行脚",
+  35: "制覇への道",
+  40: "制覇目前",
   47: "日本制覇",
 };
-const prefectures: PostAchievementDef[] = [2, 5, 15, 30, 47].map((n) => ({
+const prefectures: PostAchievementDef[] = [2, 3, 5, 7, 10, 15, 20, 25, 30, 35, 40, 47].map((n) => ({
   key: `prefectures:${n}`,
   category: "prefectures",
   rank: n >= 30 ? "gold" : "silver",
@@ -429,8 +439,9 @@ const CUSTOM_REACTION_TITLES: Record<number, string> = {
   30: "心を込めて",
   100: "見たら押す人",
   300: "絵文字団長",
+  500: "押さずにいられない",
 };
-const customEmojiReactions: ReactionAchievementDef[] = [5, 30, 100, 300].map((n) => ({
+const customEmojiReactions: ReactionAchievementDef[] = [5, 30, 100, 300, 500].map((n) => ({
   key: `reaction:custom:${n}`,
   category: "reaction-custom",
   rank: n >= 300 ? "gold" : "silver",
@@ -672,6 +683,19 @@ const singletons: PostAchievementDef[] = [
     },
   },
   {
+    key: "monthly-60",
+    category: "monthly-60",
+    rank: "gold",
+    section: "シークレット",
+    secret: true,
+    title: "月刊SHAMEZO",
+    description: "1か月に60枚以上投稿しました",
+    icon: "Newspaper",
+    // 月合計は皆勤賞用の日別内訳（投稿月・live/backfill 双方で同形式）を合計すれば出るため、
+    // AchStats に専用フィールドを足さない（足すと live と backfill の2箇所を同期する必要が出る）。
+    evaluate: (s) => Object.values(s.postMonthDayCounts).reduce((a, b) => a + b, 0) >= 60,
+  },
+  {
     key: "all-hours",
     category: "all-hours",
     rank: "gold",
@@ -791,6 +815,7 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
       { kind: "single", key: "early-bird" },
       { kind: "single", key: "night-owl" },
       { kind: "single", key: "all-hours" },
+      { kind: "single", key: "monthly-60" },
     ],
   },
 ];

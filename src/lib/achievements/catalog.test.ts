@@ -86,6 +86,27 @@ describe("evaluatePerfectMonth", () => {
   });
 });
 
+describe("monthly-60（月60枚・シークレット）", () => {
+  const def = CATALOG_BY_KEY.get("monthly-60")!;
+  const evalMonth = (perDay: number[]) => {
+    const counts: Record<number, number> = {};
+    perDay.forEach((c, i) => (counts[i + 1] = c));
+    return (def as { evaluate: (s: AchStats, p: PostFacts) => boolean }).evaluate(
+      bareStats(counts),
+      barePost()
+    );
+  };
+
+  it("投稿月の合計が60枚以上なら達成（日数ではなく枚数で数える）", () => {
+    expect(evalMonth(Array(30).fill(2))).toBe(true); // 60枚
+    expect(evalMonth([60])).toBe(true); // 1日で60枚でも成立
+  });
+
+  it("59枚では未達成", () => {
+    expect(evalMonth([...Array(29).fill(2), 1])).toBe(false);
+  });
+});
+
 describe("カタログ構造の不変条件（key の永続性・参照整合）", () => {
   it("CATALOG のキーは一意で CATALOG_BY_KEY と一致する", () => {
     const keys = CATALOG.map((d) => d.key);
