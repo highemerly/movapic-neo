@@ -43,7 +43,7 @@ export const metadata: Metadata = {
 };
 
 const CONTACT_URL = "https://highemerly.net/contact.html";
-const STATUS_URL = "https://status.highemerly.net";
+const STATUS_URL = "https://status.highemerly.net/#shamezo";
 const REPOSITORY_URL = "https://github.com/highemerly/movapic-neo";
 
 const CARD_CLASS =
