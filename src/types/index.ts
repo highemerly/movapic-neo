@@ -104,9 +104,17 @@ export const ARRANGEMENT_LABELS: Record<Arrangement, string> = {
 };
 
 // 出力形式の設定
+//
+// mastodon だけ JPEG なのは Mastodon 4.7.2 の変更による（pitfall）:
+// セキュリティ対応で libvips の HEIF ローダーがブロックされ（config/initializers/vips.rb の
+// 許可リストから VipsForeignLoadHeif が削除）、同じローダーが担当する AVIF も読めなくなった。
+// それでも supported_mime_types には image/avif が残るためアップロードは受理され、変換段で
+// 500 "Error processing thumbnail for uploaded media" になる＝AVIF で送ると投稿が全て失敗する。
+// もともと Mastodon は AVIF を受け取っても JPEG へ変換して保存・配信する
+// （IMAGE_CONVERTIBLE_MIME_TYPES）ので、JPEG で送っても連合側に届く画像は変わらない。
 export const OUTPUT_CONFIG: Record<OutputFormat, { maxSize: number; maxFileSize: number; format: "avif" | "jpeg" } | null> = {
-  mastodon: { maxSize: 2048, maxFileSize: 16 * 1024 * 1024, format: "avif" }, // 16MB, AVIF
-  misskey: { maxSize: 2048, maxFileSize: 250 * 1024 * 1024, format: "avif" }, // 250MB, AVIF
+  mastodon: { maxSize: 2048, maxFileSize: 16 * 1024 * 1024, format: "jpeg" }, // 16MB
+  misskey: { maxSize: 2048, maxFileSize: 250 * 1024 * 1024, format: "avif" }, // 250MB, AVIF（Misskeyは無変換で保存するため利点がある）
   none: null, // JPEG, リサイズなし
 };
 

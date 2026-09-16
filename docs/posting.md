@@ -42,7 +42,8 @@ Mastodon上でBotにメンションして画像生成・投稿する機能。
 
 ### 制約・出力
 - 画像1枚のみ（動画・GIF不可）・テキスト1〜140文字・ユーザーは事前ログイン必須・リトライ最大2回（失敗時Botがリプライ通知）。
-- 出力形式は連携インスタンスで自動決定（Mastodon/Misskey ともAVIF）。
+- 出力形式は連携インスタンスで自動決定（Mastodon=JPEG / Misskey=AVIF。定数は [types/index.ts](../src/types/index.ts) の `OUTPUT_CONFIG`）。
+  - Mastodon が JPEG なのは 4.7.2 が libvips の HEIF ローダーをブロックし AVIF アップロードが 500 になるため（同ファイルのコメント参照）。Mastodon は元々 AVIF を受け取っても JPEG に変換して保存する。
 - 環境変数: `MASTODON_BOT_INSTANCE_URL` / `MASTODON_BOT_INSTANCE_DOMAIN` / `MASTODON_BOT_ACCESS_TOKEN` / `MASTODON_BOT_ACCT`。
 
 ## メンションのALT引き継ぎ

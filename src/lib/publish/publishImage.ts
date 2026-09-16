@@ -270,9 +270,24 @@ export async function postImageToFediverse(
 ): Promise<PostResult | null> {
   const first = await postImageOnce(input);
 
+  if (first && !first.success) {
+    console.error(
+      `[fediverse] post failed: server=${input.user.instance.domain} type=${input.user.instance.type} ` +
+        `status=${first.statusCode ?? "-"} contentType=${input.contentType} bytes=${input.buffer.length} ` +
+        `error=${first.error}`
+    );
+  }
+
   if (first && !first.success && isTransientPostFailure(first)) {
     await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
-    return postImageOnce(input);
+    const second = await postImageOnce(input);
+    if (second && !second.success) {
+      console.error(
+        `[fediverse] post retry failed: server=${input.user.instance.domain} ` +
+          `status=${second.statusCode ?? "-"} error=${second.error}`
+      );
+    }
+    return second;
   }
 
   return first;

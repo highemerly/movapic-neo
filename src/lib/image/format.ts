@@ -59,7 +59,8 @@ export async function applyOutputFormat(
     };
   }
 
-  // JPEG出力（フォールバック）
+  // JPEG出力。合成直後のバッファが既に JPEG（imageProcessor が quality 90 で出力）なので
+  // 再エンコードせずそのまま返す。
   return {
     buffer: imageBuffer,
     contentType: "image/jpeg",

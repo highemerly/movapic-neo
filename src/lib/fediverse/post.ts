@@ -28,6 +28,34 @@ class FediverseHttpError extends Error {
 }
 
 /**
+ * Mastodon との往復の失敗を1行で記録する。
+ * 投稿失敗が「どの往復で・誰が返した何なのか」（Mastodon本体 / 前段のリバースプロキシ）を
+ * 切り分けられないと原因に辿り着けないため、ステータスに加えて応答元のヘッダと body も残す。
+ * （Mastodon 4.7.2 の AVIF 500 は、この body が唯一の手がかりだった）
+ * 成功時は出さない＝投稿ごとに出る定常ログにしない。
+ */
+function logMastodon(step: string, fields: Record<string, unknown>): void {
+  const body = Object.entries(fields)
+    .map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`)
+    .join(" ");
+  console.log(`[fediverse:mastodon] ${step} ${body}`);
+}
+
+/**
+ * 応答の出所を示すヘッダ（500がアプリ由来かゲートウェイ由来かの判別に使う）。
+ * server ヘッダを via に載せ替えるのは、投稿先ドメインを示す server フィールドと
+ * キーが衝突して一方が消えるため。
+ */
+function responseMeta(res: Response): Record<string, unknown> {
+  return {
+    status: res.status,
+    via: res.headers.get("server") ?? "",
+    contentType: res.headers.get("content-type") ?? "",
+    requestId: res.headers.get("x-request-id") ?? "",
+  };
+}
+
+/**
  * Fediverse API のエラーレスポンスから、エラーメッセージ末尾に付ける詳細文字列を作る。
  * 503/504（ゲートウェイの一時障害）はレスポンスbodyが巨大なHTMLエラーページのことが多く、
  * そのまま露出しても意味がない・ノイズになるため body は読まずステータスのみ返す。
@@ -83,6 +111,14 @@ async function uploadMastodonMedia(
   });
 
   if (!response.ok) {
+    logMastodon("media.upload.failed", {
+      server,
+      mimeType,
+      bytes: imageBuffer.length,
+      altLength: altText?.length ?? 0,
+      ...responseMeta(response),
+      body: (await response.clone().text()).slice(0, 1000),
+    });
     throw new FediverseHttpError(
       `メディアのアップロードに失敗しました: ${await fediverseErrorDetail(response)}`,
       response.status
@@ -109,8 +145,10 @@ async function waitForMastodonMediaReady(
   mediaId: string
 ): Promise<void> {
   const deadline = Date.now() + MEDIA_READY_TIMEOUT;
+  let attempt = 0;
   while (Date.now() < deadline) {
     await sleep(MEDIA_POLL_INTERVAL);
+    attempt += 1;
 
     const res = await fetch(`https://${server}/api/v1/media/${mediaId}`, {
       method: "GET",
@@ -124,6 +162,12 @@ async function waitForMastodonMediaReady(
     if (res.status === 200) return; // 処理完了
     if (res.status === 206) continue; // まだ処理中
 
+    logMastodon("media.poll.failed", {
+      mediaId,
+      attempt,
+      ...responseMeta(res),
+      body: (await res.clone().text()).slice(0, 1000),
+    });
     throw new FediverseHttpError(
       `メディア処理に失敗しました: ${await fediverseErrorDetail(res)}`,
       res.status
@@ -182,6 +226,13 @@ export async function postToMastodon(
     });
 
     if (!response.ok) {
+      logMastodon("status.failed", {
+        server,
+        mediaId,
+        visibility,
+        ...responseMeta(response),
+        body: (await response.clone().text()).slice(0, 1000),
+      });
       throw new FediverseHttpError(
         `投稿に失敗しました: ${await fediverseErrorDetail(response)}`,
         response.status
@@ -195,6 +246,19 @@ export async function postToMastodon(
       postUrl: data.url,
     };
   } catch (error) {
+    // HTTP エラーは各往復の時点で応答内容ごと記録済み。ここで拾うのはタイムアウトや
+    // 接続断など応答が無かった失敗で、原因は cause にしか出ない。
+    if (!(error instanceof FediverseHttpError)) {
+      logMastodon("post.error", {
+        server,
+        name: error instanceof Error ? error.name : typeof error,
+        message: error instanceof Error ? error.message : String(error),
+        cause:
+          error instanceof Error && error.cause
+            ? String((error.cause as { message?: string }).message ?? error.cause)
+            : "",
+      });
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : "投稿に失敗しました",

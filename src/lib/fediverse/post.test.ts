@@ -12,13 +12,17 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { postToMastodon, postToMisskey } from "@/lib/fediverse/post";
 
+// 実装は往復ログのために headers / clone() も読むため、モックにも持たせる。
 function jsonResponse(data: unknown, status = 200): Response {
-  return {
+  const res = {
     ok: status >= 200 && status < 300,
     status,
+    headers: new Headers({ "content-type": "application/json" }),
     json: async () => data,
     text: async () => JSON.stringify(data),
-  } as unknown as Response;
+    clone: () => res,
+  };
+  return res as unknown as Response;
 }
 
 /**
