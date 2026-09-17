@@ -1,6 +1,9 @@
 /**
  * 穴埋め割当の永続化（サーバー専用）。
  *
+ * 2026-09 以前の月専用（自動穴埋め）。2026-10 以降は穴埋めポイント制で全ユーザー手動のみなので呼ばれない。
+ * TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（このファイルとテストごと削除。assignMonthMakeups は perfectMonth.ts にある）
+ *
  * 穴埋め割当は Image.makeupTargetDay に持ち、カレンダー表示・皆勤賞判定の両方がこれを読む。
  * ここは「その永続値を書く」side（DBアクセスを伴う）。純粋な割当規則は perfectMonth.ts の
  * pickMakeupHole / assignMonthMakeups に集約し、ここはそれを DB に橋渡しするだけ。

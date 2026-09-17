@@ -14,7 +14,10 @@
  *   `${publicUrl}/${storageKey}` の生連結なので '#' がそのままフラグメントになる）。
  *
  * やること（対象ユーザー・対象月に対して）:
- *  1. autoMakeup=false にする（＝③OFF。reevaluate が実際に効くのはこのケースだけ）。
+ *  1. autoMakeup=false にする（＝③OFF。2026-09 以前の月で reevaluate が実際に効くのはこのケースだけ）。
+ *     2026-10 以降（穴埋めポイント制）の月なら、穴を埋められるよう台帳に dev 用のポイントを1pt 入れる
+ *     （reason="event:dev-seed"。CLEAN=1 で削除）。ポイント制の月は実投稿が無い未来月になりがちなので、
+ *     実際に試すときは SEED_YEAR/SEED_MONTH で実投稿の無い月を選ぶこと。
  *  2. その月に「1日だけ穴が空いた・後日ダブル投稿で埋められる」ダミー投稿を作る。
  *     DONOR_DAY は実際に2枚（別々の実画像）投稿されているように見せる。
  *  3. perfect-month:YYYY-MM の実績と通知を削除（＝未付与へ戻す）。何度でもリトライ検証できる。
@@ -46,6 +49,7 @@ import {
   PERFECT_MONTH_CATEGORY,
 } from "@/lib/achievements/perfectMonth";
 import { perfectMonthGrace } from "@/lib/achievements/grace";
+import { isPointEra } from "@/lib/makeup/points";
 
 const USERNAME = process.env.SEED_USER ?? "highemerly";
 // 同名ユーザーが複数インスタンスに存在するため、必ず domain で一意に絞る（ログイン中アカウントと一致させる）。
@@ -56,6 +60,8 @@ const HOLE_DAY = 5; // 投稿を忘れた日（穴）
 const DONOR_DAY = 10; // 後日のダブル投稿（HOLE_DAY より後＝穴を埋められる）
 const UNFILL = process.env.UNFILL === "1";
 const CLEAN = process.env.CLEAN === "1";
+/** ポイント制の月に入れる dev 用ポイントの理由（CLEAN で消せるよう固定）。 */
+const DEV_POINT_REASON = "event:dev-seed";
 /** ダミー識別マーカー（storageKey の '#' 以降。URL フラグメント＝サーバーには送られない）。 */
 const DUMMY_MARK = "#dev-dummy-";
 
@@ -88,6 +94,9 @@ async function main() {
     const del = await prisma.image.deleteMany({
       where: { userId: user.id, storageKey: { contains: DUMMY_MARK } },
     });
+    const delPoints = await prisma.makeupPointGrant.deleteMany({
+      where: { userId: user.id, reason: DEV_POINT_REASON },
+    });
 
     const perfectAch = await prisma.achievement.findMany({
       where: { userId: user.id, category: PERFECT_MONTH_CATEGORY },
@@ -104,7 +113,7 @@ async function main() {
     }
 
     console.log(
-      `CLEAN: @${USERNAME} のダミー投稿 ${del.count} 件 / テスト由来の皆勤賞・通知 ${testKeys.length} 件（${testKeys.join(", ") || "なし"}）を削除。`,
+      `CLEAN: @${USERNAME} のダミー投稿 ${del.count} 件 / dev 用ポイント ${delPoints.count} 件 / テスト由来の皆勤賞・通知 ${testKeys.length} 件（${testKeys.join(", ") || "なし"}）を削除。`,
     );
     console.log(`保持した正規の投稿月: ${[...realMonths].sort().join(", ") || "なし"}`);
     return;
@@ -136,7 +145,23 @@ async function main() {
 
   const key = perfectMonthKey(`${YEAR}-${mm}`);
   const daysInMonth = daysInMonthOf(YEAR, MONTH);
-  const grace = perfectMonthGrace(user.instance.domain);
+  const pointEra = isPointEra(`${YEAR}-${mm}`);
+  // ポイント制の月は台帳に dev 用の1pt を入れる（穴1日を埋めるのに足りる量）。
+  if (pointEra) {
+    await prisma.makeupPointGrant.upsert({
+      where: { userId_month_reason: { userId: user.id, month: `${YEAR}-${mm}`, reason: DEV_POINT_REASON } },
+      create: { userId: user.id, month: `${YEAR}-${mm}`, reason: DEV_POINT_REASON, amount: 1 },
+      update: { amount: 1 },
+    });
+  }
+  const grace = pointEra
+    ? ((
+        await prisma.makeupPointGrant.aggregate({
+          where: { userId: user.id, month: `${YEAR}-${mm}` },
+          _sum: { amount: true },
+        })
+      )._sum.amount ?? 0)
+    : perfectMonthGrace(user.instance.domain);
 
   // 見た目を実物にするための実画像プール（本人の公開画像・サムネあり）。1枚ずつ循環で流用する。
   const realPool = await prisma.image.findMany({
@@ -160,6 +185,7 @@ async function main() {
   const nextSrc = () => realPool[poolIdx++ % realPool.length];
 
   // 1) ③OFF に
+  // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（autoMakeup 列の削除と一緒に消す）
   await prisma.user.update({ where: { id: user.id }, data: { autoMakeup: false } });
 
   // 2) この月のダミーを作り直す
@@ -226,7 +252,9 @@ async function main() {
 
   console.log("──────────────────────────────────────");
   console.log(`@${USERNAME}@${DOMAIN} / ${YEAR}年${MONTH}月  category=${PERFECT_MONTH_CATEGORY}`);
-  console.log(`autoMakeup=false（③OFF）grace=${grace} 穴=${HOLE_DAY}日 donor=${DONOR_DAY}日（別々の実画像2枚）`);
+  console.log(
+    `autoMakeup=false（③OFF）${pointEra ? `穴埋めポイント=${grace}pt` : `grace=${grace}`} 穴=${HOLE_DAY}日 donor=${DONOR_DAY}日（別々の実画像2枚）`
+  );
   console.log(`モード: ${UNFILL ? "UNFILL（アプリ上で手動穴埋めする）" : "既定（穴埋め済み・離脱するだけで👑）"}`);
   console.log(`投稿=${distinctDays}日 / 穴=${HOLE_DAY}日 / filled=${JSON.stringify(filledHoleDays)} → isPerfectMonth=${perfect}`);
   console.log(`実績付与済み = ${owned ? "あり（リセット漏れ？）" : "なし（未付与＝これから離脱で付く）"}`);

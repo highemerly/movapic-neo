@@ -1,15 +1,23 @@
 /**
  * 通知フィードの取得。Notification テーブルを直近90日で読み、表示に必要な情報へ整形する。
- * 種別(type)で情報ソースを区別する。現状は "achievement" のみ。
+ * 種別(type)で情報ソースを区別する（実績・リアクション・皆勤賞の穴埋め）。
  */
 
 import prisma from "@/lib/db";
 import { userPathSegment } from "@/lib/userHandle";
-import { getHomeServer } from "@/lib/auth/serverPolicy";
+import { getFavorServers, getHomeServer } from "@/lib/auth/serverPolicy";
 import { getAvatarUrl, getEmojiImageUrl } from "@/lib/avatar";
 import { getMutedAuthorKeys } from "@/lib/mutes";
 import { filterFavoriteFeedByMuted } from "@/lib/notifications/muteFilter";
 import type { FavoriteNotificationData } from "@/lib/notifications/favoriteNotifications";
+import {
+  MAKEUP_NOTIFICATION_TYPES,
+  isMakeupNotificationType,
+  makeupNotificationYm,
+  makeupPointReasonLabel,
+  toMakeupPointNotificationData,
+  type MakeupPointFeedData,
+} from "@/lib/makeup/notificationTypes";
 
 export const NOTIFICATION_WINDOW_DAYS = 90;
 
@@ -31,13 +39,15 @@ export interface NotificationFeedItem {
   id: string;
   type: string;
   /** type="achievement" のとき、獲得した実績キー（表示文言は CATALOG から解決）。
-   *  type="makeup-reminder" のとき、対象月キー perfect-month:YYYY-MM。 */
+   *  穴埋め系（makeup-*）のとき、対象月キー perfect-month:YYYY-MM。 */
   achievementKey: string | null;
   createdAt: Date;
   /** 関連画像（きっかけ写真 / お気に入りされた写真）。サムネイルURLと画像ページへのリンク。 */
   image: { id: string; pageUrl: string; thumbnailUrl: string } | null;
   /** type="favorite" のとき、お気に入りした相手と総数。 */
   favorite: FavoriteFeedData | null;
+  /** 穴埋め系（makeup-*）のとき。ym は対象月（旧通知で取れなければ null）、point は makeup-point の付与内容。 */
+  makeup: { ym: string | null; point: MakeupPointFeedData | null } | null;
   /** 受信者の /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）。
    *  makeup-reminder のカレンダー遷移などのリンク生成に使う。 */
   recipientUsername: string;
@@ -96,6 +106,17 @@ export async function getRecentNotifications(
       if (raw && !filtered) continue;
       favorite = filtered;
     }
+    const pointData =
+      r.type === MAKEUP_NOTIFICATION_TYPES.POINT ? toMakeupPointNotificationData(r.data) : null;
+    const makeup = isMakeupNotificationType(r.type)
+      ? {
+          ym: makeupNotificationYm(r.achievementKey),
+          // 付与理由の表示名は特典サーバー名（env）を含むので、クライアントに渡す前にここで解決する
+          point: pointData
+            ? { ...pointData, label: makeupPointReasonLabel(pointData.reason, getFavorServers()) }
+            : null,
+        }
+      : null;
     items.push({
       id: r.id,
       type: r.type,
@@ -114,6 +135,7 @@ export async function getRecentNotifications(
           }
         : null,
       favorite,
+      makeup,
     });
   }
   return items;

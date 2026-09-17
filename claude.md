@@ -39,6 +39,7 @@
 | [docs/periodic-jobs.md](docs/periodic-jobs.md) | 定期ジョブ（graphile-worker crontab内蔵の30分毎メンテ） |
 | [docs/SETUP.md](docs/SETUP.md) | 環境構築 |
 | [src/lib/achievements/README.md](src/lib/achievements/README.md) | 実績の追加手順・不変条件 |
+| [docs/cleanup-2026-10.md](docs/cleanup-2026-10.md) | **2026-10-11以降に実施**: 自動穴埋め（旧ルール・`User.autoMakeup`）の撤去チェックリスト。コード内マーカー `TODO(cleanup-2026-10)` |
 
 ## 常に守るルール
 
@@ -66,6 +67,12 @@
 - 書き込みは本人トークンでFediverseへ送ってからDB記録（絵文字の付け替えだけでも毎回送る＝DB行があっても連合側に残っている保証は無いため）。オーナー側で取り消されたら**閲覧時(GET)・定期同期でSHAMEZOからも除去**（`reconcileRemovals`・40件フル/連合遅延はガード。操作直後の同期だけ対象外）。
 - `src/lib/reactions/*` は sharp/skia 非依存＝worker-front から呼んで安全。
 - リアクション起点の実績（押した／獲得した）は投稿フックでは確定しないため、**リアクションAPIの書き込みと `favoriteCount` を更新した瞬間からだけ**評価する（[reactionTriggers.ts](src/lib/achievements/reactionTriggers.ts)。増設禁止＝二重評価になる）。
+
+### 皆勤賞の穴埋め（詳細: [achievements/README](src/lib/achievements/README.md)「特殊: 皆勤賞」）
+- 2026-10 分から**穴埋めポイント制**（1pt=1日・月ごと・持ち越し不可・翌月10日締切・全ユーザー手動）。2026-09 以前の月は旧ルール（固定上限3/4日・自動穴埋め）のまま。
+- **その月の上限は必ず [`resolveMakeupCap`/`resolveMakeupLimits`](src/lib/makeup/ledger.ts) で解決**して `perfectMonth.ts` に渡す（`perfectMonthGrace` を直接呼ばない＝旧ルールの月にしか正しくない）。
+- ポイント台帳（`MakeupPointGrant`）は**付与のみ・追記のみ**。消費は `Image.makeupTargetDay` から導出する（消費を別に持たない）。剥奪・マイナス補正は禁止（過去月の👑が揺れる）。
+- 実績付与は `grantAll` を通す（実績ptの付与フックがそこにだけある）。
 
 ### API（詳細: [docs/api.md](docs/api.md)）
 - レート制限: プレビュー生成(`/api/v1/generate`)はIP単位のスライディングウィンドウ（[rateLimit.ts](src/lib/rateLimit.ts)）、投稿(`/api/v1/post`)はユーザー単位でDB履歴ベース（[postRateLimit.ts](src/lib/postRateLimit.ts)・15分/24時間の2窓、24時間は直近1週間の投稿数で上限が上がる）。閾値定数は将来env切り出し予定。処理タイムアウト30秒（超過で504）・レスポンスにContent-Lengthを含む。

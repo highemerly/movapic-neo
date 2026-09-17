@@ -238,7 +238,7 @@ function DetailBody({
   ladderValues,
   perfectMonths,
   seasons,
-  perfectMonthGrace,
+  currentMonthPerfect,
   celebrate = false,
 }: {
   entry: Entry;
@@ -246,8 +246,8 @@ function DetailBody({
   ladderValues: Record<string, number>;
   perfectMonths: GrantedItem[];
   seasons: GrantedItem[];
-  /** このユーザーの皆勤賞の未投稿許容日数（所属インスタンスで決まる）。 */
-  perfectMonthGrace: number;
+  /** 当月の穴埋めルール（説明文の出し分けに使う）。 */
+  currentMonthPerfect: CurrentMonthPerfect;
   /** 獲得演出中はアイコンをポップさせる（ディープリンク到達時のみ true） */
   celebrate?: boolean;
 }) {
@@ -387,7 +387,7 @@ function DetailBody({
       rank={any ? "gold" : null}
       achieved={any}
       celebrate={celebrate}
-      description={`1ヶ月の間毎日1枚以上投稿すると獲得できます（月${perfectMonthGrace}日までは救済措置があり、別日に穴埋め投稿も可能です）`}
+      description={perfectMonthDescription(currentMonthPerfect)}
     >
       {any ? (
         <ul className="space-y-1.5">
@@ -467,16 +467,22 @@ function DetailShell({
   );
 }
 
+/** 皆勤賞の説明文（穴埋めの救済ルールは当月のルールで出し分ける）。 */
+function perfectMonthDescription(p: CurrentMonthPerfect): string {
+  if (!p.pointEra) {
+    // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（従来ルールの文言ごと削除）
+    return `1ヶ月の間毎日1枚以上投稿すると獲得できます（月${p.cap}日までは救済措置があり、別日に穴埋め投稿も可能です）`;
+  }
+  return "1ヶ月の間毎日1枚以上投稿すると獲得できます（投稿を忘れた日は、穴埋めポイントを使って後日の2枚目の投稿で穴埋めできます）";
+}
+
 export function AchievementsView({
   granted,
   ladderValues,
-  perfectMonthGrace,
   currentMonthPerfect,
 }: {
   granted: GrantedItem[];
   ladderValues: Record<string, number>;
-  /** このユーザーの皆勤賞の未投稿許容日数（所属インスタンスで決まる。説明文の数字に使う）。 */
-  perfectMonthGrace: number;
   /** 「次のステップ」の当月皆勤カード用（本人・閲覧者を問わず、このページの主の進捗を表示）。 */
   currentMonthPerfect: CurrentMonthPerfect;
 }) {
@@ -574,7 +580,7 @@ export function AchievementsView({
 
   return (
     <div className="space-y-6">
-      <CollectionMeter granted={granted} perfectMonthGrace={perfectMonthGrace} />
+      <CollectionMeter granted={granted} currentMonthPerfect={currentMonthPerfect} />
 
       <NextGoals
         grantedKeys={new Set(grantedMap.keys())}
@@ -643,7 +649,7 @@ export function AchievementsView({
               ladderValues={ladderValues}
               perfectMonths={perfectMonths}
               seasons={seasons}
-              perfectMonthGrace={perfectMonthGrace}
+              currentMonthPerfect={currentMonthPerfect}
               celebrate={celebrate}
             />
           )}

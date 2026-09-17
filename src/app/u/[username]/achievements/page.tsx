@@ -9,9 +9,10 @@ import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
 import { AchievementsView } from "@/components/achievements/AchievementsView";
 import { perfectMonthKey } from "@/lib/achievements/perfectMonth";
-import { perfectMonthGrace } from "@/lib/achievements/grace";
 import { lastMonthYm, thisMonthYm } from "@/lib/achievements/lastMonthPerfect";
 import { collectLadderValues, collectCurrentMonthPerfect } from "@/lib/achievements/stats";
+import { toJstYm } from "@/lib/jst";
+import { resolveMakeupLimits } from "@/lib/makeup/ledger";
 import { parseUserHandle } from "@/lib/userHandle";
 import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { userPageRobotsMetadata } from "@/lib/crawlers";
@@ -59,6 +60,13 @@ export default async function AchievementsPage({
   const isOwner = currentUser?.id === user.id;
 
   // 「次のステップ」はこのページの主（プロフィールの持ち主）の進捗として全員に表示する。
+  const now = new Date();
+  const makeupLimits = await resolveMakeupLimits({
+    userId: user.id,
+    instanceDomain: user.instance.domain,
+    ym: toJstYm(now),
+    now,
+  });
   const [achievements, ladderValues, currentMonthPerfect] = await Promise.all([
     prisma.achievement.findMany({
       where: { userId: user.id },
@@ -66,7 +74,7 @@ export default async function AchievementsPage({
       orderBy: { grantedAt: "desc" },
     }),
     collectLadderValues(user.id),
-    collectCurrentMonthPerfect(user.id, perfectMonthGrace(user.instance.domain)),
+    collectCurrentMonthPerfect(user.id, makeupLimits),
   ]);
 
   const granted = achievements.map((a) => ({
@@ -117,7 +125,6 @@ export default async function AchievementsPage({
           <AchievementsView
             granted={granted}
             ladderValues={ladderValues}
-            perfectMonthGrace={perfectMonthGrace(user.instance.domain)}
             currentMonthPerfect={currentMonthPerfect}
           />
         </TabTransition>

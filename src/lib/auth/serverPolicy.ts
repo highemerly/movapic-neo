@@ -5,7 +5,8 @@
  * - ALLOWED_SERVERS: ログインを許可するサーバー（カンマ区切り）。未設定 = 全許可。
  * - DENIED_SERVERS : ログインを拒否するサーバー（カンマ区切り）。既存アカウントには影響しない。
  * - HOME_SERVER    : ホームインスタンス（単一値）。所属ユーザーのプロフィールURLを素の username にする。
- * - FAVOR_SERVERS  : 特典対象サーバー（カンマ区切り）。現状の特典は皆勤賞 grace の緩和。
+ * - FAVOR_SERVERS  : 特典対象サーバー（カンマ区切り）。特典は皆勤賞の穴埋め枠（2026-09 以前は grace +1日、
+ *                    2026-10 以降は穴埋めポイント 毎月+1pt）。
  *
  * ドメインは全て normalizeServer 相当（小文字）で比較する前提で、ここで小文字化して返す。
  */
@@ -74,4 +75,12 @@ export function getHomeServer(): string | undefined {
 /** 特典対象サーバー。未設定なら特典なし。 */
 export function getFavorServers(): string[] {
   return parseServerList(process.env.FAVOR_SERVERS);
+}
+
+/**
+ * そのインスタンスドメインが特典対象サーバーか（大文字小文字は区別しない）。
+ * 特典は「2026-09 以前の皆勤賞 grace +1日」と「2026-10 以降の穴埋めポイント 毎月+1pt」。
+ */
+export function isFavorServer(instanceDomain: string | null | undefined): boolean {
+  return !!instanceDomain && getFavorServers().includes(instanceDomain.toLowerCase());
 }

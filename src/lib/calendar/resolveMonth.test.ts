@@ -29,8 +29,12 @@ function row(day: number, o: Partial<CalendarImageRow> = {}): CalendarImageRow {
   };
 }
 
-const resolve = (images: CalendarImageRow[], now: Date, domain: string | null = null) =>
-  resolveCalendarMonth({ images, year: Y, month: M, domain, now });
+/**
+ * 既定は従来ルールの非特典サーバー（上限3日）。上限は呼び出し側が ledger で解決して渡す設計なので、
+ * ここでは数値で直接与える。potentialCap を省略したら cap と同じ（過去月・従来ルールと同じ扱い）。
+ */
+const resolve = (images: CalendarImageRow[], now: Date, makeupCap = 3, potentialCap = makeupCap) =>
+  resolveCalendarMonth({ images, year: Y, month: M, makeupCap, potentialCap, now });
 
 const PAST_NOW = new Date("2024-07-01T03:00:00Z"); // JST 2024-07-01（対象月は過去）
 
@@ -128,7 +132,7 @@ describe("resolveCalendarMonth: 穴埋め（makeup）", () => {
     expect(r.filledDays[0].image.id).toBe("d5");
   });
 
-  it("filledDays は holeDay 昇順で grace 件（非home=3）まで", () => {
+  it("filledDays は holeDay 昇順で上限（makeupCap=3）件まで", () => {
     // 5,10,15,20 を空けて donor を後日に置く（26日分投稿＋donor4件）
     const posted = [1, 2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14, 16, 17, 18, 19, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
     const images: CalendarImageRow[] = posted.map((d) => row(d));
@@ -136,9 +140,42 @@ describe("resolveCalendarMonth: 穴埋め（makeup）", () => {
     images.push(row(29, { makeupTargetDay: 15 }));
     images.push(row(28, { makeupTargetDay: 10 }));
     images.push(row(27, { makeupTargetDay: 5 }));
-    const r = resolve(images, PAST_NOW, null); // grace=3
+    const r = resolve(images, PAST_NOW, 3);
     expect(r.filledHoleDays.slice().sort((a, b) => a - b)).toEqual([5, 10, 15, 20]);
     expect(r.filledDays.map((f) => f.day)).toEqual([5, 10, 15]); // 昇順・3件で打ち切り
+    expect(r.makeupRemaining).toBe(0); // 上限超過でも負にならない
+  });
+
+  it("ポイント制の上限0なら穴埋め表示も0件（台帳が空のユーザー）", () => {
+    const images = [row(1), row(3, { makeupTargetDay: 2 }), row(3)];
+    const r = resolve(images, PAST_NOW, 0);
+    expect(r.filledDays).toEqual([]);
+  });
+
+  it("makeupRemaining は上限 − 埋めた数", () => {
+    const images = [row(1), row(3), row(3, { makeupTargetDay: 2 })];
+    expect(resolve(images, PAST_NOW, 3).makeupRemaining).toBe(2);
+    expect(resolve(images, PAST_NOW, 1).makeupRemaining).toBe(0);
+  });
+});
+
+describe("resolveCalendarMonth: まだ埋まっていない未投稿日（unfilledDays）", () => {
+  it("過去月は月内の投稿の無い日のうち、穴埋めしていない日を数える", () => {
+    // 30日のうち 5・10・15 日が空き。10日は20日のダブル投稿で埋めた
+    const posted = Array.from({ length: 30 }, (_, i) => i + 1).filter((d) => ![5, 10, 15].includes(d));
+    const images = posted.map((d) => row(d));
+    images.push(row(20, { makeupTargetDay: 10 }));
+    expect(resolve(images, PAST_NOW).unfilledDays).toBe(2);
+  });
+
+  it("当月は昨日までを数え、今日の未投稿は数えない（まだ投稿できる）", () => {
+    const NOW = new Date("2024-06-10T03:00:00Z"); // JST 6/10
+    const images = [1, 2, 4, 5, 6, 7, 8, 9].map((d) => row(d)); // 3日が空き・今日(10)は未投稿
+    expect(resolve(images, NOW).unfilledDays).toBe(1);
+  });
+
+  it("未来月は0", () => {
+    expect(resolve([], new Date("2024-05-15T03:00:00Z")).unfilledDays).toBe(0);
   });
 });
 
@@ -153,8 +190,13 @@ describe("resolveCalendarMonth: 皆勤賞", () => {
   it("穴埋め枠を超える欠けは非達成", () => {
     // 5,10,15,20 の4日欠け（grace=3 超）・穴埋めなし
     const posted = Array.from({ length: 30 }, (_, i) => i + 1).filter((d) => ![5, 10, 15, 20].includes(d));
-    const r = resolve(posted.map((d) => row(d)), PAST_NOW, null);
+    const r = resolve(posted.map((d) => row(d)), PAST_NOW, 3);
     expect(r.isPerfectAttendance).toBe(false);
+  });
+
+  it("上限0（ポイント0）でも完全皆勤なら達成（missing=0 は上限より先に短絡する）", () => {
+    const images = Array.from({ length: 30 }, (_, i) => row(i + 1));
+    expect(resolve(images, PAST_NOW, 0).isPerfectAttendance).toBe(true);
   });
 
   it("欠けを donor で埋めれば達成", () => {
@@ -190,13 +232,37 @@ describe("resolveCalendarMonth: 今月/未来月とコールアウト", () => {
     expect(r.callout).toBe("today");
   });
 
-  it("当月・今日すでにダブル投稿済み→ callout=tomorrow", () => {
+  it("当月・今日2枚投稿したがまだ穴に割り当てていない→ callout=ready（今すぐ埋められる）", () => {
+    // pitfall: 以前は「今日2枚＝穴埋め済み」とみなして tomorrow を返していた（自動穴埋め前提）。
+    // 手動専用だと「今すぐ穴埋めしよう」が永久に出なくなる
     const NOW = new Date("2024-06-10T03:00:00Z");
     const posted = [1, 2, 3, 4, 6, 7, 8, 9];
     const images = posted.map((d) => row(d));
     images.push(row(10)); // 今日1枚目
-    images.push(row(10)); // 今日2枚目＝ダブル
-    const r = resolve(images, NOW);
-    expect(r.callout).toBe("tomorrow");
+    images.push(row(10)); // 今日2枚目（未割当）
+    expect(resolve(images, NOW).callout).toBe("ready");
+  });
+
+  it("当月・今日の投稿が既に穴を埋めている→ callout=tomorrow（1日1donor）", () => {
+    const NOW = new Date("2024-06-10T03:00:00Z");
+    // 3日と5日が空き。今日の2枚目で3日を埋めたが、5日がまだ残っている
+    const posted = [1, 2, 4, 6, 7, 8, 9];
+    const images = posted.map((d) => row(d));
+    images.push(row(10));
+    images.push(row(10, { makeupTargetDay: 3 }));
+    expect(resolve(images, NOW).callout).toBe("tomorrow");
+  });
+
+  it("当月・穴はあるが今のポイントが0（付与を待てば達成可能）→ callout=no-points", () => {
+    // 月初に cap=0 で1日休んだ。catchup+実績で2pt 見込めるので達成可能のまま
+    const NOW = new Date("2024-06-05T03:00:00Z");
+    const images = [1, 2, 4, 5].map((d) => row(d));
+    expect(resolve(images, NOW, 0, 2).callout).toBe("no-points");
+  });
+
+  it("当月・見込みを含めても穴が多すぎて達成不可→ callout=null（つつかない）", () => {
+    const NOW = new Date("2024-06-10T03:00:00Z");
+    const images = [1, 6, 10].map((d) => row(d)); // 2〜5, 7〜9 の7日欠け
+    expect(resolve(images, NOW, 1, 2).callout).toBeNull();
   });
 });

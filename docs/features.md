@@ -9,10 +9,12 @@
   - `ALLOWED_SERVERS`: 許可サーバー（カンマ区切り）。未設定=全許可。
   - `DENIED_SERVERS`: 拒否サーバー（カンマ区切り）。ログイン開始のみ弾き、既存アカウント・セッションには影響しない。将来 admin GUI からの追加（DB とのマージ）を予定しており、`getDeniedServers()` が差し替えの単一チョークポイント。
   - `HOME_SERVER`: ホームインスタンス（**単一値**）。所属ユーザーのプロフィールURLが素の `username` になる（他は `username@domain`）。未設定なら短縮なし・素の `/u/username` は 404。クライアント側のリンク生成へは root layout から [HomeServerProvider](../src/components/HomeServerProvider.tsx)（React Context）で配る。
-  - `FAVOR_SERVERS`: 特典サーバー（カンマ区切り）。所属ユーザーは皆勤賞の未投稿許容日数が 4 日（他は 3 日）。解決は [grace.ts](../src/lib/achievements/grace.ts)。
+  - `FAVOR_SERVERS`: 特典サーバー（カンマ区切り）。特典は皆勤賞の穴埋め枠: 2026-09 以前の月は未投稿許容日数が 4 日（他は 3 日。[grace.ts](../src/lib/achievements/grace.ts)）、2026-10 以降は穴埋めポイントを毎月+1pt（[monthlyGrants.ts](../src/lib/makeup/monthlyGrants.ts)）。判定は `isFavorServer()`。
 
 ## カレンダー機能
-- 月別カレンダー表示（投稿日にサムネイル）。日付クリックでその日の全画像をモーダル表示。**皆勤賞**: その月毎日投稿で👑（過去月のみ判定）。
+- 月別カレンダー表示（投稿日にサムネイル）。日付クリックでその日の代表画像の詳細ページへ。**皆勤賞**: その月毎日投稿で👑。
+- **穴埋め**: 忘れた日を、同月の後日のダブル投稿で埋める。2026-10 分からは**穴埋めポイント制**（1pt=1日・月ごと・持ち越し不可・翌月10日締切・全ユーザー手動）。上限の解決・付与・通知・締切・不変条件は [achievements/README](../src/lib/achievements/README.md) の「特殊: 皆勤賞」を正とする。本人にはカレンダーに残りポイントと付与履歴を出す。
+  - 2026-09 以前の月の旧ルール（固定上限・自動穴埋め `User.autoMakeup`）は [cleanup-2026-10](./cleanup-2026-10.md) で撤去予定。
 - **サムネイル**: 128x128px WebP・quality 80。投稿時（`/api/v1/post`内）に生成。クロップ位置は文字位置に応じた角基準（top/left→左上、bottom→左下、right→右上）。既存画像は `npx tsx scripts/generate-thumbnails.ts`。
 
 ## 実績・通知機能

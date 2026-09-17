@@ -23,6 +23,7 @@ import { Pool } from "pg";
 import { toJstDateString } from "@/lib/streak";
 import { assignMonthMakeups } from "@/lib/achievements/perfectMonth";
 import { perfectMonthGrace } from "@/lib/achievements/grace";
+import { isPointEra } from "@/lib/makeup/points";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -72,7 +73,11 @@ async function main() {
     // donorImageId -> holeDay を集めて一括 update。grace は所属インスタンスで決まる。
     const grace = perfectMonthGrace(user.instance.domain);
     const updates: { id: string; holeDay: number }[] = [];
-    for (const posts of byMonth.values()) {
+    for (const [ym, posts] of byMonth) {
+      // 2026-10 以降の月は穴埋めポイント制で手動のみ。ここで貪欲に割り当てると自動穴埋めの復活になり、
+      // しかも上限が固定 grace なのでポイント残高を無視して埋めてしまう。
+      // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照
+      if (isPointEra(ym)) continue;
       const assigned = assignMonthMakeups(posts, grace); // Map<imageId, holeDay>
       for (const [id, holeDay] of assigned) updates.push({ id, holeDay });
     }

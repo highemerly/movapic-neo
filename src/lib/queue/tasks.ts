@@ -194,6 +194,7 @@ const processEmailTask: Task = async (payload) => {
       username: user.username,
       accessToken: decryptToken(user.accessToken),
       instance: { domain: user.instance.domain, type: user.instance.type },
+      // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照
       autoMakeup: user.autoMakeup,
     },
     text: p.text,

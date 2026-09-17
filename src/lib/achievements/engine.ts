@@ -5,11 +5,18 @@
  *   live と backfill で同じ述語を共有するための中核。
  * - evaluateAndGrant: live 用。DBから stats を集め、新規付与を per-key insert（P2002スキップ）。
  *
- * 通知専用テーブルは持たない。Achievement 行がそのまま通知になる（実績1件＝通知1件を @@unique が保証）。
+ * 実績を1件付与するたびに Notification(type="achievement") を1件作る（実績1件＝通知1件。Achievement の
+ * @@unique が二重付与を弾くので通知も二重にならない）。付与はすべて grantAll を通す。
  */
 
 import prisma from "@/lib/db";
+import { isUniqueViolation } from "@/lib/db/errors";
 import { toJstDateString } from "@/lib/streak";
+import { jstMonthRange, parseYm, toJstYm } from "@/lib/jst";
+import { maybeGrantAchievementPoint } from "@/lib/makeup/awards";
+import { resolveMakeupCap } from "@/lib/makeup/ledger";
+import { notifyMakeupProgressOnPost } from "@/lib/makeup/notify";
+import { isPointEra } from "@/lib/makeup/points";
 import {
   CATALOG,
   evaluatePerfectMonth,
@@ -27,10 +34,10 @@ import {
 import {
   currentMonthMakeupStatus,
   daysInMonthOf,
+  isPerfectMonth,
   perfectMonthKey,
   shouldRemindMakeup,
 } from "./perfectMonth";
-import { perfectMonthGrace } from "./grace";
 import { collectReactionStats, collectStats } from "./stats";
 
 export interface GrantCandidate {
@@ -42,15 +49,6 @@ export interface GrantedAchievement {
   key: string;
   category: string;
   grantedAt: Date;
-}
-
-function isUniqueViolation(e: unknown): boolean {
-  return (
-    typeof e === "object" &&
-    e !== null &&
-    "code" in e &&
-    (e as { code?: string }).code === "P2002"
-  );
 }
 
 /**
@@ -165,6 +163,12 @@ async function grantAll(
         imageId: images.notificationImageId,
       })),
     });
+    // 穴埋めポイント: その月に実績を1つでも達成したら+1pt（月1回）。実績付与の唯一の入口なので
+    // ここに1つだけ置く（投稿・リアクション・プロフィール・皆勤賞の再判定がすべて通る）。
+    // ポイントの失敗で実績の結果を失わないよう握りつぶす。
+    await maybeGrantAchievementPoint({ userId, now: new Date() }).catch((e) =>
+      console.error("Achievement makeup point failed:", e)
+    );
   }
   return granted;
 }
@@ -220,34 +224,116 @@ export async function evaluateAndGrant(opts: {
   userId: string;
   post: PostFacts;
   imageId: string;
-  /** 投稿者の所属インスタンスドメイン（皆勤賞の穴埋め枠 grace の決定に使う）。 */
+  /** 投稿者の所属インスタンスドメイン（2026-09 以前の月の穴埋め枠 grace の決定に使う）。 */
   instanceDomain: string;
 }): Promise<GrantedAchievement[]> {
   const { userId, post, imageId, instanceDomain } = opts;
-  const grace = perfectMonthGrace(instanceDomain);
+  const grace = await resolveMakeupCap({ userId, instanceDomain, ym: toJstYm(post.createdAt) });
 
-  const owned = await ownedKeysOf(userId);
-
-  const stats = await collectStats(userId, post);
+  const [owned, stats] = await Promise.all([ownedKeysOf(userId), collectStats(userId, post)]);
   const candidates = selectNewlyGranted(stats, post, owned, grace);
-  if (candidates.length === 0) return [];
+
+  // 穴埋めポイント制の促し（makeup-need-second / makeup-ready）は実績の有無と無関係に毎投稿で評価する。
+  // 実績付与（grantAll）の後に呼ぶ: 実績ptの付与で残高が増えた状態を見て判定するため。
+  // 投稿フローを止めないため、ここは独立して握りつぶす。
+  const notifyProgress = () =>
+    notifyMakeupProgressOnPost({ userId, imageId, now: post.createdAt }).catch((e) =>
+      console.error("Makeup progress notification failed:", e)
+    );
+
+  if (candidates.length === 0) {
+    await notifyProgress();
+    return [];
+  }
 
   const granted = await grantAll(userId, candidates, {
     achievementImageId: imageId,
     notificationImageId: imageId,
   });
 
-  // 皆勤賞の穴埋め推奨通知（今日投稿した・穴がある・埋め切っていない人にだけ・月1通）。
-  // 投稿フローを止めないため、ここは独立して握りつぶす。
-  await maybeNotifyMakeup(userId, post, stats, imageId, grace).catch((e) =>
-    console.error("Makeup reminder failed:", e)
-  );
+  // 2026-09 以前の月の穴埋め推奨通知（makeup-reminder・月1通）。
+  // 既知の制限: 導入時からこの早期 return の後ろにあり「その投稿で新しい実績を獲得したとき」しか
+  // 評価されていない。2026-10-01 以降は到達不能になるため、従来挙動のまま残している。
+  // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（maybeNotifyMakeup ごと削除）
+  if (!isPointEra(toJstYm(post.createdAt))) {
+    await maybeNotifyMakeup(userId, post, stats, imageId, grace).catch((e) =>
+      console.error("Makeup reminder failed:", e)
+    );
+  }
+  await notifyProgress();
 
   return granted;
 }
 
 /**
- * 穴埋め推奨通知。今日投稿した瞬間に評価され、条件を満たせば type="makeup-reminder" を1件作る。
+ * 指定月の皆勤賞をデータから判定し、成立していて未付与なら付与する（付与のみ・剥奪なし・冪等）。
+ *
+ * 使うのは2経路:
+ * - POST /api/v1/me/calendar/reevaluate（カレンダー編集モードの終了時）
+ * - 定期ジョブの monthly-catchup（11日に「先月が皆勤でないか」を確定させるため）
+ *
+ * 付与は grantAll を通す。以前 reevaluate はここを迂回して achievement.create を直接叩いており、
+ * 皆勤賞経由の「実績を達成したら+1pt」が漏れる構造だった。
+ *
+ * 判定は永続割当（Image.makeupTargetDay）を数える＝カレンダー表示と👑が食い違わない。
+ * 集計対象は全投稿（collectStats と同一。isPublic/isDisabled で絞らない）。
+ *
+ * @returns perfect: データ上皆勤か（Achievement 行の有無ではない）／granted: 今回新たに付与したか
+ */
+export async function evaluateAndGrantPerfectMonth(opts: {
+  userId: string;
+  instanceDomain: string | null | undefined;
+  ym: string;
+}): Promise<{ perfect: boolean; granted: boolean; key: string }> {
+  const { userId, instanceDomain, ym } = opts;
+  const key = perfectMonthKey(ym);
+  const { year, month } = parseYm(ym);
+  const { start, end } = jstMonthRange(year, month);
+
+  const [monthImages, grace] = await Promise.all([
+    prisma.image.findMany({
+      where: { userId, createdAt: { gte: start, lt: end } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, createdAt: true, makeupTargetDay: true },
+    }),
+    resolveMakeupCap({ userId, instanceDomain, ym }),
+  ]);
+  if (monthImages.length === 0) return { perfect: false, granted: false, key };
+
+  const dayCounts: Record<number, number> = {};
+  for (const m of monthImages) {
+    const d = Number(toJstDateString(m.createdAt).slice(8, 10));
+    dayCounts[d] = (dayCounts[d] ?? 0) + 1;
+  }
+  const filledHoleDays = monthImages
+    .map((m) => m.makeupTargetDay)
+    .filter((v): v is number => v != null);
+
+  const perfect = isPerfectMonth({
+    daysInMonth: daysInMonthOf(year, month),
+    dayCounts,
+    filledHoleDays,
+    grace,
+  });
+  if (!perfect) return { perfect, granted: false, key };
+
+  const owned = await prisma.achievement.findFirst({
+    where: { userId, key },
+    select: { id: true },
+  });
+  if (owned) return { perfect, granted: false, key };
+
+  // 実績・通知の imageId はその月の最新投稿（通知サムネ用）。並行付与は grantAll が P2002 で弾く。
+  const imageId = monthImages[0].id;
+  const granted = await grantAll(userId, [{ key, category: PERFECT_MONTH_CATEGORY }], {
+    achievementImageId: imageId,
+    notificationImageId: imageId,
+  });
+  return { perfect, granted: granted.length > 0, key };
+}
+
+/**
+ * 2026-09 以前の月の穴埋め推奨通知。今日投稿した瞬間に評価され、条件を満たせば type="makeup-reminder" を1件作る。
  * - 穴埋めは「忘れた過去日」を「後日のダブル投稿」で埋める制度なので、日付順マッチングで
  *   「まだ埋まっていない過去の穴(unfilled)」を厳密に数える（currentMonthMakeupStatus）。
  * - 重複排除: 同月キー(perfect-month:YYYY-MM)の makeup-reminder が既にあれば送らない（月1通）。
@@ -268,7 +354,10 @@ async function maybeNotifyMakeup(
     todayDayNum,
     dayCounts: stats.postMonthDayCounts,
     filledHoleDays: stats.filledHoleDays,
+    // shouldRemindMakeup は skippedSoFar / unfilled しか見ないので、donor の有無は判定に効かない。
+    todayHasDonor: false,
     grace,
+    potentialGrace: grace,
   });
   if (!shouldRemindMakeup(status.skippedSoFar, status.unfilled)) return;
 

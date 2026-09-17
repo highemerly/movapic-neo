@@ -8,9 +8,12 @@
  * という不具合が出た。両分岐とも postToMastodon/postToMisskey に altText を渡すことを検証する。
  *
  * ネットワーク（fediverse/post）・S3（storage）・prisma・実績評価はすべてモックする。
+ *
+ * あわせて、自動穴埋め（autoMakeup）が 2026-09 以前の月の投稿にだけ効くことも固定する
+ *（2026-10 以降は穴埋めポイント制で手動のみ。9月中は設定どおり自動で動かす）。
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   DEFAULT_POSITION,
   DEFAULT_FONT,
@@ -51,11 +54,14 @@ vi.mock("@/lib/achievements/makeupAssign", () => ({
   assignMakeupForNewPost: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("@/lib/achievements/perfectMonth", () => ({
-  perfectMonthGrace: vi.fn(),
+// perfectMonthGrace の定義は grace.ts（env を読む）。以前は perfectMonth.ts をモックしていたが、
+// 自動穴埋めの分岐を通るテストが無かったため誤りが表に出ていなかった。
+vi.mock("@/lib/achievements/grace", () => ({
+  perfectMonthGrace: vi.fn(() => 3),
 }));
 
 import { publishImage, type PublishImageInput } from "@/lib/publish/publishImage";
+import { assignMakeupForNewPost } from "@/lib/achievements/makeupAssign";
 
 // altText は postToMastodon/postToMisskey の第9引数（index 8）に渡る。
 const ALT_ARG_INDEX = 8;
@@ -215,5 +221,46 @@ describe("publishImage の投稿再試行（一時的失敗のみ1回だけ）",
       "https://mastodon.example/@alice/s2"
     );
     expect(imageUpdate.mock.calls[0][0].data.postId).toBe("s2");
+  });
+});
+
+describe("自動穴埋め（autoMakeup）は 2026-09 以前の月だけ", () => {
+  const autoOn = (): PublishImageInput["user"] => ({
+    id: "user-1",
+    username: "alice",
+    accessToken: "token",
+    instance: { domain: "mastodon.example", type: "mastodon" },
+    autoMakeup: true,
+  });
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("9月30日 23:59 JST の投稿は、設定がONなら自動で割り当てる", async () => {
+    vi.setSystemTime(new Date("2026-09-30T14:59:00Z"));
+
+    await publishImage(baseInput({ user: autoOn() }));
+
+    expect(assignMakeupForNewPost).toHaveBeenCalledTimes(1);
+  });
+
+  it("10月1日 00:00 JST 以降の投稿は、設定がONでも自動で割り当てない", async () => {
+    vi.setSystemTime(new Date("2026-09-30T15:00:00Z"));
+
+    await publishImage(baseInput({ user: autoOn() }));
+
+    expect(assignMakeupForNewPost).not.toHaveBeenCalled();
+  });
+
+  it("9月でも設定がOFFなら割り当てない（従来どおり）", async () => {
+    vi.setSystemTime(new Date("2026-09-20T03:00:00Z"));
+
+    await publishImage(baseInput({}));
+
+    expect(assignMakeupForNewPost).not.toHaveBeenCalled();
   });
 });

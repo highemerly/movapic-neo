@@ -21,6 +21,7 @@ import { clearMastodonAppCredentials } from "@/lib/auth/mastodonApp";
 import { createSession, getCurrentUser } from "@/lib/auth/session";
 import { extractLoginRequestInfo } from "@/lib/auth/requestInfo";
 import prisma from "@/lib/db";
+import { grantSignupMakeupPoints } from "@/lib/makeup/awards";
 
 const OAUTH_SESSION_COOKIE = "oauth_session";
 const OAUTH_STATE_COOKIE = "oauth_state";
@@ -180,6 +181,13 @@ export async function GET(request: NextRequest) {
           termsAgreedAt: new Date(),
         },
       });
+      // 穴埋めポイントの登録時付与（登録日に応じた signup ＋ 特典サーバーなら当月の favor-monthly）。
+      // 登録日は DB に入った createdAt の JST 日で決める。失敗してもログインは止めない。
+      await grantSignupMakeupPoints({
+        userId: user.id,
+        instanceDomain: instance.domain,
+        now: user.createdAt,
+      }).catch((e) => console.error("Signup makeup points failed:", e));
     }
 
     // JWTセッション作成（ログイン履歴に記録）

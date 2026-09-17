@@ -72,6 +72,7 @@ model User {
   // カレンダーの自動穴埋め。true(既定)=投稿の瞬間にダブル投稿を過去の穴へ自動割当（従来挙動）。
   // false=自動割当せず、カレンダー編集モードで明示指定した穴だけ埋める。過去の割当・皆勤賞には影響しない
   // （未来の投稿の自動判定のみを切り替える）。詳細は docs/穴埋め設計は achievements/README.md 参照。
+  // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（2026-09 以前の月専用。列ごと削除する）
   autoMakeup          Boolean @default(true) @map("auto_makeup")
 
   // 利用規約・プライバシーポリシーへの同意日時。null=未同意。
@@ -82,16 +83,17 @@ model User {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   lastLoginAt DateTime? @map("last_login_at")
 
-  instance      Instance       @relation(fields: [instanceId], references: [id])
-  images        Image[]
-  loginSessions LoginSession[]
-  achievements  Achievement[]
-  notifications Notification[]
-  reports       Report[]
-  mutesCreated  Mute[]         @relation("Muter")
-  mutedBy       Mute[]         @relation("Muted")
-  reactions     Reaction[]
-  customEmojis  CustomEmoji[]
+  instance          Instance           @relation(fields: [instanceId], references: [id])
+  images            Image[]
+  loginSessions     LoginSession[]
+  achievements      Achievement[]
+  notifications     Notification[]
+  reports           Report[]
+  mutesCreated      Mute[]             @relation("Muter")
+  mutedBy           Mute[]             @relation("Muted")
+  reactions         Reaction[]
+  customEmojis      CustomEmoji[]
+  makeupPointGrants MakeupPointGrant[]
 
   @@unique([instanceId, remoteId])
   @@unique([instanceId, username])
@@ -138,20 +140,43 @@ model Achievement {
   @@map("achievements")
 }
 
+// 穴埋めポイントの付与台帳（2026-10 分から）。1pt = 1日ぶんの穴埋め。
+// ここには「付与」しか書かない。消費は Image.makeupTargetDay から導出する（残高を二重管理すると、
+// 割当の自動付替・画像削除・退会の各経路で同期漏れが起き、カレンダー表示と残高が食い違うため）。
+// 月内は単調非減少・月末で凍結。剥奪／マイナス補正は禁止（過去月の cap が変わると確定済みの👑が揺れる）。
+// 仕様・付与条件は src/lib/makeup/points.ts。
+model MakeupPointGrant {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  // このポイントが使える対象月（JST の "YYYY-MM"）。翌月へは持ち越さない。
+  month     String   @db.VarChar(7)
+  // 付与理由。"favor-monthly" | "monthly-catchup" | "signup" | "achievement" | "event:<key>"
+  reason    String   @db.VarChar(64)
+  amount    Int
+  grantedAt DateTime @default(now()) @map("granted_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, month, reason]) // 月×理由で1回だけ＝30分ごとの定期ジョブでも二重付与をDBで防ぐ
+  @@index([userId, month])
+  @@map("makeup_point_grants")
+}
+
 // 通知。ユーザーごとに生成され、種別（type）で情報ソースを区別する。
-// 現状は実績獲得("achievement")のみだが、将来「お気に入りされた通知」など別種別をここにマージする。
 // 90日で読み捨て（読み取り時に createdAt でフィルタ）。既読状態は持たない。
 model Notification {
   id             String   @id @default(uuid())
   // 通知の受信者
   userId         String   @map("user_id")
-  // 種別 / 情報ソース。"achievement" | （将来）"favorite" 等
+  // 種別 / 情報ソース。"achievement" | "favorite" | 皆勤賞の穴埋め系（"makeup-point" | "makeup-need-second" |
+  // "makeup-ready" | 2026-09 以前の "makeup-reminder"。src/lib/makeup/notificationTypes.ts）
   type           String   @db.VarChar(40)
-  // type="achievement" のとき、獲得した実績のキー（表示文言は CATALOG から解決）
+  // type="achievement" のとき、獲得した実績のキー（表示文言は CATALOG から解決）。
+  // 穴埋め系のとき、対象月キー perfect-month:YYYY-MM（通知から対象月のカレンダーへ飛ぶため）。
   achievementKey String?  @map("achievement_key") @db.VarChar(64)
   // 関連画像（実績のきっかけ写真 / 将来: お気に入りされた写真）。画像削除時は null。
   imageId        String?  @map("image_id")
-  // 種別ごとの追加情報（将来用: お気に入りした相手の表示名・acct 等）
+  // 種別ごとの追加情報（favorite: 相手の表示名・acct 等 / makeup-point: 付与理由と量）
   data           Json?
   createdAt      DateTime @default(now()) @map("created_at")
 
@@ -240,7 +265,8 @@ model Image {
   calendarPickedAt    DateTime? @map("calendar_picked_at")
   // 皆勤賞の穴埋め割当（永続化）。この投稿(donor)が埋める「同月の空き日(1-31)」。null=穴埋めに使っていない。
   // カレンダー表示・皆勤賞判定の両方がこの永続値を読む（表示と👑のズレを防ぐ単一ソース）。
-  // 書き込み: 投稿時の自動割当(autoMakeup=true)／カレンダー編集モードの手動指定／既存分はbackfill。
+  // 書き込み: カレンダー編集モードの手動指定／2026-09以前の月のみ投稿時の自動割当(autoMakeup=true)／既存分はbackfill。
+  // 2026-10以降は穴埋めポイント（MakeupPointGrant）の残高を「占有」する。残高はここから導出する。
   makeupTargetDay     Int?      @map("makeup_target_day")
   // 管理者によるモデレーション取り下げフラグ。true で全公開面から隠す（投稿者含め非表示・復元可能）
   isDisabled          Boolean   @default(false) @map("is_disabled")

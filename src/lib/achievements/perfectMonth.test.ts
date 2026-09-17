@@ -19,9 +19,12 @@ import {
   assignMonthMakeups,
   isPerfectMonth,
   currentMonthMakeupStatus,
+  canPromptMakeup,
+  hasAssignableMakeup,
   coveredDays,
   shouldRemindMakeup,
   MAKEUP_REMINDER_MAX_SKIPPED,
+  type CurrentMonthMakeupStatus,
 } from "./perfectMonth";
 
 /** 日→枚数のレコードを作る簡易ヘルパ（例: dc([1,1,2]) は 1日目1枚,2日目1枚,3日目2枚）。 */
@@ -291,7 +294,8 @@ describe("isPerfectMonth - 皆勤賞の達成判定", () => {
 });
 
 describe("currentMonthMakeupStatus - 当月の進捗", () => {
-  const grace = 3;
+  /** 従来ルール（固定 grace=3）の月の既定引数。potentialGrace は grace と同じ値を渡す。 */
+  const legacy = { grace: 3, potentialGrace: 3, todayHasDonor: false };
 
   it("今日より前の空き日数と、未充填の穴を数える", () => {
     // today=day5。day2,day3 が空き(skipped=2)。day3 は埋め済み → unfilled=1。
@@ -301,36 +305,60 @@ describe("currentMonthMakeupStatus - 当月の進捗", () => {
       todayDayNum: 5,
       dayCounts,
       filledHoleDays: [3],
-      grace,
+      ...legacy,
     });
     expect(s.skippedSoFar).toBe(2);
     expect(s.unfilled).toBe(1);
   });
 
-  it("todayUsedMakeup は今日ダブル投稿済みか", () => {
-    const dayCounts = dc([1, 1, 1, 1, 2]); // day5=2枚
-    const s = currentMonthMakeupStatus({
-      daysInMonth: 30,
-      todayDayNum: 5,
-      dayCounts,
-      filledHoleDays: [],
-      grace,
-    });
-    expect(s.todayUsedMakeup).toBe(true);
+  it("todayHasDonor は投稿枚数ではなく実際の割当をそのまま返す（2枚投稿しても未割当なら false）", () => {
+    // pitfall: 以前は count(today)>=2 で代用していた。手動専用になると「2枚投稿したが
+    // まだ割り当てていない」が常態で、これを true にすると「今すぐ穴埋めしよう」が出なくなる
+    const dayCounts = dc([1, 0, 1, 1, 2]); // day5=2枚・day2 が穴
+    const base = { daysInMonth: 30, todayDayNum: 5, dayCounts, filledHoleDays: [], grace: 1, potentialGrace: 1 };
+    const unassigned = currentMonthMakeupStatus({ ...base, todayHasDonor: false });
+    expect(unassigned.todayPosts).toBe(2);
+    expect(unassigned.todayHasDonor).toBe(false);
+    const assigned = currentMonthMakeupStatus({ ...base, filledHoleDays: [2], todayHasDonor: true });
+    expect(assigned.todayHasDonor).toBe(true);
   });
 
-  it("stillAchievable は skippedSoFar <= grace", () => {
-    // today=day6, day1..day4 空き(skipped=4) > grace3 → 手が届かない
+  it("stillAchievable は skippedSoFar <= potentialGrace（従来ルールは grace と同値）", () => {
+    // today=day6, day1..day4 空き(skipped=4) > 3 → 手が届かない
     const dayCounts = dc([0, 0, 0, 0, 1]);
     const s = currentMonthMakeupStatus({
       daysInMonth: 30,
       todayDayNum: 6,
       dayCounts,
       filledHoleDays: [],
-      grace,
+      ...legacy,
     });
     expect(s.skippedSoFar).toBe(4);
     expect(s.stillAchievable).toBe(false);
+  });
+
+  it("ポイント制の月初: 今の cap が0でも、まだ付与されうる分で達成可能と判定する", () => {
+    // 10/5 時点で day3 を忘れた。非handon ユーザーは 11日まで cap=0 だが、
+    // catchup+実績で2pt 見込める。grace で判定すると達成不可になり、コールアウトも通知も消える
+    const dayCounts = dc([1, 1, 0, 1]);
+    const s = currentMonthMakeupStatus({
+      daysInMonth: 31,
+      todayDayNum: 5,
+      dayCounts,
+      filledHoleDays: [],
+      todayHasDonor: false,
+      grace: 0,
+      potentialGrace: 2,
+    });
+    expect(s.stillAchievable).toBe(true);
+    expect(s.remaining).toBe(0); // 今はまだ割り当てられない
+  });
+
+  it("remaining は grace − 埋めた数（負にならない）", () => {
+    const dayCounts = dc([0, 0, 1, 1, 2, 2]);
+    const base = { daysInMonth: 30, todayDayNum: 7, dayCounts, todayHasDonor: false, potentialGrace: 3 };
+    expect(currentMonthMakeupStatus({ ...base, filledHoleDays: [1], grace: 3 }).remaining).toBe(2);
+    expect(currentMonthMakeupStatus({ ...base, filledHoleDays: [1, 2], grace: 1 }).remaining).toBe(0);
   });
 
   it("今日の穴は skipped に含めない（d < todayDayNum のみ）", () => {
@@ -341,15 +369,88 @@ describe("currentMonthMakeupStatus - 当月の進捗", () => {
       todayDayNum: 3,
       dayCounts,
       filledHoleDays: [],
-      grace,
+      ...legacy,
     });
     expect(s.skippedSoFar).toBe(1); // day2 のみ
+  });
+});
+
+describe("hasAssignableMakeup - 今すぐ割り当てられる組があるか", () => {
+  it("穴より後ろに未割当のダブル投稿日があれば true（今日の投稿でなくてもよい）", () => {
+    // day3 が穴、day8 がダブル（未割当）。11日にptが来たらその場で埋められる
+    const dayCounts = dc([1, 1, 0, 1, 1, 1, 1, 2, 1, 1, 1]);
+    expect(
+      hasAssignableMakeup({ daysInMonth: 31, dayCounts, filledHoleDays: [], donorDays: [] })
+    ).toBe(true);
+  });
+
+  it("ダブル投稿日が穴より前なら false（穴は donor より前しか埋められない）", () => {
+    const dayCounts = dc([2, 1, 0, 1]);
+    expect(
+      hasAssignableMakeup({ daysInMonth: 31, dayCounts, filledHoleDays: [], donorDays: [] })
+    ).toBe(false);
+  });
+
+  it("ダブル投稿日が既に donor なら false（1日1donor）", () => {
+    const dayCounts = dc([1, 0, 0, 2]);
+    expect(
+      hasAssignableMakeup({ daysInMonth: 31, dayCounts, filledHoleDays: [2], donorDays: [4] })
+    ).toBe(false);
+  });
+
+  it("穴が全部埋まっていれば false", () => {
+    const dayCounts = dc([1, 0, 2, 2]);
+    expect(
+      hasAssignableMakeup({ daysInMonth: 31, dayCounts, filledHoleDays: [2], donorDays: [3] })
+    ).toBe(false);
+  });
+
+  it("埋まった穴の後ろの未充填の穴と、その後の未割当ダブルで組が作れる", () => {
+    // day2 は day3 で埋め済み、day4 が未充填、day5 がダブル未割当
+    const dayCounts = dc([1, 0, 2, 0, 2]);
+    expect(
+      hasAssignableMakeup({ daysInMonth: 31, dayCounts, filledHoleDays: [2], donorDays: [3] })
+    ).toBe(true);
+  });
+});
+
+describe("canPromptMakeup - ポイント制の穴埋めを促してよいか", () => {
+  /** status を最小限の値で組む（該当しない項目は促す側に倒した既定値）。 */
+  const status = (o: Partial<CurrentMonthMakeupStatus>): CurrentMonthMakeupStatus => ({
+    skippedSoFar: 1,
+    unfilled: 1,
+    remaining: 1,
+    todayPosts: 1,
+    todayHasDonor: false,
+    stillAchievable: true,
+    ...o,
+  });
+
+  it("穴があり・残高があり・まだ達成可能なら促す", () => {
+    expect(canPromptMakeup(status({}))).toBe(true);
+  });
+
+  it("残高0なら促さない（押せるボタンが無い）", () => {
+    expect(canPromptMakeup(status({ remaining: 0 }))).toBe(false);
+  });
+
+  it("埋めるべき穴が無ければ促さない", () => {
+    expect(canPromptMakeup(status({ unfilled: 0 }))).toBe(false);
+  });
+
+  it("もう皆勤不可能なら促さない（毎日つつかない）", () => {
+    expect(canPromptMakeup(status({ stillAchievable: false }))).toBe(false);
+  });
+
+  it("穴が多くても（旧仕様の上限5超でも）達成可能なら促す＝9日登録の新規ユーザーを取りこぼさない", () => {
+    expect(canPromptMakeup(status({ skippedSoFar: 8, unfilled: 8, remaining: 8 }))).toBe(true);
   });
 });
 
 describe("coveredDays - 進捗表示用の押さえた日数", () => {
   /** 7月30日時点で day5 を忘れ、day10 のダブル投稿で穴埋め済み（＝29日投稿 + 穴埋め1日）。 */
   const perDay = Array.from({ length: 30 }, (_, i) => (i + 1 === 5 ? 0 : i + 1 === 10 ? 2 : 1));
+  const legacy = { grace: 3, potentialGrace: 3, todayHasDonor: false };
 
   it("穴埋め済みの日を合算する（29日投稿 + 穴埋め1日 = 30日）", () => {
     const dayCounts = dc(perDay);
@@ -358,7 +459,7 @@ describe("coveredDays - 進捗表示用の押さえた日数", () => {
       todayDayNum: 30,
       dayCounts,
       filledHoleDays: [5],
-      grace: 3,
+      ...legacy,
     });
     expect(coveredDays(29, status)).toBe(30);
   });
@@ -370,7 +471,7 @@ describe("coveredDays - 進捗表示用の押さえた日数", () => {
       todayDayNum: 30,
       dayCounts,
       filledHoleDays: [],
-      grace: 3,
+      ...legacy,
     });
     expect(coveredDays(29, status)).toBe(29);
   });
@@ -382,7 +483,7 @@ describe("coveredDays - 進捗表示用の押さえた日数", () => {
       todayDayNum: 30,
       dayCounts,
       filledHoleDays: [],
-      grace: 3,
+      ...legacy,
     });
     expect(coveredDays(30, status)).toBe(30);
   });

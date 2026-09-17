@@ -123,6 +123,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // autoMakeupの更新（カレンダーの自動穴埋め。OFFで投稿時の自動割当を止める）
+    // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照
     if (body.autoMakeup !== undefined) {
       if (typeof body.autoMakeup !== "boolean") {
         return jsonNoStore(

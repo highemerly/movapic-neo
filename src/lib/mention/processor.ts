@@ -50,6 +50,7 @@ interface UserWithInstance {
   accessToken: string;
   defaultVisibility: string;
   mentionKeep: boolean;
+  // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照
   autoMakeup: boolean;
   instance: {
     domain: string;

@@ -11,7 +11,11 @@ import { cn } from "@/lib/utils";
 import { parseApiError, formatErrorMessage } from "@/lib/errors";
 import { isJapaneseHoliday } from "@/lib/holidays";
 import { PERFECT_MONTH_GRACE_DEFAULT } from "@/lib/achievements/perfectMonth";
+import { formatYm } from "@/lib/jst";
+import { isPointEra } from "@/lib/makeup/points";
+import Link from "@/components/Link";
 import { DayCell } from "./DayCell";
+import { MakeupPointsCallout, formatMakeupDeadline, type MakeupInfo } from "./MakeupPointsCallout";
 
 interface DayData {
   count: number;
@@ -32,8 +36,10 @@ interface FilledDay {
 interface PerfectMonthInfo {
   achieved: boolean;
   isCurrentMonth: boolean;
-  callout: "today" | "tomorrow" | null;
+  callout: "today" | "ready" | "tomorrow" | "no-points" | null;
   filledDays: FilledDay[];
+  /** 本人のときだけ返る、その月の穴埋め枠（残り・締切・付与履歴）。 */
+  makeup?: MakeupInfo;
 }
 
 /** owner編集モード用: 各日の全画像（chronological asc）。 */
@@ -63,27 +69,38 @@ interface CalendarViewProps {
   initialMonth: number;
   /** 閲覧者がこのカレンダーの持ち主本人か（穴埋め促しコールアウトの表示制御）。 */
   isOwner: boolean;
-  /** このカレンダーの持ち主の未投稿許容日数（穴埋め枠。所属インスタンスで決まる注意書きの数字）。 */
-  grace: number;
+  /**
+   * 2026-09 以前の月の、持ち主の未投稿許容日数（所属インスタンスで決まる説明文の数字）。
+   * ポイント制の月では使わない（上限は月ごとに違うので、APIレスポンスの perfectMonth.makeup を使う）。
+   * TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照
+   */
+  legacyGrace: number;
   /** 投稿先サーバー名（カレンダー画像投稿ボタンの文言に使う）。 */
   serverName: string;
+  /** 特典サーバー（FAVOR_SERVERS）のドメイン一覧。穴埋めポイントの付与条件の説明に使う。 */
+  favorServers: string[];
   /** ログイン中インスタンスの種別（"mastodon" | "misskey"）。投稿ボタンのロゴ出し分けに使う。 */
   instanceType: string;
 }
 
 /**
- * 穴埋めを促す注意書き（当月のみ）。
+ * 2026-09 以前の月の、穴埋めを促す注意書き（当月のみ）。ポイント制の月は MakeupPointsCallout に置き換えた。
+ * TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（このコンポーネントごと削除）
  * 表示するのは「まだ皆勤に届く範囲で、未埋めの穴が残る」ときだけ（callout が非 null）。
  * - "today": 本日2枚投稿すれば穴埋めできる
+ * - "ready": 今日2枚投稿済みで、まだ穴に割り当てていない（編集から今すぐ埋められる）
  * - "tomorrow": 今日はもう穴埋め済み（1日1回まで）なので翌日に促す
+ * - "no-points": 穴埋めポイントが0。付与を待てば達成可能
  * 達成/未達成のメッセージは出さない（達成時は月見出しの👑で示す）。
  */
 function PerfectMonthCallout({ pm }: { pm: PerfectMonthInfo }) {
   if (!pm.callout) return null;
-  const body =
-    pm.callout === "today"
-      ? "投稿を忘れた日があります。本日2枚投稿すれば穴埋めでき、皆勤賞に近づきます！"
-      : "明日2枚投稿すると、皆勤賞に近づきます！";
+  const body = {
+    today: "投稿を忘れた日があります。本日2枚投稿すれば穴埋めでき、皆勤賞に近づきます！",
+    ready: "今日の2枚目の写真で穴埋めできます。「編集」から埋める日を選びましょう！",
+    tomorrow: "明日2枚投稿すると、皆勤賞に近づきます！",
+    "no-points": "投稿を忘れた日があります。穴埋めポイントが付与されると穴埋めできるので、毎日の投稿を続けましょう！",
+  }[pm.callout];
   return (
     <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-[12px] leading-relaxed text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
       <Crown className="mt-0.5 h-4 w-4 shrink-0" />
@@ -127,8 +144,9 @@ export function CalendarView({
   initialYear,
   initialMonth,
   isOwner,
-  grace,
+  legacyGrace,
   serverName,
+  favorServers,
   instanceType,
 }: CalendarViewProps) {
   const router = useRouter();
@@ -451,8 +469,12 @@ export function CalendarView({
               : "",
         )}
       >
-        {/* 穴埋め促しコールアウト（本人かつ未達成で穴埋め可能なとき） */}
-        {isOwner && data?.perfectMonth && (
+        {/* 本人向け: 穴埋めポイントの案内（残り・消費済み・付与履歴）。値は月ごとにAPIから受け取る */}
+        {isOwner && data?.perfectMonth?.makeup?.pointEra && (
+          <MakeupPointsCallout month={month} makeup={data.perfectMonth.makeup} favorServers={favorServers} />
+        )}
+        {/* 2026-09 以前の月: 従来の穴埋め促しコールアウト */}
+        {isOwner && data?.perfectMonth && !isPointEra(formatYm(year, month)) && (
           <PerfectMonthCallout pm={data.perfectMonth} />
         )}
 
@@ -569,6 +591,7 @@ export function CalendarView({
 
         {/* 皆勤賞達成バナー（達成月のみ・閲覧者全員に表示・カレンダーの下） */}
         {data?.perfectMonth?.achieved && <PerfectMonthBanner />}
+
       </div>
       </div>
 
@@ -581,26 +604,39 @@ export function CalendarView({
         <p>
           1ヶ月間毎日投稿すれば、カレンダーが埋まって皆勤賞の称号が得られます。皆勤賞はSHAMEZOにおける最高の栄誉です。
         </p>
-        <p>
-          もし投稿を忘れてしまっても大丈夫。同じ月の後日に1日2枚以上投稿すれば、2枚目の投稿が投稿を忘れた日の投稿を&ldquo;穴埋め&rdquo;できます。ただし、穴埋めのための投稿は1日につき1回まで・月につき
-          {grace > PERFECT_MONTH_GRACE_DEFAULT ? (
-            <>
-              <span className="mx-0.5 font-bold text-muted-foreground/70 line-through">
-                {PERFECT_MONTH_GRACE_DEFAULT}
-              </span>
-              <span className="mx-0.5 text-base font-extrabold text-foreground">
-                {grace}
-              </span>
-              回まで。
-              <span className="font-semibold text-foreground">
-                {/* 特典（FAVOR_SERVERS）が効いている＝持ち主の所属サーバーが特典対象 */}
-                ※{serverName} ユーザー限定特典で条件緩和中！
-              </span>
-            </>
-          ) : (
-            `${grace}回まで。`
-          )}
-        </p>
+        {isPointEra(formatYm(year, month)) ? (
+          // 本人のポイント制の月は、穴埋めの説明とルールを上部の案内（とモーダル）に出しているので重ねない
+          !(isOwner && data?.perfectMonth?.makeup?.pointEra) && (
+            <p>
+              もし投稿を忘れてしまっても大丈夫。穴埋めポイントを使えば、同じ月の後日に2枚投稿して、投稿を忘れた日を&ldquo;穴埋め&rdquo;できます。
+              <Link href="/docs/spec#perfect-month" className="ml-1 underline underline-offset-2 hover:text-foreground">
+                くわしく
+              </Link>
+            </p>
+          )
+        ) : (
+          // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（従来ルールの説明ごと削除）
+          <p>
+            もし投稿を忘れてしまっても大丈夫。同じ月の後日に1日2枚以上投稿すれば、2枚目の投稿が投稿を忘れた日の投稿を&ldquo;穴埋め&rdquo;できます。ただし、穴埋めのための投稿は1日につき1回まで・月につき
+            {legacyGrace > PERFECT_MONTH_GRACE_DEFAULT ? (
+              <>
+                <span className="mx-0.5 font-bold text-muted-foreground/70 line-through">
+                  {PERFECT_MONTH_GRACE_DEFAULT}
+                </span>
+                <span className="mx-0.5 text-base font-extrabold text-foreground">
+                  {legacyGrace}
+                </span>
+                回まで。
+                <span className="font-semibold text-foreground">
+                  {/* 特典（FAVOR_SERVERS）が効いている＝持ち主の所属サーバーが特典対象 */}
+                  ※{serverName} ユーザー限定特典で条件緩和中！
+                </span>
+              </>
+            ) : (
+              `${legacyGrace}回まで。`
+            )}
+          </p>
+        )}
 
         {/* マーカーの凡例 */}
         <div className="space-y-2">
@@ -625,6 +661,7 @@ export function CalendarView({
           month={month}
           dayImages={data.ownerEdit.dayImages}
           filledByDay={filledByDay}
+          makeup={data.perfectMonth?.makeup}
           thumbUrl={thumbUrl}
           saving={saving}
           onClose={() => setPicker(null)}
@@ -754,6 +791,7 @@ function EditPicker({
   month,
   dayImages,
   filledByDay,
+  makeup,
   thumbUrl,
   saving,
   onClose,
@@ -764,6 +802,8 @@ function EditPicker({
   month: number;
   dayImages: Record<number, OwnerDayImage[]>;
   filledByDay: Map<number, FilledDay>;
+  /** その月の穴埋め枠。締切後・残り0 のときは donor の新規指定をさせない。 */
+  makeup: MakeupInfo | undefined;
   thumbUrl: (img: { thumbnailKey: string | null; storageKey: string }) => string;
   saving: boolean;
   onClose: () => void;
@@ -809,6 +849,13 @@ function EditPicker({
     donorCandidates.sort((a, b) => a.day - b.day);
   }
   const currentFill = kind === "donor" ? filledByDay.get(day) : undefined;
+  // 締切後は指定も解除も不可（サーバーも409で拒否する）。
+  const makeupClosed = kind === "donor" && makeup != null && !makeup.editable;
+  // 残り0でも、既に埋まっている穴の写真を付け替えるだけなら件数は増えないので許可する。
+  const outOfPoints = kind === "donor" && makeup != null && makeup.remaining === 0 && !currentFill;
+  const outOfPointsMessage = makeup?.pointEra
+    ? "穴埋めポイントが残っていません"
+    : `穴埋めは1か月に${makeup?.limit}日までです`;
   const repImages = kind === "representative" ? (dayImages[day] ?? []) : [];
   const pickedRep = repImages.find((i) => i.isPicked);
 
@@ -887,8 +934,19 @@ function EditPicker({
           </button>
         )}
 
-        {kind === "donor" && (
+        {makeupClosed && makeup && (
+          <p className="py-4 text-center text-xs text-muted-foreground">
+            {month}月の穴埋めは{formatMakeupDeadline(makeup.deadline)}で締め切りました
+          </p>
+        )}
+
+        {kind === "donor" && !makeupClosed && (
           <>
+            {outOfPoints && (
+              <p className="mb-2 rounded-md bg-muted px-2.5 py-1.5 text-center text-xs text-muted-foreground">
+                {outOfPointsMessage}
+              </p>
+            )}
             {donorCandidates.length === 0 ? (
               <p className="py-4 text-center text-xs text-muted-foreground">
                 この日を埋められる候補（後日の2枚以上投稿）がありません
@@ -905,11 +963,15 @@ function EditPicker({
                         toast.error(reason ?? "この写真は使用中のため選べません");
                         return;
                       }
+                      if (outOfPoints) {
+                        toast.error(outOfPointsMessage);
+                        return;
+                      }
                       onApply(img.id, { makeupTargetDay: day });
                     }}
                     className={cn(
                       "relative aspect-square overflow-hidden rounded",
-                      disabled
+                      disabled || outOfPoints
                         ? "opacity-40"
                         : isCurrent
                           ? "ring-2 ring-emerald-500"

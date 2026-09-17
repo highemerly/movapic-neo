@@ -16,6 +16,7 @@ import prisma from "@/lib/db";
 import { syncFavoriteCache } from "@/lib/fediverse/favoriteSync";
 import { isFavoriteSyncDue } from "@/lib/fediverse/favoritePolicy";
 import { FAVORITE_SYNC_WHERE } from "@/lib/fediverse/favoriteSyncQuery";
+import { runMonthlyMakeupGrants } from "@/lib/makeup/monthlyGrants";
 
 interface PeriodicJob {
   /** ログ識別用の名前 */
@@ -211,12 +212,29 @@ const muteCleanup: PeriodicJob = {
 };
 
 /**
- * 実行する定期ジョブ一覧。先頭から順に実行される。
+ * 穴埋めポイントの月次付与（2026-10 分から）と、先月の皆勤賞のデータからの確定。
  *
- * 今後ここに足す予定（実装は別途）:
- *   - 定期判定でしか付与できない実績の判定
+ * - favor-monthly: FAVOR_SERVERS 所属ユーザーへ当月分+1pt
+ * - monthly-catchup: 11日以降、先月が皆勤でなかったユーザーへ当月分+1pt
+ * crontab は UTC 基準なので「JST の1日／11日」を cron 式で書かず、ここで JST の日付を見て判定する。
+ * 「その日以降で当月の行が無ければ」付与するため、ジョブ停止で日付を跨いでも次の実行で拾う。
+ * 詳細は src/lib/makeup/monthlyGrants.ts。
  */
-const periodicJobs: PeriodicJob[] = [mentionPoll, tmpCleanup, favoriteSyncJob, muteCleanup];
+const makeupPoints: PeriodicJob = {
+  name: "makeup-points",
+  run: () => runMonthlyMakeupGrants(),
+};
+
+/**
+ * 実行する定期ジョブ一覧。先頭から順に実行される。
+ */
+const periodicJobs: PeriodicJob[] = [
+  mentionPoll,
+  tmpCleanup,
+  favoriteSyncJob,
+  muteCleanup,
+  makeupPoints,
+];
 
 /** 登録済みの定期ジョブ名一覧（手動実行スクリプトのフィルタ指定用）。 */
 export const PERIODIC_JOB_NAMES = periodicJobs.map((j) => j.name);

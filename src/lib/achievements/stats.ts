@@ -202,16 +202,23 @@ export interface CurrentMonthPerfect {
   /** 当月の皆勤賞をすでに達成しているか（永続割当ベース）。 */
   achieved: boolean;
   status: CurrentMonthMakeupStatus;
+  /**
+   * 当月が穴埋めポイント制（2026-10 以降）か。説明文の出し分けに使う。
+   * false の月は穴埋めが所属インスタンスで決まる固定の日数（cap）まで・自動割当あり。
+   */
+  pointEra: boolean;
+  /** 当月に穴埋めできる上限（ポイント制なら付与ポイント合計・従来ルールなら固定の日数）。 */
+  cap: number;
 }
 
 /**
  * 当月の皆勤賞の進捗を集める（あと少しナビの常時ピン留めカード用）。
  * 判定・進捗は perfectMonth.ts に集約された純粋関数を呼ぶ（式を再実装しない）。
- * grace は本人の所属インスタンスで決まる値を呼び出し側から渡す。
+ * 上限は呼び出し側が resolveMakeupLimits（@/lib/makeup/ledger）で当月分を解決して渡す。
  */
 export async function collectCurrentMonthPerfect(
   userId: string,
-  grace: number
+  limits: { pointEra: boolean; cap: number; potentialCap: number }
 ): Promise<CurrentMonthPerfect> {
   const todayStr = toJstDateString(new Date());
   const ym = todayStr.slice(0, 7);
@@ -228,11 +235,16 @@ export async function collectCurrentMonthPerfect(
   // 当月の日(1-31)→投稿数 と、当月の永続穴埋め割当が指す空き日。
   const dayCounts: Record<number, number> = {};
   const filledHoleDays: number[] = [];
+  let todayHasDonor = false;
   for (const r of rows) {
     const d = toJstDateString(r.createdAt);
     if (!d.startsWith(ym)) continue;
-    dayCounts[Number(d.slice(8, 10))] = (dayCounts[Number(d.slice(8, 10))] ?? 0) + 1;
-    if (r.makeupTargetDay != null) filledHoleDays.push(r.makeupTargetDay);
+    const day = Number(d.slice(8, 10));
+    dayCounts[day] = (dayCounts[day] ?? 0) + 1;
+    if (r.makeupTargetDay != null) {
+      filledHoleDays.push(r.makeupTargetDay);
+      if (day === todayDayNum) todayHasDonor = true;
+    }
   }
 
   let distinctDays = 0;
@@ -242,7 +254,17 @@ export async function collectCurrentMonthPerfect(
     daysInMonth,
     todayDayNum,
     distinctDays,
-    achieved: isPerfectMonth({ daysInMonth, dayCounts, filledHoleDays, grace }),
-    status: currentMonthMakeupStatus({ daysInMonth, todayDayNum, dayCounts, filledHoleDays, grace }),
+    achieved: isPerfectMonth({ daysInMonth, dayCounts, filledHoleDays, grace: limits.cap }),
+    status: currentMonthMakeupStatus({
+      daysInMonth,
+      todayDayNum,
+      dayCounts,
+      filledHoleDays,
+      todayHasDonor,
+      grace: limits.cap,
+      potentialGrace: limits.potentialCap,
+    }),
+    pointEra: limits.pointEra,
+    cap: limits.cap,
   };
 }

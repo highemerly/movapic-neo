@@ -12,17 +12,36 @@
  *   「占有」で、穴埋めを解除すれば同月内で再利用できる（締切後は不可）。
  *
  * catalog.ts / perfectMonth.ts と同じくクライアントからも import されうるため、
- * React・サーバー専用 API・env を import しないこと（型・純粋関数のみ）。
+ * React・サーバー専用 API を import しないこと（型・純粋関数のみ）。env は開発用の開始月の上書き
+ * （NEXT_PUBLIC_MAKEUP_POINT_START_YM・本番では無視）だけを例外として読む。
  * DB を見る側は `@/lib/makeup/ledger`（サーバー専用）。
  */
 
-import { formatYm, parseYm, shiftYm } from "@/lib/jst";
+import { jstDayOf, parseYm, shiftYm, toJstYm } from "@/lib/jst";
 
 /**
  * ポイント制を適用する最初の月（JST）。これ未満の月は従来の grace（3/4日）で判定する。
- * 2026-09 以前の実績・穴埋めを一切変えないための境界。
+ * 2026-09 以前の実績・穴埋めを一切変えないための境界。判定には makeupPointStartYm() を使う。
  */
 export const MAKEUP_POINT_START_YM = "2026-10";
+
+/**
+ * 実際に使う開始月。開発時だけ env `NEXT_PUBLIC_MAKEUP_POINT_START_YM`（YYYY-MM）で前倒しできる。
+ *
+ * 手動テストのため: 「今日を10月◯日として扱う」ような時計の偽装は、投稿の createdAt が DB の実時刻で
+ * 入るため画面とデータの日付が食い違い、しかも「今」の出所がサーバー・クライアントの多数箇所に散っていて
+ * 本番経路を広く触ることになる。開始月を今月にずらせば、時計は本物のままポイント制を実時刻で試せる。
+ *
+ * 本番（NODE_ENV=production）では無視する: 設定ミスで本番の切り替え月が動くと、確定済みの月の上限が
+ * 変わって👑が揺れるため。NEXT_PUBLIC_ にしているのは、カレンダーの説明文をクライアントでも出し分けるため
+ * （Next.js はビルド時にこの参照を値へ置き換える）。モジュール読み込み時ではなく呼ぶたびに読むのは、
+ * スクリプトが dotenv で env を読み込む前に import されても効くようにするため。
+ */
+export function makeupPointStartYm(): string {
+  if (process.env.NODE_ENV === "production") return MAKEUP_POINT_START_YM;
+  const override = process.env.NEXT_PUBLIC_MAKEUP_POINT_START_YM;
+  return override && /^\d{4}-(0[1-9]|1[0-2])$/.test(override) ? override : MAKEUP_POINT_START_YM;
+}
 
 /**
  * 穴埋めの締切日（対象月の翌月の、この日まで）。
@@ -30,6 +49,21 @@ export const MAKEUP_POINT_START_YM = "2026-10";
  * 👑も取る、という二重取りが成立してしまう。
  */
 export const MAKEUP_DEADLINE_DAY = 10;
+
+/**
+ * monthly-catchup（先月が皆勤でなかった人への+1pt）を付与する日。先月の穴埋め締切の翌日。
+ * 締切より前に付与すると、+1pt を受け取ってから先月を埋めて👑も取れてしまう。
+ */
+export const MONTHLY_CATCHUP_DAY = MAKEUP_DEADLINE_DAY + 1;
+
+/**
+ * 今日(JST)が monthly-catchup の付与を始めてよい日か（11日以降）。
+ * 「11日ちょうど」ではなく「以降」: 定期ジョブが止まっていて11日を跨いでも、次の実行で拾うため
+ * （二重付与は台帳の @@unique が弾く）。
+ */
+export function isCatchupOpen(now: Date): boolean {
+  return jstDayOf(now) >= MONTHLY_CATCHUP_DAY;
+}
 
 /** 新規登録時に付与するポイントの上限（登録が10日以降なら一律この値）。 */
 export const SIGNUP_POINT_MAX = 8;
@@ -58,7 +92,7 @@ export interface MakeupPointGrantLike {
 
 /** その月がポイント制の対象か。"YYYY-MM" は辞書順＝時系列順なので文字列比較で足りる。 */
 export function isPointEra(ym: string): boolean {
-  return ym >= MAKEUP_POINT_START_YM;
+  return ym >= makeupPointStartYm();
 }
 
 /**
@@ -87,13 +121,7 @@ export function makeupDeadline(ym: string): Date {
 export function isMakeupEditable(ym: string, now: Date): boolean {
   if (now.getTime() >= makeupDeadline(ym).getTime()) return false;
   // 未来月は編集させない（対象月がまだ始まっていない）。
-  return ym <= currentYm(now);
-}
-
-/** now(JST) の年月。`toJstYm` の薄いラッパ（このモジュール内で完結させるため再輸出しない）。 */
-function currentYm(now: Date): string {
-  const t = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  return formatYm(t.getUTCFullYear(), t.getUTCMonth() + 1);
+  return ym <= toJstYm(now);
 }
 
 /** 台帳行の合計＝その月の cap（穴埋めできる上限日数）。 */
@@ -123,21 +151,23 @@ export function hasGrant(
  */
 export function potentialCapOf(args: {
   grants: ReadonlyArray<MakeupPointGrantLike>;
-  /** JST の今日の日(1-31)。対象月が当月でないときは呼ばない（過去月は cap が確定済み）。 */
-  todayDayNum: number;
-  /** このユーザーが monthly-catchup の対象か（先月中に既にアカウントがある）。 */
+  /**
+   * 対象月が当月か。過去月はもう付与が来ない（catchup は当月11日、実績ptは達成した月にしか
+   * 付かない）ので cap がそのまま上限になる。
+   */
+  isCurrentMonth: boolean;
+  /**
+   * このユーザーが当月の monthly-catchup を受け取る見込みか（先月中に既にアカウントがあり、
+   * 先月が皆勤でない）。日付では絞らない: 11日になってから定期ジョブが付与するまでの
+   * 最大30分間も「まだ来る」扱いにするため。
+   */
   catchupEligible: boolean;
 }): number {
-  const { grants, todayDayNum, catchupEligible } = args;
-  let potential = sumGrants(grants);
-  // 11日より前なら catchup がまだ来る可能性がある。
-  if (
-    catchupEligible &&
-    todayDayNum <= MAKEUP_DEADLINE_DAY &&
-    !hasGrant(grants, MAKEUP_POINT_REASONS.MONTHLY_CATCHUP)
-  ) {
-    potential += 1;
-  }
+  const { grants, isCurrentMonth, catchupEligible } = args;
+  const cap = sumGrants(grants);
+  if (!isCurrentMonth) return cap;
+  let potential = cap;
+  if (catchupEligible && !hasGrant(grants, MAKEUP_POINT_REASONS.MONTHLY_CATCHUP)) potential += 1;
   // 実績+1pt は月内いつでも取りうる（月1回まで）。
   if (!hasGrant(grants, MAKEUP_POINT_REASONS.ACHIEVEMENT)) potential += 1;
   return potential;

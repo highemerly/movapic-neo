@@ -8,6 +8,13 @@ import { resolveAchievement } from "@/lib/achievements/catalog";
 import { favoriteNotificationWho, formatNotificationDate } from "@/lib/notifications/format";
 import { ReactionEmojiView } from "@/components/reaction/ReactionEmojiView";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
+import {
+  isMakeupNotificationType,
+  makeupNotificationDetail,
+  makeupNotificationHref,
+  makeupNotificationIcon,
+  makeupNotificationText,
+} from "@/lib/makeup/notificationTypes";
 
 type Category = "favorite" | "achievement" | "other";
 
@@ -19,7 +26,8 @@ const CATEGORIES: { key: Category; label: string }[] = [
 
 function categoryOf(n: NotificationFeedItem): Category {
   if (n.type === "favorite") return "favorite";
-  if (n.type === "makeup-reminder") return "other";
+  // 穴埋め系は achievementKey（対象月 perfect-month:YYYY-MM）を持つので、下の実績判定より先に振り分ける。
+  if (isMakeupNotificationType(n.type)) return "other";
   // achievementKey を持つ実績通知。それ以外は「その他」に寄せる。
   return n.achievementKey ? "achievement" : "other";
 }
@@ -80,7 +88,8 @@ export function NotificationsList({
       ) : (
         <ul className="divide-y rounded-xl border">
           {filtered.map((n) => {
-            const isReminder = n.type === "makeup-reminder";
+            const makeupType = isMakeupNotificationType(n.type) ? n.type : null;
+            const isReminder = makeupType !== null;
             const isFavorite = n.type === "favorite";
             // 直近のリアクション（絵文字が無い旧通知は既定のアイコンで出す）
             const latestFavoriter = n.favorite?.favoriters[0];
@@ -88,8 +97,8 @@ export function NotificationsList({
               ? { emoji: latestFavoriter.emoji, imageUrl: latestFavoriter.emojiImageUrl }
               : null;
             const a = !isReminder && !isFavorite && n.achievementKey ? resolveAchievement(n.achievementKey) : null;
-            const href = isReminder
-              ? `/u/${selfSeg}/calendar`
+            const href = makeupType
+              ? makeupNotificationHref(selfSeg, n.makeup?.ym ?? null)
               : n.image?.pageUrl ?? `/u/${selfSeg}/achievements`;
             return (
               <li key={n.id}>
@@ -110,7 +119,10 @@ export function NotificationsList({
                     </span>
                   ) : (
                     <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                      <AchievementIcon name={isReminder ? "Crown" : a?.icon ?? "Trophy"} className="h-7 w-7" />
+                      <AchievementIcon
+                        name={makeupType ? makeupNotificationIcon(makeupType) : a?.icon ?? "Trophy"}
+                        className="h-7 w-7"
+                      />
                     </span>
                   )}
                   <div className="min-w-0 flex-1">
@@ -127,8 +139,8 @@ export function NotificationsList({
                           )}
                           リアクションされました
                         </span>
-                      ) : isReminder ? (
-                        "👑 皆勤賞の穴埋めをしよう"
+                      ) : makeupType ? (
+                        makeupNotificationText(makeupType, n.makeup?.ym ?? null, n.makeup?.point ?? null)
                       ) : (
                         <>🏆 「<span className="font-semibold">{a?.title ?? "?"}</span>」を獲得</>
                       )}
@@ -136,8 +148,8 @@ export function NotificationsList({
                     <p className="mt-1 text-xs leading-snug text-muted-foreground line-clamp-2">
                       {isFavorite
                         ? favoriteNotificationWho(n.favorite)
-                        : isReminder
-                          ? "別日に2枚以上投稿すると、未投稿の日を穴埋めできます"
+                        : makeupType
+                          ? makeupNotificationDetail(makeupType)
                           : a?.description ?? ""}
                     </p>
                     <p className="mt-1.5 text-[11px] text-muted-foreground">

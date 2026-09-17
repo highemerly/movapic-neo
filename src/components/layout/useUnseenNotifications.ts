@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { markNotificationsSeen } from "@/app/actions/notifications";
+import type { MakeupPointFeedData } from "@/lib/makeup/notificationTypes";
 
 const COOKIE_NAME = "not";
 
@@ -33,6 +34,8 @@ export type NotificationItem = {
   createdAt: string;
   image: { id: string; pageUrl: string; thumbnailUrl: string } | null;
   favorite: FavoriteFeedData | null;
+  /** 穴埋め系（makeup-*）の通知のとき、対象月と付与内容（NotificationFeedItem.makeup と同形）。 */
+  makeup: { ym: string | null; point: MakeupPointFeedData | null } | null;
   recipientUsername: string;
 };
 

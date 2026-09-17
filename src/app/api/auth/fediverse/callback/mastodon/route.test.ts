@@ -30,6 +30,7 @@ const {
   userFindUnique,
   userUpdate,
   userCreate,
+  grantSignupMakeupPointsMock,
 } = vi.hoisted(() => {
   const values = new Map<string, string>();
   const deleted: string[] = [];
@@ -54,6 +55,7 @@ const {
     userFindUnique: vi.fn(),
     userUpdate: vi.fn(),
     userCreate: vi.fn(),
+    grantSignupMakeupPointsMock: vi.fn(),
   };
 });
 
@@ -80,12 +82,18 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+vi.mock("@/lib/makeup/awards", () => ({
+  grantSignupMakeupPoints: grantSignupMakeupPointsMock,
+}));
+
 import { GET } from "./route";
 import { encryptOAuthSession, generateOAuthState } from "@/lib/auth/crypto";
 import { LOGIN_REDIRECT_DEFAULT } from "@/lib/auth/redirectUrl";
 import { decryptToken } from "@/lib/auth/tokens";
 
 const BASE_URL = "https://shamezo.example";
+/** 新規作成したユーザーの createdAt（DB が埋める値のつもり）。 */
+const CREATED_AT = new Date("2026-10-05T03:00:00Z");
 const SERVER = "mastodon.example";
 const PLAIN_TOKEN = "plain-access-token";
 
@@ -120,8 +128,10 @@ beforeEach(() => {
   userFindUnique.mockResolvedValue(null);
   userCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
     id: "user-1",
+    createdAt: CREATED_AT,
     ...data,
   }));
+  grantSignupMakeupPointsMock.mockResolvedValue(undefined);
   userUpdate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
     id: "user-1",
     ...data,
@@ -289,6 +299,36 @@ describe("GET /api/auth/fediverse/callback/mastodon ログイン成功", () => {
     expect(userUpdate).toHaveBeenCalledOnce();
     expect(userCreate).not.toHaveBeenCalled();
     expect(userUpdate.mock.calls[0][0].where).toEqual({ id: "user-1" });
+  });
+
+  it("初回ログインでは、作成したユーザーの登録日時で穴埋めポイントを付与する", async () => {
+    const state = primeCookies();
+    const res = await GET(req({ code: "auth-code", state }));
+
+    expect(res.status).toBe(307);
+    expect(grantSignupMakeupPointsMock).toHaveBeenCalledWith({
+      userId: "user-1",
+      instanceDomain: SERVER,
+      now: CREATED_AT,
+    });
+  });
+
+  it("既存ユーザーのログインでは穴埋めポイントを付与しない（登録時の1回だけ）", async () => {
+    userFindUnique.mockResolvedValue({ id: "user-1", username: "alice" });
+    const state = primeCookies();
+    await await GET(req({ code: "auth-code", state }));
+
+    expect(grantSignupMakeupPointsMock).not.toHaveBeenCalled();
+  });
+
+  it("穴埋めポイントの付与に失敗してもログインは成功させる", async () => {
+    grantSignupMakeupPointsMock.mockRejectedValue(new Error("db down"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const state = primeCookies();
+    const res = await GET(req({ code: "auth-code", state }));
+
+    expect(location(res)).toBe(`${BASE_URL}/create?welcome=1`);
+    errorSpy.mockRestore();
   });
 
   it("HOME_SERVER と同一ドメインならユーザーページはドメインを省く", async () => {

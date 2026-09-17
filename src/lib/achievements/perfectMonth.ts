@@ -8,6 +8,12 @@
  * 1日分のみ埋める。判定の中核を1箇所に集め、live(stats/engine) / backfill / カレンダーAPI /
  * 穴埋め通知 の4経路がすべてここを呼ぶ。
  *
+ * **grace＝「その月に穴埋めできる上限日数」**。ここでは出所を問わない。2026-09 以前の月は
+ * 所属インスタンスで決まる固定値（3/4）、2026-10 以降は穴埋めポイントの付与合計
+ * （@/lib/makeup/points・台帳は月内で単調非減少・月末凍結）。解決は呼び出し側が
+ * `resolveMakeupCap`（@/lib/makeup/ledger）で行って渡す。意味を変えずに出所だけを差し替えたので、
+ * 割当（pickMakeupHole）・判定（isPerfectMonth）の式は制度変更の前後で同一。
+ *
  * catalog.ts と同じく「サーバー/クライアント両方から import されうる」ため、
  * React・サーバー専用 API を import しないこと（型・純粋関数のみ）。
  */
@@ -16,7 +22,8 @@
 export const PERFECT_MONTH_CATEGORY = "perfect-month";
 
 /**
- * 未投稿として許容する日数（穴埋め枠）。これを超える未投稿があるとその月の皆勤賞は不成立。
+ * 2026-09 以前の月の、未投稿として許容する日数（穴埋め枠）。2026-10 以降は穴埋めポイントに置き換わった。
+ * これを超える未投稿があるとその月の皆勤賞は不成立。
  * 特典サーバー（env FAVOR_SERVERS）所属ユーザーのみ +1 日だけ優遇する（FAVORED=4 / その他=3）。
  * しきい値は所属インスタンスごとに `perfectMonthGrace(domain)`（サーバー専用の
  * @/lib/achievements/grace）で解決し、live/backfill/カレンダーAPI のいずれも
@@ -27,7 +34,12 @@ export const PERFECT_MONTH_GRACE_FAVORED = 4;
 /** 特典サーバー以外のインスタンス所属ユーザーの未投稿許容日数。 */
 export const PERFECT_MONTH_GRACE_DEFAULT = 3;
 
-/** 穴埋め推奨通知を送る／カレンダーで注意を促す「過ぎた未投稿日数」の上限。超えたら出さない。 */
+/**
+ * 2026-09 以前の月の穴埋め推奨通知（makeup-reminder）を送る「過ぎた未投稿日数」の上限。超えたら出さない。
+ * ポイント制の月では使わない: 9日登録の新規ユーザー（8pt・穴8日）が最も救済したい層なのに、
+ * この上限だと通知が一切出なくなる。ポイント制では残高と達成可能性（canPromptMakeup）が役目を引き継ぐ。
+ */
+// TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（shouldRemindMakeup と一緒に削除）
 export const MAKEUP_REMINDER_MAX_SKIPPED = 5;
 
 /** "2026-06" → "perfect-month:2026-06" */
@@ -194,25 +206,45 @@ export interface CurrentMonthMakeupStatus {
   skippedSoFar: number;
   /** まだ埋まっていない（永続割当のつかない）過去の穴の数。 */
   unfilled: number;
-  /** 今日すでにダブル投稿しているか（count(today) >= 2 ＝ 今日の穴埋め枠を使用済み）。 */
-  todayUsedMakeup: boolean;
-  /** まだ皆勤賞に手が届く範囲か（skippedSoFar <= grace）。 */
+  /** 今月あと何日ぶん埋められるか（grace − 埋めた数）。0 なら今は割り当てられない。 */
+  remaining: number;
+  /** 今日の投稿数。1 なら「もう1枚で穴埋めできる」、2以上なら donor 候補がある。 */
+  todayPosts: number;
+  /**
+   * 今日の投稿のどれかが既に穴を埋めているか（1日1donor なので、true なら今日はもう埋められない）。
+   *
+   * pitfall: 以前は `count(today) >= 2` で代用していた。自動穴埋めでは「2枚投稿した瞬間に
+   * donor が割り当たる」ので同値だったが、手動専用になると「2枚投稿したがまだ割り当てていない」が
+   * 常態になり、コールアウトが即「明日2枚投稿しよう」になって「今すぐ穴埋めしよう」が永久に出なかった。
+   * 実際の割当（donor の有無）を見れば、自動穴埋めの月でも同じ結果になる。
+   */
+  todayHasDonor: boolean;
+  /**
+   * まだ皆勤賞に手が届く範囲か（skippedSoFar <= potentialGrace）。
+   * 「今使える枠(grace)」ではなく「月内にまだ付与されうる分も含めた上限」で判定する。
+   * grace で判定すると、ポイント制の月初（cap=0）に1日休んだ瞬間に達成不可となり、
+   * 11日に+1pt が来るまでコールアウトも通知も消えてしまうため。
+   */
   stillAchievable: boolean;
 }
 
 /**
  * 当月の穴埋め状況を計算（純粋・永続割当ベース）。todayDayNum は JST の今日の日(1-31)。
  * unfilled は「今日より前の穴」のうち filledHoleDays（永続割当）で埋まっていない数。
- * grace は投稿者の所属インスタンスで決まる（`perfectMonthGrace`）。
  */
 export function currentMonthMakeupStatus(args: {
   daysInMonth: number;
   todayDayNum: number;
   dayCounts: DayCounts;
   filledHoleDays: Iterable<number>;
+  /** 今日の投稿に donor（makeupTargetDay が付いた画像）がいるか。 */
+  todayHasDonor: boolean;
+  /** その月に今埋められる上限（cap）。 */
   grace: number;
+  /** その月にまだ付与されうる分も含めた上限（potentialCapOf）。従来ルールの月は grace と同じ値を渡す。 */
+  potentialGrace: number;
 }): CurrentMonthMakeupStatus {
-  const { daysInMonth, todayDayNum, grace } = args;
+  const { daysInMonth, todayDayNum, grace, potentialGrace } = args;
   const count = toCountFn(args.dayCounts);
   let skippedSoFar = 0;
   for (let d = 1; d < todayDayNum; d++) if (count(d) === 0) skippedSoFar++;
@@ -220,9 +252,50 @@ export function currentMonthMakeupStatus(args: {
   return {
     skippedSoFar,
     unfilled: skippedSoFar - filledPast,
-    todayUsedMakeup: count(todayDayNum) >= 2,
-    stillAchievable: skippedSoFar <= grace,
+    remaining: Math.max(0, grace - filledPast),
+    todayPosts: count(todayDayNum),
+    todayHasDonor: args.todayHasDonor,
+    stillAchievable: skippedSoFar <= potentialGrace,
   };
+}
+
+/**
+ * 今すぐ手動で割り当てられる「donor 候補の日 × 未充填の穴」の組が1つでもあるか（純粋）。
+ * donor 候補 = 2枚以上投稿していて、まだその日に donor がいない日（1日1donor）。
+ * 穴 = donor 候補の日より前の、投稿0枚でまだ埋まっていない日（穴は donor より前しか埋められない）。
+ *
+ * 付与の瞬間の「穴埋めできるようになりました」通知の判定に使う。今日の投稿に限らないのは、
+ * 例えば8日にダブル投稿・3日が穴の状態で11日に+1pt が来たら、その場で埋められるため。
+ */
+export function hasAssignableMakeup(args: {
+  daysInMonth: number;
+  dayCounts: DayCounts;
+  filledHoleDays: Iterable<number>;
+  /** donor 割当（makeupTargetDay が付いた画像）がいる日。 */
+  donorDays: Iterable<number>;
+}): boolean {
+  const { daysInMonth } = args;
+  const count = toCountFn(args.dayCounts);
+  const filled = new Set(args.filledHoleDays);
+  const donors = new Set(args.donorDays);
+  // 古い日から見て「最初に現れた未充填の穴」より後ろに donor 候補があれば組が作れる。
+  let firstOpenHole = Infinity;
+  for (let d = 1; d <= daysInMonth; d++) {
+    if (count(d) === 0 && !filled.has(d) && firstOpenHole === Infinity) firstOpenHole = d;
+    if (count(d) >= 2 && !donors.has(d) && d > firstOpenHole) return true;
+  }
+  return false;
+}
+
+/**
+ * 穴埋めを促してよい状態か（ポイント制の促し通知・カレンダーのコールアウトで共用・純粋）。
+ * - まだ埋まっていない穴がある
+ * - 今の残高で1つ以上埋められる（残高0で促しても押せるボタンが無い）
+ * - その月がまだ達成可能（穴が多すぎて皆勤不可能な人を毎日つつかない）
+ * 締切（isMakeupEditable）と「今日の枚数」による出し分けは呼び出し側で行う。
+ */
+export function canPromptMakeup(status: CurrentMonthMakeupStatus): boolean {
+  return status.unfilled > 0 && status.remaining >= 1 && status.stillAchievable;
 }
 
 /**
@@ -235,12 +308,14 @@ export function coveredDays(distinctDays: number, status: CurrentMonthMakeupStat
 }
 
 /**
- * 穴埋め推奨通知を送るべきか（純粋）。
+ * 2026-09 以前の月の穴埋め推奨通知（makeup-reminder）を送るべきか（純粋）。
+ * ポイント制の月は canPromptMakeup を使う。投稿は必ず当月に入るので、2026-10-01 以降は呼ばれない。
  * - 1日以上の未投稿がある（skippedSoFar >= 1）
  * - まだ埋まっていない穴がある（unfilled > 0）
  * - 穴が多すぎない（skippedSoFar <= MAKEUP_REMINDER_MAX_SKIPPED）
  * 「今日投稿した」「同月内で未送信」の条件は呼び出し側で担保する。
  */
+// TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照
 export function shouldRemindMakeup(skippedSoFar: number, unfilled: number): boolean {
   return skippedSoFar >= 1 && unfilled > 0 && skippedSoFar <= MAKEUP_REMINDER_MAX_SKIPPED;
 }

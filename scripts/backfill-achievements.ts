@@ -38,6 +38,7 @@ import {
 } from "@/lib/achievements/catalog";
 import { summarizeDayCounts } from "@/lib/achievements/perfectMonth";
 import { perfectMonthGrace } from "@/lib/achievements/grace";
+import { isPointEra } from "@/lib/makeup/points";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -93,7 +94,12 @@ interface GrantRow {
   grantedAt: Date;
 }
 
-function replayUser(userId: string, images: ReplayImage[], grace: number): GrantRow[] {
+/**
+ * @param capOf その月（YYYY-MM）の穴埋め上限。2026-09 以前は所属インスタンスの固定値、
+ *   2026-10 以降は穴埋めポイント台帳の合計（live の resolveMakeupCap と同じ規則）。
+ *   月ごとに違うので、ユーザー単位の1値では渡せない。
+ */
+function replayUser(userId: string, images: ReplayImage[], capOf: (ym: string) => number): GrantRow[] {
   const grants: GrantRow[] = [];
   const grantedKeys = new Set<string>();
 
@@ -213,7 +219,7 @@ function replayUser(userId: string, images: ReplayImage[], grace: number): Grant
       }
     }
     // 皆勤賞（動的）
-    const pm = evaluatePerfectMonth(stats, post, grace);
+    const pm = evaluatePerfectMonth(stats, post, capOf(toJstDateString(img.createdAt).slice(0, 7)));
     if (pm && !grantedKeys.has(pm)) {
       grantedKeys.add(pm);
       grants.push({
@@ -366,7 +372,20 @@ async function main() {
 
     // 1. 投稿ベースの実績付与
     if (images.length > 0) {
-      const grants = replayUser(user.id, images, perfectMonthGrace(user.instance.domain));
+      // 穴埋め上限は月ごとに解決する。台帳は月末で凍結し追記のみなので、実行時点の合計で判定してよい。
+      // ポイントはここでは付与しない（backfill の過去日付の実績で「実績ptを遡及」させない）。
+      const legacyGrace = perfectMonthGrace(user.instance.domain);
+      const pointCaps = new Map(
+        (
+          await prisma.makeupPointGrant.groupBy({
+            by: ["month"],
+            where: { userId: user.id },
+            _sum: { amount: true },
+          })
+        ).map((g) => [g.month, g._sum.amount ?? 0])
+      );
+      const capOf = (ym: string) => (isPointEra(ym) ? (pointCaps.get(ym) ?? 0) : legacyGrace);
+      const grants = replayUser(user.id, images, capOf);
       if (grants.length > 0) {
         const result = await prisma.achievement.createMany({ data: grants, skipDuplicates: true });
         grantedCount += result.count;

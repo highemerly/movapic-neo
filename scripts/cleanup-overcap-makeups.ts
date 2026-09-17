@@ -21,6 +21,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { toJstDateString } from "@/lib/streak";
 import { perfectMonthGrace } from "@/lib/achievements/grace";
+import { isPointEra } from "@/lib/makeup/points";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -66,6 +67,10 @@ async function main() {
     // クリアすべき donor id を決める。
     const toClear: string[] = [];
     for (const [ym, donors] of donorsByMonth) {
+      // 2026-10 以降の月の上限は固定 grace ではなく穴埋めポイント。固定値で削ると、ポイントで正当に
+      // 埋めた割当を消してしまう（ポイント制の月の超過は PATCH のロック付き上限チェックが防ぐ）。
+      // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照
+      if (isPointEra(ym)) continue;
       const dc = dayCountsByMonth.get(ym)!;
       // 有効（空き日を指す）と 不正（投稿のある日を指す）に分ける。
       const valid = donors.filter((d) => (dc[d.holeDay] ?? 0) === 0);

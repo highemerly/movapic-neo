@@ -1,14 +1,17 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
-// 境界（認証・DB・S3・Fediverse・穴埋め再計算・env依存のgrace）を先頭でモックする。
-// perfectMonth / streak は純粋ロジックなので本物を使う（判定そのものを検証したいため）。
+// 境界（認証・DB・S3・Fediverse・穴埋め再計算・env依存のgrace・穴埋めポイント台帳・削除後の掃除）を
+// 先頭でモックする。perfectMonth / streak / jst / makeup/points は純粋ロジックなので本物を使う
+// （判定・締切そのものを検証したいため）。
+//
+// 時計: 締切（対象月の翌月10日まで）が new Date() 基準なので、Date だけを固定する（既定は 2026-03-25 JST）。
+// Promise やタイマーは本物のまま（toFake: ["Date"]）。
 vi.mock("@/lib/auth/session", () => ({ getCurrentUserWithValidation: vi.fn() }));
 vi.mock("@/lib/db", () => ({
   default: {
     image: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), delete: vi.fn() },
     achievement: { findFirst: vi.fn() },
-    $transaction: vi.fn(),
   },
 }));
 vi.mock("@/lib/storage/storage", () => ({ deleteImage: vi.fn() }));
@@ -16,12 +19,23 @@ vi.mock("@/lib/auth/tokens", () => ({ decryptToken: vi.fn((t: string) => `dec:${
 vi.mock("@/lib/fediverse/delete", () => ({ fediverseStatusExists: vi.fn() }));
 vi.mock("@/lib/achievements/makeupAssign", () => ({ recomputeMonthMakeups: vi.fn() }));
 vi.mock("@/lib/achievements/grace", () => ({ perfectMonthGrace: vi.fn(() => 3) }));
+// ロックは「渡された関数をモックの prisma をトランザクションとして実行する」だけにする。
+vi.mock("@/lib/makeup/ledger", async () => {
+  const db = (await import("@/lib/db")).default;
+  return {
+    resolveMakeupCap: vi.fn(async () => 3),
+    withMonthMakeupLock: vi.fn((_userId: string, _ym: string, fn: (tx: unknown) => unknown) => fn(db)),
+  };
+});
+vi.mock("@/lib/makeup/selfHeal", () => ({ healAfterImageDelete: vi.fn() }));
 
 import { PATCH, DELETE } from "./route";
 import { getCurrentUserWithValidation } from "@/lib/auth/session";
 import { deleteImage } from "@/lib/storage/storage";
 import { fediverseStatusExists } from "@/lib/fediverse/delete";
 import { recomputeMonthMakeups } from "@/lib/achievements/makeupAssign";
+import { resolveMakeupCap, withMonthMakeupLock } from "@/lib/makeup/ledger";
+import { healAfterImageDelete } from "@/lib/makeup/selfHeal";
 import prisma from "@/lib/db";
 
 const mockAuth = vi.mocked(getCurrentUserWithValidation);
@@ -30,10 +44,17 @@ const mockFindMany = vi.mocked(prisma.image.findMany);
 const mockUpdate = vi.mocked(prisma.image.update);
 const mockDelete = vi.mocked(prisma.image.delete);
 const mockAchievementFindFirst = vi.mocked(prisma.achievement.findFirst);
-const mockTransaction = vi.mocked(prisma.$transaction);
 const mockDeleteImage = vi.mocked(deleteImage);
 const mockStatusExists = vi.mocked(fediverseStatusExists);
 const mockRecompute = vi.mocked(recomputeMonthMakeups);
+const mockResolveCap = vi.mocked(resolveMakeupCap);
+const mockLock = vi.mocked(withMonthMakeupLock);
+const mockHeal = vi.mocked(healAfterImageDelete);
+
+/** JST のその日時を「今」にする（Date だけ固定）。 */
+function setNow(iso: string) {
+  vi.setSystemTime(new Date(iso));
+}
 
 type SessionUser = Awaited<ReturnType<typeof getCurrentUserWithValidation>>;
 const OWNER = {
@@ -77,10 +98,17 @@ function targetImage(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers({ toFake: ["Date"] });
+  setNow("2026-03-25T03:00:00Z"); // 3月分の穴埋めはまだ締切前
+  mockResolveCap.mockResolvedValue(3);
+  mockHeal.mockResolvedValue(0);
   mockAuth.mockResolvedValue(OWNER);
   mockAchievementFindFirst.mockResolvedValue(null as never);
-  mockTransaction.mockImplementation(async (ops: unknown) => ops as never);
   mockUpdate.mockResolvedValue({} as never);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("DELETE /api/v1/images/[id]", () => {
@@ -171,10 +199,43 @@ describe("DELETE /api/v1/images/[id]", () => {
     });
   });
 
-  it("autoMakeup が無効なユーザーの月は触らない（手動運用のため）", async () => {
+  it("autoMakeup が無効なユーザーは再計算せず、失効した donor 割当だけを外す", async () => {
     await DELETE(deleteReq(), params());
 
     expect(mockRecompute).not.toHaveBeenCalled();
+    expect(mockHeal).toHaveBeenCalledWith({ userId: "u1", deletedCreatedAt: jst(10) });
+  });
+
+  it("ポイント制の月（2026-10 以降）は autoMakeup でも再計算せず、失効掃除だけ行う", async () => {
+    // 自動穴埋めは廃止。システムが別の写真で埋め直すと「自動穴埋めの復活」になるため
+    setNow("2026-10-25T03:00:00Z");
+    mockAuth.mockResolvedValue({ ...OWNER, autoMakeup: true } as SessionUser);
+    mockFindUnique.mockResolvedValue(image({ createdAt: jst(10, 10) }));
+
+    await DELETE(deleteReq(), params());
+
+    expect(mockRecompute).not.toHaveBeenCalled();
+    expect(mockHeal).toHaveBeenCalledWith({ userId: "u1", deletedCreatedAt: jst(10, 10) });
+  });
+
+  it("締切を過ぎた従来ルールの月は autoMakeup でも再計算しない（締切後に割当を動かさない）", async () => {
+    setNow("2026-05-01T03:00:00Z"); // 3月分の締切（4/10）後
+    mockAuth.mockResolvedValue({ ...OWNER, autoMakeup: true } as SessionUser);
+
+    await DELETE(deleteReq(), params());
+
+    expect(mockRecompute).not.toHaveBeenCalled();
+    expect(mockHeal).toHaveBeenCalled();
+  });
+
+  it("失効掃除が失敗しても画像削除は成功させる", async () => {
+    mockHeal.mockRejectedValue(new Error("heal failed"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const res = await DELETE(deleteReq(), params());
+
+    expect(res.status).toBe(200);
+    errorSpy.mockRestore();
   });
 
   it("穴埋め再計算が失敗しても画像削除は成功させる", async () => {
@@ -289,14 +350,15 @@ describe("PATCH /api/v1/images/[id]", () => {
     const res = await PATCH(patchReq({ calendarPicked: true }), params());
 
     expect(res.status).toBe(403);
-    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockLock).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it("更新フィールドが無ければ400を返す", async () => {
     const res = await PATCH(patchReq({}), params());
 
     expect(res.status).toBe(400);
-    expect(mockTransaction).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   describe("代表（サムネイル）の指定", () => {
@@ -327,7 +389,15 @@ describe("PATCH /api/v1/images/[id]", () => {
       const res = await PATCH(patchReq({ calendarPicked: true }), params());
 
       expect(res.status).toBe(409);
-      expect(mockTransaction).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("穴埋めの締切を過ぎた月でも、代表の指定はできる（締切は穴埋めだけ）", async () => {
+      setNow("2026-05-01T03:00:00Z");
+
+      const res = await PATCH(patchReq({ calendarPicked: true }), params());
+
+      expect(res.status).toBe(200);
     });
   });
 
@@ -363,7 +433,7 @@ describe("PATCH /api/v1/images/[id]", () => {
       const res = await PATCH(patchReq({ makeupTargetDay: target }), params());
 
       expect(res.status).toBe(400);
-      expect(mockTransaction).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
 
     it("自分より前の日しか埋められない（同日・未来は409）", async () => {
@@ -436,7 +506,7 @@ describe("PATCH /api/v1/images/[id]", () => {
       });
     });
 
-    it("grace（既定3日）を超える新規割当は409で拒否する", async () => {
+    it("上限（従来ルールの月は3日）を超える新規割当は409で拒否する", async () => {
       // 既に3つの穴（2,3,4日）を埋めている状態で、4つ目（5日）を足そうとする。
       mockFindMany.mockResolvedValue(
         monthImages([
@@ -454,6 +524,90 @@ describe("PATCH /api/v1/images/[id]", () => {
       await expect(res.json()).resolves.toEqual({ error: "穴埋めは1か月に3日までです" });
     });
 
+    it("上限は画像の月（今月ではない）で ledger から解決する", async () => {
+      setNow("2026-04-05T03:00:00Z"); // 4/5 に 3月分を埋める
+
+      await PATCH(patchReq({ makeupTargetDay: 5 }), params());
+
+      expect(mockResolveCap).toHaveBeenCalledWith({
+        userId: "u1",
+        instanceDomain: "handon.club",
+        ym: "2026-03",
+      });
+    });
+
+    it("ポイント制の月で残りが無ければ、ポイント不足として409で拒否する", async () => {
+      setNow("2026-10-25T03:00:00Z");
+      mockFindUnique.mockResolvedValue(targetImage({ createdAt: jst(10, 10) }));
+      mockFindMany.mockResolvedValue(
+        [
+          { id: "img1", createdAt: jst(10, 10), makeupTargetDay: null },
+          { id: "img2", createdAt: jst(10, 10), makeupTargetDay: null },
+          { id: "d1", createdAt: jst(20, 10), makeupTargetDay: 2 },
+        ] as never
+      );
+      mockResolveCap.mockResolvedValue(1); // 1pt を 2日の穴で使用済み
+
+      const res = await PATCH(patchReq({ makeupTargetDay: 5 }), params());
+
+      expect(res.status).toBe(409);
+      await expect(res.json()).resolves.toEqual({
+        error: "穴埋めポイントが足りません（10月の穴埋めポイントは1ptです）",
+      });
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("ポイント0の月は1件目から拒否する", async () => {
+      setNow("2026-10-25T03:00:00Z");
+      mockFindUnique.mockResolvedValue(targetImage({ createdAt: jst(10, 10) }));
+      mockFindMany.mockResolvedValue(
+        [
+          { id: "img1", createdAt: jst(10, 10), makeupTargetDay: null },
+          { id: "img2", createdAt: jst(10, 10), makeupTargetDay: null },
+        ] as never
+      );
+      mockResolveCap.mockResolvedValue(0);
+
+      const res = await PATCH(patchReq({ makeupTargetDay: 5 }), params());
+
+      expect(res.status).toBe(409);
+    });
+
+    it("翌月10日までは先月分を穴埋めできる", async () => {
+      setNow("2026-04-10T14:59:59Z"); // 4/10 23:59:59 JST
+
+      const res = await PATCH(patchReq({ makeupTargetDay: 5 }), params());
+
+      expect(res.status).toBe(200);
+    });
+
+    it("翌月11日になったら、指定は409で拒否し何も書かない", async () => {
+      setNow("2026-04-10T15:00:00Z"); // 4/11 00:00 JST
+
+      const res = await PATCH(patchReq({ makeupTargetDay: 5 }), params());
+
+      expect(res.status).toBe(409);
+      await expect(res.json()).resolves.toEqual({ error: "3月の穴埋めは4月10日で締め切りました" });
+      expect(mockLock).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("締切後は解除も409で拒否する（ポイントを戻して再利用させない）", async () => {
+      setNow("2026-05-01T03:00:00Z");
+      mockFindUnique.mockResolvedValue(targetImage({ makeupTargetDay: 5 }));
+
+      const res = await PATCH(patchReq({ makeupTargetDay: null }), params());
+
+      expect(res.status).toBe(409);
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("検証と書き込みはユーザー×画像の月で直列化する", async () => {
+      await PATCH(patchReq({ makeupTargetDay: 5 }), params());
+
+      expect(mockLock).toHaveBeenCalledWith("u1", "2026-03", expect.any(Function));
+    });
+
     it("皆勤賞を達成済みの月では、非達成に落ちる解除を拒否する", async () => {
       mockFindUnique.mockResolvedValue(targetImage({ makeupTargetDay: 5 }));
       mockAchievementFindFirst.mockResolvedValue({ id: "a1" } as never);
@@ -461,7 +615,7 @@ describe("PATCH /api/v1/images/[id]", () => {
       const res = await PATCH(patchReq({ makeupTargetDay: null }), params());
 
       expect(res.status).toBe(409);
-      expect(mockTransaction).not.toHaveBeenCalled();
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
 
     it("皆勤賞の判定は投稿月のキーで引く（当月ではなく）", async () => {

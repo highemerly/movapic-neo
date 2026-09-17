@@ -7,10 +7,12 @@
 | ファイル | 役割 |
 |---|---|
 | `catalog.ts` | 実績定義（カタログ）・カテゴリ／表示順（`ACHIEVEMENT_LAYOUT`）・皆勤賞の動的評価。**サーバー/クライアント両方から import されるので React・サーバー専用APIを入れない**（型・`@/lib/streak`・`@/types` のみ） |
-| `perfectMonth.ts` | **皆勤賞ロジックの単一ソース**。しきい値（`perfectMonthGrace(domain)` ＝ ホーム handon.club は4・その他は3 / `MAKEUP_REMINDER_MAX_SKIPPED`）・穴埋め割当の貪欲決定（`pickMakeupHole`＝投稿1件ぶん / `assignMonthMakeups`＝月一括）・達成判定（`isPerfectMonth`）・当月進捗（`currentMonthMakeupStatus`）・穴埋め通知ゲート（`shouldRemindMakeup`）・日別集計（`summarizeDayCounts`）。catalog 同様 React/サーバー専用APIを入れない。**穴埋め割当は Image.makeupTargetDay に永続化し、表示（カレンダー）も判定（皆勤賞）も同じ永続値を読む**＝表示と👑が食い違わない。判定は `filledHoleDays`（永続割当が指す空き日）を数える（貪欲の再計算はしない） |
-| `makeupAssign.ts` | 穴埋め割当を DB に書く side（サーバー専用）。`assignMakeupForNewPost`（投稿時に autoMakeup=true なら1件割当）/ `recomputeMonthMakeups`（削除後の自己修復で月を再割当）。純粋な割当規則は perfectMonth.ts に集約し、ここは橋渡しだけ |
+| `perfectMonth.ts` | **皆勤賞ロジックの単一ソース**。上限 `grace`（＝その月に穴埋めできる日数。出所は問わない）を受け取る純粋関数群: 穴埋め割当の貪欲決定（`pickMakeupHole` / `assignMonthMakeups`）・達成判定（`isPerfectMonth`）・当月進捗（`currentMonthMakeupStatus`）・今すぐ割当可能か（`hasAssignableMakeup`）・促してよいか（`canPromptMakeup`）・日別集計。2026-09 以前の固定値 `PERFECT_MONTH_GRACE_*` と旧通知ゲート `shouldRemindMakeup` もここ。catalog 同様 React/サーバー専用APIを入れない。**穴埋め割当は Image.makeupTargetDay に永続化し、表示（カレンダー）も判定（皆勤賞）も同じ永続値を読む**＝表示と👑が食い違わない |
+| `grace.ts` | 2026-09 以前の月の固定上限（`perfectMonthGrace(domain)` ＝ 特典サーバー4・その他3）。env を読むので perfectMonth.ts から分離。**月を問わず上限が欲しいときは `@/lib/makeup/ledger` の `resolveMakeupCap` を使う** |
+| `makeupAssign.ts` | 2026-09 以前の月専用の自動穴埋め（`assignMakeupForNewPost` / `recomputeMonthMakeups`）。2026-10 以降は呼ばれない（[cleanup-2026-10](../../../docs/cleanup-2026-10.md) で削除予定） |
+| `../makeup/*` | **穴埋めポイント制（2026-10〜）**。`points.ts`（純粋: era・付与量・締切・potentialCap）/ `ledger.ts`（上限の解決・付与・直列化ロック）/ `awards.ts`（登録時・実績時の付与）/ `events.ts`（イベント一覧）/ `monthlyGrants.ts`（定期ジョブの月次・イベント付与）/ `notify.ts`（穴埋めを促す通知）/ `notificationTypes.ts`（通知の type・文言・遷移先）/ `selfHeal.ts`（画像削除後の失効掃除） |
 | `stats.ts` | live 用。投稿後に DB から集計（`collectStats`）して `AchStats` を作る。リアクション起点の集計（`collectReactionStats`＝`ReactionStats`）もここ |
-| `engine.ts` | live 用。`evaluateAndGrant`（投稿起点）/ `evaluateAndGrantReaction`（リアクション起点）/ `evaluateAndGrantProfile`（プロフィール起点）が新規付与＋通知作成。`selectNewlyGranted*` は純粋関数で live/backfill 共有 |
+| `engine.ts` | live 用。`evaluateAndGrant`（投稿起点）/ `evaluateAndGrantReaction`（リアクション起点）/ `evaluateAndGrantProfile`（プロフィール起点）/ `evaluateAndGrantPerfectMonth`（皆勤賞の再判定・定期ジョブ）が新規付与＋通知作成。**付与はすべて `grantAll` を通す**（実績ptの付与フックがここにだけあるため）。`selectNewlyGranted*` は純粋関数で live/backfill 共有 |
 | `reactionTriggers.ts` | リアクション起点のフック（`onReactionGiven` / `onReactionsReceived`）。例外を握り潰してリアクション操作・同期を止めない |
 | `profileTriggers.ts` | プロフィール起点のフック（`onProfileUpdated`）。例外を握り潰してプロフィール保存を止めない |
 | `notifications.ts` | 通知フィード取得（直近90日の `Notification` をサムネ・リンク付きで返す） |
@@ -25,7 +27,7 @@
 - **プロフィール起点（`trigger: "profile"`）**: 自己紹介は投稿にもリアクションにも紐づかないため、**プロフィールを保存した瞬間**に評価する。渡すのは保存後の実値 `ProfileFacts`（集計値ではない）。
 
 各系統の評価ループは必ず型ガード（`isPostAchievement` / `isReactionAchievement` / `isProfileAchievement`）で絞る。「自分の系統以外を continue」で書くと、**trigger を増やしたとき既存ループへ漏れ込み、別の型の引数で `evaluate` が呼ばれる**。
-**例外（皆勤賞のみ）**: カレンダー編集モードの終了時にも皆勤賞だけ再判定する（`POST /api/v1/me/calendar/reevaluate`・**付与のみ・剥奪なし**）。これは「③自動穴埋めOFFのユーザーが後から手動で穴を埋めて皆勤を成立させた」ケースを拾うため。③ON（貪欲最適）では投稿時に判定済みなので新規付与は起きない。
+**例外（皆勤賞のみ）**: 投稿以外でも皆勤賞だけ再判定する（`evaluateAndGrantPerfectMonth`・**付与のみ・剥奪なし**）。経路は2つ: ①カレンダー編集モードの終了時（`POST /api/v1/me/calendar/reevaluate`。手動で穴を埋めて皆勤を成立させたケース。2026-10 以降は穴埋めが手動のみなので常にこの経路）②定期ジョブの monthly-catchup（毎月11日以降、先月をデータから判定して確定させる。ビーコン頼みの①の取りこぼしを拾う安全網）。
 
 ## 不変条件（壊すと既存データが壊れる）
 
@@ -106,8 +108,8 @@ DATABASE_URL="postgresql://..." npx tsx scripts/backfill-makeups.ts
 # その後に実績付与（皆勤賞は永続割当を読んで判定）
 DATABASE_URL="postgresql://..." npx tsx scripts/backfill-achievements.ts
 ```
-- `backfill-makeups.ts`: 「そのユーザーに makeupTargetDay が1件も無い」ときだけ処理（移行済み/手動編集済みは丸ごとスキップ＝手動割当を絶対に上書きしない）。再実行安全。
-- `backfill-achievements.ts`: 冪等（実績は skipDuplicates、通知は achievementKey 既存分を除外）。何度流しても安全。皆勤賞は永続割当（makeupTargetDay）を読んで判定する。
+- `backfill-makeups.ts`: 「そのユーザーに makeupTargetDay が1件も無い」ときだけ処理（移行済み/手動編集済みは丸ごとスキップ＝手動割当を絶対に上書きしない）。再実行安全。**2026-10 以降の月はスキップ**（ポイント制の月に貪欲割当すると自動穴埋めの復活になる）。
+- `backfill-achievements.ts`: 冪等（実績は skipDuplicates、通知は achievementKey 既存分を除外）。何度流しても安全。皆勤賞は永続割当（makeupTargetDay）を読み、上限は**月ごとに**解決する（2026-09 以前は固定値・以降は台帳の合計）。**穴埋めポイントは付与しない**（実績ptを遡及させない）。
 - リアクション起点は `replayReactions` が担当。押した側は `Reaction` を時系列リプレイするので **grantedAt は真の獲得日**、受け取った側は履歴が無いため現在値で一括判定し **grantedAt はスクリプト実行時刻**（通知もその日付で作られる＝ベルが光る）。
 - 新しい実績の付与＋（過去日付きの）通知補填を行う。
 
@@ -124,23 +126,76 @@ npm run build             # 本番ビルド（新ルート・静的解析）
 
 月ごとに key が増える（`perfect-month:YYYY-MM`）ため CATALOG には入れず、`evaluatePerfectMonth` で評価する。実績タブでは `ACHIEVEMENT_LAYOUT` の `{ kind: "perfectMonth" }` ブロックが獲得月ぶんのカードを並べる。同様の「無限に増える系」を足すならこの方式に倣う。
 
-**達成条件（穴埋め制度・日付順）**: 「毎日投稿」ではなく「未投稿を grace 日まで許容し、忘れた過去日を **同月の "後日" の2枚以上投稿（ダブル投稿）** で穴埋めする」。
-**grace は投稿者の所属インスタンスで決まる**（`perfectMonthGrace(domain)`：ホームインスタンス handon.club は4日・その他は3日。サービス発祥の handon.club を少しだけ優遇）。判定・進捗・カレンダー注意書きはすべて **その実績の持ち主（投稿者本人）の所属ドメイン** 基準で grace を解決する（閲覧者ではない）。
-穴埋めは日付の前後を見る: ダブル投稿日 D は **D より前の未投稿日のみ** 埋められる（将来日は埋められない＝月末日を忘れると後日が無く埋まらない）。1日のダブルは1日分だけ。
+**達成条件（穴埋め制度・日付順）**: 「毎日投稿」ではなく「忘れた過去日を **同月の "後日" の2枚以上投稿（ダブル投稿）** で穴埋めする」。ダブル投稿日 D は **D より前の未投稿日のみ** 埋められる（将来日は埋められない＝月末日を忘れると後日が無く埋まらない）。1日のダブルは1日分だけ（1日1donor）。
+判定 `isPerfectMonth` は永続割当（`filledHoleDays`）を数え、`件数 >= missing(= 月の日数 - distinctDays)` かつ `missing <= grace` なら達成。`missing=0`（完全皆勤）は `grace` より先に短絡するので、**上限0でも完全皆勤なら常に成立**。
 
-**穴埋め割当は永続化する（表示と👑の単一ソース）**: 割当（どの投稿がどの空き日を埋めるか）は `Image.makeupTargetDay` に書き、カレンダー表示も皆勤賞判定も同じ永続値を読む。書き込み経路は ①投稿時の自動割当（`assignMakeupForNewPost`・autoMakeup=true のみ）②カレンダー編集モードの手動指定（`PATCH /api/v1/images/[id]`）③既存分の一括 populate（`scripts/backfill-makeups.ts`）。判定 `isPerfectMonth` は永続割当（`filledHoleDays`）を数え、`件数 >= missing(= 月の日数 - distinctDays)` かつ `missing <= grace` なら達成。`missing=0`（完全皆勤）は常に成立し後方互換。
+### 上限 `grace` の出所（2026-10 で切り替わった）
 
-**投稿は createdAt 単調増加で過去日には投稿できない**ため、投稿時の逐次割当（`pickMakeupHole`）は一括再計算（`assignMonthMakeups`）と必ず一致する。**grace 上限のルールは `perfectMonth.ts` の中だけが持つ**。ポイントは**割当時にも grace 上限を掛ける**こと（`pickMakeupHole` は既に grace 個埋まっていれば割り当てない）。表示は元々 grace 件まで（カレンダーAPIの `slice(0, grace)`）なので、DBに grace 超の割当を残すと「表示上は空き日なのにその写真は穴埋めに使用中」と食い違う。割当時に上限を掛けても、`isPerfectMonth` は `missing <= grace` が前提＝超過割当は非達成月にしか発生しないため、皆勤賞の判定結果は不変。
+`perfectMonth.ts` の関数は `grace`＝「その月に穴埋めできる上限日数」を受け取るだけで、出所を問わない。解決は **`resolveMakeupCap` / `resolveMakeupLimits`（`@/lib/makeup/ledger`）の1か所**:
 
-**③自動穴埋め設定（User.autoMakeup）**: true(既定)=投稿時に自動割当。false=自動割当せず編集モードで指定した穴だけ埋める。切替は**過去の割当・👑に影響しない**（未来の投稿の自動判定のみ切替）ので、切替時の再判定は不要。**no-divergence 不変条件**: 達成済み(👑)月では穴埋めの解除（un-assign）で非達成に落ちる変更を PATCH が 409 で拒否（別donorへの付替は可）。画像削除は常に許可（プライバシー優先）で、削除後は `recomputeMonthMakeups` が別donorで埋め直す（埋まらなければ穴のまま・👑維持）。
+| 対象月 | 上限 | 割当 |
+|---|---|---|
+| 〜2026-09 | 所属インスタンスの固定値（`perfectMonthGrace`: 特典サーバー4・その他3） | `User.autoMakeup` が ON なら投稿時に自動（`assignMakeupForNewPost`） |
+| 2026-10〜 | **穴埋めポイント**＝その月の `MakeupPointGrant.amount` 合計 | 全ユーザー手動のみ（カレンダー編集モード） |
 
-- 判定・進捗・しきい値・通知ゲートはすべて `perfectMonth.ts` に集約。catalog/stats/backfill/カレンダーAPI/engine は **必ずここを呼ぶ**（式を各所に再実装しない）。grace は呼び出し側が `perfectMonthGrace(投稿者ドメイン)` で求めて渡す（live=`publishImage`→`evaluateAndGrant` が `input.user.instance.domain`、backfill=ユーザーの `instance.domain`、カレンダーAPI=`parseUserHandle` の domain）。
-- カレンダーAPI（`/api/v1/public/users/[username]/calendar`）は**永続割当（Image.makeupTargetDay / calendarPickedAt）を読んで**代表サムネ・穴埋め表示・`isPerfectMonth`（👑）を返す（オンザフライ貪欲は使わない）。表示の穴埋めは holeDay 昇順・grace 件までに cap。当月コールアウトは `currentMonthMakeupStatus`（永続割当ベース）。owner（本人）閲覧時だけ編集モード用の候補画像（`ownerEdit`）を返し、キャッシュは private にする。未来月以外（過去月・当月）で計算。
-- カレンダーUI: 2枚以上投稿した日（穴埋め元）は金リング＋枚数バッジ。**埋まった空き日**は「埋めた日の2枚目に投稿した写真」をサムネにして緑（透明度高め）で塗り、右上に「{何日}日」を出し、その画像ページへリンクする。当月で未埋めの穴が残り皆勤がまだ可能なら穴埋めを促すコールアウト（`callout`: `"today"`＝本日2枚で埋められる／`"tomorrow"`＝今日は穴埋め済みなので翌日）を出す。
+呼び出し側（live=`evaluateAndGrant`、カレンダーAPI、コラージュ、PATCH、実績ページ、backfill）は必ずここで解決して渡す。`resolveCalendarMonth` は純粋関数のまま `makeupCap` を引数で受ける（台帳を読むために async 化しない）。
 
-**穴埋め推奨通知（type=`makeup-reminder`）／カレンダー注意書き**: 通知は `shouldRemindMakeup(skippedSoFar, unfilled)`（未投稿1日以上・まだ埋まっていない穴がある・`skippedSoFar <= MAKEUP_REMINDER_MAX_SKIPPED`(=5)）で出す。`unfilled` は `currentMonthMakeupStatus` の日付順マッチングで厳密に数える。
-- 通知: live の `evaluateAndGrant` 内 `maybeNotifyMakeup` が投稿した瞬間に評価し1件作る。重複排除は `achievementKey = perfect-month:YYYY-MM` で **月1通**。描画（ベル・/notifications）は `type` で分岐し、`achievementKey` を実績解決せず専用文言＋カレンダー遷移にする。backfill では送らない。投稿を止めないよう `.catch` で握りつぶす。
-- カレンダー注意書き: API が `perfectMonth.callout` を返し、UI はそれだけを見て出す（達成/未達成メッセージは出さず、達成は月見出しの👑で示す）。穴埋め制度の説明文をカレンダー下にも常時表示。
+### 穴埋めポイント（2026-10〜）
+
+- **1pt = 1日ぶんの穴埋め**。ポイントは対象月に紐づき、翌月に持ち越さない。
+- **台帳は付与だけを持つ（`MakeupPointGrant`）。消費は `Image.makeupTargetDay` から導出する**。消費台帳を持つと、PATCH が1日1donor／1穴1donorのために指定外の割当も外す経路・画像削除・退会の各所で同期が要り、漏れると「カレンダーの穴埋め表示」と「残高」が食い違ってどちらが正か決められなくなる。残高が必要な箇所はどれも既にその月の画像を全件読んでいるので、導出のコストは実質ゼロ。
+  - 派生的性質: ポイントは「消費」ではなく「占有」。穴埋めの解除や donor 画像の削除で戻り、締切内なら同月で使い直せる。
+- **不変条件: 台帳は追記のみ・月内は単調非減少・月末で凍結。剥奪／マイナス補正は禁止**。過去月の上限が変わると、確定済みの👑とカレンダー表示が揺れる。
+- 付与の経路（`(userId, month, reason)` 一意＝何度走っても二重にならない）:
+
+  | reason | タイミング | 条件 | 量 | 実装 |
+  |---|---|---|---|---|
+  | `favor-monthly` | 定期ジョブ＋登録時 | FAVOR_SERVERS 所属（登録月も付与） | 1 | `monthlyGrants.ts` / `awards.grantSignupMakeupPoints` |
+  | `monthly-catchup` | 定期ジョブ（11日以降） | 当月1日より前に登録・先月が皆勤でない（**データから再計算**） | 1 | `monthlyGrants.ts` |
+  | `signup` | 登録時 | 常に（0pt なら行を作らない） | `min(登録日-1, 8)` | `awards.grantSignupMakeupPoints` |
+  | `achievement` | 実績を付与した瞬間 | その月に1回 | 1 | `grantAll` → `awards.maybeGrantAchievementPoint` |
+  | `event:<key>` | 定期ジョブ（イベントの期間中） | イベントごと（例: 開始時点で登録済み） | イベントごと | `events.ts` の一覧 → `monthlyGrants.ts` |
+
+  - イベントは `src/lib/makeup/events.ts` に1件足すだけで配られる（キー・名前・付与先の月・量・開始日時・対象）。付与は開始日時以降かつ付与先の月の間だけ。表示名（付与履歴・通知）は一覧から引くので、**終わったイベントも一覧から消さない**。キーは台帳の reason になるのでリネーム・使い回し禁止。
+  - 2026-10 の「穴埋めポイント開始記念」: 10月1日 0:00 JST 時点の登録者全員に1pt。
+
+  - catchup の「先月が皆勤でない」を Achievement 行で見てはいけない。行の付与は編集モード終了時のビーコン頼みで、「数値上は皆勤なのに行が無い」状態が11日に存在しうる。行を信じると +1pt を受け取った後に👑も取れる（締切で塞いだ二重取りが残る）。ジョブはデータから判定し、皆勤なら👑をその場で確定付与する。
+  - 実績ptは backfill から付与しない（過去日付の実績でポイントを遡及させない）。
+- **締切: 対象月の翌月10日 23:59 JST（`isMakeupEditable`）**。新旧どちらの月にも適用。PATCH の割当の指定・解除をゲートする（代表サムネの指定はゲートしない）。締切が無いと「11日の catchup を受け取ってから先月を埋めて👑も取る」が成立する。`reevaluate` はゲートしない（付与のみ・締切後は割当が変わらないので結果が決定的）。
+- **割当の書き込みはユーザー×月で直列化する**（`withMonthMakeupLock`＝advisory lock）。PATCH は「読む→上限を検証→書く」なので、残り1pt が常態のポイント制ではダブルタップで上限を超えうる。
+
+### 当月の進捗と「達成可能か」
+
+`currentMonthMakeupStatus` は `grace`（今使える上限）と `potentialGrace`（月内にまだ付与されうる分を含む上限・`potentialCapOf`）を別々に受け取る。
+- `remaining`（割当の可否・通知の可否）は `grace` で決める。
+- `stillAchievable`（「今月は達成できません」表示・促すかどうか）は `potentialGrace` で決める。pitfall: `grace` で判定すると、月初に上限0のユーザーが1日休んだ瞬間に達成不可となり、11日に+1pt が来るまでコールアウトも通知も消えていた。
+- `todayHasDonor` は**実際の割当の有無**で渡す。pitfall: 以前は `count(today) >= 2` で代用していた（自動穴埋めでは2枚目の投稿で donor が決まるので同値）。手動専用では「2枚投稿したがまだ割り当てていない」が常態で、コールアウトが即「明日2枚投稿しよう」になり「今すぐ穴埋めしよう」が出なかった。
+
+### 画像削除時
+
+- 2026-09 以前の月で `autoMakeup` が ON（かつ締切前）: 従来どおり `recomputeMonthMakeups` で月の割当を組み直す。
+- それ以外: **失効掃除だけ**（`selfHeal.healAfterImageDelete`）。削除でその日が2枚未満になったら、その日の donor 割当を外す。代わりの写真を選んで付け替えることはしない（自動穴埋めの復活になる）。
+  - pitfall: `countValidFilledHoles` は「穴が空き日か」しか見ず「donor の日がまだ2枚以上か」を見ない。従来は再計算が偶然掃除していたが、それが無いと「2枚投稿→穴埋め→1枚削除」で1pt で2日ぶん得をする。判定側に検証を足すと過去の👑月が非達成に見えるので、削除時に前向きに直す。
+- 画像削除は常に成功させ（プライバシー優先）、👑（Achievement 行）はどちらの経路でも剥奪しない。**no-divergence 不変条件**: 達成済み(👑)月では、穴埋めの解除で非達成に落ちる PATCH を 409 で拒否する（別 donor への付替は可）。
+
+### 通知
+
+| type | 発火 | 重複排除 |
+|---|---|---|
+| `makeup-point` | 付与時（台帳と同一トランザクション） | 台帳の一意制約 |
+| `makeup-need-second` | 投稿時: 今日1枚目・残りptあり・穴あり・達成可能 | 1日1通（JST の今日0時以降に同 type があれば送らない） |
+| `makeup-ready` | 投稿時: 今日2枚目以上・今日の donor 無し（同条件）／付与直後: `hasAssignableMakeup` | 1日1通 |
+| `makeup-reminder` | 2026-09 以前の月のみ（従来） | 月1通 |
+
+- `achievementKey` には対象月キー `perfect-month:YYYY-MM` を入れる（通知から対象月のカレンダーへ飛ぶため）。日付は詰めない。
+- 旧 `makeup-reminder` は導入時から `evaluateAndGrant` の「実績が1つも無ければ return」の後ろにあり、**その投稿で新しい実績を獲得したときしか評価されていなかった**。9月分は従来挙動のまま残し、新しい促し通知（`makeup-need-second` / `makeup-ready`）は実績の有無と無関係に毎投稿で評価する。
+- 表示の文言・アイコン・遷移先は `@/lib/makeup/notificationTypes` の1か所から引く（ベルと通知一覧で二重に書かない）。通知一覧のカテゴリは、`achievementKey` を持っていても穴埋め系は「その他」に振る。
+
+### カレンダー
+
+- カレンダーAPI（`/api/v1/public/users/[username]/calendar`）は永続割当を読んで代表サムネ・穴埋め表示・👑を返す（オンザフライ貪欲は使わない）。上限は**持ち主について**解決するので、非ownerの公開キャッシュは安全。
+- 本人（owner）にだけ `perfectMonth.makeup`（上限・使用・残り・締切・付与履歴）と編集用の候補（`ownerEdit`）を返し、キャッシュは private。UI はカレンダー上部の `MakeupPointsCallout` でこの値を使う（ページから固定の数字を渡さない＝月送りに追従）。常に出すのは「未投稿◯日 / 残り◯pt」の1行だけで、説明と「詳細なルール」「穴埋めポイント（獲得方法・付与と消費・持ち越し不可）」のモーダルは折りたたむ（スマホで上部が長くならないように）。カレンダー上の獲得方法・ルールは簡略版で、正確な条件は /docs/spec。
+- 当月コールアウト `callout`: `today`（今日あと1枚で埋められる）/ `ready`（今日2枚済み・未割当＝今すぐ埋められる）/ `tomorrow`（今日は donor 使用済み）/ `no-points`（達成可能だがポイント0）。**画面に出すのは 2026-09 以前の月だけ**（ポイント制の月は上部を穴埋めポイントの案内に置き換えた）。
 
 ## スキーマを変える場合（カラム追加など。通常は不要）
 

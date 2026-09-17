@@ -12,6 +12,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import { resolveAchievement } from "@/lib/achievements/catalog";
+import {
+  isMakeupNotificationType,
+  makeupNotificationHref,
+  makeupNotificationIcon,
+  makeupNotificationText,
+} from "@/lib/makeup/notificationTypes";
 import { favoriteNotificationText, formatNotificationDate } from "@/lib/notifications/format";
 import { useUnseenNotifications, useUnseenBadge } from "./useUnseenNotifications";
 
@@ -53,11 +59,12 @@ export function NotificationBell() {
         ) : (
           <ul className="py-1">
             {notifications.map((n) => {
-              const isReminder = n.type === "makeup-reminder";
+              const makeupType = isMakeupNotificationType(n.type) ? n.type : null;
+              const isReminder = makeupType !== null;
               const isFavorite = n.type === "favorite";
               const a = !isReminder && !isFavorite && n.achievementKey ? resolveAchievement(n.achievementKey) : null;
-              const href = isReminder
-                ? `/u/${n.recipientUsername}/calendar`
+              const href = makeupType
+                ? makeupNotificationHref(n.recipientUsername, n.makeup?.ym ?? null)
                 : n.image?.pageUrl ?? "/notifications";
               return (
                 <li key={n.id}>
@@ -74,15 +81,18 @@ export function NotificationBell() {
                       </span>
                     ) : (
                       <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                        <AchievementIcon name={isReminder ? "Crown" : a?.icon ?? "Trophy"} className="h-4 w-4" />
+                        <AchievementIcon
+                          name={makeupType ? makeupNotificationIcon(makeupType) : a?.icon ?? "Trophy"}
+                          className="h-4 w-4"
+                        />
                       </span>
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium leading-tight">
                         {isFavorite
                           ? favoriteNotificationText(n.favorite)
-                          : isReminder
-                            ? "皆勤賞まであと少し！1日2枚投稿して、穴埋めしよう。"
+                          : makeupType
+                            ? makeupNotificationText(makeupType, n.makeup?.ym ?? null, n.makeup?.point ?? null)
                             : `🏆 実績「${a?.title ?? "?"}」を獲得`}
                       </p>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">

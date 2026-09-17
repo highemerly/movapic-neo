@@ -17,6 +17,10 @@ interface AutoMakeupToggleProps {
  * OFF → 自動では穴埋めせず、カレンダーの編集モードで明示的に指定した穴だけを埋める。
  * ※過去に確定した穴埋めや皆勤賞には影響しない（未来の投稿の自動割当だけを切り替える）。
  * DB の User.autoMakeup（既定 true）をそのまま送る（以前の「しない」反転UIは二重否定で分かりづらいため肯定形に変更）。
+ *
+ * 2026年9月分までの設定。10月からは穴埋めポイント制になり、全ユーザーで自動穴埋めを廃止した
+ * （設定ページは10月1日から自動でこのトグルを隠す）。
+ * TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（このファイルごと削除）
  */
 export function AutoMakeupToggle({ initialEnabled }: AutoMakeupToggleProps) {
   const router = useRouter();
@@ -50,7 +54,14 @@ export function AutoMakeupToggle({ initialEnabled }: AutoMakeupToggleProps) {
     <SettingToggleRow
       title="カレンダーを自動穴埋めする"
       tag="推奨"
-      description="1日に2枚以上投稿したとき、余った分で過去の未投稿日を自動的に埋めます。"
+      description={
+        <>
+          1日に2枚以上投稿したとき、余った分で過去の未投稿日を自動的に埋めます。
+          <span className="mt-1 block">
+            ※2026年9月分までの設定です。10月からは穴埋めポイント制になり、穴埋めはカレンダーの「編集」から行います。
+          </span>
+        </>
+      }
       checked={enabled}
       onChange={handleToggle}
       disabled={isSaving}

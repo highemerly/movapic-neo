@@ -15,6 +15,8 @@ import { getEmailDomain } from "@/lib/postMethods";
 import prisma from "@/lib/db";
 import { BioEditForm } from "./BioEditForm";
 import { AutoMakeupToggle } from "./AutoMakeupToggle";
+import { toJstYm } from "@/lib/jst";
+import { isPointEra } from "@/lib/makeup/points";
 import { DisplayModeSelector } from "./DisplayModeSelector";
 import { EmailPrefixRegenerate } from "./EmailPrefixRegenerate";
 import { LocationMapToggle } from "./LocationMapToggle";
@@ -155,10 +157,15 @@ export default async function SettingsPage() {
             instanceDomain={user.instance.domain}
             instanceType={user.instance.type}
           />
-          {/* カレンダーの自動穴埋めも投稿時の挙動なので投稿系に置く */}
-          <AutoMakeupToggle
-            initialEnabled={preferences?.autoMakeup ?? true}
-          />
+          {/* カレンダーの自動穴埋めも投稿時の挙動なので投稿系に置く。
+              2026-10 からは穴埋めポイント制で全ユーザー手動のみ＝設定が効かないので、JST の10月1日に自動で隠す
+              （クリーンアップリリースを待たずに、効かないスイッチを見せ続けないため）。
+              TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（トグルごと削除） */}
+          {!isPointEra(toJstYm(new Date())) && (
+            <AutoMakeupToggle
+              initialEnabled={preferences?.autoMakeup ?? true}
+            />
+          )}
           {/* 投稿用メールアドレス（確認＋再生成）。メール投稿の設定なので投稿設定に置く。
               メール投稿が未提供（EMAIL_DOMAIN 未設定）の環境では出さない */}
           {emailDomain && (

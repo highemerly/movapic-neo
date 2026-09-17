@@ -73,6 +73,14 @@ function GoalCard({
   );
 }
 
+/** 穴を埋めるための次の一手（ポイント制の月は残ポイントを添える）。 */
+function makeupHint(p: CurrentMonthPerfect): string {
+  // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（pointEra の分岐ごと削除）
+  if (!p.pointEra) return "2枚投稿で穴埋めしよう";
+  if (p.status.remaining === 0) return "ポイントが付与されると穴埋めできます";
+  return `残り${p.status.remaining}pt ・ 2枚投稿で穴埋めしよう`;
+}
+
 /**
  * 当月皆勤カードの表示内容を状況から決める。
  * 日数はすべて covered（投稿日＋穴埋め済みの日）基準で出す。穴埋めした日はカレンダー上も
@@ -105,7 +113,7 @@ function perfectCardProps(p: CurrentMonthPerfect): {
       remain: `穴埋め ${p.status.unfilled}日`,
       remainMuted: false,
       ratio,
-      sub: `${covered}/${p.daysInMonth}日 ・ 2枚投稿で穴埋めしよう`,
+      sub: `${covered}/${p.daysInMonth}日 ・ ${makeupHint(p)}`,
     };
   }
   return {

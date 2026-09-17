@@ -580,26 +580,67 @@ export default async function SpecPage() {
               <p className="text-sm text-muted-foreground">
                 皆勤賞は、SHAMEZOにおける最も栄誉のある実績です。
               </p>
-                <ul className="mt-4 list-disc list-inside text-sm text-muted-foreground space-y-1">
-                  <li>その月に毎日投稿することで獲得できます</li>
-                  <li>1日の基準は日本標準時間の0:00~23:59です</li>
-                  <li>
-                    投稿できなかった日が月{PERFECT_MONTH_GRACE_DEFAULT}日以下
-                    {getFavorServers().length > 0 &&
-                      `（${getFavorServers().join("・")} のユーザーは月${PERFECT_MONTH_GRACE_FAVORED}日以下）`}
-                    であれば救済措置があり、同月中の後日2枚以上投稿すると、投稿できなかった日の穴埋めとして処理されます
-                  </li>
-                  <li>穴埋めは古い未投稿日から1日につき1回（1日のダブル投稿で1日分）で、未来の日付や月末以降に残った未投稿日は埋められません</li>
-                  <li>皆勤賞はユーザー画面のカレンダータブ・実績タブで公開され、誰でも確認できます</li>
-                  <li>皆勤賞は月ごとに計算されるため、毎月獲得することができます</li>
-                </ul>
+              <ul className="mt-4 list-disc list-inside text-sm text-muted-foreground space-y-1">
+                <li>その月に毎日投稿することで獲得できます</li>
+                <li>1日の基準は日本標準時間の0:00~23:59です</li>
+                <li>皆勤賞はユーザー画面のカレンダータブ・実績タブで公開され、誰でも確認できます</li>
+                <li>皆勤賞は月ごとに計算されるため、毎月獲得することができます</li>
+              </ul>
+
+              <p className="mt-5 text-xs text-muted-foreground font-medium mb-1">穴埋め（2026年10月分から）</p>
+              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                <li>
+                  投稿できなかった日は、同じ月の後日に1日2枚以上投稿し、カレンダーの「編集」で埋める日を選ぶと、2枚目の投稿で穴埋めできます
+                </li>
+                <li>穴埋めには「穴埋めポイント」を1日につき1pt使います。穴埋めに使える投稿は1日1枚までです</li>
+                <li>穴埋めは自動では行われません（穴埋めする日と写真はご自身で選びます）</li>
+                <li>埋められるのは、穴埋めに使う投稿の日より前の日だけです（未来の日付や月末日は埋められません）</li>
+                <li>
+                  その月の穴埋めは翌月10日 23:59 まで行えます。それを過ぎると、穴埋めの指定・解除はできなくなります
+                </li>
+                <li>
+                  穴埋めポイントはその月の穴埋めにだけ使え、翌月には持ち越せません。穴埋めを解除すると、そのポイントは同じ月の別の日に使い直せます
+                </li>
+              </ul>
+
+              <p className="mt-5 text-xs text-muted-foreground font-medium mb-1">穴埋めポイントがもらえる条件</p>
+              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                {getFavorServers().length > 0 && (
+                  <li>{getFavorServers().join("・")} のユーザー: 毎月1日に+1pt（その月に登録した場合は登録時）</li>
+                )}
+                <li>先月中からアカウントがあり、先月の皆勤賞を獲得しなかった場合: 毎月11日に+1pt</li>
+                <li>
+                  その月に新規登録した場合: 登録時に「登録日の前日までの日数」ぶん（2日の登録で+1pt、9日以降の登録で上限の+8pt）
+                </li>
+                <li>その月に何かしらの実績を獲得した場合: +1pt（月に1回まで）</li>
+                <li>このほか、イベントなどで付与されることがあります</li>
+              </ul>
+              <p className="mt-2 text-sm text-muted-foreground">
+                ポイントの残りと付与の履歴は、カレンダータブ（ご自身のカレンダーのみ）で確認できます。付与されたときは通知でもお知らせします。
+              </p>
+
+              {/* TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（従来ルールの説明ごと削除） */}
+              <p className="mt-5 text-xs text-muted-foreground font-medium mb-1">2026年9月分までの穴埋め</p>
+              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                <li>
+                  投稿できなかった日が月{PERFECT_MONTH_GRACE_DEFAULT}日以下
+                  {getFavorServers().length > 0 &&
+                    `（${getFavorServers().join("・")} のユーザーは月${PERFECT_MONTH_GRACE_FAVORED}日以下）`}
+                  であれば救済措置があり、同月中の後日2枚以上投稿すると、投稿できなかった日の穴埋めとして処理されます
+                </li>
+                <li>
+                  「カレンダーを自動穴埋めする」設定がオンの場合、穴埋めは古い未投稿日から自動で行われます（1日のダブル投稿で1日分）
+                </li>
+                <li>2026年9月分の穴埋めも、10月10日 23:59 までに締め切られます</li>
+              </ul>
             </SpecSection>
 
             <SpecSection id="calendar">
               <p className="text-sm text-muted-foreground">
                 ユーザーページの「カレンダー」タブでは、その月の投稿を日ごとのサムネイルで一覧表示します。
-                編集モードでは、各日に表示するサムネイルを変更できるほか、皆勤賞の穴埋めに使う投稿も選び直せます
-                （サムネイルを変更後、その画像が削除された場合は、自動で再選出されます）。
+                編集モードでは、各日に表示するサムネイルを変更できるほか、皆勤賞の穴埋めに使う投稿を選べます
+                （サムネイルを変更後、その画像が削除された場合は、自動で再選出されます。穴埋めに使った投稿を削除して
+                その日の投稿が1枚になった場合は、その穴埋めは解除され、ポイントが戻ります）。
               </p>
             </SpecSection>
 

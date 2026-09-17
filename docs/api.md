@@ -35,4 +35,16 @@
 - パラメータ cursor, limit。レスポンス `{ images[], nextCursor, hasMore }`。自分が**リアクションした**画像一覧を最新順で取得（SHAMEZO上の`Reaction`＋Fediverse側で直接押した上位40件の `favoritersCache`）。
 
 ## GET /api/v1/public/users/[username]/calendar
-- パラメータ year, month。レスポンスは `days`（日ごとの件数＋最新画像）と `hasPrevMonth`/`hasNextMonth`/`isPerfectAttendance`（皆勤賞）を含むカレンダー用月別データ。
+- パラメータ year, month。レスポンスは `days`（日ごとの件数＋代表画像）と `hasPrevMonth`/`hasNextMonth`/`isPerfectAttendance`（皆勤賞）を含むカレンダー用月別データ。
+- `perfectMonth`（未来月は null）: `achieved` / `isCurrentMonth` / `callout`（当月の穴埋め促し: `today`｜`ready`｜`tomorrow`｜`no-points`｜null）/ `filledDays`（穴埋め済みの日と埋めた写真）。
+- **本人のときだけ**: `perfectMonth.makeup`＝その月の穴埋め枠 `{ pointEra, limit, used, remaining, deadline, editable, grants[] }`（`deadline` は締切の排他上限＝翌月11日 JST 00:00 の ISO）と、編集モード用の `ownerEdit`。キャッシュは `private, no-store`。
+- 穴埋めの上限は**カレンダーの持ち主**について解決する（2026-09 以前は所属インスタンスの固定値・2026-10 以降は穴埋めポイントの合計）。閲覧者に依存しないので、本人以外へのレスポンスは公開キャッシュしてよい。
+
+## PATCH /api/v1/images/[id]（本人のみ）
+- カレンダーの手動制御。body `{ calendarPicked?: boolean, makeupTargetDay?: number | null }`（代表サムネの指定・解除／この写真で埋める穴の日の指定・解除）。
+- 穴埋め（`makeupTargetDay`）は、対象月の**翌月10日 23:59 JST を過ぎると指定・解除とも 409**。代表サムネの指定は締切と無関係。
+- 上限超過は 409（2026-10 以降は「穴埋めポイントが足りません」）。検証〜書き込みはユーザー×月で直列化する（advisory lock・並行リクエストで上限を超えないため）。
+- 皆勤賞を達成済みの月で、解除により非達成に落ちる変更は 409（別の写真への付け替えは可）。
+
+## POST /api/v1/me/calendar/reevaluate（本人のみ）
+- body `{ year, month }`。カレンダー編集モードの終了時に、その月の皆勤賞を再判定する（付与のみ・剥奪なし・冪等）。付与すると実績ポイント（+1pt・月1回）も付く。レスポンス `{ success, granted, key? }`。
