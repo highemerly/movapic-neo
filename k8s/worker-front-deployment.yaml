@@ -98,6 +98,8 @@ spec:
 #   entryPoints: [websecure]
 #   routes:
 #     # 画像生成・投稿・取り込み・カレンダー画像 → worker-front
+#     # （/api/v1/post 配下には再投稿 /api/v1/post/repost/:id も含む。compute を呼ぶルートは
+#     #   web に置けない＝NetworkPolicy と COMPUTE_SERVICE_URL が worker-front 限定のため）
 #     - match: Host(`pic.handon.club`) && (PathPrefix(`/api/v1/generate`) || PathPrefix(`/api/v1/post`) || PathPrefix(`/api/v1/ingest`) || PathPrefix(`/api/v1/calendar/collage`))
 #       kind: Rule
 #       services:

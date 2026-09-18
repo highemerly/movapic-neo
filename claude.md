@@ -31,7 +31,7 @@
 |---|---|
 | [docs/architecture.md](docs/architecture.md) | 3-tier構成（web/worker-front/compute）・ルート境界・ヘルスチェック・**HEIC/sharpソースビルド**・本番DBマイグレーション |
 | [docs/api.md](docs/api.md) | 各APIエンドポイント（generate / post / ingest/email / reactions / calendar 等） |
-| [docs/posting.md](docs/posting.md) | メール投稿・Bot（メンション）投稿・投稿ソース(source)・公開範囲(visibility) |
+| [docs/posting.md](docs/posting.md) | メール投稿・Bot（メンション）投稿・投稿ソース(source)・公開範囲(visibility)・**出力形式（保存=AVIF / Mastodon送信時のみJPEG）** |
 | [docs/ui.md](docs/ui.md) | レスポンシブ(PC/モバイル)・ボタンカラー(primary/brand)・共通セレクター(SegmentControl)・画像リトライ表示 |
 | [docs/text-rendering.md](docs/text-rendering.md) | 文字配置・フォントサイズ・影・EXIF・代替テキスト(ALT)の配管 |
 | [docs/features.md](docs/features.md) | Fediverse認証・カレンダー・実績/通知・PWA |
@@ -45,8 +45,9 @@
 
 ### アーキテクチャの境界（詳細: [docs/architecture.md](docs/architecture.md)）
 - 同一イメージを `COMPONENT_ROLE`（`web`｜`worker-front`｜`compute`、未設定=ローカルall-in-one）で起動分離。
-- **worker-front は sharp/skia を呼ばない**（必ず1Pod）。画像生成は compute の内部API（render/finalize）へ委譲。
+- **worker-front は sharp/skia を呼ばない**（必ず1Pod）。画像生成は compute の内部API（render/finalize/transcode）へ委譲。
 - Next standalone は全ルートをboot評価するため、**画像処理ルートは sharp/skia を handler内 dynamic import 必須**（非画像podで常駐させない）。
+- **compute を呼ぶルートは worker-front 配信のパスに置く**（`/api/v1/generate`・`/api/v1/post/*`・`/api/v1/ingest/*`・`/api/v1/calendar/collage/*`）。web には `COMPUTE_SERVICE_URL` を渡しておらず NetworkPolicy でも到達不可。再投稿が `/api/v1/post/repost/[id]` にあるのはこの制約による。
 
 ### UI（詳細: [docs/ui.md](docs/ui.md)）
 - **レスポンシブ**: PC/モバイルは同一ページで別レイアウト。境界は `md`（768px）、判定は原則CSSのみ。PCは右レール（`md:pr-[60px]`＝`RAIL_COLLAPSED`と一致）・モバイル/standaloneは下部ナビ。ページ幅は `container mx-auto px-4 max-w-6xl`。

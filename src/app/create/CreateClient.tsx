@@ -46,7 +46,6 @@ import {
   DEFAULT_SIZE,
   DEFAULT_OUTPUT,
   DEFAULT_ARRANGEMENT,
-  OUTPUT_CONFIG,
   OutputFormat,
   Position,
   FontFamily,
@@ -74,12 +73,9 @@ import {
 import { reportUploadFailure, probeFileReadable } from "@/lib/uploadTelemetry";
 import { Label } from "@/components/ui/label";
 
-// 出力形式の表示名
-const OUTPUT_LABELS: Record<OutputFormat, string> = {
-  mastodon: "AVIF",
-  misskey: "AVIF",
-  none: "JPEG",
-};
+// 生成画像の形式。連携先によらず常に AVIF（Mastodon へは投稿時だけ JPEG に変換して送る）。
+const GENERATED_FORMAT_LABEL = "AVIF";
+const GENERATED_MIME_TYPE = "image/avif";
 
 interface ResultInfo {
   fileSize: number;
@@ -260,7 +256,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
   }));
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
-  const [resultMimeType, setResultMimeType] = useState<string>("image/jpeg");
+  const [resultMimeType, setResultMimeType] = useState<string>(GENERATED_MIME_TYPE);
   const [resultInfo, setResultInfo] = useState<ResultInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
@@ -612,12 +608,9 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
             return null;
           }
 
-          const config = OUTPUT_CONFIG[formState.output];
-          const mimeType = config?.format === "avif" ? "image/avif" : "image/jpeg";
-
           return {
             blob: await response.blob(),
-            mimeType,
+            mimeType: GENERATED_MIME_TYPE,
             requestId: response.headers.get("X-Request-Id") || "",
             processingTime: parseInt(
               response.headers.get("X-Processing-Time") || "0",
@@ -698,7 +691,7 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
 
     setResultInfo({
       fileSize: result.blob.size,
-      format: OUTPUT_LABELS[formState.output],
+      format: GENERATED_FORMAT_LABEL,
       width: img.naturalWidth,
       height: img.naturalHeight,
       processingTime: result.processingTime,

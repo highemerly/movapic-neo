@@ -178,6 +178,25 @@ export async function renderCalendarCollage(
   };
 }
 
+/**
+ * 保存済み生成画像（AVIF）を Mastodon 向けの JPEG へ変換する。
+ * 変換が必要かの判定は resolveUploadFormat（純粋ロジック）側の責務。
+ */
+export async function transcodeToJpeg(imageBuffer: Buffer): Promise<Buffer> {
+  const form = new FormData();
+  form.append("image", bufferToBlob(imageBuffer), "image");
+  form.append("format", "jpeg");
+
+  const res = await computeFetch("/api/internal/transcode", form);
+  if (!res.ok) {
+    throw new Error(
+      `compute transcode failed: ${res.status} ${res.body.toString("utf8")}`
+    );
+  }
+
+  return res.body;
+}
+
 /** 最終画像の mime 判定＋寸法＋サムネを compute で得る。 */
 export async function finalizeImage(
   imageBuffer: Buffer,

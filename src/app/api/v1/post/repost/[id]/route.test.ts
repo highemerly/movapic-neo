@@ -1,5 +1,5 @@
 /**
- * 再投稿ルート POST /api/v1/images/:id/repost のテスト。
+ * 再投稿ルート POST /api/v1/post/repost/:id のテスト。
  *
  * 認証・レート制限・visibility 検証・repostImage の結果→HTTP マッピングを固定する。
  * repostImage 本体はモックし、ここではルートの分岐だけ検証する。
@@ -37,7 +37,7 @@ const USER = {
 } as unknown as NonNullable<SessionUser>;
 
 function makeReq(body: unknown = { visibility: "public" }): NextRequest {
-  return new NextRequest("http://localhost/api/v1/images/img/repost", {
+  return new NextRequest("http://localhost/api/v1/post/repost/img", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -56,7 +56,7 @@ beforeEach(() => {
   });
 });
 
-describe("POST /api/v1/images/:id/repost", () => {
+describe("POST /api/v1/post/repost/:id", () => {
   it("未認証は401", async () => {
     mockAuth.mockResolvedValue(null);
     const res = await POST(makeReq(), { params });

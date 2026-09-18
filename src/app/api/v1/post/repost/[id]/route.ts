@@ -1,10 +1,15 @@
 /**
  * 既存画像を改めて Fediverse へ投稿するエンドポイント
- * POST /api/v1/images/:id/repost
+ * POST /api/v1/post/repost/:id
  *
  * 対象は「まだ Fediverse 未投稿（postId=null）の自分の画像」で、SHAMEZO 保存から
  * 一定期間内（repostImage の REPOST_MAX_AGE_MS）のもの。visibility は保存されていないため
  * リクエストで受け取る（UI は public/unlisted のみ提示。既定はユーザーの defaultVisibility）。
+ *
+ * パスが /api/v1/images/:id/repost でなく /api/v1/post 配下なのは、Ingress が
+ * /api/v1/post を worker-front へ振っているため（docs/architecture.md）。再投稿は
+ * 保存済み AVIF を Mastodon 向け JPEG へ変換する＝compute を呼ぶ必要があり、
+ * compute へ到達できるのは worker-front だけ（web からは NetworkPolicy で不可）。
  */
 
 import { NextRequest, NextResponse } from "next/server";

@@ -443,7 +443,7 @@ export function ImageActionsMenu({
     if (isReposting) return;
     setIsReposting(true);
     try {
-      const response = await fetch(`/api/v1/images/${imageId}/repost`, {
+      const response = await fetch(`/api/v1/post/repost/${imageId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ visibility: repostVisibility }),

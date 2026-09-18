@@ -103,20 +103,24 @@ export const ARRANGEMENT_LABELS: Record<Arrangement, string> = {
   stamp: "ハンコ",
 };
 
-// 出力形式の設定
+// 生成画像の上限バイト数。超えたら quality を下げて再エンコードする（applyOutputFormat）。
 //
-// mastodon だけ JPEG なのは Mastodon 4.7.2 の変更による（pitfall）:
+// SHAMEZO が保存する画像は連携先によらず必ず AVIF なので、上限も連携先ごとに分けない
+// （OutputFormat は DB 列・UI ラベルとしてのみ残り、生成されるバイト列には影響しない）。
+// 連携先ごとに違うのは「Fediverse へ送るときの形式」だけで、それは投稿直前に決める
+// ＝ Mastodon だけ JPEG へ変換する（src/lib/fediverse/uploadFormat.ts）。
+//
+// Mastodon に AVIF を送れない理由（pitfall・Mastodon 4.7.2 の変更）:
 // セキュリティ対応で libvips の HEIF ローダーがブロックされ（config/initializers/vips.rb の
 // 許可リストから VipsForeignLoadHeif が削除）、同じローダーが担当する AVIF も読めなくなった。
 // それでも supported_mime_types には image/avif が残るためアップロードは受理され、変換段で
 // 500 "Error processing thumbnail for uploaded media" になる＝AVIF で送ると投稿が全て失敗する。
 // もともと Mastodon は AVIF を受け取っても JPEG へ変換して保存・配信する
 // （IMAGE_CONVERTIBLE_MIME_TYPES）ので、JPEG で送っても連合側に届く画像は変わらない。
-export const OUTPUT_CONFIG: Record<OutputFormat, { maxSize: number; maxFileSize: number; format: "avif" | "jpeg" } | null> = {
-  mastodon: { maxSize: 2048, maxFileSize: 16 * 1024 * 1024, format: "jpeg" }, // 16MB
-  misskey: { maxSize: 2048, maxFileSize: 250 * 1024 * 1024, format: "avif" }, // 250MB, AVIF（Misskeyは無変換で保存するため利点がある）
-  none: null, // JPEG, リサイズなし
-};
+//
+// 値は Mastodon のアップロード上限（16MB）由来。Misskey は 250MB まで受けるが、
+// 長辺 2048px の AVIF は実測 1MB 未満で桁が違うため、ゆるい側に合わせる理由がない。
+export const AVIF_MAX_FILE_SIZE = 16 * 1024 * 1024;
 
 export const FONT_LABELS: Record<FontFamily, string> = {
   "hui-font": "ふい字",

@@ -23,6 +23,8 @@ import {
   postToMisskey,
   PostResult,
 } from "@/lib/fediverse/post";
+import { resolveUploadFormat } from "@/lib/fediverse/uploadFormat";
+import { transcodeToJpeg } from "@/lib/compute/client";
 import {
   type PublishVisibility,
   toMastodonVisibility,
@@ -106,8 +108,10 @@ export interface PublishImageInput {
   };
   /**
    * 保存直前にだけ呼ばれ、サムネ（webp）と寸法を返す。
-   * compute(/api/internal/finalize) への委譲を内側に閉じ込めるためのコールバック。
-   * publishImage 自身は sharp を読み込まない（worker-front を native フリーに保つ）。
+   * 呼び出し側が mime 判定のために既に finalize を叩いているので、その結果を使い回せるよう
+   * コールバックで受ける（compute を二重に呼ばない）。投稿直前の形式変換のように
+   * 呼び出し側が持っていない処理は、publishImage から compute クライアントを直接呼ぶ。
+   * いずれも sharp は読み込まない（worker-front / web を native フリーに保つ）。
    * mention（persistOnPostFailure:false）では投稿成功時のみ呼ばれる＝失敗時は compute を呼ばない。
    */
   getThumbnailAndDimensions: () => Promise<{
@@ -203,13 +207,8 @@ const RETRY_BACKOFF_MS = 1500;
 
 /**
  * サービスの visibility をプラットフォーム別 visibility に変換して1回だけ投稿する。
- * local の場合は Fediverse 投稿しない（null を返す）。
  */
-async function postImageOnce(input: PostImageInput): Promise<PostResult | null> {
-  if (input.visibility === "local") {
-    return null;
-  }
-
+async function postImageOnce(input: PostImageInput): Promise<PostResult> {
   const {
     user,
     buffer,
@@ -258,6 +257,33 @@ async function postImageOnce(input: PostImageInput): Promise<PostResult | null> 
   return { success: false, error: "サポートされていないプラットフォームです" };
 }
 
+/**
+ * 投稿先に合わせて画像の形式を揃えた入力を返す。
+ *
+ * SHAMEZO の保存物は例外なく AVIF なので、AVIF を受け取れない Mastodon 向けにだけ
+ * ここで JPEG へ変換する（変換結果は送信専用＝保存しない）。変換は sharp が要るため
+ * compute に委譲する＝この関数を含め publishImage は native を読み込まない。
+ */
+async function toUploadPayload(input: PostImageInput): Promise<PostImageInput> {
+  const format = resolveUploadFormat({
+    instanceType: input.user.instance.type,
+    contentType: input.contentType,
+    filename: input.filename,
+  });
+
+  if (!format.transcodeTo) {
+    return input;
+  }
+
+  const buffer = await transcodeToJpeg(input.buffer);
+  return {
+    ...input,
+    buffer,
+    contentType: format.contentType,
+    filename: format.filename,
+  };
+}
+
 /** 再試行する価値がある一時的失敗か（5xx: 過負荷・障害 / 429: レート制限）。 */
 function isTransientPostFailure(result: PostResult): boolean {
   if (!result.statusCode) return false;
@@ -278,19 +304,40 @@ function isTransientPostFailure(result: PostResult): boolean {
 export async function postImageToFediverse(
   input: PostImageInput
 ): Promise<PostResult | null> {
-  const first = await postImageOnce(input);
+  // local は連合しないので、形式変換（compute 往復）もせずに抜ける。
+  if (input.visibility === "local") {
+    return null;
+  }
+
+  // 保存物は常に AVIF だが Mastodon は AVIF を受け取れないため、ここで送信形式に変換する。
+  // 再試行で二重に変換しないよう、リトライループの外で1回だけ行う。
+  let payload: PostImageInput;
+  try {
+    payload = await toUploadPayload(input);
+  } catch (error) {
+    console.error(
+      `[fediverse] upload transcode failed: server=${input.user.instance.domain} ` +
+        `contentType=${input.contentType} bytes=${input.buffer.length}`,
+      error
+    );
+    // AVIF のまま送っても Mastodon 側で必ず 500 になるのでフォールバックしない。
+    // 画像は保存済み（または mention なら再試行対象）なので、再投稿で復帰できる。
+    return { success: false, error: "投稿用画像の変換に失敗しました" };
+  }
+
+  const first = await postImageOnce(payload);
 
   if (first && !first.success) {
     console.error(
-      `[fediverse] post failed: server=${input.user.instance.domain} type=${input.user.instance.type} ` +
-        `status=${first.statusCode ?? "-"} contentType=${input.contentType} bytes=${input.buffer.length} ` +
+      `[fediverse] post failed: server=${payload.user.instance.domain} type=${payload.user.instance.type} ` +
+        `status=${first.statusCode ?? "-"} contentType=${payload.contentType} bytes=${payload.buffer.length} ` +
         `error=${first.error}`
     );
   }
 
   if (first && !first.success && isTransientPostFailure(first)) {
     await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
-    const second = await postImageOnce(input);
+    const second = await postImageOnce(payload);
     if (second && !second.success) {
       console.error(
         `[fediverse] post retry failed: server=${input.user.instance.domain} ` +

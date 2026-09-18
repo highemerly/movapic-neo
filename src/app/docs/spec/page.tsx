@@ -180,15 +180,15 @@ export default async function SpecPage() {
                 <div>
                   <p className="text-xs text-muted-foreground font-medium mb-1">最終出力</p>
                   <p className="text-sm text-muted-foreground mb-3">
-                    投稿先に応じた形式・サイズ上限で書き出します。この出力時の再エンコードで、元画像の EXIF メタデータは全て取り除かれます。
+                    投稿先にかかわらず AVIF で書き出し、SHAMEZOに保存します。この出力時の再エンコードで、元画像の EXIF メタデータは全て取り除かれます。投稿先ごとに変わるのは、Fediverseへアップロードするときの形式だけです。
                   </p>
                   <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
                       <thead>
                         <tr className="border-b border-border">
                           <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">投稿先</th>
-                          <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">形式</th>
-                          <th className="text-left py-2 font-medium text-xs text-muted-foreground">サイズ上限</th>
+                          <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">SHAMEZOの保存形式</th>
+                          <th className="text-left py-2 pr-4 font-medium text-xs text-muted-foreground">投稿時の形式</th>
                           <th className="text-left py-2 font-medium text-xs text-muted-foreground">EXIF</th>
                         </tr>
                       </thead>
@@ -196,20 +196,23 @@ export default async function SpecPage() {
                         <tr className="border-b border-border">
                           <td className="py-2 pr-4">Mastodon</td>
                           <td className="py-2 pr-4">AVIF</td>
-                          <td className="py-2">16MB</td>
+                          <td className="py-2 pr-4">JPEG（投稿時に変換）</td>
                           <td className="py-2">削除</td>
                         </tr>
                         <tr className="border-b border-border">
                           <td className="py-2 pr-4">Misskey</td>
                           <td className="py-2 pr-4">AVIF</td>
-                          <td className="py-2">250MB</td>
+                          <td className="py-2 pr-4">AVIF（変換なし）</td>
                           <td className="py-2">削除</td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
                   <p className="mt-2 pl-3 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground/80">
-                    AVIF出力では、 quality 80, effort 2 で書き出し、サイズを確認します。万が一出力がサイズ上限を超えた場合、quality を段階的に下げて再エンコードし、上限以下に収まった時点の出力を採用します。
+                    AVIF出力では、 quality 80, effort 2 で書き出し、サイズを確認します。万が一出力が上限（16MB）を超えた場合、quality を段階的に下げて再エンコードし、上限以下に収まった時点の出力を採用します。
+                  </p>
+                  <p className="mt-2 pl-3 border-l-2 border-muted-foreground/20 text-xs text-muted-foreground/80">
+                    Mastodonは現在AVIFのアップロードを受け付けないため（セキュリティ対応で無効化されたデコーダーがAVIFも担当しているため）、投稿の直前にJPEG（quality 90）へ変換して送信します。変換したJPEGは保存せず、SHAMEZO上の画像はAVIFのままです。なお、MastodonはAVIFを受け取れた頃も自動でJPEGへ変換して配信していたため、連合先に届く画像は変わりません。
                   </p>
                 </div>
                 <div>

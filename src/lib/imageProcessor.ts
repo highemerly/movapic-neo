@@ -184,7 +184,7 @@ export async function processImage({
   const outputStart = Date.now();
   let result: ProcessImageResult;
   try {
-    result = await applyOutputFormat(composited, output);
+    result = await applyOutputFormat(composited);
   } catch (error) {
     console.error(`[imageProcessor] rid=${rid} OUTPUT_FORMAT_FAILED:`, error);
     throw new ImageProcessError("出力形式の変換に失敗しました", "convert", rid);

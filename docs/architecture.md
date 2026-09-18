@@ -5,8 +5,9 @@
 同一のDockerイメージを `COMPONENT_ROLE`（`web` | `worker-front` | `compute`、未設定=ローカルall-in-one）で起動分離する。
 
 - **web**: ページ＋軽量API（producer）。
-- **worker-front**: `/api/v1/generate`・`/api/v1/post`・`/api/v1/ingest/email` を配信＋Graphile Worker consumer（bot/emailジョブ）＋定期ジョブのスケジューラ（graphile-worker の crontab で 30分ごとに `periodic` タスクを enqueue。[定期ジョブ](./periodic-jobs.md)参照）。**sharp/skia を呼ばない**。Redis的な役割（レート制限、Workerの管理）を担っており、必ず1Pod。
-- **compute**: 画像生成専用のステートレス内部サービス。外部Ingressなし、秘密情報を持たない（`COMPUTE_API_KEY` のみ）。内部API: `POST /api/internal/render`（文字入れ生成＝processImage）/ `POST /api/internal/finalize`（mime判定＋寸法＋サムネ）。worker-front は `src/lib/compute/client.ts` 経由で呼ぶ。
+- **worker-front**: `/api/v1/generate`・`/api/v1/post`（`/api/v1/post/repost/[id]` を含む）・`/api/v1/ingest/email`・`/api/v1/calendar/collage` を配信＋Graphile Worker consumer（bot/emailジョブ）＋定期ジョブのスケジューラ（graphile-worker の crontab で 30分ごとに `periodic` タスクを enqueue。[定期ジョブ](./periodic-jobs.md)参照）。**sharp/skia を呼ばない**。Redis的な役割（レート制限、Workerの管理）を担っており、必ず1Pod。
+- **compute**: 画像生成専用のステートレス内部サービス。外部Ingressなし、秘密情報を持たない（`COMPUTE_API_KEY` のみ）。内部API: `POST /api/internal/render`（文字入れ生成＝processImage）/ `POST /api/internal/finalize`（mime判定＋寸法＋サムネ）/ `POST /api/internal/transcode`（保存済み AVIF → Mastodon 用 JPEG。[出力形式](./posting.md#出力形式)）/ `POST /api/internal/render-calendar`（カレンダーのコラージュ）。worker-front は `src/lib/compute/client.ts` 経由で呼ぶ。
+- **compute を呼ぶルートは worker-front に置くこと**。compute は NetworkPolicy で worker-front からの通信のみ許可し、`COMPUTE_SERVICE_URL` も worker-front にしか渡していない（外部公開している web から compute に到達させない）。再投稿が `/api/v1/images/[id]/repost` ではなく `/api/v1/post/repost/[id]` にあるのはこのため（Mastodon 向けの JPEG 変換で compute を呼ぶ）。
 
 ### ルート境界とヘルスチェック
 - `src/proxy.ts`（旧 `middleware.ts`・Next.js 16でリネーム）が role でルート境界を強制（compute は `/api/internal/*`＋`/api/health` のみ／非compute は `/api/internal/*` を404）。

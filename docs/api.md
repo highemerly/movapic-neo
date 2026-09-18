@@ -4,7 +4,7 @@
 
 ## POST /api/v1/generate
 - multipart/form-data。パラメータは入力オプションの API値（image/text/position/font/color/size/output）。
-- **レスポンス**: image/jpeg または image/avif（バイナリ）。ヘッダー: Content-Type, Content-Length, Content-Disposition, Cache-Control。
+- **レスポンス**: image/avif（バイナリ）。ヘッダー: Content-Type, Content-Length, Content-Disposition, Cache-Control。生成画像は連携先によらず常に AVIF（`output` は DB 列・UI ラベルにのみ使い、生成されるバイト列には影響しない）。
 - **レート制限**（IP単位・[rateLimit.ts](../src/lib/rateLimit.ts)）: スライディングウィンドウ方式。超過で 429（Retry-After付き）。Web Pod 1台前提のインメモリ判定。
 - **エラー**: `{ success: false, error: { code, message, suggestion?, requestId? } }`
 
@@ -12,9 +12,15 @@
 - multipart/form-data・**認証必須**（JWT）。
 - パラメータ: image(生成済Blob), text, position/font/color/size/output（生成オプション）, mimeType, visibility(`public`/`unlisted`/`local`), altText(任意・画像の代替テキスト)。
 - **撮影情報**（任意・クライアントが元画像から抽出して送る）: `cameraOption`(`none`/`show`/`detail`), `cameraMake`/`cameraModel`(show/detail時), `exifDetails`(detail時・[ExifDetails](../src/lib/exif/details.ts)のJSON文字列・サーバーが `sanitizeExifDetails` でホワイトリスト検証), `locationOption`/`gpsLatitude`/`gpsLongitude` 等。
-- **処理**: S3アップロード → DB保存 → Fediverse投稿（local時はスキップ）。
+- **処理**: S3アップロード → DB保存 → Fediverse投稿（local時はスキップ）。S3・DB に入るのは受け取った AVIF そのもので、**Mastodon へ送るときだけ** 投稿直前に JPEG へ変換する（[uploadFormat.ts](../src/lib/fediverse/uploadFormat.ts)・変換は compute の `/api/internal/transcode`）。変換結果は保存しない。
 - **レート制限**（ユーザー単位・[postRateLimit.ts](../src/lib/postRateLimit.ts)）: 認証直後、重い画像処理の前に判定。①直近15分の投稿数 ②直近24時間の投稿数（上限は直近1週間の投稿数に応じて増える）の2窓を、Image履歴の1クエリで算出。超過で 429（Retry-After付き）。
 - **レスポンス**: `{ success, imageId, imagePageUrl, postUrl? }`
+
+## POST /api/v1/post/repost/[id]（認証必須・worker-front配信）
+- 既に SHAMEZO に保存済みの画像を、改めて Fediverse へ投稿する（投稿失敗した画像と、`visibility=local` で最初から連合しなかった画像が対象＝どちらも `postId=null`）。body `{ visibility }`（`public`/`unlisted`・`local` は 400）。
+- 対象条件は [repostImage.ts](../src/lib/publish/repostImage.ts): 本人の画像・未投稿・保存から `REPOST_MAX_AGE_MS`（7日）以内。再レンダリングはせず S3 の保存済み画像をそのまま使う。
+- レート制限は `/api/v1/post` と同じ枠（[postRateLimit.ts](../src/lib/postRateLimit.ts)）。**レスポンス**: `{ success, postUrl?, fediverseError?, fediverseErrorStatus? }`（投稿だけ失敗したケースは 200＋`fediverseError`）。
+- パスが `/api/v1/images/[id]/repost` ではなく `/api/v1/post` 配下なのは、Ingress が `/api/v1/post` を worker-front へ振っているため。保存済み AVIF を Mastodon 向け JPEG に変換する＝compute を呼ぶ必要があり、compute に到達できるのは worker-front だけ（[architecture.md](./architecture.md)）。
 
 ## POST /api/v1/ingest/email（内部API・worker-front配信）
 - Cloudflare Email Workerから転送されたraw emailを処理（元画像をS3一時領域へ置き、生成〜投稿は consumer へ enqueue）。`X-API-Key` 認証・`X-Email-Prefix` でユーザー特定。

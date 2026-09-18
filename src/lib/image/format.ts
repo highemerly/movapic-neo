@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { OutputFormat, OUTPUT_CONFIG } from "@/types";
+import { AVIF_MAX_FILE_SIZE } from "@/types";
 
 export interface ProcessImageResult {
   buffer: Buffer;
@@ -9,61 +9,48 @@ export interface ProcessImageResult {
   originalHeight?: number;
 }
 
+/** Fediverse へ送るための JPEG 変換品質。合成直後の中間 JPEG（imageProcessor）と同値。 */
+const UPLOAD_JPEG_QUALITY = 90;
+
 /**
- * 出力形式に応じて圧縮・フォーマット変換を適用
- * リサイズはimageProcessor.tsで事前に行われるため、ここでは行わない
+ * 生成画像を AVIF へ変換する。
+ * リサイズはimageProcessor.tsで事前に行われるため、ここでは行わない。
+ *
+ * 連携先（OutputFormat）で形式を変えないのは、SHAMEZO が保存・表示する画像を
+ * 例外なく AVIF に揃えるため。Mastodon は AVIF を受け取れないが、それは投稿直前の
+ * 変換で解決する（src/lib/fediverse/uploadFormat.ts）。
  */
 export async function applyOutputFormat(
-  imageBuffer: Buffer,
-  outputFormat: OutputFormat
+  imageBuffer: Buffer
 ): Promise<ProcessImageResult> {
-  const config = OUTPUT_CONFIG[outputFormat];
-
-  // 「なし」の場合はJPEGでそのまま返す
-  if (!config) {
-    return {
-      buffer: imageBuffer,
-      contentType: "image/jpeg",
-      extension: "jpg",
-    };
-  }
-
-  const { maxFileSize, format } = config;
-
-  // AVIF出力
   // effort: 0-9 (default 4), 低いほど高速だが圧縮率が下がる
   // effort: 2 で高速化しつつ圧縮効率を維持
-  if (format === "avif") {
-    // 初回出力（quality 80, effort 2で高速化）
-    let result = await sharp(imageBuffer)
-      .avif({ quality: 80, effort: 2 })
-      .toBuffer();
+  let result = await sharp(imageBuffer).avif({ quality: 80, effort: 2 }).toBuffer();
 
-    // ファイルサイズがmaxFileSizeを超える場合は品質を下げて再エンコード
-    if (result.length > maxFileSize) {
-      for (let quality = 70; quality >= 20; quality -= 10) {
-        result = await sharp(imageBuffer)
-          .avif({ quality, effort: 2 })
-          .toBuffer();
+  // ファイルサイズが上限を超える場合は品質を下げて再エンコード
+  if (result.length > AVIF_MAX_FILE_SIZE) {
+    for (let quality = 70; quality >= 20; quality -= 10) {
+      result = await sharp(imageBuffer).avif({ quality, effort: 2 }).toBuffer();
 
-        if (result.length <= maxFileSize) {
-          break;
-        }
+      if (result.length <= AVIF_MAX_FILE_SIZE) {
+        break;
       }
     }
-
-    return {
-      buffer: result,
-      contentType: "image/avif",
-      extension: "avif",
-    };
   }
 
-  // JPEG出力。合成直後のバッファが既に JPEG（imageProcessor が quality 90 で出力）なので
-  // 再エンコードせずそのまま返す。
   return {
-    buffer: imageBuffer,
-    contentType: "image/jpeg",
-    extension: "jpg",
+    buffer: result,
+    contentType: "image/avif",
+    extension: "avif",
   };
+}
+
+/**
+ * 保存済みの生成画像（AVIF）を JPEG へ変換する。Mastodon へのアップロード専用。
+ *
+ * SHAMEZO 側の保存物は AVIF のままなので、ここでの変換結果はどこにも保存しない
+ * （投稿のたびに作り直す＝保存物と連合先の形式を混ぜない）。
+ */
+export async function toUploadJpeg(imageBuffer: Buffer): Promise<Buffer> {
+  return sharp(imageBuffer).jpeg({ quality: UPLOAD_JPEG_QUALITY }).toBuffer();
 }

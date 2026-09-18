@@ -15,7 +15,7 @@ Generate composite images by overlaying text on images.
 
 - **Text**: 1–140 characters
 - **Supported Image Formats**: JPEG / PNG / WebP / HEIC / AVIF (up to 20MB)
-- **Output Formats**: JPEG or AVIF
+- **Output Format**: AVIF (converted to JPEG only when uploading to Mastodon, which cannot decode AVIF)
 
 ### Customization Options
 

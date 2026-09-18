@@ -33,8 +33,8 @@ grep -rn "cleanup-2026-10" src scripts prisma
 - [ ] `src/app/api/v1/me/route.ts` — PATCH の `autoMakeup` 受け付け・select・レスポンス
 - [ ] `src/lib/auth/session.ts` — `SessionUser.autoMakeup` とその代入
 - [ ] `src/lib/publish/publishImage.ts` — `PublishUser.autoMakeup` と投稿時の自動割当の分岐（`perfectMonthGrace` / `assignMakeupForNewPost` の import も）
-- [ ] `src/app/api/v1/post/route.ts` / `src/app/api/v1/images/[id]/repost/route.ts` / `src/lib/queue/tasks.ts` / `src/lib/mention/processor.ts`（型と2か所の代入）— `autoMakeup:` の受け渡し
-- [ ] テストのフィクスチャから `autoMakeup` を除去: `src/lib/auth/session.test.ts` / `src/lib/publish/publishImage.test.ts`（「自動穴埋めは 2026-09 以前の月だけ」の describe ごと）/ `src/lib/publish/repostImage.test.ts` / `src/app/api/v1/post/route.test.ts` / `src/app/api/v1/images/[id]/repost/route.test.ts`
+- [ ] `src/app/api/v1/post/route.ts` / `src/app/api/v1/post/repost/[id]/route.ts` / `src/lib/queue/tasks.ts` / `src/lib/mention/processor.ts`（型と2か所の代入）— `autoMakeup:` の受け渡し
+- [ ] テストのフィクスチャから `autoMakeup` を除去: `src/lib/auth/session.test.ts` / `src/lib/publish/publishImage.test.ts`（「自動穴埋めは 2026-09 以前の月だけ」の describe ごと）/ `src/lib/publish/repostImage.test.ts` / `src/app/api/v1/post/route.test.ts` / `src/app/api/v1/post/repost/[id]/route.test.ts`
 
 ### 画像削除時の旧ルール分岐
 - [ ] `src/app/api/v1/images/[id]/route.ts` DELETE — 「旧era かつ autoMakeup」の `recomputeMonthMakeups` 分岐を消し、`healAfterImageDelete`（失効掃除）だけにする

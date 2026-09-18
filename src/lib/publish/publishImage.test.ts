@@ -23,17 +23,22 @@ import {
   DEFAULT_ARRANGEMENT,
 } from "@/types";
 
-const { postToMastodon, postToMisskey, imageCreate, imageUpdate } = vi.hoisted(() => ({
-  postToMastodon: vi.fn(),
-  postToMisskey: vi.fn(),
-  imageCreate: vi.fn(),
-  imageUpdate: vi.fn(),
-}));
+const { postToMastodon, postToMisskey, imageCreate, imageUpdate, transcodeToJpeg } =
+  vi.hoisted(() => ({
+    postToMastodon: vi.fn(),
+    postToMisskey: vi.fn(),
+    imageCreate: vi.fn(),
+    imageUpdate: vi.fn(),
+    transcodeToJpeg: vi.fn(),
+  }));
 
 vi.mock("@/lib/fediverse/post", () => ({
   postToMastodon,
   postToMisskey,
 }));
+
+// 保存物は AVIF・Mastodon へは JPEG に変換して送るため、投稿経路は compute を1往復する。
+vi.mock("@/lib/compute/client", () => ({ transcodeToJpeg }));
 
 vi.mock("@/lib/db", () => ({
   default: { image: { create: imageCreate, update: imageUpdate } },
@@ -114,6 +119,7 @@ beforeEach(() => {
   });
   imageCreate.mockResolvedValue({});
   imageUpdate.mockResolvedValue({});
+  transcodeToJpeg.mockResolvedValue(Buffer.from("jpeg"));
 });
 
 describe("publishImage の ALT 配管", () => {
@@ -221,6 +227,85 @@ describe("publishImage の投稿再試行（一時的失敗のみ1回だけ）",
       "https://mastodon.example/@alice/s2"
     );
     expect(imageUpdate.mock.calls[0][0].data.postId).toBe("s2");
+  });
+});
+
+describe("Mastodon へのアップロード形式（保存は AVIF・送信のみ JPEG）", () => {
+  // postToMastodon/postToMisskey の引数順: server, token, buffer, contentType, filename, ...
+  const BUFFER_ARG = 2;
+  const CONTENT_TYPE_ARG = 3;
+  const FILENAME_ARG = 4;
+
+  it("Mastodon へは JPEG に変換したバッファを送る（DB保存は AVIF のまま）", async () => {
+    await publishImage(baseInput({}));
+
+    expect(transcodeToJpeg).toHaveBeenCalledTimes(1);
+    const call = postToMastodon.mock.calls[0];
+    expect(call[BUFFER_ARG].toString()).toBe("jpeg");
+    expect(call[CONTENT_TYPE_ARG]).toBe("image/jpeg");
+    expect(call[FILENAME_ARG]).toMatch(/\.jpg$/);
+    // 保存物は AVIF のまま＝変換結果はどこにも残さない
+    expect(imageCreate.mock.calls[0][0].data.mimeType).toBe("image/avif");
+  });
+
+  it("Misskey へは変換せず AVIF をそのまま送る", async () => {
+    await publishImage(
+      baseInput({
+        user: {
+          id: "user-1",
+          username: "alice",
+          accessToken: "token",
+          instance: { domain: "misskey.example", type: "misskey" },
+          autoMakeup: false,
+        },
+      })
+    );
+
+    expect(transcodeToJpeg).not.toHaveBeenCalled();
+    const call = postToMisskey.mock.calls[0];
+    expect(call[BUFFER_ARG].toString()).toBe("img");
+    expect(call[CONTENT_TYPE_ARG]).toBe("image/avif");
+  });
+
+  it("local（連合しない）は変換もしない", async () => {
+    await publishImage(baseInput({ visibility: "local" }));
+
+    expect(transcodeToJpeg).not.toHaveBeenCalled();
+    expect(postToMastodon).not.toHaveBeenCalled();
+    expect(imageCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("再試行しても変換は1回だけ（変換済みバッファを使い回す）", async () => {
+    postToMastodon.mockResolvedValue({
+      success: false,
+      error: "server error",
+      statusCode: 503,
+    });
+    await publishImage(baseInput({}));
+
+    expect(postToMastodon).toHaveBeenCalledTimes(2);
+    expect(transcodeToJpeg).toHaveBeenCalledTimes(1);
+  });
+
+  it("変換に失敗したら投稿失敗として返す（AVIF のまま送らない・画像は保存する）", async () => {
+    transcodeToJpeg.mockRejectedValue(new Error("compute down"));
+
+    const result = await publishImage(baseInput({}));
+
+    expect(postToMastodon).not.toHaveBeenCalled();
+    expect(result.postError).toBe("投稿用画像の変換に失敗しました");
+    // persistOnPostFailure=true なので画像自体は残る＝再投稿でやり直せる
+    expect(result.imageId).toBeDefined();
+    expect(imageCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("mention経路（persistOnPostFailure=false）で変換に失敗したら保存しない", async () => {
+    transcodeToJpeg.mockRejectedValue(new Error("compute down"));
+
+    const result = await publishImage(baseInput({ persistOnPostFailure: false }));
+
+    expect(result.imageId).toBeUndefined();
+    expect(imageCreate).not.toHaveBeenCalled();
   });
 });
 
