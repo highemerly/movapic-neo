@@ -59,7 +59,9 @@ npx prisma migrate dev --name init
 npm run dev
 ```
 
-http://localhost:3000 でアクセス可能。
+http://localhost:3001 でアクセス可能。
+
+ポートは `--port 3001` で固定している。ローカルは all-in-one（web / worker-front / compute が同一プロセス）で、`COMPUTE_SERVICE_URL` から**自分自身をHTTPで呼び返す**ため、ポートが変わると内部呼び出し先とずれる。固定しないと、そのポートが埋まっているとき `next dev` が黙って別のポートへずれ、`COMPUTE_SERVICE_URL` は無関係のプロセスを指したまま `404 Server action not found.` で画像生成が全滅する（起動失敗なら気づける）。ポートを変えるときは `.env.local` の `COMPUTE_SERVICE_URL` と `NEXT_PUBLIC_APP_URL` も併せて直すこと。
 
 ---
 
@@ -227,7 +229,7 @@ server {
 ### OAuth認証のテスト
 
 ```bash
-curl -X POST http://localhost:3000/api/auth/fediverse/register \
+curl -X POST http://localhost:3001/api/auth/fediverse/register \
   -H "Content-Type: application/json" \
   -d '{"server": "handon.club"}'
 ```
@@ -237,7 +239,7 @@ curl -X POST http://localhost:3000/api/auth/fediverse/register \
 ### 画像生成のテスト
 
 ```bash
-curl -X POST http://localhost:3000/api/v1/generate \
+curl -X POST http://localhost:3001/api/v1/generate \
   -F "image=@test.jpg" \
   -F "text=テスト" \
   -F "position=top" \
