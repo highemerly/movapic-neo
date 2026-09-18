@@ -44,12 +44,14 @@
 - パラメータ year, month。レスポンスは `days`（日ごとの件数＋代表画像）と `hasPrevMonth`/`hasNextMonth`/`isPerfectAttendance`（皆勤賞）を含むカレンダー用月別データ。
 - `perfectMonth`（未来月は null）: `achieved` / `isCurrentMonth` / `callout`（当月の穴埋め促し: `today`｜`ready`｜`tomorrow`｜`no-points`｜null）/ `filledDays`（穴埋め済みの日と埋めた写真）。
 - **本人のときだけ**: `perfectMonth.makeup`＝その月の穴埋め枠 `{ pointEra, limit, used, remaining, deadline, editable, grants[] }`（`deadline` は締切の排他上限＝翌月11日 JST 00:00 の ISO）と、編集モード用の `ownerEdit`。キャッシュは `private, no-store`。
+- `ownerEdit.nextMonthDayImages` は翌月1〜10日の画像（＝この月の穴を埋める donor 候補）。`dayImages` と別に返すのは、キーが日番号なので 10/3 と 11/3 を同じバケツに入れられないため。各画像の `makeupTargetMonth`（"YYYY-MM"）は、その写真がどの月の穴に使用中かを示す（1日1donor は月をまたいで共有するので日だけでは決まらない）。
 - 穴埋めの上限は**カレンダーの持ち主**について解決する（2026-09 以前は所属インスタンスの固定値・2026-10 以降は穴埋めポイントの合計）。閲覧者に依存しないので、本人以外へのレスポンスは公開キャッシュしてよい。
 
 ## PATCH /api/v1/images/[id]（本人のみ）
-- カレンダーの手動制御。body `{ calendarPicked?: boolean, makeupTargetDay?: number | null }`（代表サムネの指定・解除／この写真で埋める穴の日の指定・解除）。
+- カレンダーの手動制御。body `{ calendarPicked?: boolean, makeupTargetDay?: number | null, makeupTargetMonth?: string }`（代表サムネの指定・解除／この写真で埋める穴の日の指定・解除）。
+- `makeupTargetMonth`（"YYYY-MM"・省略＝写真と同じ月）は**どの月の穴か**。締切までなら翌月1〜10日の投稿でも前月の donor になれるため、日だけでは対象月が決まらない。解除（`makeupTargetDay: null`）では保存済みの割当から対象月を復元するので不要。写真の月でもその前月でもない値は 409。
 - 穴埋め（`makeupTargetDay`）は、対象月の**翌月10日 23:59 JST を過ぎると指定・解除とも 409**。代表サムネの指定は締切と無関係。
-- 上限超過は 409（2026-10 以降は「穴埋めポイントが足りません」）。検証〜書き込みはユーザー×月で直列化する（advisory lock・並行リクエストで上限を超えないため）。
+- 上限超過は 409（2026-10 以降は「穴埋めポイントが足りません」）。検証〜書き込みはユーザー×月で直列化する（advisory lock・並行リクエストで上限を超えないため）。月またぎ donor では変更が2つの月に及ぶので、「写真の月」と「その前月」の両方をロックし、締切・上限・👑のガードも**変更が触れる月すべて**に対して回す。
 - 皆勤賞を達成済みの月で、解除により非達成に落ちる変更は 409（別の写真への付け替えは可）。
 
 ## POST /api/v1/me/calendar/reevaluate（本人のみ）

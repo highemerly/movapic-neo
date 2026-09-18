@@ -71,6 +71,7 @@
 
 ### 皆勤賞の穴埋め（詳細: [achievements/README](src/lib/achievements/README.md)「特殊: 皆勤賞」）
 - 2026-10 分から**穴埋めポイント制**（1pt=1日・月ごと・持ち越し不可・翌月10日締切・全ユーザー手動）。2026-09 以前の月は旧ルール（固定上限3/4日・自動穴埋め）のまま。
+- **donor（穴を埋める写真）は締切までなら翌月1〜10日の投稿でもよい**（`Image.makeupTargetMonthDelta`＝0同月/-1前月。規則は [donor.ts](src/lib/makeup/donor.ts) が単一ソース）。月末日を忘れた人だけが救済不能になる非対称を無くすため。ポイント制の月だけ。**1日1donor は月をまたいで共有**（共有しないと1回のダブル投稿で2日ぶん埋まる）。読む側は `donorRange` で読み `filledHoleOf` で振り分け、**対象月の外の行は donor としてだけ効かせる**（11/3 を 10/3 の投稿として数えない）。
 - **その月の上限は必ず [`resolveMakeupCap`/`resolveMakeupLimits`](src/lib/makeup/ledger.ts) で解決**して `perfectMonth.ts` に渡す（`perfectMonthGrace` を直接呼ばない＝旧ルールの月にしか正しくない）。
 - ポイント台帳（`MakeupPointGrant`）は**付与のみ・追記のみ**。消費は `Image.makeupTargetDay` から導出する（消費を別に持たない）。剥奪・マイナス補正は禁止（過去月の👑が揺れる）。
 - 実績付与は `grantAll` を通す（実績ptの付与フックがそこにだけある）。

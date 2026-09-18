@@ -92,6 +92,7 @@ function targetImage(over: Record<string, unknown> = {}) {
     createdAt: jst(10),
     calendarPickedAt: null,
     makeupTargetDay: null,
+    makeupTargetMonthDelta: 0,
     ...over,
   } as never;
 }
@@ -313,6 +314,7 @@ describe("PATCH /api/v1/images/[id]", () => {
       id: e.id,
       createdAt: jst(e.day),
       makeupTargetDay: e.makeupTargetDay ?? null,
+      makeupTargetMonthDelta: 0,
     })) as never;
   }
 
@@ -408,7 +410,7 @@ describe("PATCH /api/v1/images/[id]", () => {
       expect(res.status).toBe(200);
       expect(mockUpdate).toHaveBeenCalledWith({
         where: { id: "img1" },
-        data: { makeupTargetDay: 5 },
+        data: { makeupTargetDay: 5, makeupTargetMonthDelta: 0 },
       });
     });
 
@@ -420,7 +422,7 @@ describe("PATCH /api/v1/images/[id]", () => {
       expect(res.status).toBe(200);
       expect(mockUpdate).toHaveBeenCalledWith({
         where: { id: "img1" },
-        data: { makeupTargetDay: null },
+        data: { makeupTargetDay: null, makeupTargetMonthDelta: 0 },
       });
     });
 
@@ -484,7 +486,7 @@ describe("PATCH /api/v1/images/[id]", () => {
       expect(res.status).toBe(200);
       expect(mockUpdate).toHaveBeenCalledWith({
         where: { id: "img4" },
-        data: { makeupTargetDay: null },
+        data: { makeupTargetDay: null, makeupTargetMonthDelta: 0 },
       });
     });
 
@@ -502,7 +504,7 @@ describe("PATCH /api/v1/images/[id]", () => {
       expect(res.status).toBe(200);
       expect(mockUpdate).toHaveBeenCalledWith({
         where: { id: "img2" },
-        data: { makeupTargetDay: null },
+        data: { makeupTargetDay: null, makeupTargetMonthDelta: 0 },
       });
     });
 
@@ -541,9 +543,9 @@ describe("PATCH /api/v1/images/[id]", () => {
       mockFindUnique.mockResolvedValue(targetImage({ createdAt: jst(10, 10) }));
       mockFindMany.mockResolvedValue(
         [
-          { id: "img1", createdAt: jst(10, 10), makeupTargetDay: null },
-          { id: "img2", createdAt: jst(10, 10), makeupTargetDay: null },
-          { id: "d1", createdAt: jst(20, 10), makeupTargetDay: 2 },
+          { id: "img1", createdAt: jst(10, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img2", createdAt: jst(10, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "d1", createdAt: jst(20, 10), makeupTargetDay: 2, makeupTargetMonthDelta: 0 },
         ] as never
       );
       mockResolveCap.mockResolvedValue(1); // 1pt を 2日の穴で使用済み
@@ -562,8 +564,8 @@ describe("PATCH /api/v1/images/[id]", () => {
       mockFindUnique.mockResolvedValue(targetImage({ createdAt: jst(10, 10) }));
       mockFindMany.mockResolvedValue(
         [
-          { id: "img1", createdAt: jst(10, 10), makeupTargetDay: null },
-          { id: "img2", createdAt: jst(10, 10), makeupTargetDay: null },
+          { id: "img1", createdAt: jst(10, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img2", createdAt: jst(10, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
         ] as never
       );
       mockResolveCap.mockResolvedValue(0);
@@ -602,10 +604,10 @@ describe("PATCH /api/v1/images/[id]", () => {
       expect(mockUpdate).not.toHaveBeenCalled();
     });
 
-    it("検証と書き込みはユーザー×画像の月で直列化する", async () => {
+    it("検証と書き込みは、写真の月とその前月をまとめて直列化する（月またぎdonorのため）", async () => {
       await PATCH(patchReq({ makeupTargetDay: 5 }), params());
 
-      expect(mockLock).toHaveBeenCalledWith("u1", "2026-03", expect.any(Function));
+      expect(mockLock).toHaveBeenCalledWith("u1", ["2026-02", "2026-03"], expect.any(Function));
     });
 
     it("皆勤賞を達成済みの月では、非達成に落ちる解除を拒否する", async () => {
@@ -616,6 +618,170 @@ describe("PATCH /api/v1/images/[id]", () => {
 
       expect(res.status).toBe(409);
       expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    describe("月またぎ（翌月1〜10日のダブル投稿で前月を埋める）", () => {
+      /** 11/3 にダブル投稿していて、10/31 が空き日の状態。 */
+      function novemberDonor(over: Record<string, unknown> = {}) {
+        setNow("2026-11-05T03:00:00Z");
+        mockResolveCap.mockResolvedValue(1);
+        mockFindUnique.mockResolvedValue(targetImage({ createdAt: jst(3, 11), ...over }));
+        mockFindMany.mockResolvedValue([
+          { id: "img1", createdAt: jst(3, 11), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img2", createdAt: jst(3, 11), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "oct1", createdAt: jst(30, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+        ] as never);
+      }
+
+      it("11/3 のダブル投稿で 10/31 を埋められる（delta=-1 で保存する）", async () => {
+        novemberDonor();
+
+        const res = await PATCH(
+          patchReq({ makeupTargetDay: 31, makeupTargetMonth: "2026-10" }),
+          params()
+        );
+
+        expect(res.status).toBe(200);
+        expect(mockUpdate).toHaveBeenCalledWith({
+          where: { id: "img1" },
+          data: { makeupTargetDay: 31, makeupTargetMonthDelta: -1 },
+        });
+      });
+
+      it("上限・締切は対象月（10月）で解決する", async () => {
+        novemberDonor();
+
+        await PATCH(patchReq({ makeupTargetDay: 31, makeupTargetMonth: "2026-10" }), params());
+
+        expect(mockResolveCap).toHaveBeenCalledWith({
+          userId: "u1",
+          instanceDomain: "handon.club",
+          ym: "2026-10",
+        });
+      });
+
+      it("10月の締切（11/10）を過ぎたら409で拒否し、ロックも取らない", async () => {
+        novemberDonor();
+        setNow("2026-11-10T15:00:00Z"); // 11/11 00:00 JST
+
+        const res = await PATCH(
+          patchReq({ makeupTargetDay: 31, makeupTargetMonth: "2026-10" }),
+          params()
+        );
+
+        expect(res.status).toBe(409);
+        await expect(res.json()).resolves.toEqual({
+          error: "10月の穴埋めは11月10日で締め切りました",
+        });
+        expect(mockLock).not.toHaveBeenCalled();
+      });
+
+      it("前々月など donor になれない月を指定したら409で拒否する", async () => {
+        novemberDonor();
+
+        const res = await PATCH(
+          patchReq({ makeupTargetDay: 5, makeupTargetMonth: "2026-09" }),
+          params()
+        );
+
+        expect(res.status).toBe(409);
+        expect(mockUpdate).not.toHaveBeenCalled();
+      });
+
+      it("解除は保存済みの delta から対象月を復元する（10月の締切で判定する）", async () => {
+        novemberDonor({ makeupTargetDay: 31, makeupTargetMonthDelta: -1 });
+
+        const res = await PATCH(patchReq({ makeupTargetDay: null }), params());
+
+        expect(res.status).toBe(200);
+        expect(mockResolveCap).toHaveBeenCalledWith(
+          expect.objectContaining({ ym: "2026-10" })
+        );
+        expect(mockUpdate).toHaveBeenCalledWith({
+          where: { id: "img1" },
+          data: { makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+        });
+      });
+
+      it("1日1donor は月をまたいで共有する: 同じ11/3の別写真が10月を埋めていたら外す", async () => {
+        setNow("2026-11-05T03:00:00Z");
+        mockResolveCap.mockResolvedValue(2);
+        mockFindUnique.mockResolvedValue(targetImage({ createdAt: jst(3, 11) }));
+        mockFindMany.mockResolvedValue([
+          { id: "img1", createdAt: jst(3, 11), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img2", createdAt: jst(3, 11), makeupTargetDay: 31, makeupTargetMonthDelta: -1 },
+          { id: "nov1", createdAt: jst(2, 11), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+        ] as never);
+
+        // 11/1 の穴を、同じ 11/3 の別の写真で埋めようとする
+        const res = await PATCH(
+          patchReq({ makeupTargetDay: 1, makeupTargetMonth: "2026-11" }),
+          params()
+        );
+
+        expect(res.status).toBe(200);
+        expect(mockUpdate).toHaveBeenCalledWith({
+          where: { id: "img2" },
+          data: { makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+        });
+      });
+
+      it("10月の👑を崩す付け替え（1日1donor による10月の割当外し）は409で拒否する", async () => {
+        setNow("2026-11-05T03:00:00Z");
+        mockResolveCap.mockResolvedValue(1);
+        mockFindUnique.mockResolvedValue(targetImage({ createdAt: jst(3, 11) }));
+        // 10月は1〜30日に投稿があり、31日の穴を 11/3 の img2 が埋めている＝達成済み。
+        // 11月は2〜30日に投稿があり、1日が穴。img1（同じ11/3）でその穴を埋めようとすると、
+        // 1日1donor の月またぎ共有で img2 の10月の割当が外れ、10月が非達成に落ちる。
+        const octoberPosts = Array.from({ length: 30 }, (_, i) => ({
+          id: `oct${i + 1}`,
+          createdAt: jst(i + 1, 10),
+          makeupTargetDay: null,
+          makeupTargetMonthDelta: 0,
+        }));
+        const novemberPosts = Array.from({ length: 29 }, (_, i) => ({
+          id: `nov${i + 2}`,
+          createdAt: jst(i + 2, 11),
+          makeupTargetDay: null,
+          makeupTargetMonthDelta: 0,
+        }));
+        mockFindMany.mockResolvedValue([
+          ...octoberPosts,
+          ...novemberPosts,
+          { id: "img1", createdAt: jst(3, 11), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img2", createdAt: jst(3, 11), makeupTargetDay: 31, makeupTargetMonthDelta: -1 },
+        ] as never);
+        mockAchievementFindFirst.mockResolvedValue({ id: "a1" } as never);
+
+        const res = await PATCH(
+          patchReq({ makeupTargetDay: 1, makeupTargetMonth: "2026-11" }),
+          params()
+        );
+
+        expect(res.status).toBe(409);
+        // 11月そのものは成立する（＝弾いたのは巻き添えになる10月の側だと分かる）
+        await expect(res.json()).resolves.toEqual({
+          error: "10月は皆勤賞を達成済みのため、穴埋めを解除できません（別の写真への付け替えは可能です）",
+        });
+        expect(mockUpdate).not.toHaveBeenCalled();
+      });
+
+      it("同じ日・未来日は月をまたいでも埋められない（10/31 の写真で 11/1 は不可）", async () => {
+        setNow("2026-11-05T03:00:00Z");
+        mockResolveCap.mockResolvedValue(1);
+        mockFindUnique.mockResolvedValue(targetImage({ createdAt: jst(31, 10) }));
+        mockFindMany.mockResolvedValue([
+          { id: "img1", createdAt: jst(31, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img2", createdAt: jst(31, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+        ] as never);
+
+        const res = await PATCH(
+          patchReq({ makeupTargetDay: 1, makeupTargetMonth: "2026-11" }),
+          params()
+        );
+
+        expect(res.status).toBe(409);
+      });
     });
 
     it("皆勤賞の判定は投稿月のキーで引く（当月ではなく）", async () => {

@@ -47,6 +47,7 @@ const image = (id: string, day: number, makeupTargetDay: number | null = null) =
   createdAt: jst(day),
   calendarPickedAt: null,
   makeupTargetDay,
+  makeupTargetMonthDelta: 0,
 });
 
 function req(): NextRequest {

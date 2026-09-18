@@ -30,6 +30,8 @@ interface DayData {
 interface FilledDay {
   day: number;
   filledBy: number;
+  /** filledBy の月(1-12)。月またぎ donor（翌月1〜10日の投稿）では表示中の月と違う。 */
+  filledByMonth: number;
   image: { id: string; thumbnailKey: string | null; storageKey: string };
 }
 
@@ -49,6 +51,8 @@ interface OwnerDayImage {
   storageKey: string;
   isPicked: boolean;
   makeupTargetDay: number | null;
+  /** その穴がある月 "YYYY-MM"。null=穴埋めに使っていない。月またぎがあるので日だけでは決まらない。 */
+  makeupTargetMonth: string | null;
 }
 
 interface CalendarData {
@@ -59,7 +63,11 @@ interface CalendarData {
   hasNextMonth: boolean;
   isPerfectAttendance: boolean;
   perfectMonth: PerfectMonthInfo | null;
-  ownerEdit?: { dayImages: Record<number, OwnerDayImage[]> };
+  ownerEdit?: {
+    dayImages: Record<number, OwnerDayImage[]>;
+    /** 翌月1〜10日の画像（この月の穴を埋める donor 候補）。締切までなら翌月の投稿も使える。 */
+    nextMonthDayImages?: Record<number, OwnerDayImage[]>;
+  };
 }
 
 interface CalendarViewProps {
@@ -544,7 +552,14 @@ export function CalendarView({
                 dayData={day ? data?.days[day] : undefined}
                 filledMakeup={
                   filled
-                    ? { filledBy: filled.filledBy, image: filled.image }
+                    ? {
+                        // 月またぎ donor（翌月1〜10日の投稿）だけ月も添えて、同月の日と取り違えないようにする。
+                        filledByLabel:
+                          filled.filledByMonth === month
+                            ? `${filled.filledBy}日`
+                            : `${filled.filledByMonth}月${filled.filledBy}日`,
+                        image: filled.image,
+                      }
                     : undefined
                 }
                 publicUrl={publicUrl}
@@ -660,6 +675,7 @@ export function CalendarView({
           year={year}
           month={month}
           dayImages={data.ownerEdit.dayImages}
+          nextMonthDayImages={data.ownerEdit.nextMonthDayImages}
           filledByDay={filledByDay}
           makeup={data.perfectMonth?.makeup}
           thumbUrl={thumbUrl}
@@ -790,6 +806,7 @@ function EditPicker({
   year,
   month,
   dayImages,
+  nextMonthDayImages,
   filledByDay,
   makeup,
   thumbUrl,
@@ -801,6 +818,8 @@ function EditPicker({
   year: number;
   month: number;
   dayImages: Record<number, OwnerDayImage[]>;
+  /** 翌月1〜10日の画像。締切までは翌月の投稿もこの月の穴埋めに使える。 */
+  nextMonthDayImages: Record<number, OwnerDayImage[]> | undefined;
   filledByDay: Map<number, FilledDay>;
   /** その月の穴埋め枠。締切後・残り0 のときは donor の新規指定をさせない。 */
   makeup: MakeupInfo | undefined;
@@ -812,41 +831,57 @@ function EditPicker({
   const { kind, day } = picker;
 
   // カレンダーと同じ曜日色（日/祝=赤・土=青）でその日の番号を表示するためのヘルパー。
-  const dayNumberClass = (d: number): string => {
-    const dow = new Date(year, month - 1, d).getDay();
-    const isRed = dow === 0 || isJapaneseHoliday(year, month, d);
+  // 候補には翌月の日も並ぶので、月も受け取って曜日・祝日を取り違えないようにする。
+  const dayNumberClass = (d: number, m: number): string => {
+    const y = m < month ? year + 1 : year; // 12月のカレンダーから見た翌月＝翌年1月
+    const dow = new Date(y, m - 1, d).getDay();
+    const isRed = dow === 0 || isJapaneseHoliday(y, m, d);
     const isBlue = dow === 6 && !isRed;
     return isRed ? "text-red-400" : isBlue ? "text-blue-400" : "text-white";
   };
 
+  const targetYm = `${year}-${String(month).padStart(2, "0")}`;
+  const nextMonth = month === 12 ? 1 : month + 1;
+
   // 穴埋め割当の候補: その穴より後の「2枚以上投稿した日」の画像を全て表示し、
   // 選べないもの（＝その日のサムネイル／別の穴で使用中）はグレーアウトして見せる。
+  // 候補には翌月1〜10日の投稿も含める（月末日を忘れても後日のダブル投稿で埋められるように）。
+  // 「別の穴で使用中」は月をまたいで効く＝1日1donor は月をまたいで共有するため。
   const donorCandidates: {
     day: number;
+    /** その候補の月(1-12)。翌月の候補はラベルに月を出して同月の日と区別する。 */
+    candidateMonth: number;
     img: OwnerDayImage;
     disabled: boolean;
     isCurrent: boolean;
     reason: string | null;
   }[] = [];
   if (kind === "donor") {
+    const push = (d: number, candidateMonth: number, imgs: OwnerDayImage[]) => {
+      for (const img of imgs) {
+        const isCurrent = img.makeupTargetDay === day && img.makeupTargetMonth === targetYm;
+        const usedElsewhere = img.makeupTargetDay != null && !isCurrent;
+        const disabled = img.isPicked || usedElsewhere;
+        // 選べない理由（タップ時のトーストで案内する）
+        const reason = img.isPicked
+          ? "この写真はその日のサムネイルに使用中のため、穴埋めには使えません"
+          : usedElsewhere
+            ? `この写真は${Number(img.makeupTargetMonth!.slice(5, 7))}月${img.makeupTargetDay}日の穴埋めに使用中のため、この日には使えません`
+            : null;
+        donorCandidates.push({ day: d, candidateMonth, img, disabled, isCurrent, reason });
+      }
+    };
     for (const [dStr, imgs] of Object.entries(dayImages)) {
       const d = Number(dStr);
-      if (d > day && imgs.length >= 2) {
-        for (const img of imgs) {
-          const isCurrent = img.makeupTargetDay === day;
-          const usedElsewhere = img.makeupTargetDay != null && !isCurrent;
-          const disabled = img.isPicked || usedElsewhere;
-          // 選べない理由（タップ時のトーストで案内する）
-          const reason = img.isPicked
-            ? "この写真はその日のサムネイルに使用中のため、穴埋めには使えません"
-            : usedElsewhere
-              ? `この写真は${img.makeupTargetDay}日の穴埋めに使用中のため、この日には使えません`
-              : null;
-          donorCandidates.push({ day: d, img, disabled, isCurrent, reason });
-        }
-      }
+      if (d > day && imgs.length >= 2) push(d, month, imgs);
     }
-    donorCandidates.sort((a, b) => a.day - b.day);
+    // 翌月の投稿はこの月のどの日よりも後なので、日の大小は見ない。
+    for (const [dStr, imgs] of Object.entries(nextMonthDayImages ?? {})) {
+      if (imgs.length >= 2) push(Number(dStr), nextMonth, imgs);
+    }
+    donorCandidates.sort(
+      (a, b) => (a.candidateMonth === month ? 0 : 1) - (b.candidateMonth === month ? 0 : 1) || a.day - b.day
+    );
   }
   const currentFill = kind === "donor" ? filledByDay.get(day) : undefined;
   // 締切後は指定も解除も不可（サーバーも409で拒否する）。
@@ -953,7 +988,7 @@ function EditPicker({
               </p>
             ) : (
               <div className="grid grid-cols-4 gap-2">
-                {donorCandidates.map(({ day: d, img, disabled, isCurrent, reason }) => (
+                {donorCandidates.map(({ day: d, candidateMonth, img, disabled, isCurrent, reason }) => (
                   <button
                     key={img.id}
                     disabled={saving}
@@ -967,7 +1002,9 @@ function EditPicker({
                         toast.error(outOfPointsMessage);
                         return;
                       }
-                      onApply(img.id, { makeupTargetDay: day });
+                      // 対象月は「今見ているカレンダーの月」。翌月の写真を donor にするので、
+                      // 日だけ送るとサーバー側でどちらの月の穴か決まらない。
+                      onApply(img.id, { makeupTargetDay: day, makeupTargetMonth: targetYm });
                     }}
                     className={cn(
                       "relative aspect-square overflow-hidden rounded",
@@ -980,14 +1017,15 @@ function EditPicker({
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={thumbUrl(img)} alt="" className="h-full w-full object-cover" />
-                    {/* ラベルはカレンダーと同じ「日付のみ（曜日色）」に統一。使用中は「使用中」に簡略化。 */}
+                    {/* ラベルはカレンダーと同じ「日付のみ（曜日色）」に統一。使用中は「使用中」に簡略化。
+                        翌月の候補だけは月も出す（同月の同じ日番号と取り違えないため）。 */}
                     <span
                       className={cn(
                         "absolute bottom-0 left-0 right-0 bg-black/60 text-center text-[10px] font-semibold",
-                        disabled ? "text-white/90" : dayNumberClass(d),
+                        disabled ? "text-white/90" : dayNumberClass(d, candidateMonth),
                       )}
                     >
-                      {disabled ? "使用中" : d}
+                      {disabled ? "使用中" : candidateMonth === month ? d : `${candidateMonth}/${d}`}
                     </span>
                   </button>
                 ))}

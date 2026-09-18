@@ -26,13 +26,17 @@ vi.mock("@/lib/db", () => ({
 }));
 vi.mock("./ledger", () => ({ resolveMakeupLimits }));
 
-import { buildMonthMakeupState, notifyMakeupProgressOnPost, notifyMakeupReadyAfterGrant } from "./notify";
+import { notifyMakeupProgressOnPost, notifyMakeupReadyAfterGrant } from "./notify";
 
 /** JST で 2026-10-DD の正午。 */
 const jst = (day: number, month = 10) => new Date(Date.UTC(2026, month - 1, day, 3, 0, 0));
 /** 月の画像行。targets は makeupTargetDay。 */
 const rows = (entries: Array<[day: number, target?: number]>) =>
-  entries.map(([day, target]) => ({ createdAt: jst(day), makeupTargetDay: target ?? null }));
+  entries.map(([day, target]) => ({
+    createdAt: jst(day),
+    makeupTargetDay: target ?? null,
+    makeupTargetMonthDelta: 0,
+  }));
 
 /** 1〜4日は毎日投稿、2日だけ抜けている10月5日の状態に、今日(5日)の投稿を足す。 */
 const withToday = (todayPosts: number, todayTarget?: number) =>
@@ -52,16 +56,6 @@ beforeEach(() => {
   notificationFindFirst.mockResolvedValue(null);
   notificationCreate.mockResolvedValue({});
   resolveMakeupLimits.mockResolvedValue(limits(1));
-});
-
-describe("buildMonthMakeupState - 月の割当状況", () => {
-  it("日別の枚数・有効な穴・donor のいる日を組む", () => {
-    const s = buildMonthMakeupState(rows([[1], [3], [3, 2], [4, 3]]));
-    expect(s.dayCounts).toEqual({ 1: 1, 3: 2, 4: 1 });
-    // 3日を指す割当は3日に投稿があるので穴埋めとして数えない
-    expect(s.filledHoleDays).toEqual([2]);
-    expect(s.donorDays.sort()).toEqual([3, 4]);
-  });
 });
 
 describe("notifyMakeupProgressOnPost - 投稿した瞬間の促し", () => {

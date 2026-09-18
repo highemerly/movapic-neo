@@ -26,6 +26,7 @@ function row(day: number, o: Partial<CalendarImageRow> = {}): CalendarImageRow {
     createdAt: o.createdAt ?? jstNoon(day),
     calendarPickedAt: o.calendarPickedAt ?? null,
     makeupTargetDay: o.makeupTargetDay ?? null,
+    makeupTargetMonthDelta: o.makeupTargetMonthDelta ?? 0,
   };
 }
 
@@ -156,6 +157,39 @@ describe("resolveCalendarMonth: 穴埋め（makeup）", () => {
     const images = [row(1), row(3), row(3, { makeupTargetDay: 2 })];
     expect(resolve(images, PAST_NOW, 3).makeupRemaining).toBe(2);
     expect(resolve(images, PAST_NOW, 1).makeupRemaining).toBe(0);
+  });
+
+  it("翌月1〜10日の donor（delta=-1）が埋めた穴も載る。投稿数・代表サムネには数えない", () => {
+    const images = [
+      row(1),
+      // 7/3 のダブル投稿で 6/30（月末）を埋めた＝月内に後日が無くても埋められる
+      {
+        ...row(3, { id: "next1" }),
+        createdAt: new Date("2024-07-03T03:00:00Z"),
+      },
+      {
+        ...row(3, { id: "next2", makeupTargetDay: 30, makeupTargetMonthDelta: -1 }),
+        createdAt: new Date("2024-07-03T03:00:00Z"),
+      },
+    ];
+    const r = resolve(images, PAST_NOW);
+    expect(r.filledHoleDays).toEqual([30]);
+    expect(r.filledDays[0]).toMatchObject({ day: 30, filledBy: 3, filledByMonth: 7 });
+    // 7月の投稿は6月の日別集計に混ぜない（6/3 に投稿があることにしてはいけない）
+    expect(r.dayCounts).toEqual({ 1: 1 });
+    expect(r.days[3]).toBeUndefined();
+  });
+
+  it("翌月の donor が前月を埋めていても、その月自身の穴埋めとしては数えない", () => {
+    const images = [
+      row(1),
+      {
+        ...row(3, { id: "x", makeupTargetDay: 30, makeupTargetMonthDelta: -1 }),
+        createdAt: new Date("2024-06-03T03:00:00Z"),
+      },
+    ];
+    // 6/3 の写真が5月の30日を埋めている → 6月の filledHoleDays には入らない
+    expect(resolve(images, PAST_NOW).filledHoleDays).toEqual([]);
   });
 });
 

@@ -36,7 +36,9 @@ import {
   type PostFacts,
   type ReactionStats,
 } from "@/lib/achievements/catalog";
-import { summarizeDayCounts } from "@/lib/achievements/perfectMonth";
+import { daysInMonthOf, isPerfectMonth, perfectMonthKey, summarizeDayCounts } from "@/lib/achievements/perfectMonth";
+import { donorTargetYm } from "@/lib/makeup/donor";
+import { parseYm } from "@/lib/jst";
 import { perfectMonthGrace } from "@/lib/achievements/grace";
 import { isPointEra } from "@/lib/makeup/points";
 
@@ -82,6 +84,7 @@ interface ReplayImage {
   postUrl: string | null;
   postId: string | null;
   makeupTargetDay: number | null;
+  makeupTargetMonthDelta: number;
 }
 
 interface GrantRow {
@@ -125,6 +128,21 @@ function replayUser(userId: string, images: ReplayImage[], capOf: (ym: string) =
   let hasEmailPost = false;
   let hasMentionPost = false;
 
+  /** running 集計から、その月が皆勤で成立しているか（月またぎ donor の前月評価用）。 */
+  const isPerfectMonthOf = (ym: string): boolean => {
+    const mdc = monthDayCounts.get(ym);
+    if (!mdc) return false;
+    const counts: Record<number, number> = {};
+    for (const [dayStr, c] of mdc) counts[Number(dayStr.slice(8, 10))] = c;
+    const { year, month } = parseYm(ym);
+    return isPerfectMonth({
+      daysInMonth: daysInMonthOf(year, month),
+      dayCounts: counts,
+      filledHoleDays: monthFilledHoles.get(ym) ?? [],
+      grace: capOf(ym),
+    });
+  };
+
   for (const img of images) {
     const day = toJstDateString(img.createdAt);
     const ym = day.slice(0, 7);
@@ -140,12 +158,14 @@ function replayUser(userId: string, images: ReplayImage[], capOf: (ym: string) =
     const mdc = monthDayCounts.get(ym)!;
     mdc.set(day, (mdc.get(day) ?? 0) + 1);
 
-    // この投稿(donor)が永続的な穴埋め割当を持つなら、その月の filledHoleDays に積む。
+    // この投稿(donor)が永続的な穴埋め割当を持つなら、埋めている月の filledHoleDays に積む。
     // donor は穴より後の日に投稿されるためリプレイ順で正しいタイミングに加算される
     //（＝穴が埋まり切った donor 投稿の瞬間に皆勤賞が確定する）。
-    if (img.makeupTargetDay != null) {
-      if (!monthFilledHoles.has(ym)) monthFilledHoles.set(ym, []);
-      monthFilledHoles.get(ym)!.push(img.makeupTargetDay);
+    // 月またぎ donor（翌月1〜10日の投稿で前月を埋めたもの）は前月の側に積む。
+    const filledYm = img.makeupTargetDay != null ? donorTargetYm(ym, img.makeupTargetMonthDelta) : null;
+    if (img.makeupTargetDay != null && filledYm != null) {
+      if (!monthFilledHoles.has(filledYm)) monthFilledHoles.set(filledYm, []);
+      monthFilledHoles.get(filledYm)!.push(img.makeupTargetDay);
     }
 
     // 案B（完全隔離）: season 投稿はスタイル列が中立デフォルトなので、スタイル系の集計から除外する
@@ -219,7 +239,7 @@ function replayUser(userId: string, images: ReplayImage[], capOf: (ym: string) =
       }
     }
     // 皆勤賞（動的）
-    const pm = evaluatePerfectMonth(stats, post, capOf(toJstDateString(img.createdAt).slice(0, 7)));
+    const pm = evaluatePerfectMonth(stats, post, capOf(ym));
     if (pm && !grantedKeys.has(pm)) {
       grantedKeys.add(pm);
       grants.push({
@@ -229,6 +249,22 @@ function replayUser(userId: string, images: ReplayImage[], capOf: (ym: string) =
         imageId: img.id,
         grantedAt: img.createdAt,
       });
+    }
+    // 月またぎ donor は「前月」を成立させうる。live では編集モード終了時の reevaluate と
+    // 定期ジョブが前月を再判定するので、リプレイでも同じ月をこの時点で評価する
+    //（evaluatePerfectMonth は投稿した月しか見ないため、ここを通さないと取りこぼす）。
+    if (filledYm != null && filledYm !== ym) {
+      const prevKey = perfectMonthKey(filledYm);
+      if (!grantedKeys.has(prevKey) && isPerfectMonthOf(filledYm)) {
+        grantedKeys.add(prevKey);
+        grants.push({
+          userId,
+          key: prevKey,
+          category: PERFECT_MONTH_CATEGORY,
+          imageId: img.id,
+          grantedAt: img.createdAt,
+        });
+      }
     }
     // シーズン（期間限定・動的）
     const season = evaluateSeason(post);
@@ -367,6 +403,7 @@ async function main() {
         postUrl: true,
         postId: true,
         makeupTargetDay: true,
+        makeupTargetMonthDelta: true,
       },
     });
 

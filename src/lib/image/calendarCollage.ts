@@ -14,7 +14,7 @@ import sharp from "sharp";
 import { Canvas, CanvasRenderingContext2D, loadImage } from "skia-canvas";
 import { ensureFontsLoaded } from "./fonts";
 import { CANVAS_FONT_NAMES, calendarFontStack } from "./text";
-import type { CalendarCollageSpec } from "@/lib/calendar/collageTypes";
+import type { CalendarCell, CalendarCollageSpec } from "@/lib/calendar/collageTypes";
 
 // 出力解像度の倍率。レイアウト定数は論理pxのまま据え置き、Canvas だけ SCALE 倍で確保して
 // ctx.scale で拡大する（描画コードは論理座標で書ける）。等倍だと出力が約988px幅しかなく、
@@ -158,6 +158,17 @@ function dayColor(
 }
 
 /**
+ * 穴埋めセルに併記する「埋めた投稿日」のラベル。
+ * 月またぎ donor（翌月1〜10日の投稿で前月を埋めたもの）は月も出す＝同月の日と取り違えない。
+ */
+function makeupFillLabel(cell: CalendarCell, month: number): string | undefined {
+  if (cell.filledBy == null) return undefined;
+  return cell.filledByMonth != null && cell.filledByMonth !== month
+    ? `${cell.filledByMonth}/${cell.filledBy}`
+    : String(cell.filledBy);
+}
+
+/**
  * セル中央下の日付（Web の DayCell と同じ位置）。
  * - 通常セル: 日番号を中央下に。
  * - 穴埋めセル: 穴の日を打ち消し線で消し、実際に埋めた投稿日を併記（例: 5̶ 20）。
@@ -172,7 +183,8 @@ function drawDayNumber(
   isHoliday: boolean,
   onPhoto: boolean,
   pal: Palette,
-  filledBy?: number
+  /** 穴埋めセルで併記する「埋めた投稿日」のラベル（同月は "20"・月またぎは "11/3"）。 */
+  fillLabel?: string
 ): void {
   const color = dayColor(col, isHoliday, onPhoto, pal);
   const size = 22;
@@ -180,7 +192,7 @@ function drawDayNumber(
   ctx.textBaseline = "alphabetic";
   const baseY = y + CELL - 9; // 中央下（下端から少し上）
 
-  if (filledBy == null) {
+  if (fillLabel == null) {
     ctx.textAlign = "center";
     fillTextOutlined(ctx, String(day), x + CELL / 2, baseY, color, onPhoto);
     return;
@@ -188,7 +200,7 @@ function drawDayNumber(
 
   // 穴埋め: [穴の日(打ち消し)] [埋めた投稿日]
   const holeStr = String(day);
-  const fillStr = String(filledBy);
+  const fillStr = fillLabel;
   const gap = 8;
   ctx.textAlign = "left";
   const holeW = ctx.measureText(holeStr).width;
@@ -330,7 +342,7 @@ export async function renderCalendarCollage(
         isHoliday,
         true,
         pal,
-        cell.kind === "makeup" ? cell.filledBy : undefined
+        cell.kind === "makeup" ? makeupFillLabel(cell, spec.month) : undefined
       );
     } else {
       ctx.fillStyle = pal.cellEmptyBg;

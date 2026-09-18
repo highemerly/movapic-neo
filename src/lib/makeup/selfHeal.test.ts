@@ -71,7 +71,8 @@ describe("healAfterImageDelete - DB への反映", () => {
     });
     expect(updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["b"] } },
-      data: { makeupTargetDay: null },
+      // 対象月のオフセットも既定（同月）に戻す＝月またぎ donor の失効でも残骸が残らない
+      data: { makeupTargetDay: null, makeupTargetMonthDelta: 0 },
     });
   });
 

@@ -5,6 +5,7 @@
 
 import prisma from "@/lib/db";
 import { calculateStreak, toJstDateString, toJstHour } from "@/lib/streak";
+import { filledHoleOf } from "@/lib/makeup/donor";
 import type { AchStats, PostFacts, ReactionStats } from "./catalog";
 import {
   summarizeDayCounts,
@@ -23,7 +24,12 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
     // makeupTargetDay も相乗せ（投稿月の永続穴埋め割当＝皆勤賞判定の filledHoleDays に使う）。
     prisma.image.findMany({
       where: { userId },
-      select: { createdAt: true, source: true, makeupTargetDay: true },
+      select: {
+        createdAt: true,
+        source: true,
+        makeupTargetDay: true,
+        makeupTargetMonthDelta: true,
+      },
     }),
     // 機能別の利用回数（season 投稿はスタイル列が中立デフォルト＝案Bの隔離のため除外）
     prisma.$transaction([
@@ -69,12 +75,12 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
     postMonthDayCounts[Number(dayStr.slice(8, 10))] = c;
   }
 
-  // 投稿月の永続穴埋め割当（Image.makeupTargetDay）が指す空き日。皆勤賞判定の単一ソース。
+  // 投稿月の穴を埋めている永続割当が指す空き日。皆勤賞判定の単一ソース。
+  // donor は翌月1〜10日の投稿でもよい（filledHoleOf が月を解決する）ので、投稿月の行だけ見てはいけない。
   const filledHoleDays: number[] = [];
   for (const r of dateRows) {
-    if (r.makeupTargetDay != null && toJstDateString(r.createdAt).startsWith(postYm)) {
-      filledHoleDays.push(r.makeupTargetDay);
-    }
+    const hole = filledHoleOf(r, postYm);
+    if (hole != null) filledHoleDays.push(hole);
   }
 
   // 投稿日（JST）に使った source の種類数（ハットトリック判定）
@@ -229,22 +235,23 @@ export async function collectCurrentMonthPerfect(
 
   const rows = await prisma.image.findMany({
     where: { userId },
-    select: { createdAt: true, makeupTargetDay: true },
+    select: { createdAt: true, makeupTargetDay: true, makeupTargetMonthDelta: true },
   });
 
-  // 当月の日(1-31)→投稿数 と、当月の永続穴埋め割当が指す空き日。
+  // 当月の日(1-31)→投稿数 と、当月の穴を埋めている永続割当が指す空き日。
   const dayCounts: Record<number, number> = {};
   const filledHoleDays: number[] = [];
   let todayHasDonor = false;
   for (const r of rows) {
     const d = toJstDateString(r.createdAt);
-    if (!d.startsWith(ym)) continue;
-    const day = Number(d.slice(8, 10));
-    dayCounts[day] = (dayCounts[day] ?? 0) + 1;
-    if (r.makeupTargetDay != null) {
-      filledHoleDays.push(r.makeupTargetDay);
-      if (day === todayDayNum) todayHasDonor = true;
+    if (d.startsWith(ym)) {
+      const day = Number(d.slice(8, 10));
+      dayCounts[day] = (dayCounts[day] ?? 0) + 1;
+      // 1日1donor は月をまたいで共有する＝前月の穴を埋めた写真でも「今日は使用済み」。
+      if (r.makeupTargetDay != null && day === todayDayNum) todayHasDonor = true;
     }
+    const hole = filledHoleOf(r, ym);
+    if (hole != null) filledHoleDays.push(hole);
   }
 
   let distinctDays = 0;

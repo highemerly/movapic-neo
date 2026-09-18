@@ -12,8 +12,9 @@
 import prisma from "@/lib/db";
 import { isUniqueViolation } from "@/lib/db/errors";
 import { toJstDateString } from "@/lib/streak";
-import { jstMonthRange, parseYm, toJstYm } from "@/lib/jst";
+import { parseYm, toJstYm } from "@/lib/jst";
 import { maybeGrantAchievementPoint } from "@/lib/makeup/awards";
+import { donorRange, filledHoleOf } from "@/lib/makeup/donor";
 import { resolveMakeupCap } from "@/lib/makeup/ledger";
 import { notifyMakeupProgressOnPost } from "@/lib/makeup/notify";
 import { isPointEra } from "@/lib/makeup/points";
@@ -288,16 +289,19 @@ export async function evaluateAndGrantPerfectMonth(opts: {
   const { userId, instanceDomain, ym } = opts;
   const key = perfectMonthKey(ym);
   const { year, month } = parseYm(ym);
-  const { start, end } = jstMonthRange(year, month);
+  // 範囲は月末ではなく穴埋めの締切まで（donorRange）。翌月1〜10日の投稿も前月の donor になれる。
+  const { start, end } = donorRange(ym);
 
-  const [monthImages, grace] = await Promise.all([
+  const [rows, grace] = await Promise.all([
     prisma.image.findMany({
       where: { userId, createdAt: { gte: start, lt: end } },
       orderBy: { createdAt: "desc" },
-      select: { id: true, createdAt: true, makeupTargetDay: true },
+      select: { id: true, createdAt: true, makeupTargetDay: true, makeupTargetMonthDelta: true },
     }),
     resolveMakeupCap({ userId, instanceDomain, ym }),
   ]);
+  // 判定・実績のきっかけ写真は対象月の投稿だけ（翌月の donor は穴埋めにしか効かせない）。
+  const monthImages = rows.filter((r) => toJstDateString(r.createdAt).startsWith(ym));
   if (monthImages.length === 0) return { perfect: false, granted: false, key };
 
   const dayCounts: Record<number, number> = {};
@@ -305,8 +309,8 @@ export async function evaluateAndGrantPerfectMonth(opts: {
     const d = Number(toJstDateString(m.createdAt).slice(8, 10));
     dayCounts[d] = (dayCounts[d] ?? 0) + 1;
   }
-  const filledHoleDays = monthImages
-    .map((m) => m.makeupTargetDay)
+  const filledHoleDays = rows
+    .map((r) => filledHoleOf(r, ym))
     .filter((v): v is number => v != null);
 
   const perfect = isPerfectMonth({

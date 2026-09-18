@@ -20,6 +20,7 @@ import { toJstDateString } from "@/lib/streak";
 import { CACHE_PUBLIC_MEDIUM } from "@/lib/http";
 import { formatYm } from "@/lib/jst";
 import { resolveMakeupLimits } from "@/lib/makeup/ledger";
+import { allowsPrevMonthDonor, donorTargetYm } from "@/lib/makeup/donor";
 import { isMakeupEditable, makeupDeadline } from "@/lib/makeup/points";
 import {
   calendarMonthRange,
@@ -62,20 +63,30 @@ interface PerfectMonthInfo {
   makeup?: MakeupInfo;
 }
 
+/** owner（本人）だけに返す編集モード用の画像1枚。 */
+interface OwnerEditImage {
+  id: string;
+  thumbnailKey: string | null;
+  storageKey: string;
+  /** この画像がその日の代表（calendarPickedAt あり）か。 */
+  isPicked: boolean;
+  /** この画像が埋めている穴の日(1-31)。null=穴埋めに使っていない。 */
+  makeupTargetDay: number | null;
+  /**
+   * その穴がある月 "YYYY-MM"。null=穴埋めに使っていない。
+   * 月またぎ donor があるため、日だけでは「どの穴に使用中か」が決まらない。
+   */
+  makeupTargetMonth: string | null;
+}
+
 /** owner（本人）だけに返す編集モード用データ。各日の全画像（chronological asc）。 */
 interface OwnerEditData {
-  dayImages: Record<
-    number,
-    Array<{
-      id: string;
-      thumbnailKey: string | null;
-      storageKey: string;
-      /** この画像がその日の代表（calendarPickedAt あり）か。 */
-      isPicked: boolean;
-      /** この画像が埋めている穴の日(1-31)。null=穴埋めに使っていない。 */
-      makeupTargetDay: number | null;
-    }>
-  >;
+  dayImages: Record<number, OwnerEditImage[]>;
+  /**
+   * 翌月1〜10日の画像（日 → 画像）。この月の穴を埋める donor 候補になる。
+   * 月末日を忘れると後日が無く埋まらない非対称を無くすため、締切までに投稿した写真は翌月のものでも使える。
+   */
+  nextMonthDayImages?: Record<number, OwnerEditImage[]>;
 }
 
 interface CalendarResponse {
@@ -150,26 +161,38 @@ export async function GET(
     });
 
     // owner編集用: 各日の全画像（chronological asc）。images は desc なので unshift で整列。
+    // images は締切（翌月10日）までを含むので、当月ぶんと翌月ぶんを別の入れ物に分ける
+    // （日番号をキーにするため、10/3 と 11/3 を同じバケツに入れてはいけない）。
     let ownerEdit: OwnerEditData | undefined;
     if (isOwner) {
       const dayImages: OwnerEditData["dayImages"] = {};
+      const nextMonthDayImages: OwnerEditData["dayImages"] = {};
       // resolveCalendarMonth と同じ JST 日付でグルーピングする。
       // desc（新しい順）を維持したまま各日で unshift＝chronological asc。
       const desc = [...images].sort(
         (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
       );
       for (const image of desc) {
-        const day = Number(toJstDateString(image.createdAt).slice(8, 10));
-        if (!dayImages[day]) dayImages[day] = [];
-        dayImages[day].unshift({
+        const jst = toJstDateString(image.createdAt);
+        const day = Number(jst.slice(8, 10));
+        const bucket = jst.startsWith(ym) ? dayImages : nextMonthDayImages;
+        if (!bucket[day]) bucket[day] = [];
+        bucket[day].unshift({
           id: image.id,
           thumbnailKey: image.thumbnailKey,
           storageKey: image.storageKey,
           isPicked: image.calendarPickedAt != null,
           makeupTargetDay: image.makeupTargetDay,
+          makeupTargetMonth:
+            image.makeupTargetDay == null
+              ? null
+              : donorTargetYm(jst.slice(0, 7), image.makeupTargetMonthDelta),
         });
       }
-      ownerEdit = { dayImages };
+      ownerEdit = {
+        dayImages,
+        ...(allowsPrevMonthDonor(ym) ? { nextMonthDayImages } : {}),
+      };
     }
 
     // 前月に投稿があるか（前月の範囲＝当月 startDate の直前月）。

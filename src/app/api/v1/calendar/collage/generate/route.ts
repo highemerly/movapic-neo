@@ -118,6 +118,7 @@ async function generateCollage(
       kind: "post" | "makeup";
       key: string;
       filledBy?: number;
+      filledByMonth?: number;
     }[] = [];
     for (let day = 1; day <= resolved.daysInMonth; day++) {
       const d = resolved.days[day];
@@ -136,6 +137,7 @@ async function generateCollage(
           kind: "makeup",
           key: filled.image.thumbnailKey ?? filled.image.storageKey,
           filledBy: filled.filledBy,
+          filledByMonth: filled.filledByMonth,
         });
       }
     }
@@ -178,6 +180,7 @@ async function generateCollage(
         kind: t.kind,
         imageIndex: thumbnails.length,
         filledBy: t.filledBy,
+        filledByMonth: t.filledByMonth,
       });
       thumbnails.push(buf);
     });

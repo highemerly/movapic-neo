@@ -19,47 +19,23 @@ import {
   hasAssignableMakeup,
   perfectMonthKey,
 } from "@/lib/achievements/perfectMonth";
-import { jstDayOf, jstDayStart, jstMonthRangeOfYm, parseYm, toJstYm } from "@/lib/jst";
+import { jstDayOf, jstDayStart, parseYm, toJstYm } from "@/lib/jst";
 import { isMakeupEditable, isPointEra } from "./points";
 import { resolveMakeupLimits } from "./ledger";
+import { buildMonthMakeupState, donorRange, type MonthMakeupState } from "./donor";
 import { MAKEUP_NOTIFICATION_TYPES, type MakeupNotificationType } from "./notificationTypes";
 
-/** その月の割当状況（全投稿ベース）。 */
-export interface MonthMakeupState {
-  dayCounts: Record<number, number>;
-  /** 実在する空き日を指している割当の穴の日（重複なし）。 */
-  filledHoleDays: number[];
-  /** donor（makeupTargetDay が付いた画像）がいる日。 */
-  donorDays: number[];
-}
-
-/** 月の画像行から割当状況を組む（純粋）。 */
-export function buildMonthMakeupState(
-  rows: ReadonlyArray<{ createdAt: Date; makeupTargetDay: number | null }>
-): MonthMakeupState {
-  const dayCounts: Record<number, number> = {};
-  for (const r of rows) {
-    const d = jstDayOf(r.createdAt);
-    dayCounts[d] = (dayCounts[d] ?? 0) + 1;
-  }
-  const filled = new Set<number>();
-  const donors = new Set<number>();
-  for (const r of rows) {
-    if (r.makeupTargetDay == null) continue;
-    donors.add(jstDayOf(r.createdAt));
-    // 投稿のある日を指す割当は穴埋めとして数えない（countValidFilledHoles と同じ規則）。
-    if ((dayCounts[r.makeupTargetDay] ?? 0) === 0) filled.add(r.makeupTargetDay);
-  }
-  return { dayCounts, filledHoleDays: [...filled], donorDays: [...donors] };
-}
-
+/**
+ * 対象月の割当状況を読む。範囲は donorRange＝対象月の1日から締切（翌月10日）まで。
+ * 翌月1〜10日の投稿も前月の donor になれるので、月の範囲だけ読むと穴埋め済みを見落とす。
+ */
 async function loadMonthMakeupState(userId: string, ym: string): Promise<MonthMakeupState> {
-  const { start, end } = jstMonthRangeOfYm(ym);
+  const { start, end } = donorRange(ym);
   const rows = await prisma.image.findMany({
     where: { userId, createdAt: { gte: start, lt: end } },
-    select: { createdAt: true, makeupTargetDay: true },
+    select: { createdAt: true, makeupTargetDay: true, makeupTargetMonthDelta: true },
   });
-  return buildMonthMakeupState(rows);
+  return buildMonthMakeupState(rows, ym);
 }
 
 /** 同じ type の通知が JST の今日すでにあれば作らない（1日1通）。 */

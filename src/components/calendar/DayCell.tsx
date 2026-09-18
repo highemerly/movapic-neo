@@ -20,9 +20,12 @@ interface DayData {
 
 /** 後日のダブル投稿で、この空き日が埋まったときの情報。 */
 interface FilledMakeup {
-  /** 穴を埋めた（ダブル投稿した）日(1-31)。 */
-  filledBy: number;
-  /** filledBy 日に2枚目に投稿した写真（サムネ＋リンク先）。 */
+  /**
+   * 穴を埋めた（ダブル投稿した）日の表示ラベル（例: "20日" / 月またぎ donor は "11月3日"）。
+   * 月またぎがあるので日番号だけでは一意に読めず、整形済みの文字列を受け取る。
+   */
+  filledByLabel: string;
+  /** その日に2枚目に投稿した写真（サムネ＋リンク先）。 */
   image: { id: string; thumbnailKey: string | null; storageKey: string };
 }
 
@@ -103,7 +106,7 @@ export function DayCell({
         showAddPost
           ? "今日の画像を投稿する"
           : isFilledHole
-            ? `${filledMakeup!.filledBy}日のダブル投稿で穴埋めされました`
+            ? `${filledMakeup!.filledByLabel}のダブル投稿で穴埋めされました`
             : makeupCount > 0
               ? `${dayData!.count}枚投稿`
               : undefined
@@ -155,7 +158,7 @@ export function DayCell({
           <img
             ref={imgRef}
             src={filledImageUrl}
-            alt={`${day}日の穴埋め（${filledMakeup!.filledBy}日の投稿）`}
+            alt={`${day}日の穴埋め（${filledMakeup!.filledByLabel}の投稿）`}
             onLoad={() => setImgLoaded(true)}
             onError={() => setImgLoaded(true)}
             className={`absolute inset-0 w-full h-full object-cover grayscale transition-opacity duration-300 ${

@@ -10,7 +10,7 @@
 | `perfectMonth.ts` | **皆勤賞ロジックの単一ソース**。上限 `grace`（＝その月に穴埋めできる日数。出所は問わない）を受け取る純粋関数群: 穴埋め割当の貪欲決定（`pickMakeupHole` / `assignMonthMakeups`）・達成判定（`isPerfectMonth`）・当月進捗（`currentMonthMakeupStatus`）・今すぐ割当可能か（`hasAssignableMakeup`）・促してよいか（`canPromptMakeup`）・日別集計。2026-09 以前の固定値 `PERFECT_MONTH_GRACE_*` と旧通知ゲート `shouldRemindMakeup` もここ。catalog 同様 React/サーバー専用APIを入れない。**穴埋め割当は Image.makeupTargetDay に永続化し、表示（カレンダー）も判定（皆勤賞）も同じ永続値を読む**＝表示と👑が食い違わない |
 | `grace.ts` | 2026-09 以前の月の固定上限（`perfectMonthGrace(domain)` ＝ 特典サーバー4・その他3）。env を読むので perfectMonth.ts から分離。**月を問わず上限が欲しいときは `@/lib/makeup/ledger` の `resolveMakeupCap` を使う** |
 | `makeupAssign.ts` | 2026-09 以前の月専用の自動穴埋め（`assignMakeupForNewPost` / `recomputeMonthMakeups`）。2026-10 以降は呼ばれない（[cleanup-2026-10](../../../docs/cleanup-2026-10.md) で削除予定） |
-| `../makeup/*` | **穴埋めポイント制（2026-10〜）**。`points.ts`（純粋: era・付与量・締切・potentialCap）/ `ledger.ts`（上限の解決・付与・直列化ロック）/ `awards.ts`（登録時・実績時の付与）/ `events.ts`（イベント一覧）/ `monthlyGrants.ts`（定期ジョブの月次・イベント付与）/ `notify.ts`（穴埋めを促す通知）/ `notificationTypes.ts`（通知の type・文言・遷移先）/ `selfHeal.ts`（画像削除後の失効掃除） |
+| `../makeup/*` | **穴埋めポイント制（2026-10〜）**。`points.ts`（純粋: era・付与量・締切・potentialCap）/ `donor.ts`（純粋: donor になれる範囲＝月またぎ・割当がどの月の穴を指すかの解決・月の割当状況の組み立て）/ `ledger.ts`（上限の解決・付与・直列化ロック）/ `awards.ts`（登録時・実績時の付与）/ `events.ts`（イベント一覧）/ `monthlyGrants.ts`（定期ジョブの月次・イベント付与）/ `notify.ts`（穴埋めを促す通知）/ `notificationTypes.ts`（通知の type・文言・遷移先）/ `selfHeal.ts`（画像削除後の失効掃除） |
 | `stats.ts` | live 用。投稿後に DB から集計（`collectStats`）して `AchStats` を作る。リアクション起点の集計（`collectReactionStats`＝`ReactionStats`）もここ |
 | `engine.ts` | live 用。`evaluateAndGrant`（投稿起点）/ `evaluateAndGrantReaction`（リアクション起点）/ `evaluateAndGrantProfile`（プロフィール起点）/ `evaluateAndGrantPerfectMonth`（皆勤賞の再判定・定期ジョブ）が新規付与＋通知作成。**付与はすべて `grantAll` を通す**（実績ptの付与フックがここにだけあるため）。`selectNewlyGranted*` は純粋関数で live/backfill 共有 |
 | `reactionTriggers.ts` | リアクション起点のフック（`onReactionGiven` / `onReactionsReceived`）。例外を握り潰してリアクション操作・同期を止めない |
@@ -126,7 +126,7 @@ npm run build             # 本番ビルド（新ルート・静的解析）
 
 月ごとに key が増える（`perfect-month:YYYY-MM`）ため CATALOG には入れず、`evaluatePerfectMonth` で評価する。実績タブでは `ACHIEVEMENT_LAYOUT` の `{ kind: "perfectMonth" }` ブロックが獲得月ぶんのカードを並べる。同様の「無限に増える系」を足すならこの方式に倣う。
 
-**達成条件（穴埋め制度・日付順）**: 「毎日投稿」ではなく「忘れた過去日を **同月の "後日" の2枚以上投稿（ダブル投稿）** で穴埋めする」。ダブル投稿日 D は **D より前の未投稿日のみ** 埋められる（将来日は埋められない＝月末日を忘れると後日が無く埋まらない）。1日のダブルは1日分だけ（1日1donor）。
+**達成条件（穴埋め制度・日付順）**: 「毎日投稿」ではなく「忘れた過去日を **"後日" の2枚以上投稿（ダブル投稿）** で穴埋めする」。ダブル投稿日 D は **D より前の未投稿日のみ** 埋められる（将来日は埋められない）。1日のダブルは1日分だけ（1日1donor）。donor は締切までなら**翌月1〜10日の投稿でもよい**（下記「月またぎ donor」）。
 判定 `isPerfectMonth` は永続割当（`filledHoleDays`）を数え、`件数 >= missing(= 月の日数 - distinctDays)` かつ `missing <= grace` なら達成。`missing=0`（完全皆勤）は `grace` より先に短絡するので、**上限0でも完全皆勤なら常に成立**。
 
 ### 上限 `grace` の出所（2026-10 で切り替わった）
@@ -163,6 +163,19 @@ npm run build             # 本番ビルド（新ルート・静的解析）
   - 実績ptは backfill から付与しない（過去日付の実績でポイントを遡及させない）。
 - **締切: 対象月の翌月10日 23:59 JST（`isMakeupEditable`）**。新旧どちらの月にも適用。PATCH の割当の指定・解除をゲートする（代表サムネの指定はゲートしない）。締切が無いと「11日の catchup を受け取ってから先月を埋めて👑も取る」が成立する。`reevaluate` はゲートしない（付与のみ・締切後は割当が変わらないので結果が決定的）。
 - **割当の書き込みはユーザー×月で直列化する**（`withMonthMakeupLock`＝advisory lock）。PATCH は「読む→上限を検証→書く」なので、残り1pt が常態のポイント制ではダブルタップで上限を超えうる。
+
+### 月またぎ donor（翌月1〜10日の投稿で前月を埋める）
+
+donor を同月に限ると**月末日を忘れた人だけが構造的に救済不能**だった（後日が無い）。締切は元々「翌月10日」なので、締切までに投稿されたダブル投稿は翌月のものでも donor にできる。これで「穴埋めできる上限」はポイント（cap）だけになり、月内に残ったダブル投稿の機会が暗黙の上限になる状態が消える。
+
+- 表現は `Image.makeupTargetDay`（穴の日 1-31）＋ `Image.makeupTargetMonthDelta`（0=同月 / -1=前月）。**既存行は delta=0 で意味が変わらない**＝過去月の割当・👑は揺れない。
+- 規則は [`src/lib/makeup/donor.ts`](../makeup/donor.ts) が単一ソース。`donorRange(ym)`＝「対象月の1日〜締切」の1本の範囲（DBクエリにそのまま渡せる）、`filledHoleOf(row, ym)`＝その行が対象月の穴を埋めているか、`buildMonthMakeupState(rows, ym)`＝日別枚数・有効な穴・donor のいる日。
+- **1日1donor は月をまたいで共有する**。11/3 を10月の穴埋めに使ったら 11/3 は11月の穴埋めに使えない（共有しないと1回のダブル投稿で2日ぶん埋まり、1pt で2日得をする）。`donorDays` には「他の月の穴を埋めている donor」も入れる。
+- **月またぎを許すのはポイント制の対象月だけ**（`allowsPrevMonthDonor`）。2026-09 以前は投稿時の自動割当（`recomputeMonthMakeups`）が同月だけを見て月の割当を組み直すため、月またぎ donor を知らずに同じ穴へ二重に割り当ててしまう。
+- **filledHoleDays を組む側が月を解決する**。`perfectMonth.ts` の純粋関数は「対象月の日(1-31)」しか受け取らないので無変更。読む側（`stats.ts` / `engine.ts` / `resolveMonth.ts` / `notify.ts` / PATCH / backfill）が `donorRange` で読み `filledHoleOf` で振り分ける。**対象月の外の行は donor としてだけ効かせ、日別の投稿数・代表サムネには数えない**（11/3 を 10/3 の投稿として数えない）。
+- PATCH は対象月を body の `makeupTargetMonth`（"YYYY-MM"・省略＝写真と同じ月）で受ける。日だけでは「11/3 の写真で 1日を埋める」が10月か11月か決まらないため。解除（`makeupTargetDay: null`）は保存済みの delta から対象月を復元する。
+- PATCH のガードは**変更が触れるすべての月**に対して回す（`affected`）。1日1donor の月またぎ共有で「11月の穴を埋めるために、同じ日の写真が埋めていた10月の割当を外す」が起きるので、対象月だけを見ていると締切後の月を変えたり、確定した👑を崩したりしうる。ロックも「写真の月」と「その前月」の2つを昇順で取る。
+- backfill のリプレイは、月またぎ donor を処理した時点で**前月の皆勤賞も評価する**（`evaluatePerfectMonth` は投稿した月しか見ないため、ここを通さないと取りこぼす）。
 
 ### 当月の進捗と「達成可能か」
 

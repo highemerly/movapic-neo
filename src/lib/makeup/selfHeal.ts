@@ -12,6 +12,10 @@
  *
  * 判定側に「donor の日が2枚以上か」の検証を足さないのは、過去データを遡って無効化し、
  * 既に👑が付いた月の表示が非達成に見える事故になるため。削除の時点で前向きに直す。
+ *
+ * 月またぎ donor（翌月1〜10日の投稿で前月を埋めたもの）も同じ経路で直る。失効の条件は
+ * 「donor **自身の日**が2枚未満になったか」なので、見るのは常に削除した画像の月＝donor の月であり、
+ * どの月の穴を埋めているかは関係しない。
  */
 
 import prisma from "@/lib/db";
@@ -49,7 +53,7 @@ export async function healAfterImageDelete(args: {
   if (ids.length === 0) return 0;
   const { count } = await prisma.image.updateMany({
     where: { id: { in: ids } },
-    data: { makeupTargetDay: null },
+    data: { makeupTargetDay: null, makeupTargetMonthDelta: 0 },
   });
   return count;
 }

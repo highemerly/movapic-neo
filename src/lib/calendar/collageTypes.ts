@@ -20,6 +20,11 @@ export interface CalendarCell {
   imageIndex: number;
   /** makeup のとき、その穴を実際に埋めた投稿日(1-31)。日付を打ち消して併記する。 */
   filledBy?: number;
+  /**
+   * makeup のとき、filledBy の月(1-12)。月またぎ donor（翌月1〜10日の投稿で前月を埋めたもの）で
+   * 対象月と異なる。省略＝対象月と同じ。
+   */
+  filledByMonth?: number;
 }
 
 export interface CalendarCollageSpec {

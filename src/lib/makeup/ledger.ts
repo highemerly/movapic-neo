@@ -33,15 +33,22 @@ import { MAKEUP_NOTIFICATION_TYPES, type MakeupPointNotificationData } from "./n
  * ポイント制では残り1pt が常態で、ダブルタップ1回で超過し得る。消費を台帳に持たない（導出）設計を
  * 保ったまま整合性を守るため、スキーマ変更の要らない advisory lock で直列化する。
  * ロックはトランザクション終了で自動解放される（xact 版）。
+ *
+ * 月またぎ donor（翌月1〜10日の投稿で前月を埋める）では、守る不変条件が2つの月に分かれる:
+ * 上限(cap)・1穴1donor は**対象月**、1日1donor は**donor 自身の月**。両方を渡して2つとも取る。
+ * デッドロックを避けるため、複数の月は必ず昇順でロックする（取得順を全リクエストで揃える）。
  */
 export function withMonthMakeupLock<T>(
   userId: string,
-  ym: string,
+  ym: string | readonly string[],
   fn: (tx: Prisma.TransactionClient) => Promise<T>
 ): Promise<T> {
+  const yms = [...new Set(typeof ym === "string" ? [ym] : ym)].sort();
   return prisma.$transaction(async (tx) => {
-    // pg_advisory_xact_lock は void を返し、Prisma が void 列を読めずに失敗するため int の1行に包む。
-    await tx.$queryRaw`SELECT 1 AS locked FROM (SELECT pg_advisory_xact_lock(hashtextextended(${`makeup:${userId}:${ym}`}, 0))) AS l`;
+    for (const m of yms) {
+      // pg_advisory_xact_lock は void を返し、Prisma が void 列を読めずに失敗するため int の1行に包む。
+      await tx.$queryRaw`SELECT 1 AS locked FROM (SELECT pg_advisory_xact_lock(hashtextextended(${`makeup:${userId}:${m}`}, 0))) AS l`;
+    }
     return fn(tx);
   });
 }

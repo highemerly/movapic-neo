@@ -11,7 +11,8 @@
 
 import prisma from "@/lib/db";
 import { toJstDateString } from "@/lib/streak";
-import { jstMonthRange } from "@/lib/jst";
+import { formatYm, jstMonthRange } from "@/lib/jst";
+import { donorRange, donorTargetYm } from "@/lib/makeup/donor";
 import {
   canPromptMakeup,
   currentMonthMakeupStatus,
@@ -48,6 +49,8 @@ export interface FilledDay {
   day: number;
   /** その穴を埋めた（ダブル投稿した）日(1-31)。 */
   filledBy: number;
+  /** filledBy の月(1-12)。月またぎ donor（翌月1〜10日の投稿）では対象月と違う。 */
+  filledByMonth: number;
   /** 穴埋めの決め手になった写真（donor＝makeupTargetDay を持つ画像）。 */
   image: { id: string; thumbnailKey: string | null; storageKey: string };
 }
@@ -61,6 +64,7 @@ export interface CalendarImageRow {
   createdAt: Date;
   calendarPickedAt: Date | null;
   makeupTargetDay: number | null;
+  makeupTargetMonthDelta: number;
 }
 
 export interface ResolvedCalendarMonth {
@@ -143,19 +147,25 @@ export function calendarMonthRange(
   return { startDate: start, endDate: end };
 }
 
-/** 指定月の公開画像を createdAt 降順で取得する（カレンダー系で共通利用）。 */
+/**
+ * 指定月の公開画像を createdAt 降順で取得する（カレンダー系で共通利用）。
+ *
+ * 範囲は月末ではなく穴埋めの締切（翌月10日）まで＝ donorRange。翌月1〜10日の投稿も前月の donor に
+ * なれるため、月の範囲だけ読むと穴埋め済みの日を見落とす。対象月の外の行は donor としてだけ効き、
+ * 日別の投稿数・代表サムネには数えない（resolveCalendarMonth が月で振り分ける）。
+ */
 export function fetchCalendarImages(
   userId: string,
   year: number,
   month: number
 ): Promise<CalendarImageRow[]> {
-  const { startDate, endDate } = calendarMonthRange(year, month);
+  const { start, end } = donorRange(formatYm(year, month));
   return prisma.image.findMany({
     where: {
       userId,
       isPublic: true,
       isDisabled: false,
-      createdAt: { gte: startDate, lt: endDate },
+      createdAt: { gte: start, lt: end },
     },
     select: {
       id: true,
@@ -165,6 +175,7 @@ export function fetchCalendarImages(
       createdAt: true,
       calendarPickedAt: true,
       makeupTargetDay: true,
+      makeupTargetMonthDelta: true,
     },
     orderBy: { createdAt: "desc" },
   });
@@ -205,18 +216,37 @@ export function resolveCalendarMonth(args: {
   const donorRows: {
     holeDay: number;
     filledBy: number;
+    filledByMonth: number;
     image: { id: string; thumbnailKey: string | null; storageKey: string };
   }[] = [];
+  // 対象月の中で donor 割当を持つ日。1日1donor は月をまたいで共有するので、他月の穴を
+  // 埋めている donor（翌月の穴を埋めることは無いが、前月を埋める donor はここに来る）も数える。
+  const donorDaysInMonth = new Set<number>();
 
+  const ym = formatYm(year, month);
   for (const image of images) {
     const jst = toJstDateString(image.createdAt);
     const day = Number(jst.slice(8, 10));
+    const imageYm = jst.slice(0, 7);
     const ref: DayImageRef = {
       id: image.id,
       thumbnailKey: image.thumbnailKey,
       storageKey: image.storageKey,
       position: image.position,
     };
+
+    // 対象月の外（＝翌月1〜10日の donor 候補）は穴埋めだけに効かせ、投稿数・代表サムネには数えない。
+    if (imageYm !== ym) {
+      if (image.makeupTargetDay != null && donorTargetYm(imageYm, image.makeupTargetMonthDelta) === ym) {
+        donorRows.push({
+          holeDay: image.makeupTargetDay,
+          filledBy: day,
+          filledByMonth: Number(jst.slice(5, 7)),
+          image: { id: image.id, thumbnailKey: image.thumbnailKey, storageKey: image.storageKey },
+        });
+      }
+      continue;
+    }
 
     dayCounts[day] = (dayCounts[day] ?? 0) + 1;
 
@@ -236,11 +266,15 @@ export function resolveCalendarMonth(args: {
     }
 
     if (image.makeupTargetDay != null) {
-      donorRows.push({
-        holeDay: image.makeupTargetDay,
-        filledBy: day,
-        image: { id: image.id, thumbnailKey: image.thumbnailKey, storageKey: image.storageKey },
-      });
+      donorDaysInMonth.add(day);
+      if (donorTargetYm(imageYm, image.makeupTargetMonthDelta) === ym) {
+        donorRows.push({
+          holeDay: image.makeupTargetDay,
+          filledBy: day,
+          filledByMonth: month,
+          image: { id: image.id, thumbnailKey: image.thumbnailKey, storageKey: image.storageKey },
+        });
+      }
     }
   }
 
@@ -272,7 +306,12 @@ export function resolveCalendarMonth(args: {
       .filter((d) => !days[d.holeDay])
       .sort((a, b) => a.holeDay - b.holeDay)
       .slice(0, makeupCap)
-      .map((d) => ({ day: d.holeDay, filledBy: d.filledBy, image: d.image }));
+      .map((d) => ({
+        day: d.holeDay,
+        filledBy: d.filledBy,
+        filledByMonth: d.filledByMonth,
+        image: d.image,
+      }));
     makeupRemaining = Math.max(0, makeupCap - new Set(filledHoleDays).size);
     // 当月は今日を含めない（まだ投稿できる）。過去月は月末まで。
     const lastCountedDay = isCurrentMonth ? Number(jstToday.slice(8, 10)) - 1 : daysInMonth;
@@ -288,7 +327,8 @@ export function resolveCalendarMonth(args: {
         todayDayNum,
         dayCounts,
         filledHoleDays,
-        todayHasDonor: donorRows.some((d) => d.filledBy === todayDayNum),
+        // 1日1donor は月をまたいで共有するので、前月の穴を埋めた donor も「今日は使用済み」にする。
+        todayHasDonor: donorDaysInMonth.has(todayDayNum),
         grace: makeupCap,
         potentialGrace: potentialCap,
       });

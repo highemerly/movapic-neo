@@ -13,14 +13,76 @@ import { toJstDateString } from "@/lib/streak";
 import { daysInMonthOf, isPerfectMonth, perfectMonthKey } from "@/lib/achievements/perfectMonth";
 import { perfectMonthGrace } from "@/lib/achievements/grace";
 import { recomputeMonthMakeups } from "@/lib/achievements/makeupAssign";
-import { formatYm, jstMonthRange, parseYm, shiftYm, toJstYm } from "@/lib/jst";
+import { jstMonthRangeOfYm, parseYm, shiftYm, toJstYm } from "@/lib/jst";
 import { resolveMakeupCap, withMonthMakeupLock } from "@/lib/makeup/ledger";
-import { MAKEUP_DEADLINE_DAY, isMakeupEditable, isPointEra } from "@/lib/makeup/points";
+import {
+  DONOR_SAME_MONTH,
+  donorDeltaFor,
+  donorTargetYm,
+  filledHoleOf,
+  type DonorRow,
+} from "@/lib/makeup/donor";
+import {
+  MAKEUP_DEADLINE_DAY,
+  isMakeupEditable,
+  isPointEra,
+  makeupDeadline,
+} from "@/lib/makeup/points";
 import { healAfterImageDelete } from "@/lib/makeup/selfHeal";
 
 /** その画像の JST 日(1-31)。 */
 function jstDay(createdAt: Date): number {
   return Number(toJstDateString(createdAt).slice(8, 10));
+}
+
+/** 穴埋め割当の変更内容（day=null は解除）。月またぎがあるので対象月のオフセットも持つ。 */
+interface MakeupUpdate {
+  day: number | null;
+  delta: number;
+}
+
+/** 検証で読む画像行（穴埋め割当の解決に必要な最小限＋id）。 */
+type MakeupRow = DonorRow & { id: string };
+
+/** 締切を過ぎた月の穴埋めを触ろうとしたときの案内。 */
+function makeupClosedMessage(ym: string): string {
+  const { month } = parseYm(ym);
+  const deadlineMonth = parseYm(shiftYm(ym, 1)).month;
+  return `${month}月の穴埋めは${deadlineMonth}月${MAKEUP_DEADLINE_DAY}日で締め切りました`;
+}
+
+/** 対象月 ym の日(1-31) → 投稿数。その月に投稿された行だけ数える（翌月の donor は数えない）。 */
+function dayCountsOf(rows: ReadonlyArray<MakeupRow>, ym: string): Record<number, number> {
+  const counts: Record<number, number> = {};
+  for (const r of rows) {
+    if (!toJstDateString(r.createdAt).startsWith(ym)) continue;
+    const d = jstDay(r.createdAt);
+    counts[d] = (counts[d] ?? 0) + 1;
+  }
+  return counts;
+}
+
+/**
+ * 変更を適用した後に、対象月 ym の穴を埋めている割当の穴の日（実在する空き日のみ・重複なし）。
+ * 上限チェックと no-divergence 判定の両方がこれを使う。
+ */
+function filledHolesAfter(
+  rows: ReadonlyArray<MakeupRow>,
+  ym: string,
+  dayCounts: Record<number, number>,
+  updates: ReadonlyMap<string, MakeupUpdate>
+): Set<number> {
+  const filled = new Set<number>();
+  for (const r of rows) {
+    const upd = updates.get(r.id);
+    const hole = upd
+      ? upd.day != null && donorTargetYm(toJstYm(r.createdAt), upd.delta) === ym
+        ? upd.day
+        : null
+      : filledHoleOf(r, ym);
+    if (hole != null && (dayCounts[hole] ?? 0) === 0) filled.add(hole);
+  }
+  return filled;
 }
 
 /**
@@ -50,7 +112,14 @@ export async function PATCH(
 
     const image = await prisma.image.findUnique({
       where: { id },
-      select: { id: true, userId: true, createdAt: true, calendarPickedAt: true, makeupTargetDay: true },
+      select: {
+        id: true,
+        userId: true,
+        createdAt: true,
+        calendarPickedAt: true,
+        makeupTargetDay: true,
+        makeupTargetMonthDelta: true,
+      },
     });
     if (!image) {
       return NextResponse.json({ error: "画像が見つかりません" }, { status: 404 });
@@ -59,11 +128,8 @@ export async function PATCH(
       return NextResponse.json({ error: "権限がありません" }, { status: 403 });
     }
 
-    const jst = toJstDateString(image.createdAt);
-    const year = Number(jst.slice(0, 4));
-    const month = Number(jst.slice(5, 7));
-    const imageDay = Number(jst.slice(8, 10));
-    const daysInMonth = daysInMonthOf(year, month);
+    const imageJstDate = toJstDateString(image.createdAt);
+    const imageYm = imageJstDate.slice(0, 7);
 
     const wantsPick = typeof body.calendarPicked === "boolean";
     const wantsMakeup = body.makeupTargetDay !== undefined;
@@ -71,39 +137,68 @@ export async function PATCH(
       return NextResponse.json({ error: "更新するフィールドがありません" }, { status: 400 });
     }
 
-    const ym = formatYm(year, month);
-    if (wantsMakeup && !isMakeupEditable(ym, new Date())) {
-      const deadlineMonth = parseYm(shiftYm(ym, 1)).month;
+    // ② の対象月。指定時は body.makeupTargetMonth（省略＝この写真と同じ月）、解除時は今埋めている月。
+    // 月またぎ donor（翌月1〜10日の投稿で前月を埋める）があるので、写真の月とは別に持つ必要がある。
+    let targetYm = imageYm;
+    if (wantsMakeup) {
+      if (body.makeupTargetDay === null) {
+        targetYm = donorTargetYm(imageYm, image.makeupTargetMonthDelta);
+      } else if (body.makeupTargetMonth !== undefined) {
+        if (typeof body.makeupTargetMonth !== "string") {
+          return NextResponse.json({ error: "穴埋め先の月が不正です" }, { status: 400 });
+        }
+        targetYm = body.makeupTargetMonth;
+      }
+    }
+    const resolvedDelta = donorDeltaFor(imageYm, targetYm);
+    if (wantsMakeup && resolvedDelta === null) {
       return NextResponse.json(
-        { error: `${month}月の穴埋めは${deadlineMonth}月${MAKEUP_DEADLINE_DAY}日で締め切りました` },
+        { error: "この写真はその月の穴埋めには使えません" },
         { status: 409 }
       );
+    }
+    // pick 専用リクエストでは donor にしないので同月扱いでよい。
+    const donorDelta = resolvedDelta ?? DONOR_SAME_MONTH;
+
+    const { year: targetYear, month: targetMonth } = parseYm(targetYm);
+    const daysInMonth = daysInMonthOf(targetYear, targetMonth);
+
+    const now = new Date();
+    if (wantsMakeup && !isMakeupEditable(targetYm, now)) {
+      return NextResponse.json({ error: makeupClosedMessage(targetYm) }, { status: 409 });
     }
 
     // 検証〜適用をユーザー×月で直列化する。検証で弾いたときは NextResponse を返し（書き込みなし）、
     // 通ったときは null を返す。
-    const rejected = await withMonthMakeupLock(user.id, ym, async (tx) => {
-      // 月の全画像（実績と同じ集合＝isPublic/isDisabledで絞らない）。バリデーション・皆勤判定に使う。
-      const { start: monthStart, end: monthEnd } = jstMonthRange(year, month);
-      const monthImages = await tx.image.findMany({
-        where: { userId: user.id, createdAt: { gte: monthStart, lt: monthEnd } },
-        select: { id: true, createdAt: true, makeupTargetDay: true },
+    // ロックは「この写真の月」と「その前月」の2つ。月またぎ donor では守る不変条件が2つの月に
+    // 分かれる（上限・1穴1donor は対象月 / 1日1donor は写真自身の月）ため、写真の月から到達しうる
+    // 月をすべて押さえる。withMonthMakeupLock が昇順で取るのでデッドロックしない。
+    const lockYms = wantsMakeup ? [shiftYm(imageYm, -1), imageYm] : [imageYm];
+    const rejected = await withMonthMakeupLock(user.id, lockYms, async (tx) => {
+      // 検証に要る画像（実績と同じ集合＝isPublic/isDisabledで絞らない）。
+      // 範囲は「前月の1日 〜 この写真の月の締切」。月またぎ donor があるので、対象月の投稿だけでなく
+      // 前月の投稿と、この写真と同じ日の投稿がすべて1本の範囲に入るようにする。
+      const rangeStart = jstMonthRangeOfYm(shiftYm(imageYm, -1)).start;
+      const rangeEnd = makeupDeadline(imageYm);
+      const rows: MakeupRow[] = await tx.image.findMany({
+        where: { userId: user.id, createdAt: { gte: rangeStart, lt: rangeEnd } },
+        select: { id: true, createdAt: true, makeupTargetDay: true, makeupTargetMonthDelta: true },
       });
-      const dayCounts: Record<number, number> = {};
-      for (const m of monthImages) {
-        const d = jstDay(m.createdAt);
-        dayCounts[d] = (dayCounts[d] ?? 0) + 1;
-      }
+      const dayCounts = dayCountsOf(rows, targetYm);
+      // この写真と同じ日の投稿（ダブル投稿判定・1日1代表・1日1donor）。
+      // 月をまたぐので日番号ではなく JST 日付そのもので比べる（10/3 と 11/3 を取り違えない）。
+      const sameDate = rows.filter((m) => toJstDateString(m.createdAt) === imageJstDate);
 
       // 実行する DB 更新（imageId -> 変更内容）をまとめてから1トランザクションで適用する。
       const pickUpdates = new Map<string, Date | null>();
-      const makeupUpdates = new Map<string, number | null>();
+      const makeupUpdates = new Map<string, MakeupUpdate>();
+      const unassign: MakeupUpdate = { day: null, delta: DONOR_SAME_MONTH };
 
       // ---- ① 代表（サムネイル）----
       if (wantsPick) {
         if (body.calendarPicked === true) {
           // ①↔②重複: 代表にする画像が donor（穴埋めに使用中）なら不可
-          if (image.makeupTargetDay != null || makeupUpdates.get(id) != null) {
+          if (image.makeupTargetDay != null) {
             return NextResponse.json(
               { error: "穴埋めに使っている写真は、その日のサムネイルにできません" },
               { status: 409 }
@@ -111,8 +206,8 @@ export async function PATCH(
           }
           pickUpdates.set(id, new Date());
           // 1日1代表: 同JST日の他画像の pick を外す
-          for (const m of monthImages) {
-            if (m.id !== id && jstDay(m.createdAt) === imageDay) pickUpdates.set(m.id, null);
+          for (const m of sameDate) {
+            if (m.id !== id) pickUpdates.set(m.id, null);
           }
         } else {
           pickUpdates.set(id, null);
@@ -123,13 +218,15 @@ export async function PATCH(
       if (wantsMakeup) {
         const target = body.makeupTargetDay;
         if (target === null) {
-          makeupUpdates.set(id, null);
+          makeupUpdates.set(id, unassign);
         } else {
           if (typeof target !== "number" || !Number.isInteger(target) || target < 1 || target > daysInMonth) {
             return NextResponse.json({ error: "穴埋め先の日付が不正です" }, { status: 400 });
           }
           // 合法性: donorは穴より後・穴は空き日・donor日はダブル投稿・代表ではない
-          if (imageDay <= target) {
+          // 「穴より後」は月をまたぐので JST 日付で比べる（11/3 は 10/31 より後）。
+          const holeDate = `${targetYm}-${String(target).padStart(2, "0")}`;
+          if (imageJstDate <= holeDate) {
             return NextResponse.json(
               { error: "穴埋めは、その日より後のダブル投稿でしか埋められません" },
               { status: 409 }
@@ -138,7 +235,7 @@ export async function PATCH(
           if ((dayCounts[target] ?? 0) !== 0) {
             return NextResponse.json({ error: "その日には投稿があるため穴埋めできません" }, { status: 409 });
           }
-          if ((dayCounts[imageDay] ?? 0) < 2) {
+          if (sameDate.length < 2) {
             return NextResponse.json(
               { error: "1日に2枚以上投稿した日の写真だけが穴埋めに使えます" },
               { status: 409 }
@@ -150,61 +247,84 @@ export async function PATCH(
               { status: 409 }
             );
           }
-          makeupUpdates.set(id, target);
-          // 1日1donor: 同JST日の他の donor を外す（この画像が代表donorになる）
-          for (const m of monthImages) {
-            if (m.id !== id && jstDay(m.createdAt) === imageDay && m.makeupTargetDay != null) {
-              makeupUpdates.set(m.id, null);
-            }
+          makeupUpdates.set(id, { day: target, delta: donorDelta });
+          // 1日1donor（月またぎ共有）: 同JST日の他の donor を外す。どの月の穴を埋めていても外す
+          //（共有しないと1回のダブル投稿で2日ぶん埋まり、1pt で2日得をする）。
+          for (const m of sameDate) {
+            if (m.id !== id && m.makeupTargetDay != null) makeupUpdates.set(m.id, unassign);
           }
           // 1穴1donor（再割当）: 同じ穴を埋めている別donorを外す＝別donorへ付替
-          for (const m of monthImages) {
-            if (m.id !== id && m.makeupTargetDay === target) makeupUpdates.set(m.id, null);
+          for (const m of rows) {
+            if (m.id !== id && filledHoleOf(m, targetYm) === target) makeupUpdates.set(m.id, unassign);
           }
         }
       }
 
-      // ---- 穴埋めまわりのガード（grace 上限 / no-divergence）----
+      // ---- 穴埋めまわりのガード（grace 上限 / 締切 / no-divergence）----
       if (makeupUpdates.size > 0) {
-        const grace = await resolveMakeupCap({ userId: user.id, instanceDomain: user.instance.domain, ym });
-        // 変更後の filledHoleDays（実在する空き日のみ・distinct）を算出。
-        const effective = new Map<string, number | null>(
-          monthImages.map((m) => [m.id, m.makeupTargetDay])
-        );
-        for (const [k, v] of makeupUpdates) effective.set(k, v);
-        const filledHoleSet = new Set<number>();
-        for (const v of effective.values()) {
-          if (v != null && (dayCounts[v] ?? 0) === 0) filledHoleSet.add(v);
+        // 変更が穴埋めに影響する月（＝外す割当の元の月と、新しく埋める月）。1日1donor の月またぎ共有で
+        // 「11月の穴を埋めるために、同じ日の写真が埋めていた10月の割当を外す」が起きるため、
+        // 対象月だけを見ていると別の月を締切後に変えたり、確定した👑を崩したりしうる。
+        // 対象月は指定・解除のどちらでも必ず変わるので最初から入れる。
+        const affected = new Set<string>([targetYm]);
+        const rowById = new Map(rows.map((m) => [m.id, m]));
+        for (const [rowId, upd] of makeupUpdates) {
+          const row = rowById.get(rowId);
+          if (!row) continue;
+          const rowYm = toJstYm(row.createdAt);
+          if (row.makeupTargetDay != null) affected.add(donorTargetYm(rowYm, row.makeupTargetMonthDelta));
+          if (upd.day != null) affected.add(donorTargetYm(rowYm, upd.delta));
         }
 
-        // grace 上限: 新規割当（target != null）で穴埋め数が grace を超えるなら拒否。
-        // （表示・DBともに grace 件までに揃え、「表示上は空きなのに使用中」の食い違いを防ぐ）
-        const isAssign = wantsMakeup && body.makeupTargetDay !== null;
-        if (isAssign && filledHoleSet.size > grace) {
-          return NextResponse.json(
-            {
-              error: isPointEra(ym)
-                ? `穴埋めポイントが足りません（${month}月の穴埋めポイントは${grace}ptです）`
-                // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（従来ルールの文言ごと削除）
-                : `穴埋めは1か月に${grace}日までです`,
-            },
-            { status: 409 }
-          );
-        }
+        for (const ym of affected) {
+          // 締切: どの月であれ、締め切った月の割当は動かさない（月を凍結するのが締切の目的）。
+          if (!isMakeupEditable(ym, now)) {
+            return NextResponse.json({ error: makeupClosedMessage(ym) }, { status: 409 });
+          }
+          const { year: y, month: m } = parseYm(ym);
+          const counts = dayCountsOf(rows, ym);
+          const grace = await resolveMakeupCap({
+            userId: user.id,
+            instanceDomain: user.instance.domain,
+            ym,
+          });
+          const filledHoleSet = filledHolesAfter(rows, ym, counts, makeupUpdates);
 
-        // no-divergence: 達成済み(👑)月を非達成に落とす変更（穴埋めの解除など）は拒否。
-        const grantedPerfect = await tx.achievement.findFirst({
-          where: { userId: user.id, key: perfectMonthKey(`${year}-${String(month).padStart(2, "0")}`) },
-          select: { id: true },
-        });
-        if (
-          grantedPerfect &&
-          !isPerfectMonth({ daysInMonth, dayCounts, filledHoleDays: [...filledHoleSet], grace })
-        ) {
-          return NextResponse.json(
-            { error: "この月は皆勤賞を達成済みのため、穴埋めを解除できません（別の写真への付け替えは可能です）" },
-            { status: 409 }
-          );
+          // grace 上限: 新規割当で穴埋め数が grace を超えるなら拒否（他の月は外すだけなので増えない）。
+          // （表示・DBともに grace 件までに揃え、「表示上は空きなのに使用中」の食い違いを防ぐ）
+          if (ym === targetYm && body.makeupTargetDay !== null && filledHoleSet.size > grace) {
+            return NextResponse.json(
+              {
+                error: isPointEra(ym)
+                  ? `穴埋めポイントが足りません（${m}月の穴埋めポイントは${grace}ptです）`
+                  // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（従来ルールの文言ごと削除）
+                  : `穴埋めは1か月に${grace}日までです`,
+              },
+              { status: 409 }
+            );
+          }
+
+          // no-divergence: 達成済み(👑)月を非達成に落とす変更（穴埋めの解除など）は拒否。
+          const grantedPerfect = await tx.achievement.findFirst({
+            where: { userId: user.id, key: perfectMonthKey(ym) },
+            select: { id: true },
+          });
+          if (
+            grantedPerfect &&
+            !isPerfectMonth({
+              daysInMonth: daysInMonthOf(y, m),
+              dayCounts: counts,
+              filledHoleDays: [...filledHoleSet],
+              grace,
+            })
+          ) {
+            return NextResponse.json(
+              {
+                error: `${m}月は皆勤賞を達成済みのため、穴埋めを解除できません（別の写真への付け替えは可能です）`,
+              },
+              { status: 409 }
+            );
+          }
         }
       }
 
@@ -213,7 +333,10 @@ export async function PATCH(
         await tx.image.update({ where: { id: imgId }, data: { calendarPickedAt: v } });
       }
       for (const [imgId, v] of makeupUpdates) {
-        await tx.image.update({ where: { id: imgId }, data: { makeupTargetDay: v } });
+        await tx.image.update({
+          where: { id: imgId },
+          data: { makeupTargetDay: v.day, makeupTargetMonthDelta: v.delta },
+        });
       }
       return null;
 
