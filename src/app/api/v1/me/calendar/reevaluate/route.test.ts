@@ -51,6 +51,9 @@ describe("POST /api/v1/me/calendar/reevaluate", () => {
     ["月が0", { year: 2026, month: 0 }],
     ["月が13", { year: 2026, month: 13 }],
     ["整数でない", { year: 2026, month: 1.5 }],
+    // 年が4桁でないと "YYYY-MM" の切り出しが壊れる（Invalid Date のまま DB へ行き 500 になる）
+    ["年が5桁", { year: 12345, month: 10 }],
+    ["年が3桁", { year: 999, month: 10 }],
   ])("年月が不正なら400を返す（%s）", async (_label, body) => {
     const res = await POST(req(body));
 
