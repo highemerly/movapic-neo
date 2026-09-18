@@ -480,11 +480,14 @@ export function AchievementsView({
   granted,
   ladderValues,
   currentMonthPerfect,
+  isOwner,
 }: {
   granted: GrantedItem[];
   ladderValues: Record<string, number>;
   /** 「次のステップ」の当月皆勤カード用（本人・閲覧者を問わず、このページの主の進捗を表示）。 */
   currentMonthPerfect: CurrentMonthPerfect;
+  /** 閲覧者がこのページの主本人か（穴埋めの残ポイントは本人にしか出さない）。 */
+  isOwner: boolean;
 }) {
   const grantedMap = useMemo(
     () => new Map(granted.map((g) => [g.key, g.grantedAt])),
@@ -586,6 +589,7 @@ export function AchievementsView({
         grantedKeys={new Set(grantedMap.keys())}
         ladderValues={ladderValues}
         currentMonthPerfect={currentMonthPerfect}
+        isOwner={isOwner}
         onOpen={openByKey}
         onOpenPerfect={openPerfect}
       />

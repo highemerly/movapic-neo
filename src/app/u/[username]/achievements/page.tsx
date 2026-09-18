@@ -126,6 +126,7 @@ export default async function AchievementsPage({
             granted={granted}
             ladderValues={ladderValues}
             currentMonthPerfect={currentMonthPerfect}
+            isOwner={isOwner}
           />
         </TabTransition>
 

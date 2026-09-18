@@ -73,10 +73,13 @@ function GoalCard({
   );
 }
 
-/** 穴を埋めるための次の一手（ポイント制の月は残ポイントを添える）。 */
-function makeupHint(p: CurrentMonthPerfect): string {
+/**
+ * 穴を埋めるための次の一手（ポイント制の月は残ポイントを添える）。
+ * 残ポイントは本人にだけ出す（カレンダーAPIも makeup 枠を owner にしか返さない＝出し分けを揃える）。
+ */
+function makeupHint(p: CurrentMonthPerfect, isOwner: boolean): string {
   // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（pointEra の分岐ごと削除）
-  if (!p.pointEra) return "2枚投稿で穴埋めしよう";
+  if (!p.pointEra || !isOwner) return "2枚投稿で穴埋めしよう";
   if (p.status.remaining === 0) return "ポイントが付与されると穴埋めできます";
   return `残り${p.status.remaining}pt ・ 2枚投稿で穴埋めしよう`;
 }
@@ -86,7 +89,10 @@ function makeupHint(p: CurrentMonthPerfect): string {
  * 日数はすべて covered（投稿日＋穴埋め済みの日）基準で出す。穴埋めした日はカレンダー上も
  * 埋まって見えるため、実投稿日数で出すと「毎日埋めているのに 29/31」と食い違う。
  */
-function perfectCardProps(p: CurrentMonthPerfect): {
+function perfectCardProps(
+  p: CurrentMonthPerfect,
+  isOwner: boolean
+): {
   remain: string;
   remainMuted: boolean;
   ratio: number;
@@ -113,7 +119,7 @@ function perfectCardProps(p: CurrentMonthPerfect): {
       remain: `穴埋め ${p.status.unfilled}日`,
       remainMuted: false,
       ratio,
-      sub: `${covered}/${p.daysInMonth}日 ・ ${makeupHint(p)}`,
+      sub: `${covered}/${p.daysInMonth}日 ・ ${makeupHint(p, isOwner)}`,
     };
   }
   return {
@@ -133,19 +139,22 @@ export function NextGoals({
   grantedKeys,
   ladderValues,
   currentMonthPerfect,
+  isOwner,
   onOpen,
   onOpenPerfect,
 }: {
   grantedKeys: Set<string>;
   ladderValues: Record<string, number>;
   currentMonthPerfect: CurrentMonthPerfect;
+  /** 閲覧者がこのページの主本人か（残ポイントなど本人限定の値の出し分け）。 */
+  isOwner: boolean;
   /** ラダーゴールのタップ（該当実績の詳細モーダルを開く）。 */
   onOpen: (achievementKey: string) => void;
   /** 皆勤カードのタップ（皆勤賞の詳細モーダルを開く）。 */
   onOpenPerfect: () => void;
 }) {
   const goals: NextGoal[] = ladderNextGoals(grantedKeys, ladderValues).slice(0, MAX_LADDER_GOALS);
-  const pc = perfectCardProps(currentMonthPerfect);
+  const pc = perfectCardProps(currentMonthPerfect, isOwner);
 
   return (
     <section>
