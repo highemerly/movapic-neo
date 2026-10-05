@@ -1,53 +1,48 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { getRumOrigin, getRumBeaconUrl } from "./rum";
+import { isRumEnabled, getRumBeaconUrl } from "./rum";
 
-const original = process.env.RUM_ORIGIN;
+const original = process.env.RUM_ENABLED;
 
 afterEach(() => {
-  if (original === undefined) delete process.env.RUM_ORIGIN;
-  else process.env.RUM_ORIGIN = original;
+  if (original === undefined) delete process.env.RUM_ENABLED;
+  else process.env.RUM_ENABLED = original;
 });
 
-describe("getRumOrigin", () => {
-  it("未設定なら null（RUM無効）を返す", () => {
-    delete process.env.RUM_ORIGIN;
-    expect(getRumOrigin()).toBeNull();
+describe("isRumEnabled", () => {
+  it("未設定なら false（RUM無効）を返す", () => {
+    delete process.env.RUM_ENABLED;
+    expect(isRumEnabled()).toBe(false);
   });
 
-  it("空文字・空白のみなら null を返す", () => {
-    process.env.RUM_ORIGIN = "   ";
-    expect(getRumOrigin()).toBeNull();
+  it("空文字・空白のみなら false を返す", () => {
+    process.env.RUM_ENABLED = "   ";
+    expect(isRumEnabled()).toBe(false);
   });
 
-  it("オリジンをそのまま返す", () => {
-    process.env.RUM_ORIGIN = "https://rum.piyo.me";
-    expect(getRumOrigin()).toBe("https://rum.piyo.me");
+  it("\"1\" なら true を返す", () => {
+    process.env.RUM_ENABLED = "1";
+    expect(isRumEnabled()).toBe(true);
   });
 
-  it("末尾スラッシュやパスが付いていてもオリジンだけを返す", () => {
-    process.env.RUM_ORIGIN = "https://rum.piyo.me/beacon.js";
-    expect(getRumOrigin()).toBe("https://rum.piyo.me");
+  it("\"1\" 以外の値は例外を投げる", () => {
+    process.env.RUM_ENABLED = "true";
+    expect(() => isRumEnabled()).toThrow(/RUM_ENABLED/);
   });
 
-  it("URL として不正なら例外を投げる", () => {
-    process.env.RUM_ORIGIN = "rum.piyo.me";
-    expect(() => getRumOrigin()).toThrow(/RUM_ORIGIN/);
-  });
-
-  it("http/https 以外のスキームは例外を投げる", () => {
-    process.env.RUM_ORIGIN = "ftp://rum.piyo.me";
-    expect(() => getRumOrigin()).toThrow(/http\/https/);
+  it("旧 RUM_ORIGIN 相当の値（URL）を入れても例外を投げる", () => {
+    process.env.RUM_ENABLED = "https://rum.piyo.me";
+    expect(() => isRumEnabled()).toThrow(/RUM_ENABLED/);
   });
 });
 
 describe("getRumBeaconUrl", () => {
-  it("オリジン配下の beacon.js を返す", () => {
-    process.env.RUM_ORIGIN = "https://rum.piyo.me";
-    expect(getRumBeaconUrl()).toBe("https://rum.piyo.me/beacon.js");
+  it("有効なら同一オリジンの /_n-rum/beacon.js を返す", () => {
+    process.env.RUM_ENABLED = "1";
+    expect(getRumBeaconUrl()).toBe("/_n-rum/beacon.js");
   });
 
   it("未設定なら null を返す", () => {
-    delete process.env.RUM_ORIGIN;
+    delete process.env.RUM_ENABLED;
     expect(getRumBeaconUrl()).toBeNull();
   });
 });

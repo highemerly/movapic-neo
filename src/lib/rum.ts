@@ -1,41 +1,39 @@
 /**
- * RUM（Real User Monitoring）ビーコンの配信元（env 読み取りの単一集約点）。
+ * RUM（Real User Monitoring）ビーコンの配信（env 読み取りの単一集約点）。
  *
- * - RUM_ORIGIN: コレクタのオリジン（例: https://rum.piyo.me）。未設定なら RUM 自体を無効化する。
+ * - RUM_ENABLED: "1" のときだけビーコン <script> を配信する。未設定なら RUM 自体を無効化する。
  *
- * ビーコンの <script>（layout.tsx）と CSP の script-src（proxy.ts）の両方で同じ値が要る。
- * 片方だけ直すと「読み込もうとして CSP で落ちる」状態になるため、必ずここを経由する。
+ * ビーコンは自サイトと同じオリジンの `/_n-rum/` から配る。このパスは Next へ届かない —
+ * Ingress が `/_n-rum/{beacon.js,web-vitals.js,rum-config.json,collect}` の4パスだけを
+ * コレクタ（next-rum）へ回し、プレフィックスを剥がす（k8s/worker-front-deployment.yaml 末尾の例）。
+ * 同一オリジンなので CSP は script-src / connect-src とも 'self' で足り、緩和は要らない。
  *
- * 有効/無効は RUM_ORIGIN の有無だけで決める（NODE_ENV では見ない）。ローカル開発で撃つと
- * service="unknown" として本番メトリクスに混ざるので、dev では設定しないこと。
+ * 有効/無効を NODE_ENV で決めないのは、Ingress にルートが無い環境（検証環境・ローカルの
+ * `next start`）だと `/_n-rum/beacon.js` が Next へ落ちて全ページ表示で 404 を出すため。
+ * ルートを張った環境でだけ RUM_ENABLED を立てること。
  */
+
+/** Ingress がコレクタへ回すパスのプレフィックス。変えるときは Ingress 側のルールも直す。 */
+const RUM_PATH_PREFIX = "/_n-rum";
 
 /**
- * コレクタのオリジン。未設定なら null（＝RUM 無効）。
- * URL として不正なら例外にする（サイレントに無効化すると「なぜか計測が来ない」で迷子になるため）。
+ * RUM が有効か。
+ * "1" 以外の値は例外にする（サイレントに無効化すると「なぜか計測が来ない」で迷子になるため）。
  */
-export function getRumOrigin(): string | null {
-  const raw = process.env.RUM_ORIGIN?.trim();
-  if (!raw) return null;
-
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    throw new Error(`RUM_ORIGIN が URL として不正です: "${raw}"（例: https://rum.piyo.me）`);
+export function isRumEnabled(): boolean {
+  const raw = process.env.RUM_ENABLED?.trim();
+  if (!raw) return false;
+  if (raw !== "1") {
+    throw new Error(`RUM_ENABLED は "1" のみ指定できます（無効にするなら未設定にする）: "${raw}"`);
   }
-  if (url.protocol !== "https:" && url.protocol !== "http:") {
-    throw new Error(`RUM_ORIGIN は http/https のみ指定できます: "${raw}"`);
-  }
-  // パスやクエリが付いていても CSP のソース表現に使えるオリジンだけを採用する
-  return url.origin;
+  return true;
 }
 
 /**
- * ビーコンスクリプトの URL。未設定なら null。
+ * ビーコンスクリプトの URL（同一オリジンのパス）。無効なら null。
+ * web-vitals.js / rum-config.json / collect は beacon.js が自分の置き場所から相対で解決し、
  * service / path_group はコレクタ側の rum-config.json で解決するため、属性は付けない。
  */
 export function getRumBeaconUrl(): string | null {
-  const origin = getRumOrigin();
-  return origin === null ? null : `${origin}/beacon.js`;
+  return isRumEnabled() ? `${RUM_PATH_PREFIX}/beacon.js` : null;
 }

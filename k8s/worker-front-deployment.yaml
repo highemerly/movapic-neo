@@ -97,6 +97,20 @@ spec:
 # spec:
 #   entryPoints: [websecure]
 #   routes:
+#     # RUM（next-rum）を自ホスト名で配る。/_n-rum を剥がしてコレクタへ渡す（rum.ts）。
+#     # PathPrefix にしないこと: /_n-rum/metrics や /_n-rum/healthz まで公開される。
+#     # このルートを張った環境でだけ RUM_ENABLED=1 を立てる。
+#     - match: >-
+#         Host(`pic.handon.club`) &&
+#         (Path(`/_n-rum/beacon.js`) || Path(`/_n-rum/web-vitals.js`) ||
+#          Path(`/_n-rum/rum-config.json`) || Path(`/_n-rum/collect`))
+#       kind: Rule
+#       services:
+#         - name: rum-collector
+#           namespace: rum-prd
+#           port: 8080
+#       middlewares:
+#         - name: rum-strip-prefix   # stripPrefix: /_n-rum（コレクタはルート直下でしか待っていない）
 #     # 画像生成・投稿・取り込み・カレンダー画像 → worker-front
 #     # （/api/v1/post 配下には再投稿 /api/v1/post/repost/:id も含む。compute を呼ぶルートは
 #     #   web に置けない＝NetworkPolicy と COMPUTE_SERVICE_URL が worker-front 限定のため）
