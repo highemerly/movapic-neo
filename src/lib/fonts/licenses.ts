@@ -31,12 +31,13 @@ export interface FontLicense {
   /** 補足（noto-emoji の「絵文字は全てこのフォント」等） */
   note?: string;
   /**
-   * シーズン限定フォントの紐付けキー（例: "kimodameshi-2026"）。
-   * これが設定されたフォントは /license 一覧では期間中のみ表示する。
+   * シーズン限定フォントの紐付けキー（例: "kimodameshi-2026"）。同じフォントを複数の
+   * シーズンで使うので配列。これが設定されたフォントは /license 一覧では、いずれかの
+   * シーズンの期間中のみ表示する。
    * 一方、画像詳細ページのバッジ→モーダルはキー引き（FONT_LICENSES）なので、
    * 期間終了後も過去投稿から常に表示できる（このフィールドは一覧の出し分けだけに使う）。
    */
-  seasonKey?: string;
+  seasonKeys?: string[];
 }
 
 /** 表示順を保った一覧（/license ページ用）。 */
@@ -80,7 +81,7 @@ export const FONT_LICENSE_LIST: FontLicense[] = [
     link: { href: "https://booth.pm/ja/items/2328262", label: "https://booth.pm/ja/items/2328262" },
   },
   {
-    // 肝試しシーズン限定フォント。通常は選択不可だが、詳細ページのフォント名バッジは
+    // シーズン限定フォント（肝試し・ハロウィン）。通常は選択不可だが、詳細ページのフォント名バッジは
     // image.font（=preset.font="horror-mincho"）から FONT_LICENSES[font] で引くため一覧に必要。
     key: "horror-mincho",
     label: "ふぉんとうは怖い明朝体",
@@ -99,8 +100,9 @@ export const FONT_LICENSE_LIST: FontLicense[] = [
       href: "https://moji.or.jp/ipafont/license/",
       label: "IPA Font License Agreement v1.0",
     },
-    note: "夏休み限定「肝試し」アレンジ専用のフォントです。",
-    seasonKey: "kimodameshi-2026", // /license 一覧は期間中のみ表示（詳細ページは常時表示）
+    note: "期間限定アレンジ（「肝試し」「ハロウィン」）専用のフォントです。",
+    // /license 一覧は期間中のみ表示（詳細ページは常時表示）
+    seasonKeys: ["kimodameshi-2026", "halloween-2026"],
   },
   {
     key: "noto-emoji",

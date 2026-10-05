@@ -1,6 +1,6 @@
 export type Position = "top" | "right" | "left" | "bottom";
 
-// horror-mincho は「肝試し」シーズン専用の限定フォント。VALID_FONTS には入れないため
+// horror-mincho はシーズン専用の限定フォント（肝試し・ハロウィン）。VALID_FONTS には入れないため
 // 通常の /create・generate・post では選択できず、シーズンのプリセット経由でのみ描画に使う。
 // 型・ラベル・ファイル名は Record<FontFamily> の網羅性のためここに載せる必要がある。
 export type FontFamily = "hui-font" | "noto-sans-jp" | "light-novel-pop" | "horror-mincho";

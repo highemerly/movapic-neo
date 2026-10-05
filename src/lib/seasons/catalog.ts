@@ -3,6 +3,7 @@
  *
  * シーズンは position/color/size/font/arrangement とは独立した特殊モードで、選択すると
  * それら通常オプションを完全に上書きし、プリセットの装飾で生成する（縦書き短冊など）。
+ * 文字の向きはプリセットの position で決まる（left/right=縦書き・top/bottom=横書き）。
  *
  * このファイルは「純粋な静的config」。worker-front（期間検証・ラベル表示）と
  * compute（実際の描画）の両方から import される。React / DB / 秘密情報に依存しないこと。
@@ -16,7 +17,7 @@
 import type { Position, Color, Size, FontFamily } from "@/types";
 
 /** compute のレンダラ分岐キー（装飾の種類） */
-export type SeasonDecoration = "tanzaku" | "obake" | "hagaki" | "tsukimi";
+export type SeasonDecoration = "tanzaku" | "obake" | "hagaki" | "tsukimi" | "lantern";
 
 export interface SeasonDef {
   /** 永続キー。例: "tanabata-2026"（実績キーになるためリネーム禁止） */
@@ -118,6 +119,23 @@ export const SEASONS: SeasonDef[] = [
     },
     decoration: "tsukimi", // 宵の色被り＋名月（月相つき）＋薄雲＋すすき＋月見団子
     description: "縦書き・名月と月見団子のお月見限定デコレーション",
+  },
+  {
+    key: "halloween-2026",
+    label: "ハロウィン",
+    // 10/31 当日の写真は翌日以降に投稿されることも多いので、文化の日（11/3）まで開ける。
+    start: "2026-10-19T00:00:00+09:00",
+    end: "2026-11-03T23:59:59+09:00",
+    preset: {
+      position: "bottom", // 横書き（下）＝既存シーズンは全て縦書きなので構図を変える
+      color: "orange", // DB列用（描画はランタンの橙＝下の textColorHex で上書き）
+      size: "medium",
+      font: "horror-mincho", // 肝試しと同じ怖い明朝（シーズン限定フォントの再登板）
+      textColorHex: "#ffb03a", // かぼちゃランタンの橙
+      strokeColorHex: "rgba(34, 12, 52, 0.9)", // 夜の紫。明るい写真でも読める
+    },
+    decoration: "lantern", // 下辺の夕暮れ＋かぼちゃランタンの行列＋こうもり
+    description: "横書き・かぼちゃランタンが並ぶハロウィン限定デコレーション",
   },
 ];
 

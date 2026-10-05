@@ -5,8 +5,10 @@ import { FontFamily, Size, Position } from "@/types";
 import { SIZE_MULTIPLIERS } from "@/types";
 import { isEmojiGrapheme, splitGraphemes } from "@/lib/text/grapheme";
 
-// プロポーショナルフォント（横書き時のみ）
-export const PROPORTIONAL_FONTS: Set<FontFamily> = new Set(["noto-sans-jp"]);
+// プロポーショナルフォント（横書き時のみ）。
+// 怖い明朝（horror-mincho）は欧文グリフが字ごとに幅の違うデザインで、半角セルに等間隔で
+// 置くと「Hal l oween」のように字間がばらつくため、横書き（ハロウィン）では実測幅で詰める。
+export const PROPORTIONAL_FONTS: Set<FontFamily> = new Set(["noto-sans-jp", "horror-mincho"]);
 
 // 等幅フォント（半角文字の幅を半分にする）。
 // 怖い明朝（horror-mincho）は全角グリッドの和文フォントなので縦書きの列組みを等幅扱いにする。

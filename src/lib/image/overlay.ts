@@ -19,6 +19,7 @@ import { splitGraphemes, isEmojiGrapheme } from "@/lib/text/grapheme";
 import { drawStampText } from "./stamp";
 import { drawNeonText } from "./neon";
 import { drawSeasonBackground } from "./seasons";
+import { HALLOWEEN_BOTTOM_INSET_RATIO } from "./seasons/halloween";
 import { getSeasonByKey } from "@/lib/seasons/catalog";
 
 // フォントを登録（overlay/collage 共通のローダーで1回だけ実行）
@@ -72,10 +73,10 @@ export async function createTextOverlay(
   const isVertical = position === "left" || position === "right";
 
   // シーズン（期間限定）: 特殊モードとして背景＋テキストを専用に描いて return する。
-  // 縦書き方向はプリセットの position、上部余白と文字の影は装飾（decoration）ごとに変える。
+  // 文字の向きはプリセットの position、余白と文字の影は装飾（decoration）ごとに変える。
   const seasonDef = season ? getSeasonByKey(season) : undefined;
   if (seasonDef) {
-    const vpos: "left" | "right" = seasonDef.preset.position === "left" ? "left" : "right";
+    const seasonPos = seasonDef.preset.position;
     // tanzaku だけが上部に「穴＋紐」のぶんの余白を要る（他の装飾は 0）。
     const topInset = seasonDef.decoration === "tanzaku" ? fontSize * 1.7 : 0;
     drawSeasonBackground(ctx, seasonDef.decoration, text, width, height, fontSize, margin, topInset);
@@ -97,12 +98,39 @@ export async function createTextOverlay(
       ctx.shadowBlur = Math.max(2, fontSize * 0.28);
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = Math.max(1, fontSize * 0.05);
+    } else if (seasonDef.decoration === "lantern") {
+      // ハロウィン: 橙の文字をランタンの灯りのように滲ませる紫の影。
+      ctx.shadowColor = "rgba(30, 10, 48, 0.8)";
+      ctx.shadowBlur = Math.max(2, fontSize * 0.28);
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = Math.max(1, fontSize * 0.05);
     }
     // 残暑見舞い(hagaki): 影の上書きなし＝通常どおり白文字＋黒縁取りで写真の上に直接描く。
+    if (seasonPos === "top" || seasonPos === "bottom") {
+      // lantern だけが下辺に「かぼちゃの列」のぶんの余白を要る（他の装飾は 0）。
+      const bottomInset =
+        seasonDef.decoration === "lantern" ? fontSize * HALLOWEEN_BOTTOM_INSET_RATIO : 0;
+      drawHorizontalText(
+        ctx,
+        text,
+        seasonPos,
+        width,
+        height,
+        fontSize,
+        margin,
+        textColor,
+        strokeColor,
+        strokeWidth,
+        "none",
+        fontFamily,
+        bottomInset
+      );
+      return Buffer.from(await canvas.toBuffer("png"));
+    }
     drawVerticalText(
       ctx,
       text,
-      vpos,
+      seasonPos,
       width,
       height,
       fontSize,
@@ -181,7 +209,8 @@ function drawHorizontalText(
   strokeColor: string,
   strokeWidth: number,
   arrangement: Arrangement,
-  fontFamily: FontFamily
+  fontFamily: FontFamily,
+  bottomInset = 0
 ): void {
   const maxWidth = width - margin * 2;
   const lineHeight = fontSize * 1.4;
@@ -210,8 +239,9 @@ function drawHorizontalText(
     // 先頭行の上端を margin に揃える
     startY = margin + fontSize / 2;
   } else {
-    // 最終行の下端を height - margin に揃える（上の余白 margin と対称）
-    startY = height - margin - fontSize / 2 - (lines.length - 1) * lineHeight;
+    // 最終行の下端を height - margin に揃える（上の余白 margin と対称）。
+    // bottomInset があればそのぶん持ち上げる。
+    startY = height - margin - bottomInset - fontSize / 2 - (lines.length - 1) * lineHeight;
   }
 
   // 描画

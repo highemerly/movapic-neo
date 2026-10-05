@@ -15,7 +15,7 @@ export default async function LicensePage() {
   // 期間の境界は JST の絶対時刻で比較するのでサーバーTZに依存しない。
   const now = new Date();
   const licenses = FONT_LICENSE_LIST.filter(
-    (l) => !l.seasonKey || isSeasonActiveNow(l.seasonKey, now)
+    (l) => !l.seasonKeys || l.seasonKeys.some((key) => isSeasonActiveNow(key, now))
   );
 
   return (
