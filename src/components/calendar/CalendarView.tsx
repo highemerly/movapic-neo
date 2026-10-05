@@ -87,6 +87,11 @@ interface CalendarViewProps {
   serverName: string;
   /** 特典サーバー（FAVOR_SERVERS）のドメイン一覧。穴埋めポイントの付与条件の説明に使う。 */
   favorServers: string[];
+  /**
+   * 持ち主が特典サーバー所属か。本人向けの案内（isOwner のときだけ出る）で、
+   * 自分に関係のないサーバー特典の説明を出さないために使う。
+   */
+  isFavorUser: boolean;
   /** ログイン中インスタンスの種別（"mastodon" | "misskey"）。投稿ボタンのロゴ出し分けに使う。 */
   instanceType: string;
 }
@@ -155,6 +160,7 @@ export function CalendarView({
   legacyGrace,
   serverName,
   favorServers,
+  isFavorUser,
   instanceType,
 }: CalendarViewProps) {
   const router = useRouter();
@@ -479,7 +485,7 @@ export function CalendarView({
       >
         {/* 本人向け: 穴埋めポイントの案内（残り・消費済み・付与履歴）。値は月ごとにAPIから受け取る */}
         {isOwner && data?.perfectMonth?.makeup?.pointEra && (
-          <MakeupPointsCallout month={month} makeup={data.perfectMonth.makeup} favorServers={favorServers} />
+          <MakeupPointsCallout month={month} makeup={data.perfectMonth.makeup} favorServers={favorServers} isFavorUser={isFavorUser} />
         )}
         {/* 2026-09 以前の月: 従来の穴埋め促しコールアウト */}
         {isOwner && data?.perfectMonth && !isPointEra(formatYm(year, month)) && (

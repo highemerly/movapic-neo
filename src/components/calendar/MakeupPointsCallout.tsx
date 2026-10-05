@@ -73,11 +73,14 @@ export function MakeupPointsCallout({
   month,
   makeup,
   favorServers,
+  isFavorUser,
 }: {
   month: number;
   makeup: MakeupInfo;
   /** 特典サーバー（FAVOR_SERVERS）のドメイン一覧。獲得方法の説明に使う。 */
   favorServers: string[];
+  /** 本人が特典サーバー所属か。対象外の人にはサーバー特典の獲得方法を見せない（もらえない特典の案内になるため）。 */
+  isFavorUser: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -112,7 +115,7 @@ export function MakeupPointsCallout({
               <div className="space-y-4">
                 <section>
                   <p className="mb-1.5 text-sm font-semibold">獲得方法</p>
-                  <MakeupPointConditions favorServers={favorServers} />
+                  <MakeupPointConditions favorServers={isFavorUser ? favorServers : []} />
                 </section>
                 <section>
                   <p className="mb-1.5 text-sm font-semibold">{month}月の付与・消費</p>
