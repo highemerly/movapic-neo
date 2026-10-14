@@ -26,6 +26,8 @@ import { assertSafeRemoteUrl } from "@/lib/security/ssrf";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { userPathSegment } from "@/lib/userHandle";
 import { getHomeServer } from "@/lib/auth/serverPolicy";
+import { findLatestOwnImageId } from "@/lib/replies/target";
+import { threadBrokenMessage } from "@/lib/replies/threadBroken";
 
 const REQUEST_TIMEOUT = 30000;
 const MAX_RETRY_COUNT = 2;
@@ -371,6 +373,18 @@ export async function processOneMention(
       "現在利用できるシーズンがありません。"
     );
   }
+  // 「連」: 投稿者本人の直近の投稿へのリプライとして投稿する（他人の投稿には繋がらない）。
+  // 連投の順序は enqueueMention の queueName で送信者ごとに直列化して保つ。docs/reply.md
+  // 繋ぐ先が無いのは投稿し直しても変わらないので恒久エラー（リトライで同じ返信を重ねない）。
+  const replyToImageId = options.thread ? await findLatestOwnImageId(user.id) : null;
+  if (options.thread && !replyToImageId) {
+    return handleError(
+      ErrorCodes.VALIDATION_INVALID,
+      "「連」で繋げる直前の投稿がありません。「連」を外してもう一度メンションしてください。",
+      false,
+      { permanent: true }
+    );
+  }
 
   // シーズン時はサムネのクロップ位置をプリセット位置に合わせ、案B（完全隔離）で
   // DBのスタイル列には中立デフォルトを保存する。
@@ -459,6 +473,7 @@ export async function processOneMention(
           },
       source: "mention",
       visibility: effectiveVisibility as PublishVisibility,
+      replyToImageId,
       persistOnPostFailure: false,
       // 投稿成功時にだけ呼ばれる＝失敗時は compute(finalize)を呼ばない
       getThumbnailAndDimensions: async () => {
@@ -527,7 +542,10 @@ export async function processOneMention(
     await sendBotReply(
       statusId,
       replyToAcct,
-      `処理が完了しました (${requestId})\n処理時間: ${elapsedSeconds}秒`,
+      `処理が完了しました (${requestId})\n処理時間: ${elapsedSeconds}秒` +
+        (published.threadBroken
+          ? `\n${threadBrokenMessage(user.instance.domain)}`
+          : ""),
       originalVisibility
     );
   }

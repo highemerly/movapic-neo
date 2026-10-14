@@ -10,6 +10,7 @@ import { OptionsPanel } from "@/components/OptionsPanel";
 import { VisibilityPicker } from "@/components/VisibilityPicker";
 import { SegmentControl } from "@/components/SegmentControl";
 import { SeasonToggle } from "./SeasonToggle";
+import { ReplyTargetBanner } from "./ReplyTargetBanner";
 import { AltTextDialog } from "@/components/AltTextDialog";
 import { LoginButton } from "@/components/auth/LoginButton";
 import {
@@ -101,6 +102,16 @@ interface GenerateResult {
   originalHeight: number;
 }
 
+/** スレッドに投稿する先の写真（page.tsx で可視性を検証・URL を解決済み）。 */
+export interface ReplyTargetProps {
+  id: string;
+  overlayText: string;
+  thumbnailUrl: string;
+  pageUrl: string;
+  /** 投稿者の表示（@username または @username@domain） */
+  authorLabel: string;
+}
+
 // サーバーシェル（page.tsx）から渡される認証済みユーザー情報とフォーム初期値。
 // 旧来の client 側 fetch("/api/v1/me") を廃止し、サーバーで getCurrentUserWithPreferences
 // から取得して props で渡す。
@@ -148,6 +159,10 @@ export interface CreateClientProps {
       退避→ログイン往復→復元する。撮影情報/公開範囲/設定保存など認証・連携先が要る機能は隠す。
       user は空のセンチネル、preferences は全 null で渡される。 */
   guest?: boolean;
+  /** 画像詳細の「スレッドに投稿」から来たときのリプライ先（/create?replyTo=<id>）。 */
+  replyTarget?: ReplyTargetProps | null;
+  /** replyTo を指定されたが見えない（削除・取り下げ）＝通常の投稿になることを知らせる */
+  replyTargetMissing?: boolean;
   /** ゲストのログインモーダルに渡す許可サーバー（単一なら入力欄なしのワンクリックログイン）。
       トップの LoginSection と同じ getAllowedServers() の値。 */
   allowedServers?: string[];
@@ -231,9 +246,23 @@ const UNREADABLE_FILE_ERROR = {
   suggestion: "クラウド上の写真は、端末に保存してから選び直してください",
 };
 
-export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn, firstTime = false, showWelcome = false, postMethods, guest = false, allowedServers }: CreateClientProps) {
+export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn, firstTime = false, showWelcome = false, postMethods, guest = false, allowedServers, replyTarget: initialReplyTarget = null, replyTargetMissing = false }: CreateClientProps) {
   const router = useRouter();
   const homeServer = useHomeServer();
+  // リプライ先は props ではなく state で持つ: ?shared=1 / ?restore=1 の消費で URL が変わると
+  // page.tsx が再実行され props が変わりうるため（初回の値を保持する）。リセットでは消さない。
+  const [replyTarget, setReplyTarget] = useState<ReplyTargetProps | null>(initialReplyTarget);
+  // 処理済みのクエリだけを URL から消す。丸ごと /create に置き換えると、?replyTo や ?season まで
+  // 消えてリロードで失われる（以前は router.replace("/create") で全消ししていた）。
+  const dropQueryParam = useCallback(
+    (key: string) => {
+      const params = new URLSearchParams(window.location.search);
+      params.delete(key);
+      const qs = params.toString();
+      router.replace(qs ? `/create?${qs}` : "/create");
+    },
+    [router],
+  );
   // 初回投稿者は③以降（色・位置などの詳細オプション）を折りたたんで最初は隠す。
   // 既定はデフォルト値で投稿できるので、写真→コメント→投稿の最短動線を邪魔しない。
   // 2回目以降のユーザーは従来どおり最初から開いておく。
@@ -463,14 +492,14 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
         console.error("共有画像の読み込みに失敗しました:", e);
       } finally {
         // リロードで再処理されないよう URL から ?shared=1 を消す
-        router.replace("/create");
+        dropQueryParam("shared");
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [handleImageSelect, router]);
+  }, [handleImageSelect, dropQueryParam]);
 
   // 期限切れのゲスト下書きを掃除する。退避したままログインをやめると、写真（最大20MB）が
   // IndexedDB に残り続けて共用端末では次の人に見えてしまう。/create は下書きの唯一の書き込み元
@@ -530,14 +559,14 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
         console.error("下書きの復元に失敗しました:", e);
       } finally {
         // リロードで再処理されないよう ?restore=1 を消す
-        router.replace("/create");
+        dropQueryParam("restore");
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [guest, handleImageSelect, router, activeSeason]);
+  }, [guest, handleImageSelect, dropQueryParam, activeSeason]);
 
   const handleReset = useCallback(() => {
     // 出力形式はインスタンス種別の自動値を保持（ゲストは連携先未確定なので JPEG(none)）
@@ -832,6 +861,8 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
       formData.append("visibility", visibility);
       // 代替テキスト（ALT）: 設定されている場合のみ送る（generate には送らない）
       if (altText.trim()) formData.append("altText", altText.trim());
+      // スレッドに投稿する先（generate には送らない）
+      if (replyTarget) formData.append("replyTo", replyTarget.id);
 
       // EXIFメタデータ: 表示オプションに従って送る内容を決める
       // - none:         何も送らない
@@ -926,7 +957,9 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
         const federr = data.fediverseError
           ? `&federr=1${data.fediverseErrorStatus ? `&fedstatus=${data.fediverseErrorStatus}` : ""}`
           : "";
-        router.push(`${path}${sep}posted=1${federr}`);
+        // Fediverse には投稿できたが、スレッドには繋げられなかった（SHAMEZO 内では繋がっている）
+        const thread = data.threadBroken ? "&thread=0" : "";
+        router.push(`${path}${sep}posted=1${federr}${thread}`);
       } else {
         // imagePageUrl が返らなかった稀なケースのフォールバック。投稿は保存済みなので、
         // 自分のユーザーページへ送って保存物を確認できるようにする。
@@ -1106,8 +1139,18 @@ export function CreateClient({ user, preferences, activeSeason, defaultSeasonOn,
         } ${showSticky ? "pb-28" : ""}`}
       >
         <h1 className="mb-3 text-xl font-bold">
-          {guest ? "写真に文字を入れてみる" : "新しい写真を投稿する"}
+          {guest ? "写真に文字を入れてみる" : replyTarget ? "スレッドに写真を投稿する" : "新しい写真を投稿する"}
         </h1>
+
+        {!guest && (replyTarget || replyTargetMissing) && (
+          <ReplyTargetBanner
+            target={replyTarget}
+            onClear={() => {
+              setReplyTarget(null);
+              dropQueryParam("replyTo");
+            }}
+          />
+        )}
 
         {/* 未ログイン（ゲスト）向けの案内。ログイン不要でプレビューまで試せること、投稿には
             ログインが要ることを先に伝えて期待値を合わせる。 */}

@@ -8,7 +8,14 @@ import { userPathSegment } from "@/lib/userHandle";
 import { getFavorServers, getHomeServer } from "@/lib/auth/serverPolicy";
 import { getAvatarUrl, getEmojiImageUrl } from "@/lib/avatar";
 import { getMutedAuthorKeys } from "@/lib/mutes";
-import { filterFavoriteFeedByMuted } from "@/lib/notifications/muteFilter";
+import {
+  filterFavoriteFeedByMuted,
+  isReplyNotificationVisible,
+} from "@/lib/notifications/muteFilter";
+import {
+  REPLY_NOTIFICATION_TYPE,
+  type ReplyFeedData,
+} from "@/lib/notifications/replyNotificationType";
 import type { FavoriteNotificationData } from "@/lib/notifications/favoriteNotifications";
 import {
   MAKEUP_NOTIFICATION_TYPES,
@@ -48,6 +55,8 @@ export interface NotificationFeedItem {
   favorite: FavoriteFeedData | null;
   /** 穴埋め系（makeup-*）のとき。ym は対象月（旧通知で取れなければ null）、point は makeup-point の付与内容。 */
   makeup: { ym: string | null; point: MakeupPointFeedData | null } | null;
+  /** type="reply" のとき、スレッドに投稿した相手（image はリプライ側の写真）。 */
+  reply: ReplyFeedData | null;
   /** 受信者の /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）。
    *  makeup-reminder のカレンダー遷移などのリンク生成に使う。 */
   recipientUsername: string;
@@ -85,14 +94,22 @@ export async function getRecentNotifications(
           id: true,
           thumbnailKey: true,
           storageKey: true,
-          user: { select: { username: true, instance: { select: { domain: true } } } },
+          isDisabled: true,
+          replyTo: { select: { userId: true } },
+          user: {
+            select: {
+              username: true,
+              displayName: true,
+              instance: { select: { domain: true } },
+            },
+          },
         },
       },
     },
   });
 
   const base = publicBase();
-  // ミュートした相手からのお気に入り／リアクション通知は出さない（未読の赤ドットにも数えない
+  // ミュートした相手からのお気に入り／リアクション／リプライ通知は出さない（未読の赤ドットにも数えない
   // ＝このAPIが未読判定の元データを兼ねるため、ここで除けば赤ドットも点かない）。
   const mutedAccts = new Set(await getMutedAuthorKeys(userId));
 
@@ -105,6 +122,27 @@ export async function getRecentNotifications(
       // 完全にミュート相手のみの通知（filtered=null）は通知ごと隠す。
       if (raw && !filtered) continue;
       favorite = filtered;
+    }
+    let reply: ReplyFeedData | null = null;
+    if (r.type === REPLY_NOTIFICATION_TYPE) {
+      const authorAcct = r.image
+        ? `${r.image.user.username}@${r.image.user.instance.domain}`
+        : "";
+      const visible = isReplyNotificationVisible(
+        {
+          recipientUserId: userId,
+          replyImage: r.image
+            ? {
+                isDisabled: r.image.isDisabled,
+                parentUserId: r.image.replyTo?.userId ?? null,
+                authorAcct,
+              }
+            : null,
+        },
+        mutedAccts
+      );
+      if (!visible) continue;
+      reply = { displayName: r.image?.user.displayName ?? null, acct: authorAcct };
     }
     const pointData =
       r.type === MAKEUP_NOTIFICATION_TYPES.POINT ? toMakeupPointNotificationData(r.data) : null;
@@ -136,6 +174,7 @@ export async function getRecentNotifications(
         : null,
       favorite,
       makeup,
+      reply,
     });
   }
   return items;

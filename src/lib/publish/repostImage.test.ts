@@ -7,14 +7,14 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { findUnique, imageUpdate, getImage, postImageToFediverse } = vi.hoisted(
-  () => ({
+const { findUnique, imageUpdate, getImage, postImageToFediverse, resolveFediverseReplyTarget } =
+  vi.hoisted(() => ({
     findUnique: vi.fn(),
     imageUpdate: vi.fn(),
     getImage: vi.fn(),
     postImageToFediverse: vi.fn(),
-  })
-);
+    resolveFediverseReplyTarget: vi.fn(),
+  }));
 
 vi.mock("@/lib/db", () => ({
   default: { image: { findUnique, update: imageUpdate } },
@@ -28,6 +28,8 @@ vi.mock("@/lib/storage/storage", () => ({
 vi.mock("@/lib/publish/publishImage", () => ({
   postImageToFediverse,
 }));
+
+vi.mock("@/lib/replies/fediverseTarget", () => ({ resolveFediverseReplyTarget }));
 
 import {
   isImageRepostable,
@@ -177,5 +179,39 @@ describe("repostImage", () => {
       postError: "server error",
       postErrorStatus: 503,
     });
+  });
+});
+
+describe("repostImage のリプライ（スレッド）", () => {
+  it("リプライの画像は親を解決して返信として投稿する（local で作ったスレッドを後から連合させても繋ぐ）", async () => {
+    findUnique.mockResolvedValue(baseImage({ replyToId: "parent-img" }));
+    resolveFediverseReplyTarget.mockResolvedValue({ kind: "linked", postId: "parent-status" });
+
+    await repostImage({ imageId: "img", user: OWNER, visibility: "public", now: NOW });
+
+    expect(resolveFediverseReplyTarget).toHaveBeenCalledWith({
+      replyToImageId: "parent-img",
+      viewer: { domain: "mastodon.example", type: "mastodon", accessToken: "token" },
+    });
+    expect(postImageToFediverse.mock.calls[0][0].replyToPostId).toBe("parent-status");
+  });
+
+  it("親を解決できなければ単独で投稿する", async () => {
+    findUnique.mockResolvedValue(baseImage({ replyToId: "parent-img" }));
+    resolveFediverseReplyTarget.mockResolvedValue({ kind: "shamezo-only", reason: "unresolved" });
+
+    const result = await repostImage({ imageId: "img", user: OWNER, visibility: "public", now: NOW });
+
+    expect(result.ok).toBe(true);
+    expect(postImageToFediverse.mock.calls[0][0].replyToPostId).toBeNull();
+  });
+
+  it("リプライでなければ解決しない", async () => {
+    findUnique.mockResolvedValue(baseImage({ replyToId: null }));
+
+    await repostImage({ imageId: "img", user: OWNER, visibility: "public", now: NOW });
+
+    expect(resolveFediverseReplyTarget).not.toHaveBeenCalled();
+    expect(postImageToFediverse.mock.calls[0][0].replyToPostId).toBeNull();
   });
 });

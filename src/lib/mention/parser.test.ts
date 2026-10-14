@@ -64,6 +64,7 @@ describe("parseMentionContent - オプション解析", () => {
       arrangement: "none",
       debug: false,
       keep: false,
+      thread: false,
     });
   });
 
@@ -201,6 +202,7 @@ describe("formatOptionsSummary", () => {
       seasonRequested: false,
       debug: false,
       keep: false,
+      thread: false,
     };
     const summary = formatOptionsSummary(options);
     expect(summary).toContain("位置: 上");
@@ -222,6 +224,7 @@ describe("formatOptionsSummary", () => {
       seasonRequested: false,
       debug: false,
       keep: false,
+      thread: false,
     };
     const summary = formatOptionsSummary(options);
     expect(summary).toContain("アレンジ: ネオン");
@@ -238,6 +241,7 @@ describe("formatOptionsSummary", () => {
       seasonRequested: false,
       debug: false,
       keep: false,
+      thread: false,
       visibility: "unlisted" as const,
     };
     const summary = formatOptionsSummary(options);
@@ -255,6 +259,7 @@ describe("formatOptionsSummary", () => {
       seasonRequested: false,
       debug: false,
       keep: false,
+      thread: false,
     };
     const summary = formatOptionsSummary(options, "public");
     expect(summary).toContain("公開範囲: 公開(デフォルト)");
@@ -271,9 +276,42 @@ describe("formatOptionsSummary", () => {
       seasonRequested: false,
       debug: true,
       keep: true,
+      thread: false,
     };
     const summary = formatOptionsSummary(options);
     expect(summary).toContain("debug: on");
     expect(summary).toContain("keep: on");
+  });
+});
+
+describe("parseMentionContent - 連（スレッド）", () => {
+  it("指定なしは thread=false", () => {
+    const result = parseMentionContent(`<p>@${BOT_ACCT} [上 赤] テスト</p>`, BOT_ACCT);
+    expect(result.options.thread).toBe(false);
+  });
+
+  it("「連」で thread=true（コマンド部分は本文から除く）", () => {
+    const result = parseMentionContent(`<p>@${BOT_ACCT} [連] 続き</p>`, BOT_ACCT);
+    expect(result.options.thread).toBe(true);
+    expect(result.text).toBe("続き");
+  });
+
+  it("他のコマンドと併用できる", () => {
+    const result = parseMentionContent(`<p>@${BOT_ACCT} [下 連 青 unlisted] 続き</p>`, BOT_ACCT);
+    expect(result.options.thread).toBe(true);
+    expect(result.options.position).toBe("bottom");
+    expect(result.options.color).toBe("blue");
+    expect(result.options.visibility).toBe("unlisted");
+  });
+
+  it("本文中の「連」はコマンドにならない", () => {
+    const result = parseMentionContent(`<p>@${BOT_ACCT} 連休の写真</p>`, BOT_ACCT);
+    expect(result.options.thread).toBe(false);
+    expect(result.text).toBe("連休の写真");
+  });
+
+  it("サマリーに 連: on を出す", () => {
+    const result = parseMentionContent(`<p>@${BOT_ACCT} [連] 続き</p>`, BOT_ACCT);
+    expect(formatOptionsSummary(result.options)).toContain("連: on");
   });
 });

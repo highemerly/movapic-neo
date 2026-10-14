@@ -39,6 +39,7 @@ const SECTIONS = [
   { id: "rate-limit", title: "レート制限" },
   { id: "post-methods", title: "Webブラウザ以外の投稿方法" },
   { id: "reactions", title: "機能: リアクション" },
+  { id: "thread", title: "機能: スレッド" },
   { id: "open-on-server", title: "機能: サーバーで開く" },
   { id: "perfect-month", title: "機能: 皆勤賞" },
   { id: "calendar", title: "機能: カレンダー" },
@@ -559,6 +560,20 @@ export default async function SpecPage() {
                 カスタム絵文字の一覧をみる
                 <ChevronRight className="h-3.5 w-3.5 flex-shrink-0" />
               </Link>
+            </SpecSection>
+
+            <SpecSection id="thread">
+              <p className="text-sm text-muted-foreground">
+                自分または他の人の写真に続けて、写真をスレッドとして投稿できます。1枚目→2枚目→3枚目のように何枚でも続けられます。
+              </p>
+              <ul className="mt-4 list-disc list-inside text-sm text-muted-foreground space-y-1">
+                <li>Webでは、写真の詳細ページのメニューから「スレッドに投稿」を選びます。</li>
+                <li>Bot投稿・メール投稿では、オプション「連」を付けると、あなたの直前の投稿に続けて投稿します（続ける写真は選べません。他の人の写真には続けられません）。直前の投稿が無いとき、Bot投稿はエラーで返信し、メール投稿は通常の投稿になります。</li>
+                <li>続けた写真と続けられた写真の両方がFediverseサーバーに投稿されている場合は、Fediverse上でもスレッド（返信）としてつながります。どちらかが「このサービスのみ」の場合は、SHAMEZO上だけでつながります。</li>
+                <li>Fediverse上で続け先の投稿が見つからない場合（削除済み・連合が未反映など）は、SHAMEZO上だけでつながり、Fediverseには単独の投稿として投稿します。</li>
+                <li>他の人の写真に続けたとき、Fediverseに送る本文に相手へのメンションは付けません。そのため相手のFediverseサーバーで通知されないことがあります（SHAMEZOの通知ではお知らせします）。</li>
+                <li>続け先の写真が削除された場合、続けた写真は単独の投稿として表示されます。</li>
+              </ul>
             </SpecSection>
 
             <SpecSection id="open-on-server">

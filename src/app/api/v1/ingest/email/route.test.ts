@@ -86,6 +86,7 @@ const DEFAULT_OPTIONS = {
   visibility: "public",
   cameraOption: "none",
   locationOption: "none",
+  thread: false,
 };
 
 function parsed(over: Record<string, unknown> = {}) {
@@ -358,6 +359,15 @@ describe("POST /api/v1/ingest/email — 受付", () => {
     expect(payload.sourceStorageKey).toMatch(/^tmp\/email\//);
     // dedup キーは raw email のハッシュ＝同一メールの再転送を潰す。
     expect(dedupKey).toBe(bodyHashOf(RAW_EMAIL));
+  });
+
+  it("件名の「連」を payload に載せる（繋ぐ先は consumer の処理時点で決める）", async () => {
+    mockParseEmail.mockResolvedValue(parsed({ options: { ...DEFAULT_OPTIONS, thread: true } }) as never);
+
+    const res = await POST(req());
+
+    expect(res.status).toBe(202);
+    expect(mockEnqueue.mock.calls[0][0].options.thread).toBe(true);
   });
 
   it("S3保存に失敗したらジョブを積まない", async () => {

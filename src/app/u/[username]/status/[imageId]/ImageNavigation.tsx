@@ -1,34 +1,11 @@
 import Link from "@/components/Link";
-import { userPathSegment } from "@/lib/userHandle";
-import { getHomeServer } from "@/lib/auth/serverPolicy";
-
-interface NavImage {
-  id: string;
-  overlayText: string;
-  thumbnailKey: string | null;
-  storageKey: string;
-  user: {
-    username: string;
-    instance: {
-      domain: string;
-    };
-  };
-}
+import { navImageHref, navImageThumbnailUrl, type NavImage } from "./navImage";
 
 interface ImageNavigationProps {
   prevImage: NavImage | null;
   nextImage: NavImage | null;
   from?: string;
   publicUrl: string;
-}
-
-// サムネイルURLを取得（サムネイルがなければフルサイズ画像にフォールバック）
-function getThumbnailUrl(
-  image: NavImage,
-  publicUrl: string
-): string {
-  const key = image.thumbnailKey || image.storageKey;
-  return `${publicUrl}/${key}`;
 }
 
 export function ImageNavigation({
@@ -50,14 +27,14 @@ export function ImageNavigation({
       <div className="flex-1 min-w-0">
         {prevImage ? (
           <Link
-            href={`/u/${userPathSegment(prevImage.user.username, prevImage.user.instance.domain, getHomeServer())}/status/${prevImage.id}${queryString}`}
+            href={navImageHref(prevImage, queryString)}
             className="flex flex-col items-start gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors group"
           >
             <div className="flex items-center gap-2">
               <span className="shrink-0">←</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={getThumbnailUrl(prevImage, publicUrl)}
+                src={navImageThumbnailUrl(prevImage, publicUrl)}
                 alt=""
                 className="w-8 h-8 rounded object-cover shrink-0"
               />
@@ -75,13 +52,13 @@ export function ImageNavigation({
       <div className="flex-1 min-w-0">
         {nextImage ? (
           <Link
-            href={`/u/${userPathSegment(nextImage.user.username, nextImage.user.instance.domain, getHomeServer())}/status/${nextImage.id}${queryString}`}
+            href={navImageHref(nextImage, queryString)}
             className="flex flex-col items-end gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors group"
           >
             <div className="flex items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={getThumbnailUrl(nextImage, publicUrl)}
+                src={navImageThumbnailUrl(nextImage, publicUrl)}
                 alt=""
                 className="w-8 h-8 rounded object-cover shrink-0"
               />

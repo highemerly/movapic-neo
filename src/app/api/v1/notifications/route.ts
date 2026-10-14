@@ -35,14 +35,11 @@ export async function GET(request: NextRequest) {
   const items = await getRecentNotifications(userId, limit);
 
   return NextResponse.json({
+    // フィールドを列挙せず丸ごと渡す: 列挙すると新しいフィールドの入れ忘れでベルにだけ無言で欠落する
+    // （makeup がこれで落ちていた）。Date だけクライアント型（NotificationItem）に合わせて文字列化する。
     notifications: items.map((n) => ({
-      id: n.id,
-      type: n.type,
-      achievementKey: n.achievementKey,
+      ...n,
       createdAt: n.createdAt.toISOString(),
-      image: n.image,
-      favorite: n.favorite,
-      recipientUsername: n.recipientUsername,
     })),
   });
 }

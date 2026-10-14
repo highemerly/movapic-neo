@@ -47,6 +47,11 @@ import { userPathSegment } from "@/lib/userHandle";
 import { getHomeServer } from "@/lib/auth/serverPolicy";
 import type { PostFacts } from "@/lib/achievements/catalog";
 import type { ExifDetails } from "@/lib/exif/details";
+import {
+  resolveFediverseReplyTarget,
+  type ReplyLink,
+} from "@/lib/replies/fediverseTarget";
+import { createReplyNotification } from "@/lib/notifications/replyNotifications";
 
 // PublishVisibility は @/lib/visibility に集約。後方互換のため再エクスポートする。
 export type { PublishVisibility } from "@/lib/visibility";
@@ -90,6 +95,12 @@ export interface PublishImageInput {
   };
   source: "web" | "email" | "mention";
   visibility: PublishVisibility;
+  /**
+   * リプライ（スレッド）先の画像ID。null/undefined=単独投稿。呼び出し側で可視性を検証済みであること
+   * （web=findReplyableImage / 「連」=findLatestOwnImageId）。ミュートでは拒否しない。
+   * 親も Fediverse に投稿されていれば、Fediverse 上でもスレッドに繋ぐ。docs/reply.md。
+   */
+  replyToImageId?: string | null;
   /**
    * 投稿失敗時にも画像をDB保存するか。
    * - web/email: true（投稿が失敗してもサービス内には保存する）
@@ -136,6 +147,11 @@ export interface PublishImageResult {
   postErrorStatus?: number;
   /** この投稿で新規獲得した実績（web投稿の演出用。保存された場合のみ） */
   newAchievements?: GrantedAchievement[];
+  /**
+   * Fediverse への投稿は成功したが、リプライ先に繋げられず単独投稿になった（SHAMEZO 内では繋がっている）。
+   * 親が local（そもそも連合していない）の場合は仕様どおりなので false。
+   */
+  threadBroken?: boolean;
 }
 
 /** 保存された投稿から実績評価用の PostFacts を作る。 */
@@ -154,6 +170,52 @@ function toPostFacts(input: PublishImageInput): PostFacts {
     visibility: input.visibility,
     createdAt: new Date(),
   };
+}
+
+/**
+ * リプライ通知を作る。保存・連合が済んだ後に例外を返すと、web はクライアントの再送・mention は
+ * ジョブのリトライで二重投稿になるため、投稿処理を止めないようここで例外を握る。
+ */
+async function notifyReplySafely(
+  input: PublishImageInput,
+  imageId: string,
+  replyToId: string | null
+): Promise<void> {
+  if (!replyToId) return;
+  try {
+    await createReplyNotification({
+      replyImageId: imageId,
+      replierUserId: input.user.id,
+      parentImageId: replyToId,
+    });
+  } catch (error) {
+    console.error("Reply notification failed:", error);
+  }
+}
+
+/**
+ * 保存が確定した後の処理。publishImage の2分岐（先保存／先投稿）の両方から呼ぶ。
+ * 後処理を分岐ごとに書くと片方だけ漏れる（ALT で実際に起きた）ため、ここ1箇所に足すこと。
+ */
+async function afterSaved(
+  input: PublishImageInput,
+  imageId: string,
+  replyToId: string | null
+): Promise<GrantedAchievement[]> {
+  const newAchievements = await evaluateAchievementsSafely(input, imageId);
+  await notifyReplySafely(input, imageId, replyToId);
+  return newAchievements;
+}
+
+/**
+ * Fediverse 上でスレッドに繋げられなかったことを、利用者に知らせるべきか。
+ * 親が連合していない（local・投稿失敗）／親が既に無いのは仕様どおり（表示しない）なので含めない。
+ * 原因（返信先の削除・見つからない）は利用者には区別して見せず、logReply のログで追う。
+ */
+function isThreadBroken(link: ReplyLink | null, post: PostResult | null): boolean {
+  if (!link || !post?.success) return false;
+  if (post.replyDropped) return true;
+  return link.kind === "shamezo-only" && (link.reason === "unresolved" || link.reason === "resolve-failed");
 }
 
 /**
@@ -200,6 +262,8 @@ interface PostImageInput {
   visibility: PublishVisibility;
   /** 画像の代替テキスト（ALT）。未設定なら送らない。 */
   altText?: string | null;
+  /** リプライ先の status / note ID（投稿者自身のインスタンス上）。未設定なら単独投稿。 */
+  replyToPostId?: string | null;
 }
 
 /** 5xx/429 再試行前の軽いバックオフ */
@@ -218,40 +282,31 @@ async function postImageOnce(input: PostImageInput): Promise<PostResult> {
     imagePageUrl,
     visibility,
     altText,
+    replyToPostId,
   } = input;
 
   // 空文字/空白のみは未設定として扱う（description/comment を送らない）
   const alt = altText?.trim() || undefined;
 
+  const common = {
+    server: user.instance.domain,
+    accessToken: user.accessToken,
+    imageBuffer: buffer,
+    mimeType: contentType,
+    filename,
+    statusText: text,
+    imageUrl: imagePageUrl,
+    altText: alt,
+    replyToId: replyToPostId,
+  };
+
   if (user.instance.type === "mastodon") {
-    const v = toMastodonVisibility(visibility);
-    return postToMastodon(
-      user.instance.domain,
-      user.accessToken,
-      buffer,
-      contentType,
-      filename,
-      text,
-      imagePageUrl,
-      v,
-      alt
-    );
+    return postToMastodon({ ...common, visibility: toMastodonVisibility(visibility) });
   }
 
   if (user.instance.type === "misskey") {
     // Misskey では unlisted が home に相当
-    const v = toMisskeyVisibility(visibility);
-    return postToMisskey(
-      user.instance.domain,
-      user.accessToken,
-      buffer,
-      contentType,
-      filename,
-      text,
-      imagePageUrl,
-      v,
-      alt
-    );
+    return postToMisskey({ ...common, visibility: toMisskeyVisibility(visibility) });
   }
 
   return { success: false, error: "サポートされていないプラットフォームです" };
@@ -362,9 +417,9 @@ function buildImagePageUrl(username: string, domain: string, imageId: string): s
 async function storeAndRecord(
   input: PublishImageInput,
   imageId: string,
-  postUrl?: string,
-  postId?: string
+  record: { postUrl?: string; postId?: string; replyToId: string | null }
 ): Promise<{ imagePageUrl: string; storageKey: string }> {
+  const { postUrl, postId, replyToId } = record;
   const extension = getExtensionFromMimeType(input.contentType);
   const storageKey = generateStorageKey(imageId, extension);
   const filename = `movapic-${imageId}.${extension}`;
@@ -414,6 +469,7 @@ async function storeAndRecord(
         undefined,
       locationPrefecture: input.extras?.locationPrefecture ?? null,
       locationCity: input.extras?.locationCity ?? null,
+      replyToId,
     },
   });
 
@@ -442,19 +498,53 @@ export async function publishImage(
 
   const isLocal = input.visibility === "local";
 
+  // 投稿入力は両分岐で共通。分岐ごとに組むと片方だけ項目が漏れる（ALT で実際に起きた）ため1回だけ組む。
+  const basePost: PostImageInput = {
+    user: input.user,
+    buffer: input.buffer,
+    contentType: input.contentType,
+    filename,
+    text: input.text,
+    imagePageUrl,
+    visibility: input.visibility,
+    altText: input.altText,
+  };
+
+  // リプライ先を投稿者のサーバー上の ID に解決する。local は連合しないので解決しない。
+  const replyToImageId = input.replyToImageId ?? null;
+  const resolveReply = async (): Promise<ReplyLink | null> =>
+    replyToImageId && !isLocal
+      ? resolveFediverseReplyTarget({
+          replyToImageId,
+          viewer: {
+            domain: input.user.instance.domain,
+            type: input.user.instance.type,
+            accessToken: input.user.accessToken,
+          },
+        })
+      : null;
+  const replyToPostIdOf = (link: ReplyLink | null) =>
+    link?.kind === "linked" ? link.postId : null;
+  const logReply = (link: ReplyLink | null, post: PostResult | null) => {
+    if (!isThreadBroken(link, post)) return;
+    console.warn(
+      `[reply] posted without thread: image=${imageId} parent=${replyToImageId} ` +
+        `server=${input.user.instance.domain} link=${JSON.stringify(link)} replyDropped=${!!post?.replyDropped}`
+    );
+  };
+
   if (input.persistOnPostFailure || isLocal) {
-    // 先に保存（投稿失敗でも画像を残すポリシー、または local で投稿しない）
-    const { storageKey } = await storeAndRecord(input, imageId);
+    // 先に保存（投稿失敗でも画像を残すポリシー、または local で投稿しない）。
+    // リプライ先の解決（最大 REPLY_RESOLVE_TIMEOUT_MS）は保存と並行させ、同期 /api/v1/post の
+    // 応答時間（Ingress の504）に上乗せしない。解決は throw しないので保存の例外伝播は変わらない。
+    const [{ storageKey }, replyLink] = await Promise.all([
+      storeAndRecord(input, imageId, { replyToId: replyToImageId }),
+      resolveReply(),
+    ]);
 
     const postResult = await postImageToFediverse({
-      user: input.user,
-      buffer: input.buffer,
-      contentType: input.contentType,
-      filename,
-      text: input.text,
-      imagePageUrl,
-      visibility: input.visibility,
-      altText: input.altText,
+      ...basePost,
+      replyToPostId: replyToPostIdOf(replyLink),
     });
 
     if (postResult?.success && postResult.postUrl) {
@@ -463,9 +553,10 @@ export async function publishImage(
         data: { postUrl: postResult.postUrl, postId: postResult.postId },
       });
     }
+    logReply(replyLink, postResult);
 
     // 画像は保存済み（投稿失敗でも残るポリシー）なので実績評価する
-    const newAchievements = await evaluateAchievementsSafely(input, imageId);
+    const newAchievements = await afterSaved(input, imageId, replyToImageId);
 
     return {
       imageId,
@@ -477,19 +568,15 @@ export async function publishImage(
       postErrorStatus:
         postResult && !postResult.success ? postResult.statusCode : undefined,
       newAchievements,
+      threadBroken: isThreadBroken(replyLink, postResult),
     };
   }
 
   // persistOnPostFailure=false かつ 非local: 投稿が成功したときだけ保存する
+  const replyLink = await resolveReply();
   const postResult = await postImageToFediverse({
-    user: input.user,
-    buffer: input.buffer,
-    contentType: input.contentType,
-    filename,
-    text: input.text,
-    imagePageUrl,
-    visibility: input.visibility,
-    altText: input.altText,
+    ...basePost,
+    replyToPostId: replyToPostIdOf(replyLink),
   });
 
   if (!postResult || !postResult.success) {
@@ -498,16 +585,19 @@ export async function publishImage(
       postErrorStatus: postResult?.statusCode,
     };
   }
+  logReply(replyLink, postResult);
 
-  const { storageKey } = await storeAndRecord(
-    input,
-    imageId,
-    postResult.postUrl,
-    postResult.postId
-  );
+  // 解決の時点で親が既に無いなら、存在しない ID を保存しない（FK 違反になる。DB の SET NULL と同じ結果にする）。
+  const replyToId =
+    replyLink?.kind === "shamezo-only" && replyLink.reason === "parent-gone" ? null : replyToImageId;
+  const { storageKey } = await storeAndRecord(input, imageId, {
+    postUrl: postResult.postUrl,
+    postId: postResult.postId,
+    replyToId,
+  });
 
   // 投稿成功時のみ保存されるので、ここで実績評価する
-  const newAchievements = await evaluateAchievementsSafely(input, imageId);
+  const newAchievements = await afterSaved(input, imageId, replyToId);
 
   return {
     imageId,
@@ -516,5 +606,6 @@ export async function publishImage(
     postUrl: postResult.postUrl,
     postId: postResult.postId,
     newAchievements,
+    threadBroken: isThreadBroken(replyLink, postResult),
   };
 }

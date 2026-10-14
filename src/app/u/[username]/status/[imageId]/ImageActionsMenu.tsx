@@ -21,6 +21,7 @@ import {
   VolumeX,
   Send,
   SmilePlus,
+  MessageSquarePlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -72,6 +73,7 @@ import { useReactionActions } from "@/components/reaction/useReactionActions";
 import type { ReactionSnapshot } from "@/components/reaction/reactionSync";
 import type { ReactionUser } from "@/lib/reactions/types";
 import { PrefectureScrollLink } from "@/components/ScrollIntoViewOnSelect";
+import Link from "@/components/Link";
 
 /**
  * メニューに「リアクションを付ける／変更する」を出すための一式。
@@ -119,6 +121,11 @@ interface ImageActionsMenuProps {
   canMute: boolean;
   /** 閲覧者が投稿者を既にミュート中か（文言・解除導線の出し分け）。 */
   isMuted: boolean;
+  /**
+   * 「スレッドに投稿」（この写真へのリプライ）を出すか。要ログイン（自分・他人の写真どちらにも出す）。
+   * canMute 等と違いログイン有無を呼び出し側で必ず見ること（未ログインでは投稿できない）。
+   */
+  canThread: boolean;
   /** トリガー（ミートボール）に足すクラス（非ログイン時に狭い画面のみ表示する等） */
   triggerClassName?: string;
   /**
@@ -202,7 +209,7 @@ function InteractIcons() {
  * 画像詳細ページの「その他」操作メニュー（ミートボール）。誰にでも表示する。
  * 先頭に「リアクションを付ける／変更する」（reaction を渡したインスタンスのみ＝モバイルの
  * フローティングバー）を置き、区切り線のあとに以下の3グループを並べる:
- *   1. 閲覧・共有系（コメント設定/EXIF/各サーバーで開く/リンク投稿/共有）— 誰でも
+ *   1. 閲覧・共有系（スレッドに投稿※要ログイン/コメント設定/EXIF/各サーバーで開く/リンク投稿/共有）— 誰でも
  *   2. 対他者（ミュート/通報）— ログイン済み かつ 非オーナー
  *   3. オーナー操作（再投稿/サムネ/位置削除/ピン/削除）— オーナーのみ
  * 2と3は互いに排他（!isOwner / isOwner）なので区切り線は1本で足りる。
@@ -220,6 +227,7 @@ export function ImageActionsMenu({
   canReport,
   canMute,
   isMuted,
+  canThread,
   triggerClassName,
   triggerVariant = "boxed",
   nativeShare,
@@ -535,6 +543,15 @@ export function ImageActionsMenu({
         )}
 
         {/* --- グループ1: 閲覧・共有系（誰でも） --- */}
+        {/* この写真へのリプライ。投稿ページへ遷移してリプライ先付きで投稿する（docs/reply.md）。 */}
+        {canThread && (
+          <DropdownMenuItem asChild>
+            <Link href={`/create?replyTo=${encodeURIComponent(imageId)}`}>
+              <MessageSquarePlus className="mr-2 h-4 w-4" />
+              スレッドに投稿
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem
           onSelect={() => {
             // preventDefault しない＝選択でミートボールを閉じ、モーダルだけを開く。

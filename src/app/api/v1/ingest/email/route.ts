@@ -190,6 +190,7 @@ export async function POST(request: NextRequest) {
         visibility: parsed.options.visibility,
         cameraOption: parsed.options.cameraOption,
         locationOption: parsed.options.locationOption,
+        thread: parsed.options.thread,
       },
       sourceStorageKey,
       sourceContentType: parsed.image.contentType,

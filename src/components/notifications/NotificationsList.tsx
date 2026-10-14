@@ -15,17 +15,24 @@ import {
   makeupNotificationIcon,
   makeupNotificationText,
 } from "@/lib/makeup/notificationTypes";
+import {
+  REPLY_NOTIFICATION_TYPE,
+  replyNotificationTitle,
+  replyNotificationWho,
+} from "@/lib/notifications/replyNotificationType";
 
-type Category = "favorite" | "achievement" | "other";
+type Category = "favorite" | "reply" | "achievement" | "other";
 
 const CATEGORIES: { key: Category; label: string }[] = [
   { key: "favorite", label: "リアクション" },
+  { key: "reply", label: "スレッド" },
   { key: "achievement", label: "実績" },
   { key: "other", label: "その他" },
 ];
 
 function categoryOf(n: NotificationFeedItem): Category {
   if (n.type === "favorite") return "favorite";
+  if (n.type === REPLY_NOTIFICATION_TYPE) return "reply";
   // 穴埋め系は achievementKey（対象月 perfect-month:YYYY-MM）を持つので、下の実績判定より先に振り分ける。
   if (isMakeupNotificationType(n.type)) return "other";
   // achievementKey を持つ実績通知。それ以外は「その他」に寄せる。
@@ -91,12 +98,13 @@ export function NotificationsList({
             const makeupType = isMakeupNotificationType(n.type) ? n.type : null;
             const isReminder = makeupType !== null;
             const isFavorite = n.type === "favorite";
+            const isReply = n.type === REPLY_NOTIFICATION_TYPE;
             // 直近のリアクション（絵文字が無い旧通知は既定のアイコンで出す）
             const latestFavoriter = n.favorite?.favoriters[0];
             const latestReaction = latestFavoriter?.emoji
               ? { emoji: latestFavoriter.emoji, imageUrl: latestFavoriter.emojiImageUrl }
               : null;
-            const a = !isReminder && !isFavorite && n.achievementKey ? resolveAchievement(n.achievementKey) : null;
+            const a = !isReminder && !isFavorite && !isReply && n.achievementKey ? resolveAchievement(n.achievementKey) : null;
             const href = makeupType
               ? makeupNotificationHref(selfSeg, n.makeup?.ym ?? null)
               : n.image?.pageUrl ?? `/u/${selfSeg}/achievements`;
@@ -139,6 +147,8 @@ export function NotificationsList({
                           )}
                           リアクションされました
                         </span>
+                      ) : isReply ? (
+                        <>💬 {replyNotificationTitle()}</>
                       ) : makeupType ? (
                         makeupNotificationText(makeupType, n.makeup?.ym ?? null, n.makeup?.point ?? null)
                       ) : (
@@ -148,7 +158,9 @@ export function NotificationsList({
                     <p className="mt-1 text-xs leading-snug text-muted-foreground line-clamp-2">
                       {isFavorite
                         ? favoriteNotificationWho(n.favorite)
-                        : makeupType
+                        : isReply
+                          ? replyNotificationWho(n.reply)
+                          : makeupType
                           ? makeupNotificationDetail(makeupType)
                           : a?.description ?? ""}
                     </p>

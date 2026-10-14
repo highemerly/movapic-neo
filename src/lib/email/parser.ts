@@ -13,6 +13,7 @@ import {
   FONT_MAP,
   ARRANGEMENT_MAP,
   VISIBILITY_MAP,
+  THREAD_KEYWORD,
   decodeHtmlEntities,
 } from "@/lib/options/maps";
 import { getActiveSeason } from "@/lib/seasons/catalog";
@@ -39,10 +40,12 @@ export interface ParsedEmailOptions {
   seasonRequested: boolean;
   /** 公開範囲（件名コマンドは公開/非収載のみ。localはユーザー設定からのみ） */
   visibility: Visibility;
-  /** カメラ機種を保存するか（件名コマンド「機種」「機種なし」で上書き可） */
+  /** カメラ機種を保存するか（件名コマンド「カメラ」「カメラ詳細」「カメラなし」で上書き可） */
   cameraOption: EmailCameraOption;
   /** 件名コマンド「都道府県」「市町村」で指定。指定なしは none */
   locationOption: EmailLocationOption;
+  /** 件名コマンド「連」: 投稿者本人の直近の投稿へのリプライとして投稿する */
+  thread: boolean;
 }
 
 /** ユーザーがWebで保存した初期設定（null=未設定→ハードコードのデフォルトを使う） */
@@ -97,6 +100,7 @@ const FALLBACK_OPTIONS: ParsedEmailOptions = {
   visibility: "public",
   cameraOption: "none",
   locationOption: "none",
+  thread: false,
 };
 
 /**
@@ -117,6 +121,8 @@ function buildDefaultOptions(userDefaults?: EmailUserDefaults): ParsedEmailOptio
     visibility: (userDefaults?.visibility as Visibility) || FALLBACK_OPTIONS.visibility,
     cameraOption: (userDefaults?.cameraOption as EmailCameraOption) || FALLBACK_OPTIONS.cameraOption,
     locationOption: "none",
+    // 「連」はユーザー設定に持たせない（投稿ごとの指定）。
+    thread: false,
   };
 }
 
@@ -148,6 +154,8 @@ function parseSubjectOptions(
       options.cameraOption = CAMERA_MAP[token];
     } else if (LOCATION_MAP[token]) {
       options.locationOption = LOCATION_MAP[token];
+    } else if (token === THREAD_KEYWORD) {
+      options.thread = true;
     } else if (token === SEASON_KEYWORD) {
       // シーズン（期間限定）: 受信時刻でアクティブなシーズンに解決。
       // 期間外なら season=null のまま（producer がエラーにする）。他オプションは無視される。

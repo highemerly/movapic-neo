@@ -37,6 +37,7 @@ describe("parseEmail - 件名オプション解析", () => {
       visibility: "public",
       cameraOption: "none",
       locationOption: "none",
+      thread: false,
     });
   });
 
@@ -98,7 +99,22 @@ describe("parseEmail - 件名オプション解析", () => {
       visibility: "public",
       cameraOption: "none",
       locationOption: "none",
+      thread: false,
     });
+  });
+
+  it("「連」で thread=true（他のコマンドと併用可）", async () => {
+    mockSimpleParser.mockResolvedValueOnce(makeMailMock({ subject: "下 連 赤" }) as never);
+    const result = await parseEmail(Buffer.from(""));
+    expect(result.options.thread).toBe(true);
+    expect(result.options.position).toBe("bottom");
+    expect(result.options.color).toBe("red");
+  });
+
+  it("「連」を含むだけの語（連休など）はコマンドにならない", async () => {
+    mockSimpleParser.mockResolvedValueOnce(makeMailMock({ subject: "連休" }) as never);
+    const result = await parseEmail(Buffer.from(""));
+    expect(result.options.thread).toBe(false);
   });
 
   it("不明なトークンは無視する", async () => {

@@ -6,9 +6,12 @@ import { buildOgImage } from "@/lib/ogImage";
 import prisma from "@/lib/db";
 import { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/session";
-import { getMutedAuthorKeys, isMutedByViewer } from "@/lib/mutes";
+import { getActiveMutedUserIds, getMutedAuthorKeys } from "@/lib/mutes";
 import { DeleteLocationButton } from "./DeleteLocationButton";
 import { ImageNavigation } from "./ImageNavigation";
+import { ThreadParent, THREAD_REPLIES_LIMIT, threadParentSelect } from "./ThreadLinks";
+import { ThreadRepliesMeta } from "./ThreadRepliesMeta";
+import { navImageHref, navImageSelect, navImageThumbnailUrl } from "./navImage";
 import { FontLicenseBadge } from "./FontLicenseBadge";
 import { hasEmoji, hasNonEmojiText } from "@/lib/text/grapheme";
 import { ImageActionsMenu, type ReactionMenuData } from "./ImageActionsMenu";
@@ -156,13 +159,15 @@ interface PageProps {
     posted?: string;
     federr?: string;
     fedstatus?: string;
+    /** "0" = スレッドに投稿したが連携サーバー上では繋がらなかった（投稿直後のみ） */
+    thread?: string;
     zoom?: string;
   }>;
 }
 
 export default async function ImageDetailPage({ params, searchParams }: PageProps) {
   const { username, imageId } = await params;
-  const { from, posted, federr, fedstatus, zoom } = await searchParams;
+  const { from, posted, federr, fedstatus, thread, zoom } = await searchParams;
   // from は遷移元タブを表す。カレンダー/地図からの遷移では "種別:状態" 形式で
   // 元の月・都道府県を載せ、戻る導線で復元する（例 "user-calendar:2026-5" / "user-map:東京都"）。
   // 最初の ":" のみで分割（都道府県名に ":" は含まれない）。
@@ -181,6 +186,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   const fediverseFailed = justPosted && federr === "1";
   // サーバーが返した HTTP ステータスコード（タイムアウト等では付かない）
   const fediverseErrorStatus = fedstatus ? Number(fedstatus) : undefined;
+  const threadBroken = justPosted && thread === "0";
 
   // ログインユーザーを取得
   const currentUser = await getCurrentUser();
@@ -289,18 +295,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   // 前後の画像を取得
   // 公開TLからの場合: 全ユーザーの公開画像を対象
   // ユーザーギャラリーからの場合: 同じユーザーの公開画像のみ
-  const navigationSelect = {
-    id: true,
-    overlayText: true,
-    thumbnailKey: true,
-    storageKey: true,
-    user: {
-      select: {
-        username: true,
-        instance: { select: { domain: true } },
-      },
-    },
-  };
+  const navigationSelect = navImageSelect;
 
   // 前後ナビの対象範囲を遷移元で切り替える。
   // - 公開（みんな/同じサーバー）: 全体、または該当サーバーに限定
@@ -330,7 +325,24 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     navigationScope = { userId: image.userId };
   }
 
-  const [prevImage, nextImage, earnedAchievementRows] = await Promise.all([
+  // 閲覧者がミュートしている投稿者。スレッドのリプライ先/リプライから除き（muter の視界からだけ隠す。
+  // ミュートされた側の書き込みは拒否しない＝バレない）、メニューの文言出し分けにも使う。
+  const mutedUserIds = currentUser ? await getActiveMutedUserIds(currentUser.id) : [];
+  // スレッドは見えるものだけ引く。削除は SET NULL・取り下げ/ミュートはここで落とす＝痕跡を出さない。
+  const threadVisibleWhere: Prisma.ImageWhereInput = {
+    isPublic: true,
+    isDisabled: false,
+    ...(mutedUserIds.length > 0 ? { userId: { notIn: mutedUserIds } } : {}),
+  };
+
+  const [
+    prevImage,
+    nextImage,
+    earnedAchievementRows,
+    threadParent,
+    threadReplyRows,
+    threadReplyCount,
+  ] = await Promise.all([
     // 前の画像（古い方向）
     prisma.image.findFirst({
       where: {
@@ -359,19 +371,42 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
       orderBy: { grantedAt: "asc" },
       select: { key: true, category: true },
     }),
+    // スレッド: リプライ先（直接の1件だけ）
+    image.replyToId
+      ? prisma.image.findFirst({
+          where: { id: image.replyToId, ...threadVisibleWhere },
+          select: threadParentSelect,
+        })
+      : Promise.resolve(null),
+    // スレッド: この写真への直接のリプライ（古い順・上限まで）。「ほかにもある」は件数と比べて判定する。
+    prisma.image.findMany({
+      where: { replyToId: image.id, ...threadVisibleWhere },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: THREAD_REPLIES_LIMIT,
+      select: navImageSelect,
+    }),
+    // メタ行の「リプライ N件」。一覧（上限あり）と同じ条件で数える＝閲覧者のミュート相手は数えない。
+    prisma.image.count({ where: { replyToId: image.id, ...threadVisibleWhere } }),
   ]);
+  const publicUrl = (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
+  // ダイアログはクライアント部品なので、URL（HOME_SERVER・S3 の公開URL＝env 由来）はここで解決して渡す。
+  const threadReplies = threadReplyRows.map((r) => ({
+    id: r.id,
+    href: navImageHref(r),
+    thumbnailUrl: navImageThumbnailUrl(r, publicUrl),
+  }));
+  const hasMoreThreadReplies = threadReplyCount > threadReplies.length;
 
   const earnedAchievements = earnedAchievementRows.map((a) =>
     resolveAchievement(a.key, a.category)
   );
 
-  const publicUrl = (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
   const imageUrl = `${publicUrl}/${image.storageKey}`;
 
   // 自分の画像かどうか
   const isOwner = currentUser?.id === image.userId;
   // 閲覧者が投稿者を既にミュート中か（メニューの文言・解除導線の出し分け用）
-  const isMutingAuthor = await isMutedByViewer(currentUser?.id, image.userId);
+  const isMutingAuthor = mutedUserIds.includes(image.userId);
 
   // PWAおすすめモーダルの前提: 投稿直後の本人で、かつ2投稿目以降（初投稿では出さない）。
   // 件数は要らないので findFirst の存在確認だけにする（count より軽い）。posted=1 のときしか引かない。
@@ -518,6 +553,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
       canReport={!isOwner}
       canMute={!isOwner}
       isMuted={isMutingAuthor}
+      canThread={!!currentUser}
       exif={exif}
       postUrl={image.postUrl}
       viewerServerName={currentUser?.instance.domain ?? ""}
@@ -560,8 +596,9 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             fediversePosted: !!image.postId,
             serverDomain: image.user.instance.domain,
             statusCode: fediverseErrorStatus,
+            threadBroken,
           })}
-          clearParams={["posted", "federr", "fedstatus"]}
+          clearParams={["posted", "federr", "fedstatus", "thread"]}
         />
       )}
       {justPosted && (
@@ -578,6 +615,17 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
         >
           {backLabel}
         </BackLink>
+
+        {/* スレッドのリプライ先（直接の1件）。画像の直上に控えめに置く */}
+        <ThreadParent
+          parent={threadParent}
+          publicUrl={publicUrl}
+          sameAuthor={
+            !!threadParent &&
+            threadParent.user.username === image.user.username &&
+            threadParent.user.instance.domain === image.user.instance.domain
+          }
+        />
 
         {/* 画像。ALTがある場合は右下に「ALT」バッジを重ね、押すと画像下にALTテキストを展開。
             アスペクト比で幅から高さが決まる（RetryImage の aspectRatio）ため、縦長画像だと
@@ -599,6 +647,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             initialOpen={zoom === "1"}
           />
         </div>
+
 
         {/* テキスト */}
         <div className="mb-2">
@@ -702,6 +751,12 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               text={image.overlayText}
             />
           ) : null}
+          {/* この写真への直接のリプライ（件数のみ。押すと写真の一覧ダイアログ） */}
+          <ThreadRepliesMeta
+            count={threadReplyCount}
+            replies={threadReplies}
+            hasMore={hasMoreThreadReplies}
+          />
         </div>
 
         {/* 投稿者情報と、その右の「その他」カード（PCのみ）。items-stretch で2枚の高さを揃える

@@ -1,5 +1,6 @@
 import type { FlashToast } from "@/components/ToastFlasher";
 import { failureAdvice } from "@/lib/fediverse/failureAdvice";
+import { threadBrokenMessage } from "@/lib/replies/threadBroken";
 
 // 原因の推定はステータスコードから共通に決まる（@/lib/fediverse/failureAdvice）。
 // Web 固有なのは対処の導線だけ：再投稿はこのページの「⋯（その他）」メニュー内にある（ImageActionsMenu）。
@@ -19,20 +20,29 @@ export function buildPostFlash({
   fediversePosted,
   serverDomain,
   statusCode,
+  threadBroken = false,
 }: {
   fediverseFailed: boolean;
   /** 成功時、連携サーバーへ投稿したか（local=false なら汎用文言）。 */
   fediversePosted: boolean;
   serverDomain: string;
   statusCode?: number;
+  /** スレッドに投稿したが、連携サーバー上ではリプライ先に繋げられなかった（docs/reply.md）。 */
+  threadBroken?: boolean;
 }): FlashToast {
   if (!fediverseFailed) {
-    return {
-      variant: "success",
-      message: fediversePosted
-        ? `${serverDomain} への投稿が完了しました`
-        : "投稿が完了しました",
-    };
+    const message = fediversePosted
+      ? `${serverDomain} への投稿が完了しました`
+      : "投稿が完了しました";
+    if (threadBroken && fediversePosted) {
+      // 投稿自体は成功しているので success のまま、繋がらなかったことだけ補足する（黙らない）。
+      return {
+        variant: "success",
+        message,
+        description: threadBrokenMessage(serverDomain),
+      };
+    }
+    return { variant: "success", message };
   }
 
   const response = statusCode !== undefined ? `${statusCode}` : "応答なし";

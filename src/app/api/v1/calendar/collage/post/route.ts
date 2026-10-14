@@ -133,30 +133,30 @@ export async function POST(request: NextRequest) {
     // 5xx のときだけ1回再試行。
     const postOnce = (): Promise<PostResult | null> => {
       if (user.instance.type === "mastodon") {
-        return postToMastodon(
-          domain,
-          token,
-          buffer,
-          contentType,
+        return postToMastodon({
+          server: domain,
+          accessToken: token,
+          imageBuffer: buffer,
+          mimeType: contentType,
           filename,
-          caption,
-          calendarUrl,
-          toMastodon(visibility),
-          altText
-        );
+          statusText: caption,
+          imageUrl: calendarUrl,
+          visibility: toMastodon(visibility),
+          altText,
+        });
       }
       if (user.instance.type === "misskey") {
-        return postToMisskey(
-          domain,
-          token,
-          buffer,
-          contentType,
+        return postToMisskey({
+          server: domain,
+          accessToken: token,
+          imageBuffer: buffer,
+          mimeType: contentType,
           filename,
-          caption,
-          calendarUrl,
-          toMisskey(visibility),
-          altText
-        );
+          statusText: caption,
+          imageUrl: calendarUrl,
+          visibility: toMisskey(visibility),
+          altText,
+        });
       }
       return Promise.resolve({
         success: false,

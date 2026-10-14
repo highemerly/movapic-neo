@@ -235,7 +235,7 @@ model Image {
   // （タイル表示のフォーカス位置・拡大率を実際の描画に一致させるため）。実績側は
   // season:null フィルタで別途隔離する。レジストリは src/lib/seasons/catalog.ts。
   season              String?   @db.VarChar(40)
-  source              String    @default("web") @db.VarChar(20) // "web" | "email"
+  source              String    @default("web") @db.VarChar(20) // "web" | "email" | "mention"
   thumbnailKey        String?   @map("thumbnail_key") @db.VarChar(500)
   // 一覧のBlurプレースホルダ用 LQIP。原本を32pxに縮小したWebPの data URI
   // （data:image/webp;base64,...）。原本AVIF読み込み中にこれを即描画してぼかし表示する
@@ -284,9 +284,14 @@ model Image {
   exifDetails         Json?     @map("exif_details")
   locationPrefecture  String?   @map("location_prefecture") @db.VarChar(50)
   locationCity        String?   @map("location_city") @db.VarChar(100)
+  // リプライ（スレッド）先の画像。null=単独投稿。親が削除されたら SET NULL で痕跡なく単独投稿に戻す
+  // （仕様: 削除されたリプライ先は何も表示しない）。仕様の全体は docs/reply.md。
+  replyToId           String?   @map("reply_to_id")
   createdAt           DateTime  @default(now()) @map("created_at")
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replyTo       Image?         @relation("ImageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies       Image[]        @relation("ImageReplies")
   achievements  Achievement[]
   notifications Notification[]
   reports       Report[]
@@ -294,6 +299,7 @@ model Image {
 
   @@index([userId, createdAt])
   @@index([isPublic, createdAt])
+  @@index([replyToId])
   @@map("images")
 }
 

@@ -9,6 +9,7 @@ vi.mock("@/lib/compute/client", () => ({ finalizeImage: vi.fn() }));
 vi.mock("@/lib/publish/publishImage", () => ({ publishImage: vi.fn() }));
 vi.mock("@/lib/geocode/gsi", () => ({ reverseGeocode: vi.fn() }));
 vi.mock("@/lib/locations", () => ({ userHasPostedLocation: vi.fn() }));
+vi.mock("@/lib/replies/target", () => ({ findReplyableImage: vi.fn() }));
 
 import { POST } from "./route";
 import { getCurrentUserWithValidation } from "@/lib/auth/session";
@@ -16,6 +17,7 @@ import { checkPostRateLimit } from "@/lib/postRateLimit";
 import { finalizeImage } from "@/lib/compute/client";
 import { publishImage } from "@/lib/publish/publishImage";
 import { reverseGeocode } from "@/lib/geocode/gsi";
+import { findReplyableImage } from "@/lib/replies/target";
 import { MAX_FILE_SIZE, MAX_TEXT_LENGTH } from "@/types";
 
 const mockAuth = vi.mocked(getCurrentUserWithValidation);
@@ -23,6 +25,7 @@ const mockRateLimit = vi.mocked(checkPostRateLimit);
 const mockFinalize = vi.mocked(finalizeImage);
 const mockPublish = vi.mocked(publishImage);
 const mockGeocode = vi.mocked(reverseGeocode);
+const mockFindReplyable = vi.mocked(findReplyableImage);
 
 type SessionUser = Awaited<ReturnType<typeof getCurrentUserWithValidation>>;
 const USER = {
@@ -69,6 +72,7 @@ beforeEach(() => {
   mockFinalize.mockReset();
   mockPublish.mockReset();
   mockGeocode.mockReset();
+  mockFindReplyable.mockReset();
   // 既定: 認証OK・レート制限OK・finalize成功・publish成功
   mockAuth.mockResolvedValue(USER);
   mockRateLimit.mockResolvedValue({ allowed: true });
@@ -267,5 +271,57 @@ describe("POST /api/v1/post: カメラ撮影情報（cameraOption）", () => {
     const extras = mockPublish.mock.calls[0][0].extras;
     expect(extras?.cameraModel).toBeNull();
     expect(extras?.exifDetails).toBeNull();
+  });
+});
+
+describe("POST /api/v1/post: スレッドに投稿（replyTo）", () => {
+  const PARENT = {
+    id: "parent-1",
+    userId: "u2",
+    overlayText: "親",
+    thumbnailKey: null,
+    storageKey: "k",
+    user: { username: "bob", instance: { domain: "misskey.example" } },
+  };
+
+  it("見えるリプライ先なら publish に replyToImageId を渡す", async () => {
+    mockFindReplyable.mockResolvedValue(PARENT);
+    const res = await POST(makeReq({ replyTo: "parent-1" }));
+    expect(res.status).toBe(200);
+    expect(mockFindReplyable).toHaveBeenCalledWith("parent-1");
+    expect(mockPublish.mock.calls[0][0].replyToImageId).toBe("parent-1");
+  });
+
+  it("見つからない（削除・取り下げ）リプライ先は 400（画像処理せず）", async () => {
+    mockFindReplyable.mockResolvedValue(null);
+    const res = await POST(makeReq({ replyTo: "gone" }));
+    expect(res.status).toBe(400);
+    expect(mockFinalize).not.toHaveBeenCalled();
+    expect(mockPublish).not.toHaveBeenCalled();
+  });
+
+  it("replyTo が無ければ検証せず単独投稿（replyToImageId=null）", async () => {
+    const res = await POST(makeReq());
+    expect(res.status).toBe(200);
+    expect(mockFindReplyable).not.toHaveBeenCalled();
+    expect(mockPublish.mock.calls[0][0].replyToImageId).toBeNull();
+  });
+
+  it("Fediverse 上で繋げられなかったら threadBroken=true を返す", async () => {
+    mockFindReplyable.mockResolvedValue(PARENT);
+    mockPublish.mockResolvedValue({
+      imageId: "img3",
+      imagePageUrl: "/u/alice/status/img3",
+      postUrl: "https://mastodon.example/@alice/3",
+      newAchievements: [],
+      threadBroken: true,
+    });
+    const b = await body(await POST(makeReq({ replyTo: "parent-1" })));
+    expect(b.threadBroken).toBe(true);
+  });
+
+  it("通常は threadBroken=false", async () => {
+    const b = await body(await POST(makeReq()));
+    expect(b.threadBroken).toBe(false);
   });
 });

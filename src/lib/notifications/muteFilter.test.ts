@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { filterFavoriteFeedByMuted } from "./muteFilter";
+import { filterFavoriteFeedByMuted, isReplyNotificationVisible } from "./muteFilter";
 
 function fav(accts: string[], count = accts.length) {
   return { count, favoriters: accts.map((acct) => ({ acct })) };
@@ -31,5 +31,38 @@ describe("filterFavoriteFeedByMuted", () => {
     const f = fav(["a@ex.com"], 3); // 表示は1人だが総数3
     const r = filterFavoriteFeedByMuted(f, new Set(["a@ex.com"]));
     expect(r).toEqual({ count: 2, favoriters: [] });
+  });
+});
+
+describe("isReplyNotificationVisible", () => {
+  const visible = (
+    replyImage: { isDisabled: boolean; parentUserId: string | null; authorAcct: string } | null,
+    muted: string[] = []
+  ) => isReplyNotificationVisible({ recipientUserId: "me", replyImage }, new Set(muted));
+  const ok = { isDisabled: false, parentUserId: "me", authorAcct: "bob@ex.com" };
+
+  it("見えるリプライなら出す", () => {
+    expect(visible(ok)).toBe(true);
+  });
+
+  it("リプライ画像が削除された（imageId が SET NULL）なら隠す", () => {
+    expect(visible(null)).toBe(false);
+  });
+
+  it("リプライ画像が取り下げられたら隠す", () => {
+    expect(visible({ ...ok, isDisabled: true })).toBe(false);
+  });
+
+  it("親が削除された（replyTo が SET NULL）なら隠す", () => {
+    expect(visible({ ...ok, parentUserId: null })).toBe(false);
+  });
+
+  it("親が受信者の投稿でなければ隠す", () => {
+    expect(visible({ ...ok, parentUserId: "someone" })).toBe(false);
+  });
+
+  it("送信者をミュートしていたら隠す（読み取り時に muter の視界から落とす）", () => {
+    expect(visible(ok, ["bob@ex.com"])).toBe(false);
+    expect(visible(ok, ["carol@ex.com"])).toBe(true);
   });
 });

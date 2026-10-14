@@ -1,5 +1,5 @@
 /**
- * postToMastodon / postToMisskey の代替テキスト（ALT）配管のユニットテスト。
+ * postToMastodon / postToMisskey の代替テキスト（ALT）とリプライ先の配管のユニットテスト。
  *
  * 実 Fediverse には出さず global.fetch をモックし、メディアアップロード時の FormData に
  * ALT が正しく載るかを検証する。設計上の不変条件:
@@ -27,11 +27,15 @@ function jsonResponse(data: unknown, status = 200): Response {
 
 /**
  * URL ごとにモック応答を返し、メディアアップロード（v2/media・drive/files/create）の
- * FormData を捕捉する fetch を global に差し込む。
+ * FormData と、status / note 作成の JSON body（送信順）を捕捉する fetch を global に差し込む。
  * Mastodon の v2/media は status=200 かつ url ありにして完了ポーリングを飛ばす。
+ * createResponses を渡すと、status / note 作成の応答を呼び出し順に差し替える（足りない分は成功）。
  */
-function installFetch() {
-  const captured: { mediaForm?: FormData } = {};
+function installFetch(createResponses: Response[] = []) {
+  const captured: { mediaForm?: FormData; createBodies: Record<string, unknown>[] } = {
+    createBodies: [],
+  };
+  const queue = [...createResponses];
   const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("/api/v2/media")) {
@@ -39,14 +43,16 @@ function installFetch() {
       return jsonResponse({ id: "media-1", url: "https://cdn.example/x.avif" }, 200);
     }
     if (url.includes("/api/v1/statuses")) {
-      return jsonResponse({ id: "status-1", url: "https://mastodon.example/@u/1" }, 200);
+      captured.createBodies.push(JSON.parse(init!.body as string));
+      return queue.shift() ?? jsonResponse({ id: "status-1", url: "https://mastodon.example/@u/1" }, 200);
     }
     if (url.includes("/api/drive/files/create")) {
       captured.mediaForm = init!.body as FormData;
       return jsonResponse({ id: "file-1" }, 200);
     }
     if (url.includes("/api/notes/create")) {
-      return jsonResponse({ createdNote: { id: "note-1" } }, 200);
+      captured.createBodies.push(JSON.parse(init!.body as string));
+      return queue.shift() ?? jsonResponse({ createdNote: { id: "note-1" } }, 200);
     }
     throw new Error(`unexpected fetch: ${url}`);
   });
@@ -60,32 +66,34 @@ afterEach(() => {
 
 const IMG = Buffer.from("fake-image-bytes");
 
-function callMastodon(altText?: string) {
-  return postToMastodon(
-    "mastodon.example",
-    "token",
-    IMG,
-    "image/avif",
-    "x.avif",
-    "本文",
-    "",
-    "public",
-    altText
-  );
+function callMastodon(altText?: string, replyToId?: string | null) {
+  return postToMastodon({
+    server: "mastodon.example",
+    accessToken: "token",
+    imageBuffer: IMG,
+    mimeType: "image/avif",
+    filename: "x.avif",
+    statusText: "本文",
+    imageUrl: "",
+    visibility: "public",
+    altText,
+    replyToId,
+  });
 }
 
-function callMisskey(altText?: string) {
-  return postToMisskey(
-    "misskey.example",
-    "token",
-    IMG,
-    "image/avif",
-    "x.avif",
-    "本文",
-    "",
-    "home",
-    altText
-  );
+function callMisskey(altText?: string, replyToId?: string | null) {
+  return postToMisskey({
+    server: "misskey.example",
+    accessToken: "token",
+    imageBuffer: IMG,
+    mimeType: "image/avif",
+    filename: "x.avif",
+    statusText: "本文",
+    imageUrl: "",
+    visibility: "home",
+    altText,
+    replyToId,
+  });
 }
 
 describe("postToMastodon の ALT (description)", () => {
@@ -154,5 +162,82 @@ describe("postToMisskey の ALT (comment)", () => {
     const cap = installFetch();
     await callMisskey("");
     expect(cap.mediaForm?.get("comment")).toBeNull();
+  });
+});
+
+describe("postToMastodon のリプライ先 (in_reply_to_id)", () => {
+  it("replyToId を in_reply_to_id として送る", async () => {
+    const cap = installFetch();
+    const result = await callMastodon(undefined, "parent-1");
+    expect(result.success).toBe(true);
+    expect(result.replyDropped).toBeUndefined();
+    expect(cap.createBodies).toHaveLength(1);
+    expect(cap.createBodies[0].in_reply_to_id).toBe("parent-1");
+  });
+
+  it("未指定なら in_reply_to_id キー自体を載せない", async () => {
+    const cap = installFetch();
+    await callMastodon(undefined, null);
+    expect(cap.createBodies[0]).not.toHaveProperty("in_reply_to_id");
+  });
+
+  it("返信先が無い(404)なら同じメディアで返信なしに1回だけ送り直し replyDropped を返す", async () => {
+    const cap = installFetch([jsonResponse({ error: "Record not found" }, 404)]);
+    const result = await callMastodon(undefined, "gone-1");
+    expect(result.success).toBe(true);
+    expect(result.replyDropped).toBe(true);
+    expect(cap.createBodies).toHaveLength(2);
+    expect(cap.createBodies[1]).not.toHaveProperty("in_reply_to_id");
+    expect(cap.createBodies[1].media_ids).toEqual(cap.createBodies[0].media_ids);
+  });
+
+  it("返信先と無関係な失敗(422)では送り直さない", async () => {
+    const cap = installFetch([jsonResponse({ error: "Validation failed" }, 422)]);
+    const result = await callMastodon(undefined, "parent-1");
+    expect(result.success).toBe(false);
+    expect(result.statusCode).toBe(422);
+    expect(cap.createBodies).toHaveLength(1);
+  });
+
+  it("返信先なしの 404 は送り直さない", async () => {
+    const cap = installFetch([jsonResponse({ error: "not found" }, 404)]);
+    const result = await callMastodon(undefined, null);
+    expect(result.success).toBe(false);
+    expect(cap.createBodies).toHaveLength(1);
+  });
+});
+
+describe("postToMisskey のリプライ先 (replyId)", () => {
+  it("replyToId を replyId として送る", async () => {
+    const cap = installFetch();
+    const result = await callMisskey(undefined, "note-parent");
+    expect(result.success).toBe(true);
+    expect(cap.createBodies[0].replyId).toBe("note-parent");
+  });
+
+  it("未指定なら replyId キー自体を載せない", async () => {
+    const cap = installFetch();
+    await callMisskey(undefined, undefined);
+    expect(cap.createBodies[0]).not.toHaveProperty("replyId");
+  });
+
+  it.each(["NO_SUCH_REPLY_TARGET", "CANNOT_REPLY_TO_AN_INVISIBLE_NOTE", "YOU_HAVE_BEEN_BLOCKED"])(
+    "返信先が原因の %s なら返信なしで1回だけ送り直し replyDropped を返す",
+    async (code) => {
+      const cap = installFetch([jsonResponse({ error: { code } }, 400)]);
+      const result = await callMisskey(undefined, "note-parent");
+      expect(result.success).toBe(true);
+      expect(result.replyDropped).toBe(true);
+      expect(cap.createBodies).toHaveLength(2);
+      expect(cap.createBodies[1]).not.toHaveProperty("replyId");
+      expect(cap.createBodies[1].fileIds).toEqual(["file-1"]);
+    }
+  );
+
+  it("返信先と無関係な 400 では送り直さない", async () => {
+    const cap = installFetch([jsonResponse({ error: { code: "INVALID_PARAM" } }, 400)]);
+    const result = await callMisskey(undefined, "note-parent");
+    expect(result.success).toBe(false);
+    expect(cap.createBodies).toHaveLength(1);
   });
 });

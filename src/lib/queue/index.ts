@@ -66,13 +66,20 @@ function getWorkerUtils(): Promise<WorkerUtils> {
   return workerUtilsPromise;
 }
 
-/** bot（メンション）ジョブを enqueue。statusId で dedup（同一メンションの二重投入を防ぐ）。 */
+/**
+ * bot（メンション）ジョブを enqueue。statusId で dedup（同一メンションの二重投入を防ぐ）。
+ *
+ * queueName で同じ送信者のジョブを直列化する: 「連」は処理時点の直近の投稿へ繋ぐため、
+ * 連投が並列に処理されると 1→2→3 の順が崩れる（concurrency>1）。enqueue 時点では SHAMEZO の
+ * userId が未解決なので、Bot サーバー上の送信者アカウントIDで束ねる。docs/reply.md
+ */
 export async function enqueueMention(
   payload: ProcessMentionPayload
 ): Promise<void> {
   const utils = await getWorkerUtils();
   await utils.addJob(TASK_PROCESS_MENTION, payload, {
     jobKey: `mention:${payload.notification.status!.id}`,
+    queueName: `mention:${payload.notification.account.id}`,
     maxAttempts: MAX_ATTEMPTS,
   });
 }
@@ -89,8 +96,20 @@ export async function enqueueEmail(
   const utils = await getWorkerUtils();
   await utils.addJob(TASK_PROCESS_EMAIL, payload, {
     jobKey: `email:${dedupKey}`,
+    // 同じユーザーのメール投稿を直列化する（「連」の 1→2→3 の順を保つ。enqueueMention と同じ理由）
+    queueName: `email:${payload.userId}`,
     maxAttempts: MAX_ATTEMPTS,
   });
+}
+
+/**
+ * 参照するジョブが無くなった名前付きキュー（job_queues の行）を削除する。
+ * enqueueMention / enqueueEmail は送信者ごとの queueName で直列化しており、キュー行は
+ * ジョブが尽きても残る（graphile-worker は高カーディナリティな queueName に定期掃除を求めている）。
+ */
+export async function cleanupEmptyJobQueues(): Promise<void> {
+  const utils = await getWorkerUtils();
+  await utils.cleanup({ tasks: ["GC_JOB_QUEUES"] });
 }
 
 /** 通報の管理者通知ジョブを enqueue。reportId で dedup（同一通報の二重通知を防ぐ）。 */

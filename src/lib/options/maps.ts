@@ -51,6 +51,10 @@ export const VISIBILITY_MAP: Record<string, "public" | "unlisted"> = {
   "unlisted": "unlisted",
 };
 
+// 「連」= 投稿者本人の直近の投稿へのリプライ（スレッド）として投稿する。
+// 繋ぐ先は選べない（Bot・メールでは画像を指定する手段が無いため）。docs/reply.md
+export const THREAD_KEYWORD = "連";
+
 // HTMLエンティティのデコード
 const HTML_ENTITIES: Record<string, string> = {
   "&lt;": "<",

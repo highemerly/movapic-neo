@@ -34,6 +34,32 @@ describe("buildPostFlash 成功", () => {
   });
 });
 
+describe("buildPostFlash スレッドに繋がらなかった", () => {
+  it("連合投稿は成功・スレッドだけ繋がらなかったら success のまま「見つかりませんでした」を補足する", () => {
+    const flash = buildPostFlash({
+      fediverseFailed: false,
+      fediversePosted: true,
+      serverDomain: SERVER,
+      threadBroken: true,
+    });
+    expect(flash).toEqual({
+      variant: "success",
+      message: "handon.club への投稿が完了しました",
+      description: "スレッドの前の投稿が handon.club で見つかりませんでした",
+    });
+  });
+
+  it("local（連合なし）なら補足しない", () => {
+    const flash = buildPostFlash({
+      fediverseFailed: false,
+      fediversePosted: false,
+      serverDomain: SERVER,
+      threadBroken: true,
+    });
+    expect(flash.description).toBeUndefined();
+  });
+});
+
 describe("buildPostFlash 失敗", () => {
   it("応答なし（statusなし）: タイトルに応答なし、原因＋対処を改行で持つ", () => {
     const flash = buildPostFlash({

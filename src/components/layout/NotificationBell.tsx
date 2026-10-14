@@ -19,6 +19,10 @@ import {
   makeupNotificationText,
 } from "@/lib/makeup/notificationTypes";
 import { favoriteNotificationText, formatNotificationDate } from "@/lib/notifications/format";
+import {
+  REPLY_NOTIFICATION_TYPE,
+  replyNotificationText,
+} from "@/lib/notifications/replyNotificationType";
 import { useUnseenNotifications, useUnseenBadge } from "./useUnseenNotifications";
 
 export function NotificationBell() {
@@ -62,7 +66,8 @@ export function NotificationBell() {
               const makeupType = isMakeupNotificationType(n.type) ? n.type : null;
               const isReminder = makeupType !== null;
               const isFavorite = n.type === "favorite";
-              const a = !isReminder && !isFavorite && n.achievementKey ? resolveAchievement(n.achievementKey) : null;
+              const isReply = n.type === REPLY_NOTIFICATION_TYPE;
+              const a = !isReminder && !isFavorite && !isReply && n.achievementKey ? resolveAchievement(n.achievementKey) : null;
               const href = makeupType
                 ? makeupNotificationHref(n.recipientUsername, n.makeup?.ym ?? null)
                 : n.image?.pageUrl ?? "/notifications";
@@ -91,7 +96,9 @@ export function NotificationBell() {
                       <p className="text-sm font-medium leading-tight">
                         {isFavorite
                           ? favoriteNotificationText(n.favorite)
-                          : makeupType
+                          : isReply
+                            ? replyNotificationText(n.reply)
+                            : makeupType
                             ? makeupNotificationText(makeupType, n.makeup?.ym ?? null, n.makeup?.point ?? null)
                             : `🏆 実績「${a?.title ?? "?"}」を獲得`}
                       </p>

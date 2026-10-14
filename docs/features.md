@@ -23,6 +23,7 @@
 - 例外はリアクション起点の実績（`trigger: "reaction"`）。投稿と無関係に増減するため、**リアクションの書き込み（PUT）と `Image.favoriteCount` を更新した瞬間**だけで評価する（[reactionTriggers.ts](../src/lib/achievements/reactionTriggers.ts)）。
 - **追加・変更の手順と不変条件は [`src/lib/achievements/README.md`](../src/lib/achievements/README.md) に集約**（keyは永続でリネーム禁止、しきい値は `>=`、live と backfill の集計を必ず同期 等）。
 - 既存ユーザーへの反映: `DATABASE_URL=... npx tsx scripts/backfill-achievements.ts`（冪等）。
+- 通知の種別（`Notification.type`）: `achievement` / `favorite` / `makeup-*` / `reply`（スレッドに投稿された。[リプライ仕様](./reply.md)）。表示文言は種別ごとに1モジュールへ集約し、ベル（[NotificationBell](../src/components/layout/NotificationBell.tsx)）と通知一覧（[NotificationsList](../src/components/notifications/NotificationsList.tsx)）で二重に書かない。ミュート相手の通知は読み取り時（[getRecentNotifications](../src/lib/achievements/notifications.ts)）に落とす。
 
 ## PWA対応
 ホーム画面追加対応のPWA。Push通知は**やらない**。

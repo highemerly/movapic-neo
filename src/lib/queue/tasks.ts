@@ -31,6 +31,7 @@ import {
   type CameraOption,
 } from "@/types";
 import { getSeasonByKey } from "@/lib/seasons/catalog";
+import { findLatestOwnImageId } from "@/lib/replies/target";
 
 export const TASK_PROCESS_MENTION = "process-mention";
 export const TASK_PROCESS_EMAIL = "process-email";
@@ -81,6 +82,12 @@ export interface ProcessEmailPayload {
     cameraOption: CameraOption;
     /** 件名コマンドで指定された位置情報の保存範囲（none=保存しない） */
     locationOption: "none" | "pref" | "city";
+    /**
+     * 件名コマンド「連」: 投稿者本人の直近の投稿へのリプライとして投稿する。
+     * 繋ぐ先は consumer の処理時点で決める（連投の順は enqueueEmail の queueName で保つ）。
+     * optional なのはデプロイ前に積まれたジョブ（フィールド無し）を通常投稿として扱うため。
+     */
+    thread?: boolean;
   };
   /** producer が S3 一時領域にアップロードした元画像のキー */
   sourceStorageKey: string;
@@ -173,6 +180,13 @@ const processEmailTask: Task = async (payload) => {
   const seasonDef = p.options.season ? getSeasonByKey(p.options.season) : undefined;
   const cropPosition: Position = seasonDef ? seasonDef.preset.position : p.options.position;
 
+  // 「連」: 本人の直近の投稿へ繋ぐ。メールには結果を返す経路が無いので、繋ぐ先が無ければ
+  // エラーにせず通常の単独投稿にする（エラーにすると写真が無言で失われる）。docs/reply.md
+  const replyToImageId = p.options.thread ? await findLatestOwnImageId(user.id) : null;
+  if (p.options.thread && !replyToImageId) {
+    console.warn(`[process-email] 「連」指定だが直前の投稿が無いため単独投稿: user=${user.id}`);
+  }
+
   // 文字入れは compute へ委譲（worker は sharp/skia を呼ばない）
   const result = await renderImage({
     imageBuffer: sourceBuffer,
@@ -227,6 +241,7 @@ const processEmailTask: Task = async (payload) => {
       return { thumbnail: f.thumbnail, width: f.width, height: f.height, blurDataUrl: f.blurDataUrl };
     },
     extras: { cameraMake, cameraModel, exifDetails, locationPrefecture, locationCity },
+    replyToImageId,
   });
 
   // 成功時のみ一時画像を削除（失敗時はリトライで再利用するため残す）

@@ -122,6 +122,9 @@ export function MentionGuide({
           <li>
             <strong>公開範囲:</strong> public unlisted
           </li>
+          <li>
+            <strong>スレッド:</strong> 連（直前の投稿の続きとして投稿）
+          </li>
         </ul>
         <p className="text-muted-foreground text-xs">※カメラ機種および位置情報には非対応です</p>
         <div className="p-3 bg-muted/50 rounded-lg space-y-2">

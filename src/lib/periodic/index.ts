@@ -17,6 +17,7 @@ import { syncFavoriteCache } from "@/lib/fediverse/favoriteSync";
 import { isFavoriteSyncDue } from "@/lib/fediverse/favoritePolicy";
 import { FAVORITE_SYNC_WHERE } from "@/lib/fediverse/favoriteSyncQuery";
 import { runMonthlyMakeupGrants } from "@/lib/makeup/monthlyGrants";
+import { cleanupEmptyJobQueues } from "@/lib/queue";
 
 interface PeriodicJob {
   /** ログ識別用の名前 */
@@ -226,6 +227,15 @@ const makeupPoints: PeriodicJob = {
 };
 
 /**
+ * 空になったジョブキュー行の掃除。Bot・メール投稿は「連」の順序を保つため送信者ごとの
+ * queueName で直列化しており（src/lib/queue/index.ts）、キュー行が送信者の数だけ残るため。
+ */
+const queueCleanup: PeriodicJob = {
+  name: "queue-cleanup",
+  run: () => cleanupEmptyJobQueues(),
+};
+
+/**
  * 実行する定期ジョブ一覧。先頭から順に実行される。
  */
 const periodicJobs: PeriodicJob[] = [
@@ -234,6 +244,7 @@ const periodicJobs: PeriodicJob[] = [
   favoriteSyncJob,
   muteCleanup,
   makeupPoints,
+  queueCleanup,
 ];
 
 /** 登録済みの定期ジョブ名一覧（手動実行スクリプトのフィルタ指定用）。 */

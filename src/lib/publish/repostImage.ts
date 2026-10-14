@@ -22,6 +22,7 @@ import {
   type PublishUser,
 } from "@/lib/publish/publishImage";
 import type { PublishVisibility } from "@/lib/visibility";
+import { resolveFediverseReplyTarget } from "@/lib/replies/fediverseTarget";
 
 /**
  * SHAMEZO への保存(createdAt)から再投稿を許可する期間。
@@ -94,6 +95,7 @@ export async function repostImage(params: {
       altText: true,
       postId: true,
       createdAt: true,
+      replyToId: true,
     },
   });
 
@@ -114,6 +116,19 @@ export async function repostImage(params: {
     imageId
   );
 
+  // local で作ったスレッドを後から連合させたときも、親が連合済みなら Fediverse 上で繋ぐ。
+  // 解決できなければ単独投稿（SHAMEZO 内の繋がりは replyToId のまま残る）。
+  const replyLink = image.replyToId
+    ? await resolveFediverseReplyTarget({
+        replyToImageId: image.replyToId,
+        viewer: {
+          domain: user.instance.domain,
+          type: user.instance.type,
+          accessToken: user.accessToken,
+        },
+      })
+    : null;
+
   const postResult = await postImageToFediverse({
     user,
     buffer,
@@ -123,6 +138,7 @@ export async function repostImage(params: {
     imagePageUrl,
     visibility,
     altText: image.altText,
+    replyToPostId: replyLink?.kind === "linked" ? replyLink.postId : null,
   });
 
   // 投稿成功時のみ postUrl/postId を書き込む（publishImage の成功時分岐と同一）。

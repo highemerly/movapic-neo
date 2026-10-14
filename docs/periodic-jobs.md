@@ -10,6 +10,7 @@
 - `favorite-sync`: リアクションのフォールバック同期。画像詳細ページが一度も開かれない投稿は閲覧時（GET）の同期に乗らないため、ここで拾う。オーナー側で取り消されたリアクションの反映（`reconcileRemovals`）も兼ねる。発火条件・バックオフ・停止条件は入り組んでいるので [リアクション仕様](./favorite.md) を正とする。
 - `mute-cleanup`: 期限切れミュート行の削除（`expiresAt=null` の無期は残す）。表示・除外は期限切れ行が残っていても正しく動くので、肥大防止のための掃除。
 - `makeup-points`: 皆勤賞の穴埋めポイントの月次付与（2026-10 分から）。`favor-monthly`（FAVOR_SERVERS 所属へ当月+1pt）と、11日以降の `monthly-catchup`（先月からいて先月が皆勤でなかった人へ当月+1pt）と、期間中のイベント（[events.ts](../src/lib/makeup/events.ts)）の付与。crontab は UTC 基準なので「JST の1日／11日」は cron 式で書かず、ジョブ内で JST の日付を見る。「その日以降で当月の台帳行が無ければ付与」なので、ジョブ停止で日付を跨いでも次の実行で拾い、二重付与は台帳の一意制約が弾く。catchup の「先月が皆勤でない」は Achievement 行ではなくデータから再計算し、皆勤ならここで👑を確定付与する。1回あたり理由ごとに200人まで。実装は [monthlyGrants.ts](../src/lib/makeup/monthlyGrants.ts)。
+- `queue-cleanup`: 参照するジョブが無くなった名前付きキュー（`graphile_worker` の job_queues 行）の削除（`cleanup({ tasks: ["GC_JOB_QUEUES"] })`）。Bot・メール投稿は「連」（[リプライ仕様](./reply.md)）の 1→2→3 の順を保つため送信者ごとの `queueName` で直列化しており、キュー行が送信者の数だけ残るため。
 
 ## graphile-worker のスキーマ更新
 `graphile_worker` スキーマを作る・更新するのは **`run()` を呼ぶ worker-front だけ**。producer（web）が使う `makeWorkerUtils` は migrate せず、既存スキーマへ `add_job` するだけなので、producer 側のバージョンがずれていても enqueue は通る。

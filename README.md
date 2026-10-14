@@ -67,6 +67,13 @@ Post via email. Specify options in the subject line, text in the body, and attac
 - Body: Text to overlay on the image
 - Attachment: Image file
 
+### Threads (Replies)
+
+An image can be posted as a reply to any post (yours or someone else's), and replies can be chained (1st → 2nd → 3rd). When both posts are on Mastodon / Misskey, they are also connected as a thread there (`in_reply_to_id` / `replyId`).
+
+- Web: choose "スレッドに投稿" from the menu on the image detail page.
+- Bot / Email: add the option `連` to reply to your own most recent post (e.g., `@pic [連] Continued`).
+
 ## User Interface
 
 - "Like"

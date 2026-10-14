@@ -4,7 +4,10 @@ import { getAvatarUrl } from "@/lib/avatar";
 import { getActiveSeason, seasonPeriodLabel } from "@/lib/seasons/catalog";
 import { getBotAcct, getEmailDomain } from "@/lib/postMethods";
 import prisma from "@/lib/db";
-import { CreateClient } from "./CreateClient";
+import { findReplyableImage } from "@/lib/replies/target";
+import { userPathSegment } from "@/lib/userHandle";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
+import { CreateClient, type ReplyTargetProps } from "./CreateClient";
 import type {
   Position,
   FontFamily,
@@ -89,12 +92,36 @@ export default async function CreatePage({
   const firstTime = imageCount === 0;
   const showWelcome = sp.welcome === "1";
 
+  // 画像詳細の「スレッドに投稿」から来た: /create?replyTo=<imageId>。
+  // 見えない（削除・取り下げ）なら通常投稿になる旨を出す（黙って単独投稿にしない）。
+  // ゲストはメニュー項目が出ないので扱わない（直URLで来ても通常のゲスト画面）。
+  const requestedReplyTo = typeof sp.replyTo === "string" ? sp.replyTo : undefined;
+  const replyImage = requestedReplyTo ? await findReplyableImage(requestedReplyTo) : null;
+  let replyTarget: ReplyTargetProps | null = null;
+  if (replyImage) {
+    const seg = userPathSegment(
+      replyImage.user.username,
+      replyImage.user.instance.domain,
+      getHomeServer()
+    );
+    const publicUrl = (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
+    replyTarget = {
+      id: replyImage.id,
+      overlayText: replyImage.overlayText,
+      thumbnailUrl: `${publicUrl}/${replyImage.thumbnailKey || replyImage.storageKey}`,
+      pageUrl: `/u/${seg}/status/${replyImage.id}`,
+      authorLabel: `@${seg}`,
+    };
+  }
+
   return (
     <CreateClient
       firstTime={firstTime}
       showWelcome={showWelcome}
       defaultSeasonOn={defaultSeasonOn}
       activeSeason={activeSeasonProps}
+      replyTarget={replyTarget}
+      replyTargetMissing={!!requestedReplyTo && !replyTarget}
       user={{
         username: user.username,
         instance: { domain: user.instanceDomain, type: user.instanceType },

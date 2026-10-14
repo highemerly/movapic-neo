@@ -21,3 +21,26 @@ export function filterFavoriteFeedByMuted<T extends { acct: string }>(
   if (count === 0 && favoriters.length === 0) return null;
   return { count, favoriters };
 }
+
+/**
+ * リプライ通知を受信者に見せるか。どれか1つでも当てはまれば痕跡なく隠す。
+ * - リプライ画像が削除された（Notification.imageId が SET NULL）／管理者に取り下げられた
+ * - 親が受信者の投稿でなくなった（親が削除されて replyTo が SET NULL）
+ * - 送信者を受信者がミュートしている（ミュートは読み取り時に muter の視界だけから落とす）
+ */
+export function isReplyNotificationVisible(
+  params: {
+    recipientUserId: string;
+    replyImage: {
+      isDisabled: boolean;
+      parentUserId: string | null;
+      authorAcct: string;
+    } | null;
+  },
+  mutedAccts: ReadonlySet<string>
+): boolean {
+  const { recipientUserId, replyImage } = params;
+  if (!replyImage || replyImage.isDisabled) return false;
+  if (replyImage.parentUserId !== recipientUserId) return false;
+  return !mutedAccts.has(replyImage.authorAcct);
+}

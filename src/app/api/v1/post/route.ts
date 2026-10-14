@@ -11,6 +11,7 @@ import { reverseGeocode } from "@/lib/geocode/gsi";
 import { userHasPostedLocation } from "@/lib/locations";
 import { finalizeImage } from "@/lib/compute/client";
 import { publishImage } from "@/lib/publish/publishImage";
+import { findReplyableImage } from "@/lib/replies/target";
 import { normalizeVisibility } from "@/lib/visibility";
 import { isSeasonActiveNow, getSeasonByKey } from "@/lib/seasons/catalog";
 import {
@@ -76,6 +77,8 @@ export async function POST(request: NextRequest) {
     const arrangement = (formData.get("arrangement") as Arrangement | null) || "none";
     const season = (formData.get("season") as string | null) || null;
     const visibility = formData.get("visibility") as string | null;
+    // リプライ（スレッド）先の画像ID。画像詳細の「スレッドに投稿」からだけ付く。docs/reply.md
+    const replyTo = (formData.get("replyTo") as string | null)?.trim() || null;
 
     // EXIFメタデータ（クライアントが元画像から抽出したものを受け取る）
     // カメラ機種と撮影場所は独立。各オプションごとに保存対象を決める。
@@ -122,6 +125,15 @@ export async function POST(request: NextRequest) {
     if (!imageBlob || !text || !output || (!season && (!position || !font || !color || !size))) {
       return NextResponse.json(
         { error: "必須パラメータが不足しています" },
+        { status: 400 }
+      );
+    }
+
+    // リプライ先の再検証（クライアントを信用しない）。重い finalize（compute）より前に弾く。
+    // ミュートでは拒否しない: 拒否するとミュートされていることが本人に分かってしまうため。
+    if (replyTo && !(await findReplyableImage(replyTo))) {
+      return NextResponse.json(
+        { error: "スレッドに投稿する先の写真が見つかりません" },
         { status: 400 }
       );
     }
@@ -301,6 +313,7 @@ export async function POST(request: NextRequest) {
           },
       source: "web",
       visibility: publishVisibility,
+      replyToImageId: replyTo,
       persistOnPostFailure: true,
       getThumbnailAndDimensions: async () => ({
         thumbnail: finalized.thumbnail,
@@ -322,6 +335,8 @@ export async function POST(request: NextRequest) {
       postUrl: result.postUrl,
       fediverseError: result.postError,
       fediverseErrorStatus: result.postErrorStatus,
+      // Fediverse には投稿できたが、リプライ先に繋げられず単独投稿になった（SHAMEZO 内では繋がっている）
+      threadBroken: result.threadBroken ?? false,
       // この投稿で新規獲得した実績（演出用）。キーのみ返し、表示文言はクライアントが解決
       newAchievements: (result.newAchievements ?? []).map((a) => ({
         key: a.key,

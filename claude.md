@@ -35,6 +35,7 @@
 | [docs/ui.md](docs/ui.md) | レスポンシブ(PC/モバイル)・ボタンカラー(primary/brand)・共通セレクター(SegmentControl)・画像リトライ表示 |
 | [docs/text-rendering.md](docs/text-rendering.md) | 文字配置・フォントサイズ・影・EXIF・代替テキスト(ALT)の配管 |
 | [docs/features.md](docs/features.md) | Fediverse認証・カレンダー・実績/通知・PWA |
+| [docs/reply.md](docs/reply.md) | リプライ（スレッド）: `Image.replyToId`・Web「スレッドに投稿」/Bot・メール「連」・Fediverse上の接続と繋げられないケース・ミュート・通知 |
 | [docs/favorite.md](docs/favorite.md) | リアクション（Mastodon favourite / Misskey reaction連携）のマージ表示・絵文字・TTL・定期同期・取り消し反映など全仕様 |
 | [docs/periodic-jobs.md](docs/periodic-jobs.md) | 定期ジョブ（graphile-worker crontab内蔵の30分毎メンテ） |
 | [docs/SETUP.md](docs/SETUP.md) | 環境構築 |
@@ -68,6 +69,12 @@
 - 書き込みは本人トークンでFediverseへ送ってからDB記録（絵文字の付け替えだけでも毎回送る＝DB行があっても連合側に残っている保証は無いため）。オーナー側で取り消されたら**閲覧時(GET)・定期同期でSHAMEZOからも除去**（`reconcileRemovals`・40件フル/連合遅延はガード。操作直後の同期だけ対象外）。
 - `src/lib/reactions/*` は sharp/skia 非依存＝worker-front から呼んで安全。
 - リアクション起点の実績（押した／獲得した）は投稿フックでは確定しないため、**リアクションAPIの書き込みと `favoriteCount` を更新した瞬間からだけ**評価する（[reactionTriggers.ts](src/lib/achievements/reactionTriggers.ts)。増設禁止＝二重評価になる）。
+
+### リプライ（スレッド）（詳細: [docs/reply.md](docs/reply.md)）
+- **ミュート・削除・取り下げは読み取り時に落とす**（書き込みでは拒否しない＝ミュートされた側にバレない）。親の削除は `replyToId` の SET NULL で痕跡なく単独投稿に戻す。
+- 「連」の繋ぐ先は必ず投稿者本人（`findLatestOwnImageId` が userId で絞る）。Bot・メールは送信者ごとの `queueName` で直列化して順序を保つ。
+- Fediverse 上で繋げられないときは単独投稿にし、`ReplyLink.reason`／`replyDropped` で原因を残して `threadBroken` で利用者に知らせる（黙らない）。
+- 投稿保存後の処理は publishImage の `afterSaved` に足す（先保存／先投稿の2分岐で片方だけ漏れるのを防ぐ。ALT で実例あり）。
 
 ### 皆勤賞の穴埋め（詳細: [achievements/README](src/lib/achievements/README.md)「特殊: 皆勤賞」）
 - 2026-10 分から**穴埋めポイント制**（1pt=1日・月ごと・持ち越し不可・翌月10日締切・全ユーザー手動）。2026-09 以前の月は旧ルール（固定上限3/4日・自動穴埋め）のまま。

@@ -22,6 +22,7 @@ import {
   FONT_MAP,
   ARRANGEMENT_MAP,
   VISIBILITY_MAP,
+  THREAD_KEYWORD,
   decodeHtmlEntities,
 } from "@/lib/options/maps";
 import { getActiveSeason, seasonLabel } from "@/lib/seasons/catalog";
@@ -44,6 +45,8 @@ export interface ParsedMentionOptions {
   seasonRequested: boolean;
   debug: boolean;
   keep: boolean;
+  /** 「連」: 投稿者本人の直近の投稿へのリプライとして投稿する */
+  thread: boolean;
   visibility?: CommandVisibility; // コマンドで指定された場合のみ設定
 }
 
@@ -76,6 +79,7 @@ const FALLBACK_OPTIONS: ParsedMentionOptions = {
   seasonRequested: false,
   debug: false,
   keep: false,
+  thread: false,
 };
 
 /**
@@ -93,6 +97,8 @@ function buildDefaultOptions(userDefaults?: UserDefaults): ParsedMentionOptions 
     seasonRequested: false,
     debug: FALLBACK_OPTIONS.debug,
     keep: FALLBACK_OPTIONS.keep,
+    // 「連」もユーザー設定に持たせない（投稿ごとの指定）。
+    thread: FALLBACK_OPTIONS.thread,
   };
 }
 
@@ -147,6 +153,8 @@ function parseCommandTokens(commandString: string): Partial<ParsedMentionOptions
       options.font = FONT_MAP[token];
     } else if (ARRANGEMENT_MAP[token]) {
       options.arrangement = ARRANGEMENT_MAP[token];
+    } else if (token === THREAD_KEYWORD) {
+      options.thread = true;
     } else if (token === SEASON_KEYWORD) {
       // シーズン（期間限定）: 受信時刻でアクティブなシーズンに解決。
       // 期間外なら season=null のまま（processor がエラー通知する）。他オプションは無視される。
@@ -223,6 +231,7 @@ export function formatOptionsSummary(options: ParsedMentionOptions, defaultVisib
     parts.push(`公開範囲: ${visLabel}(デフォルト)`);
   }
 
+  if (options.thread) parts.push("連: on");
   parts.push(`debug: ${options.debug ? "on" : "off"}`);
   parts.push(`keep: ${options.keep ? "on" : "off"}`);
 

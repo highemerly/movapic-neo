@@ -18,6 +18,7 @@
 
 import { USER_AGENT } from "@/lib/userAgent";
 import { apShowNoteId, ApShowError } from "@/lib/fediverse/misskey";
+import { searchResolveStatusId, SearchResolveError } from "@/lib/fediverse/mastodon";
 import {
   FAVOURITE_KEY,
   normalizeReactionKey,
@@ -387,25 +388,19 @@ async function resolveViewerStatusId(params: {
     return postId;
   }
 
-  const url = `https://${viewerDomain}/api/v2/search?q=${encodeURIComponent(postUrl)}&resolve=true&type=statuses&limit=1`;
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${viewerToken}`,
-      "User-Agent": USER_AGENT,
-    },
-    signal: AbortSignal.timeout(RESOLVE_TIMEOUT),
-  });
-
-  if (!response.ok) {
-    throw new FavoriteError(
-      classifyPostStatus(response.status)!,
-      response.status,
-      `failed to resolve status: ${response.status}`
-    );
+  let statusId: string | null;
+  try {
+    statusId = await searchResolveStatusId(viewerDomain, viewerToken, postUrl, RESOLVE_TIMEOUT);
+  } catch (error) {
+    if (error instanceof SearchResolveError) {
+      throw new FavoriteError(
+        classifyPostStatus(error.status)!,
+        error.status,
+        `failed to resolve status: ${error.status}`
+      );
+    }
+    throw error;
   }
-
-  const data = (await response.json()) as { statuses?: MastodonStatus[] };
-  const statusId = data.statuses?.[0]?.id;
   if (!statusId) {
     // searchは成功したが該当statusが無い＝viewerインスタンスにまだ投稿が無い。
     // 削除済みとは限らず、連合の未伝播やresolveの取りこぼしの可能性が高いため

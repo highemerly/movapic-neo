@@ -76,6 +76,9 @@ export function EmailGuide({ emailPrefix, emailDomain }: EmailGuideProps) {
           <li>
             <strong>位置情報:</strong> 都道府県 市町村
           </li>
+          <li>
+            <strong>スレッド:</strong> 連（直前の投稿の続きとして投稿）
+          </li>
         </ul>
         <div className="p-3 bg-muted/50 rounded-lg space-y-2">
           <code className="block text-xs bg-background p-2 rounded border whitespace-pre-line">

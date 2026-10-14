@@ -75,6 +75,37 @@ export interface PostResult {
   error?: string;
   /** サーバーが HTTP エラー応答を返した場合のステータスコード（タイムアウト等では undefined） */
   statusCode?: number;
+  /**
+   * replyToId を指定したが、サーバーが返信先を無効と応答したため返信なしで投稿し直した。
+   * 単独投稿としては成功している（success=true）。docs/reply.md「繋げられないケース」。
+   */
+  replyDropped?: boolean;
+}
+
+/**
+ * postToMastodon / postToMisskey の引数。
+ * 位置引数が10個に増えると呼び出し元（publishImage / カレンダーコラージュ）で取り違えやすいため
+ * オブジェクトで受ける。
+ */
+export interface PostToFediverseParams<V extends string> {
+  server: string;
+  accessToken: string;
+  imageBuffer: Buffer;
+  mimeType: string;
+  filename: string;
+  statusText: string;
+  /**
+   * 本文末尾に付ける画像ページURL。空文字なら付けない（カレンダー画像などサービス側にページを
+   * 持たない投稿はメディア＋本文のみで投稿する）。
+   */
+  imageUrl: string;
+  visibility?: V;
+  altText?: string;
+  /**
+   * リプライ先の status / note ID（投稿者自身のインスタンス上のID）。null/undefined=単独投稿。
+   * Mastodon は in_reply_to_id・Misskey は replyId として送る。
+   */
+  replyToId?: string | null;
 }
 
 /**
@@ -183,21 +214,32 @@ async function waitForMastodonMediaReady(
 export type MastodonVisibility = "public" | "unlisted" | "private" | "direct";
 
 /**
+ * Mastodon が「返信先が無い／見えない」と応答したか。
+ * Mastodon は in_reply_to_id の status を見つけられない（削除済み・閲覧権限なし）と 404 を返す
+ * （StatusesController#set_thread）。メディアや本文の不正は 422 なので区別できる。
+ */
+function isMastodonReplyTargetInvalid(status: number): boolean {
+  return status === 404;
+}
+
+/**
  * Mastodonにステータスを投稿
  */
 export async function postToMastodon(
-  server: string,
-  accessToken: string,
-  imageBuffer: Buffer,
-  mimeType: string,
-  filename: string,
-  statusText: string,
-  // 本文末尾に付ける画像ページURL。空文字なら付けない（カレンダー画像などサービス側にページを
-  // 持たない投稿はメディア＋本文のみで投稿する）。
-  imageUrl: string,
-  visibility: MastodonVisibility = "public",
-  altText?: string
+  params: PostToFediverseParams<MastodonVisibility>
 ): Promise<PostResult> {
+  const {
+    server,
+    accessToken,
+    imageBuffer,
+    mimeType,
+    filename,
+    statusText,
+    imageUrl,
+    visibility = "public",
+    altText,
+    replyToId,
+  } = params;
   try {
     // メディアをアップロード
     const mediaId = await uploadMastodonMedia(
@@ -209,21 +251,40 @@ export async function postToMastodon(
       altText
     );
 
+    const createStatus = (inReplyToId: string | null | undefined) =>
+      fetch(`https://${server}/api/v1/statuses`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+          "User-Agent": USER_AGENT,
+        },
+        body: JSON.stringify({
+          status: imageUrl ? `${statusText}\n${imageUrl}` : statusText,
+          media_ids: [mediaId],
+          visibility,
+          ...(inReplyToId ? { in_reply_to_id: inReplyToId } : {}),
+        }),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+      });
+
     // ステータスを投稿
-    const response = await fetch(`https://${server}/api/v1/statuses`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        "User-Agent": USER_AGENT,
-      },
-      body: JSON.stringify({
-        status: imageUrl ? `${statusText}\n${imageUrl}` : statusText,
-        media_ids: [mediaId],
-        visibility,
-      }),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT),
-    });
+    let response = await createStatus(replyToId);
+    let replyDropped = false;
+
+    // 返信先がサーバー上で消えている（Fediverse 側だけで削除された等）と、返信付きの投稿は
+    // 何度送っても失敗する。「連」は常に直前の投稿へ繋ぐため、放置すると以後の投稿が恒久失敗する。
+    // 返信先が原因と確定できる応答のときだけ、アップロード済みメディアを使って返信なしで1回送り直す。
+    if (!response.ok && replyToId && isMastodonReplyTargetInvalid(response.status)) {
+      logMastodon("status.reply_target_invalid", {
+        server,
+        replyToId,
+        ...responseMeta(response),
+        body: (await response.clone().text()).slice(0, 1000),
+      });
+      response = await createStatus(null);
+      replyDropped = true;
+    }
 
     if (!response.ok) {
       logMastodon("status.failed", {
@@ -244,6 +305,7 @@ export async function postToMastodon(
       success: true,
       postId: data.id,
       postUrl: data.url,
+      ...(replyDropped ? { replyDropped } : {}),
     };
   } catch (error) {
     // HTTP エラーは各往復の時点で応答内容ごと記録済み。ここで拾うのはタイムアウトや
@@ -310,19 +372,43 @@ async function uploadMisskeyFile(
 export type MisskeyVisibility = "public" | "home" | "followers" | "specified";
 
 /**
+ * Misskey が「返信先が無い／返信できない」と応答したときの error.code。
+ * いずれも返信先ノート側の状態（削除済み・不可視・ブロック）が原因で、返信を外せば投稿できる。
+ */
+const MISSKEY_REPLY_TARGET_INVALID_CODES = new Set([
+  "NO_SUCH_REPLY_TARGET",
+  "CANNOT_REPLY_TO_AN_INVISIBLE_NOTE",
+  "YOU_HAVE_BEEN_BLOCKED",
+]);
+
+async function isMisskeyReplyTargetInvalid(response: Response): Promise<boolean> {
+  if (response.status !== 400) return false;
+  try {
+    const body = (await response.clone().json()) as { error?: { code?: string } };
+    return MISSKEY_REPLY_TARGET_INVALID_CODES.has(body.error?.code ?? "");
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Misskeyにノートを投稿
  */
 export async function postToMisskey(
-  server: string,
-  accessToken: string,
-  imageBuffer: Buffer,
-  mimeType: string,
-  filename: string,
-  statusText: string,
-  imageUrl: string,
-  visibility: MisskeyVisibility = "public",
-  altText?: string
+  params: PostToFediverseParams<MisskeyVisibility>
 ): Promise<PostResult> {
+  const {
+    server,
+    accessToken,
+    imageBuffer,
+    mimeType,
+    filename,
+    statusText,
+    imageUrl,
+    visibility = "public",
+    altText,
+    replyToId,
+  } = params;
   try {
     // ファイルをアップロード
     const fileId = await uploadMisskeyFile(
@@ -334,21 +420,37 @@ export async function postToMisskey(
       altText
     );
 
+    const createNote = (replyId: string | null | undefined) =>
+      fetch(`https://${server}/api/notes/create`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": USER_AGENT,
+        },
+        body: JSON.stringify({
+          i: accessToken,
+          text: imageUrl ? `${statusText}\n${imageUrl}` : statusText,
+          fileIds: [fileId],
+          visibility,
+          ...(replyId ? { replyId } : {}),
+        }),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+      });
+
     // ノートを投稿
-    const response = await fetch(`https://${server}/api/notes/create`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": USER_AGENT,
-      },
-      body: JSON.stringify({
-        i: accessToken,
-        text: imageUrl ? `${statusText}\n${imageUrl}` : statusText,
-        fileIds: [fileId],
-        visibility,
-      }),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT),
-    });
+    let response = await createNote(replyToId);
+    let replyDropped = false;
+
+    // Mastodon と同じ理由（返信先が消えていると以後の「連」が恒久失敗する）で、
+    // 返信先が原因と確定できる応答のときだけ、アップロード済みファイルで返信なしで1回送り直す。
+    if (!response.ok && replyToId && (await isMisskeyReplyTargetInvalid(response))) {
+      console.log(
+        `[fediverse:misskey] note.reply_target_invalid server=${server} replyToId=${replyToId} ` +
+          `body=${(await response.clone().text()).slice(0, 1000)}`
+      );
+      response = await createNote(null);
+      replyDropped = true;
+    }
 
     if (!response.ok) {
       throw new FediverseHttpError(
@@ -365,6 +467,7 @@ export async function postToMisskey(
       success: true,
       postId: noteId,
       postUrl,
+      ...(replyDropped ? { replyDropped } : {}),
     };
   } catch (error) {
     return {
