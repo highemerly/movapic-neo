@@ -2,7 +2,9 @@ Dockerfile
 .dockerignore
 node_modules
 npm-debug.log
-.git
+# サブディレクトリの .git（fonts/.git 等）も除外する。ルートだけだと fonts の
+# git 履歴・認証情報がイメージに入る。
+**/.git
 .gitignore
 .next
 .env*.local

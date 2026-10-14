@@ -40,6 +40,9 @@ jobs:
           repository: highemerly/movapic-fonts
           token: ${{ secrets.FONT_REPO_TOKEN }}
           path: fonts
+          # 既定(true)だとトークンが fonts/.git/config に残り、COPY で公開イメージへ混入する
+          # （v1.4.12 以前のイメージで実際に漏洩した）。checkout 後に git 操作はしないので不要。
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -91,6 +94,9 @@ jobs:
           repository: highemerly/movapic-fonts
           token: ${{ secrets.FONT_REPO_TOKEN }}
           path: fonts
+          # 既定(true)だとトークンが fonts/.git/config に残り、COPY で公開イメージへ混入する
+          # （v1.4.12 以前のイメージで実際に漏洩した）。checkout 後に git 操作はしないので不要。
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
