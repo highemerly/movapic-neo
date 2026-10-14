@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifyComputeApiKey } from "@/lib/compute/internalAuth";
+import { RENDER_STAGE_ERROR_STATUS } from "@/lib/errors/renderStageError";
 import {
   Position,
   FontFamily,
@@ -30,6 +31,7 @@ import {
   isValidArrangement,
 } from "@/types";
 import { getSeasonByKey } from "@/lib/seasons/catalog";
+import { ImageProcessError } from "@/lib/errors";
 
 export async function POST(request: NextRequest) {
   if (!verifyComputeApiKey(request)) {
@@ -119,6 +121,16 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    // 画像処理の段階エラー（読み込み不可・画素数超過など）は stage と文言を返し、worker-front 側で
+    // ImageProcessError に戻す。汎用500にすると generate が利用者向けの文言を出せない
+    // （3層分割で一度失われ、常に「処理中にエラーが発生しました」になっていた）。
+    if (error instanceof ImageProcessError) {
+      console.error(`[internal/render] ${error.stage} failed: ${error.message}`);
+      return NextResponse.json(
+        { stage: error.stage, message: error.message },
+        { status: RENDER_STAGE_ERROR_STATUS }
+      );
+    }
     console.error("[internal/render] failed:", error);
     return NextResponse.json({ error: "render failed" }, { status: 500 });
   }

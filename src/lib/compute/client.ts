@@ -7,6 +7,8 @@
  */
 
 import type { ProcessImageResult } from "@/lib/image";
+import { ImageProcessError } from "@/lib/errors";
+import { RENDER_STAGE_ERROR_STATUS, parseRenderStageError } from "@/lib/errors/renderStageError";
 import type { CalendarCollageSpec } from "@/lib/calendar/collageTypes";
 import type {
   Position,
@@ -118,6 +120,12 @@ export async function renderImage(
   if (p.requestId) form.append("requestId", p.requestId);
 
   const res = await computeFetch("/api/internal/render", form, p.signal);
+  if (res.status === RENDER_STAGE_ERROR_STATUS) {
+    const stageError = parseRenderStageError(res.body.toString("utf8"));
+    if (stageError) {
+      throw new ImageProcessError(stageError.message, stageError.stage, p.requestId);
+    }
+  }
   if (!res.ok) {
     throw new Error(`compute render failed: ${res.status} ${res.body.toString("utf8")}`);
   }
