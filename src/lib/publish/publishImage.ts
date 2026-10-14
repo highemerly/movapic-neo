@@ -154,8 +154,11 @@ export interface PublishImageResult {
   threadBroken?: boolean;
 }
 
-/** 保存された投稿から実績評価用の PostFacts を作る。 */
-function toPostFacts(input: PublishImageInput): PostFacts {
+/**
+ * 保存された投稿から実績評価用の PostFacts を作る。
+ * replyToId は実際に保存した値（mention で解決時に親が消えていたら null）を受ける＝DB と一致させる。
+ */
+function toPostFacts(input: PublishImageInput, replyToId: string | null): PostFacts {
   return {
     overlayText: input.text,
     position: input.options.position,
@@ -168,6 +171,7 @@ function toPostFacts(input: PublishImageInput): PostFacts {
     cameraModel: input.extras?.cameraModel ?? null,
     locationPrefecture: input.extras?.locationPrefecture ?? null,
     visibility: input.visibility,
+    isReply: replyToId != null,
     createdAt: new Date(),
   };
 }
@@ -202,7 +206,7 @@ async function afterSaved(
   imageId: string,
   replyToId: string | null
 ): Promise<GrantedAchievement[]> {
-  const newAchievements = await evaluateAchievementsSafely(input, imageId);
+  const newAchievements = await evaluateAchievementsSafely(input, imageId, replyToId);
   await notifyReplySafely(input, imageId, replyToId);
   return newAchievements;
 }
@@ -223,7 +227,8 @@ function isThreadBroken(link: ReplyLink | null, post: PostResult | null): boolea
  */
 async function evaluateAchievementsSafely(
   input: PublishImageInput,
-  imageId: string
+  imageId: string,
+  replyToId: string | null
 ): Promise<GrantedAchievement[]> {
   try {
     // 自動穴埋め: 実績評価の「前」に割当を書き、書いた割当を含めて皆勤賞を判定させる。
@@ -242,7 +247,7 @@ async function evaluateAchievementsSafely(
     }
     return await evaluateAndGrant({
       userId: input.user.id,
-      post: toPostFacts(input),
+      post: toPostFacts(input, replyToId),
       imageId,
       instanceDomain: input.user.instance.domain,
     });

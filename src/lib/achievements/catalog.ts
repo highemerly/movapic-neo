@@ -109,6 +109,8 @@ export interface PostFacts {
   locationPrefecture: string | null;
   /** 公開範囲。"local" は連携サーバーへ同時投稿しない（Fediverse未投稿） */
   visibility: string; // "public" | "unlisted" | "local"
+  /** スレッドへの投稿（Image.replyToId あり＝他の写真への続き）か。docs/reply.md */
+  isReply: boolean;
   createdAt: Date;
 }
 
@@ -633,6 +635,16 @@ const singletons: PostAchievementDef[] = [
     evaluate: (s) => s.hasMentionPost,
   },
   {
+    key: "first-thread",
+    category: "first-thread",
+    rank: "silver",
+    section: "デビュー",
+    title: "つづく",
+    description: "はじめてスレッドに写真を投稿しました",
+    icon: "MessageSquarePlus",
+    evaluate: (_s, p) => p.isReply,
+  },
+  {
     key: "first-location",
     category: "first-location",
     rank: "silver",
@@ -769,6 +781,7 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
       { kind: "single", key: "first-location" },
       { kind: "single", key: "first-email" },
       { kind: "single", key: "first-mention" },
+      { kind: "single", key: "first-thread" },
       { kind: "single", key: "local-only" },
       { kind: "single", key: "first-reaction" },
       { kind: "single", key: "bio-set" },

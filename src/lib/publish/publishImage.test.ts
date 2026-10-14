@@ -80,6 +80,7 @@ vi.mock("@/lib/achievements/grace", () => ({
 
 import { publishImage, type PublishImageInput } from "@/lib/publish/publishImage";
 import { assignMakeupForNewPost } from "@/lib/achievements/makeupAssign";
+import { evaluateAndGrant } from "@/lib/achievements/engine";
 
 /** postToMastodon/postToMisskey はオブジェクト引数。n 回目の呼び出しの引数を返す。 */
 function postArgs(mock: typeof postToMastodon, n = 0) {
@@ -442,6 +443,21 @@ describe("リプライ（スレッド）の配管", () => {
       });
     });
   }
+
+  it("実績評価にはスレッドへの投稿かどうか（実際に保存した replyToId）を渡す", async () => {
+    await publishImage(baseInput({ replyToImageId: "parent-img" }));
+    expect(vi.mocked(evaluateAndGrant).mock.calls[0][0].post.isReply).toBe(true);
+
+    vi.mocked(evaluateAndGrant).mockClear();
+    await publishImage(baseInput({}));
+    expect(vi.mocked(evaluateAndGrant).mock.calls[0][0].post.isReply).toBe(false);
+  });
+
+  it("mention経路で解決時に親が既に無ければ、実績評価でもスレッド投稿として扱わない", async () => {
+    resolveFediverseReplyTarget.mockResolvedValue({ kind: "shamezo-only", reason: "parent-gone" });
+    await publishImage(baseInput({ persistOnPostFailure: false, replyToImageId: "gone-img" }));
+    expect(vi.mocked(evaluateAndGrant).mock.calls[0][0].post.isReply).toBe(false);
+  });
 
   it("リプライでなければ解決も通知もしない", async () => {
     const result = await publishImage(baseInput({}));

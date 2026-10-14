@@ -35,6 +35,7 @@ import {
   Users,
   IdCard,
   Newspaper,
+  MessageSquarePlus,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { cn } from "@/lib/utils";
@@ -99,6 +100,7 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   IdCard,
   Newspaper,
   SoccerBall,
+  MessageSquarePlus,
 };
 
 export function AchievementIcon({

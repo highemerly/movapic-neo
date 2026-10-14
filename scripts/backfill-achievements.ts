@@ -83,6 +83,7 @@ interface ReplayImage {
   locationPrefecture: string | null;
   postUrl: string | null;
   postId: string | null;
+  replyToId: string | null;
   makeupTargetDay: number | null;
   makeupTargetMonthDelta: number;
 }
@@ -220,6 +221,8 @@ function replayUser(userId: string, images: ReplayImage[], capOf: (ym: string) =
       locationPrefecture: img.locationPrefecture,
       // visibility は Image に保存されていないため近似: Fediverse未投稿(postUrl/postId なし)=local
       visibility: img.postUrl == null && img.postId == null ? "local" : "public",
+      // 親が削除されると replyToId は SET NULL になり判定できない（live では投稿時点の値で付与済み）
+      isReply: img.replyToId != null,
       createdAt: img.createdAt,
     };
 
@@ -402,6 +405,7 @@ async function main() {
         locationPrefecture: true,
         postUrl: true,
         postId: true,
+        replyToId: true,
         makeupTargetDay: true,
         makeupTargetMonthDelta: true,
       },

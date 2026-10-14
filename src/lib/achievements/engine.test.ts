@@ -56,6 +56,7 @@ function post(overrides: Partial<PostFacts> = {}): PostFacts {
     cameraModel: null,
     locationPrefecture: null,
     visibility: "public",
+    isReply: false,
     createdAt: new Date("2026-06-15T03:00:00Z"),
     ...overrides,
   };
@@ -135,6 +136,11 @@ describe("selectNewlyGranted: 単発・シークレット述語", () => {
     );
     // JST 6時 = UTC 21時（前日）
     expect(keysOf(stats(), post({ createdAt: new Date("2026-06-14T21:00:00Z") }))).toContain("early-bird");
+  });
+
+  it("スレッドへの投稿で first-thread（通常の投稿では立たない）", () => {
+    expect(keysOf(stats(), post({ isReply: true }))).toContain("first-thread");
+    expect(keysOf(stats(), post())).not.toContain("first-thread");
   });
 
   it("24時間すべてに投稿していれば all-hours（23時間では立たない）", () => {
