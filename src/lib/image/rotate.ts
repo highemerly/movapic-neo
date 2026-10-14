@@ -1,12 +1,12 @@
 import sharp from "sharp";
 import * as jpeg from "jpeg-js";
 import { ImageProcessError } from "@/lib/errors";
+import { MAX_DECODE_PIXELS, exceedsDecodePixelLimit } from "@/lib/image/decodeLimits";
 
 // sharp デコード時のピクセル数上限。unlimited:true でも limitInputPixels は独立に効く
 // （実測: sharp 0.34.5。unlimited は libheif の max_items 等フォーマット固有ガードだけを外し、
-// ピクセル数ガードは外さない）。既定268MPより絞り、200MP機(Samsung 200MP等)の実写真は
-// 許容しつつ、高圧縮な巨大寸法画像(decompression bomb)のデコード天井を ~600MB(RGB) 級に抑える。
-const MAX_DECODE_PIXELS = 200_000_000; // 200MP
+// ピクセル数ガードは外さない）。limitInputPixels は形式を知る前（コンストラクタ）に決める必要が
+// あるため全形式共通の天井を渡し、形式別の上限はヘッダを読んだ直後に decodeLimits で判定する。
 
 /**
  * EXIF Orientationに従って画像を自動回転
@@ -29,6 +29,13 @@ export async function rotateImage(
       limitInputPixels: MAX_DECODE_PIXELS,
     }).rotate();
     const meta = await pipeline.metadata();
+    // metadata() はヘッダだけを読む。展開（toBuffer）の前に形式別の上限で弾く。
+    if (exceedsDecodePixelLimit(meta)) {
+      console.warn(
+        `[rotate] rid=${requestId} DECODE_LIMIT_EXCEEDED: format=${meta.format}, size=${meta.width}x${meta.height}, input=${inputSizeKB}KB`
+      );
+      throw new ImageProcessError("画像の画素数が大きすぎます", "rotate", requestId);
+    }
     // HEIC/HEIF(meta.format==="heif"・AVIF含む)はそのまま toBuffer すると HEIF で再エンコードされ
     // 重く(実測 約6倍)、後続でも HEIF 再デコードが必要になる。JPEG 化して後段へ渡す（最終出力は
     // AVIF/JPEG なので中間 JPEG95 の劣化は実用上無視できる）。非HEICは元フォーマット維持。
@@ -38,6 +45,8 @@ export async function rotateImage(
         : await pipeline.toBuffer();
     return { buffer: rotatedBuffer, usedFallback: false };
   } catch (sharpError) {
+    // 上限超過は壊れた JPEG ではないので jpeg-js へ回さない
+    if (sharpError instanceof ImageProcessError) throw sharpError;
     // sharpが失敗した場合、JPEGならjpeg-jsでクリーンアップを試みる
     const magic = imageBuffer.subarray(0, 2).toString("hex");
     const isJpeg = magic === "ffd8";
