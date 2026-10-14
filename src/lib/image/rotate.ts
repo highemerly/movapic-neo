@@ -1,7 +1,11 @@
 import sharp from "sharp";
 import * as jpeg from "jpeg-js";
 import { ImageProcessError } from "@/lib/errors";
-import { MAX_DECODE_PIXELS, exceedsDecodePixelLimit } from "@/lib/image/decodeLimits";
+import {
+  MAX_DECODE_PIXELS,
+  exceedsDecodePixelLimit,
+  isSupportedInputFormat,
+} from "@/lib/image/decodeLimits";
 
 // sharp デコード時のピクセル数上限。unlimited:true でも limitInputPixels は独立に効く
 // （実測: sharp 0.34.5。unlimited は libheif の max_items 等フォーマット固有ガードだけを外し、
@@ -29,7 +33,17 @@ export async function rotateImage(
       limitInputPixels: MAX_DECODE_PIXELS,
     }).rotate();
     const meta = await pipeline.metadata();
-    // metadata() はヘッダだけを読む。展開（toBuffer）の前に形式別の上限で弾く。
+    // metadata() はヘッダだけを読む。展開（toBuffer）の前に、実際の形式と形式別の上限で弾く。
+    if (!isSupportedInputFormat(meta.format)) {
+      console.warn(
+        `[rotate] rid=${requestId} UNSUPPORTED_FORMAT: format=${meta.format}, input=${inputSizeKB}KB`
+      );
+      throw new ImageProcessError(
+        "JPEG、PNG、WebP、HEIC、AVIF形式のみ対応しています",
+        "rotate",
+        requestId
+      );
+    }
     if (exceedsDecodePixelLimit(meta)) {
       console.warn(
         `[rotate] rid=${requestId} DECODE_LIMIT_EXCEEDED: format=${meta.format}, size=${meta.width}x${meta.height}, input=${inputSizeKB}KB`

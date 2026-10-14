@@ -4,7 +4,26 @@ import {
   MAX_DECODE_PIXELS_HEAVY,
   maxDecodePixels,
   exceedsDecodePixelLimit,
+  isSupportedInputFormat,
 } from "./decodeLimits";
+
+describe("isSupportedInputFormat", () => {
+  it("JPEG・PNG・WebP・HEIF（HEIC/AVIF）は受け付ける", () => {
+    for (const f of ["jpeg", "png", "webp", "heif"]) {
+      expect(isSupportedInputFormat(f)).toBe(true);
+    }
+  });
+
+  it("libvips が読めても対応外の形式は弾く（申告 MIME を偽って届くため）", () => {
+    for (const f of ["gif", "svg", "tiff", "jp2k", "ppm", "rad", "raw"]) {
+      expect(isSupportedInputFormat(f)).toBe(false);
+    }
+  });
+
+  it("形式が判定できないときは弾く", () => {
+    expect(isSupportedInputFormat(undefined)).toBe(false);
+  });
+});
 
 describe("maxDecodePixels", () => {
   it("HEIF（HEIC/AVIF）と WebP は重い形式の上限", () => {

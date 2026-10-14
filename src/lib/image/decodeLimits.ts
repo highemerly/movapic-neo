@@ -14,7 +14,19 @@
  * iPhone の 48MP HEIC は通る。
  */
 
-/** JPEG / PNG など、上記の重い形式以外の上限（200MP 機の実写真を通す） */
+/**
+ * 受け付ける入力形式（sharp の metadata().format＝中身から判定した値）。HEIC と AVIF はどちらも "heif"。
+ * 入口（generate・メール）の形式チェックはクライアント申告の MIME / 拡張子しか見られないため、
+ * ここで実際の形式を確かめる。pitfall: 以前は申告を偽れば libvips が読める形式は何でも通り、
+ * 130KB の 196MP GIF（image/jpeg と申告）1枚で compute が OOM Kill された。
+ */
+const SUPPORTED_INPUT_FORMATS: ReadonlySet<string> = new Set(["jpeg", "png", "webp", "heif"]);
+
+export function isSupportedInputFormat(format: string | undefined): boolean {
+  return format !== undefined && SUPPORTED_INPUT_FORMATS.has(format);
+}
+
+/** JPEG / PNG の上限（200MP 機の実写真を通す） */
 export const MAX_DECODE_PIXELS = 200_000_000;
 
 /** HEIF（HEIC / AVIF）・WebP の上限 */
