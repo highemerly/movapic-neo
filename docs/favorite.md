@@ -241,6 +241,7 @@ SHAMEZO 上のリアクションは押した本人のトークンで Fediverse �
 - 送信中の追加操作は**最後の意図だけを保持して直列に送る**（Fediverse への二重送信を避けるため並行させない）。送信中もボタンは押せる。
 - マウント時の GET は、送信中・送信待ちがあるときは結果を捨てる（楽観表示を古い値で上書きしないため）。
 - 楽観更新でリアクション一覧に自分を差し込むため、閲覧者の表示情報（`acct`/`displayName`/`avatarUrl`/`profileUrl`）を詳細ページから props で渡す。形は `Reaction` テーブル由来の行（[store.ts](../src/lib/reactions/store.ts)）と揃える。
+- 画像のズーム表示（全画面）にもリアクションボタンがある（[ZoomReactionButton](../src/app/u/[username]/status/[imageId]/ZoomReactionButton.tsx)）。ズームを閉じずにピッカーを重ね、選んだら絵文字を中央で弾ませてズームに戻る。チップ行が見えないので、失敗はトーストで知らせる。
 - INP: リアクション状態が変わるとピッカー（絵文字が数千個）も再レンダー対象になる。`handlePick` の identity を安定させ `EmojiButton` を `memo` で包んであるので、**ピッカーへ渡すハンドラをインラインで作り直さないこと**（memo が丸ごと無効になり、押下の応答時間に乗る）。
 
 ## 12. 変更時のチェックリスト

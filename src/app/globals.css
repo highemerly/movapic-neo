@@ -432,12 +432,56 @@
   animation: pill-flash 1.6s ease both;
 }
 
+/* 画像のズーム表示でリアクションした直後、選んだ絵文字を中央で弾ませてから浮かせて消す。
+   ズーム中はチップ行が見えないので、付いたことをその場で伝える。 */
+@keyframes reaction-burst {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  18% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+  30% {
+    transform: scale(0.95);
+  }
+  40%,
+  70% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-40px) scale(1.1);
+  }
+}
+
+@keyframes reaction-burst-fade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  20%,
+  70% {
+    opacity: 1;
+  }
+}
+
+.reaction-burst {
+  animation: reaction-burst 1.1s ease-out both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tl-enter,
   .pill-in,
   .control-in,
   .pill-flash {
     animation: none;
+  }
+  /* animation:none にはしない。animationend で片付けているため、止めると絵文字が居座る。 */
+  .reaction-burst {
+    animation-name: reaction-burst-fade;
   }
   /* 走査を止めると光の帯が中央に居座るため、動きを止める代わりに丸ごと隠す */
   .animate-shimmer {

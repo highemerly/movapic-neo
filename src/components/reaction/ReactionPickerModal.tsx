@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { RetryImg } from "@/components/RetryImg";
+import { cn } from "@/lib/utils";
 import { ReactionEmojiView } from "./ReactionEmojiView";
 import { loadRecentReactions, pushRecentReaction, type RecentReaction } from "./recentReactions";
 
@@ -47,6 +48,7 @@ export function ReactionPickerModal({
   sendsToFediverse,
   viewerType,
   viewerDomain,
+  className,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -58,6 +60,8 @@ export function ReactionPickerModal({
   /** 閲覧者のインスタンス種別／ドメイン。送信先の注釈の文言に使う */
   viewerType: "mastodon" | "misskey" | null;
   viewerDomain: string | null;
+  /** ダイアログ本体に足すクラス。より手前の全画面表示の上から開くとき z-index を上げるのに使う。 */
+  className?: string;
 }) {
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -76,7 +80,7 @@ export function ReactionPickerModal({
       {/* 中身は開いている間だけマウントされる（開閉ごとに効くエフェクトを持たなくて済む）。 */}
       <DialogContent
         ref={contentRef}
-        className="sm:max-w-sm"
+        className={cn("sm:max-w-sm", className)}
         // 既定では最初のフォーカス可能要素（＝検索input）にフォーカスが入り、スマホで
         // ソフトウェアキーボードが勝手に開いてしまう。代わりにダイアログ本体（tabIndex=-1）へ
         // フォーカスして、キーボードは出さずに Esc / フォーカストラップだけ効かせる。

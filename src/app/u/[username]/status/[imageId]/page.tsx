@@ -291,6 +291,15 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
           profileUrl: `https://${currentUser.instance.domain}/@${currentUser.username}`,
         }
       : null;
+  // リアクションの入口（モバイルのミートボール・ズーム表示）に渡す一式。
+  const reactionData: ReactionMenuData = {
+    initialSnapshot: initialReactionSnapshot,
+    canReact,
+    sendsToFediverse: fediverseSendable,
+    viewer: reactionViewer,
+    viewerType,
+    viewerDomain,
+  };
 
   // 前後の画像を取得
   // 公開TLからの場合: 全ユーザーの公開画像を対象
@@ -636,6 +645,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             大きく見たいときは画像タップでフル幅↔上限をトグルできる（ExpandableDetailImage）。 */}
         <div className="mb-2">
           <ExpandableDetailImage
+            imageId={imageId}
             src={imageUrl}
             alt={image.altText || image.overlayText}
             altText={image.altText}
@@ -645,6 +655,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             prev={modalPrev}
             next={modalNext}
             initialOpen={zoom === "1"}
+            reaction={canReact ? reactionData : undefined}
           />
         </div>
 
@@ -866,14 +877,7 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
               triggerClassName: PILL,
               // リアクション項目はこのメニューにだけ出す（上部の戻る行のミートボールにも
               // 出すと同じ導線が同じ画面に二重に並ぶ）。
-              reaction: {
-                initialSnapshot: initialReactionSnapshot,
-                canReact,
-                sendsToFediverse: fediverseSendable,
-                viewer: reactionViewer,
-                viewerType,
-                viewerDomain,
-              },
+              reaction: reactionData,
             })}
           </div>
         </div>

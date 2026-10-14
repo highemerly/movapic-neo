@@ -6,6 +6,8 @@ import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "@/components/Link";
 import { AltTextReveal } from "@/components/AltTextReveal";
 import { RetryImage } from "@/components/gallery/RetryImage";
+import type { ReactionMenuData } from "./ImageActionsMenu";
+import { ZoomReactionButton } from "./ZoomReactionButton";
 
 /** 全画面モーダル内の前後ナビ先。href は遷移先の詳細ページ（zoom=1 付き＝モーダルを開いたまま）。 */
 interface ModalNav {
@@ -24,8 +26,12 @@ interface ModalNav {
  *
  * ALT バッジ（AltTextReveal）は画像ボタンの兄弟要素として重なるので、バッジのタップはモーダルを
  * 開かない（別要素・最前面で ALT ダイアログを開く）。
+ *
+ * ログイン中でリアクションできる投稿なら、モーダル下部にリアクションボタンを出す（ZoomReactionButton）。
+ * ズームを閉じずにリアクションしてそのまま見続けられるようにするため。
  */
 export function ExpandableDetailImage({
+  imageId,
   src,
   alt,
   altText,
@@ -35,7 +41,9 @@ export function ExpandableDetailImage({
   prev,
   next,
   initialOpen = false,
+  reaction,
 }: {
+  imageId: string;
   src: string;
   alt: string;
   altText?: string | null;
@@ -47,6 +55,8 @@ export function ExpandableDetailImage({
   next?: ModalNav | null;
   /** URL の zoom=1 由来で初期表示からモーダルを開くか（前後遷移の連続表示用）。 */
   initialOpen?: boolean;
+  /** モーダル内のリアクションボタン用。リアクションできない（未ログイン等）ときは渡さない。 */
+  reaction?: ReactionMenuData;
 }) {
   const [open, setOpen] = useState(initialOpen);
 
@@ -67,7 +77,9 @@ export function ExpandableDetailImage({
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
+      // 上に重ねたリアクションピッカー（Radix Dialog）の Esc は、Radix が document の capture で
+      // 先に受けて preventDefault する。それを見て、ピッカーだけ閉じてズームは残す。
+      if (e.key === "Escape" && !e.defaultPrevented) close();
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -165,6 +177,11 @@ export function ExpandableDetailImage({
           </div>,
           document.body,
         )}
+
+      {/* オーバーレイの外（React ツリー上の兄弟）に置く。理由は ZoomReactionButton の pitfall 参照。 */}
+      {reaction?.canReact && (
+        <ZoomReactionButton imageId={imageId} open={open} reaction={reaction} />
+      )}
     </div>
   );
 }
