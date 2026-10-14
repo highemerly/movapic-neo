@@ -35,6 +35,35 @@ describe("totalXp", () => {
     ]);
     expect(xp).toBe(220);
   });
+
+  it("月間投稿日数は同じ月の上位に吸収する（20日の月は10日を数えない）", () => {
+    const xp = totalXp([
+      { key: "month-days:2026-10:10", category: "month-days" }, // 0（20日に吸収）
+      { key: "month-days:2026-10:20", category: "month-days" }, // 40
+      { key: "month-days:2026-11:10", category: "month-days" }, // 40（別の月は独立）
+    ]);
+    expect(xp).toBe(80);
+  });
+
+  it("皆勤賞の月は10日・20日とも数えない", () => {
+    const xp = totalXp([
+      { key: "perfect-month:2026-10", category: "perfect-month" }, // 100
+      { key: "month-days:2026-10:10", category: "month-days" }, // 0
+      { key: "month-days:2026-10:20", category: "month-days" }, // 0
+    ]);
+    expect(xp).toBe(100);
+  });
+
+  it("段が上がってもXPは減らない（10日→20日は±0、→皆勤賞は増える）", () => {
+    const m10 = { key: "month-days:2026-10:10", category: "month-days" };
+    const m20 = { key: "month-days:2026-10:20", category: "month-days" };
+    const pm = { key: "perfect-month:2026-10", category: "perfect-month" };
+    const a = totalXp([m10]);
+    const b = totalXp([m10, m20]);
+    const c = totalXp([m10, m20, pm]);
+    expect(b).toBeGreaterThanOrEqual(a);
+    expect(c).toBeGreaterThanOrEqual(b);
+  });
 });
 
 describe("cumulativeXpForLevel / levelForXp", () => {

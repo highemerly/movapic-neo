@@ -21,12 +21,18 @@ import {
   CATALOG_BY_KEY,
   ACHIEVEMENT_LAYOUT,
   LADDER_META,
+  MONTH_DAYS_CATEGORY,
   PERFECT_MONTH_CATEGORY,
   SEASON_CATEGORY,
   resolveAchievement,
   type AchievementDef,
   type AchievementRank,
 } from "@/lib/achievements/catalog";
+import {
+  MONTH_DAYS_TIERS,
+  parseMonthDaysKey,
+  withoutAbsorbedMonthDays,
+} from "@/lib/achievements/monthDays";
 
 export interface GrantedItem {
   key: string;
@@ -53,12 +59,18 @@ function formatDate(iso: string): string {
   });
 }
 
-/** "perfect-month:2026-05" → "2026年5月" */
-function monthLabel(key: string): string {
-  const ym = key.slice(PERFECT_MONTH_CATEGORY.length + 1); // "2026-05"
+/** "2026-05" → "2026年5月" */
+function ymLabel(ym: string): string {
   const [y, m] = ym.split("-");
   return `${y}年${Number(m)}月`;
 }
+
+/** "perfect-month:2026-05" → "2026年5月" */
+function monthLabel(key: string): string {
+  return ymLabel(key.slice(PERFECT_MONTH_CATEGORY.length + 1));
+}
+
+const MONTH_DAYS_DESCRIPTION = `1ヶ月のうち${MONTH_DAYS_TIERS.join("日・")}日投稿すると獲得できます（穴埋めした日は数えません）`;
 
 /** 金/銀トロフィーのアイコン（中を塗りつぶし）。 */
 function RankBadge({ rank, className }: { rank: AchievementRank; className?: string }) {
@@ -91,35 +103,53 @@ type Entry =
   | { id: string; kind: "single"; def: AchievementDef }
   | { id: string; kind: "ladder"; ladderKey: string; defs: AchievementDef[] }
   | { id: string; kind: "perfectMonth" }
+  | { id: string; kind: "monthDays" }
   | { id: string; kind: "season" };
 
-/** 実績 key（単発キー・ラダーの段キー・皆勤賞キー・シーズンキーのいずれか）が、このエントリのモーダルで表示されるか。 */
+/** 動的キーの実績（皆勤賞・月間投稿日数・シーズン）を系列ごとに分けたもの。 */
+interface DynamicGranted {
+  perfectMonths: GrantedItem[];
+  monthDays: GrantedItem[];
+  seasons: GrantedItem[];
+}
+
+/** 実績 key（単発キー・ラダーの段キー・動的キーのいずれか）が、このエントリのモーダルで表示されるか。 */
 function entryMatchesKey(entry: Entry, key: string): boolean {
   if (entry.kind === "single") return entry.def.key === key;
   if (entry.kind === "ladder") return entry.defs.some((d) => d.key === key);
   if (entry.kind === "season") return key.startsWith(`${SEASON_CATEGORY}:`);
+  if (entry.kind === "monthDays") return parseMonthDaysKey(key) != null;
   return key.startsWith(`${PERFECT_MONTH_CATEGORY}:`); // perfectMonth
 }
 
 /** エントリが1つでも獲得済みか（獲得演出を出してよいかの判定に使う）。 */
-function isEntryAchieved(
-  entry: Entry,
-  grantedMap: Map<string, string>,
-  perfectMonths: GrantedItem[],
-  seasons: GrantedItem[]
-): boolean {
+function isEntryAchieved(entry: Entry, grantedMap: Map<string, string>, dyn: DynamicGranted): boolean {
   if (entry.kind === "single") return grantedMap.has(entry.def.key);
   if (entry.kind === "ladder") return entry.defs.some((d) => grantedMap.has(d.key));
-  if (entry.kind === "season") return seasons.length > 0;
-  return perfectMonths.length > 0;
+  if (entry.kind === "season") return dyn.seasons.length > 0;
+  if (entry.kind === "monthDays") return dyn.monthDays.length > 0;
+  return dyn.perfectMonths.length > 0;
 }
 
-function tileModel(
-  entry: Entry,
-  grantedMap: Map<string, string>,
-  perfectMonths: GrantedItem[],
-  seasons: GrantedItem[]
-): TileModel {
+/** 月間投稿日数の獲得を月ごとにまとめる（新しい月順）。tiers は到達した段の昇順。 */
+function groupMonthDays(items: GrantedItem[]): { ym: string; tiers: number[]; grantedAt: string }[] {
+  const byYm = new Map<string, { tiers: number[]; grantedAt: string }>();
+  for (const g of items) {
+    const parsed = parseMonthDaysKey(g.key);
+    if (!parsed) continue;
+    const cur = byYm.get(parsed.ym) ?? { tiers: [], grantedAt: g.grantedAt };
+    cur.tiers.push(parsed.tier);
+    // 獲得日は最上段に届いた日（その月の到達点として見せる）
+    if (g.grantedAt > cur.grantedAt) cur.grantedAt = g.grantedAt;
+    byYm.set(parsed.ym, cur);
+  }
+  return [...byYm.entries()]
+    .map(([ym, v]) => ({ ym, tiers: v.tiers.sort((a, b) => a - b), grantedAt: v.grantedAt }))
+    .sort((a, b) => b.ym.localeCompare(a.ym));
+}
+
+function tileModel(entry: Entry, grantedMap: Map<string, string>, dyn: DynamicGranted): TileModel {
+  const { perfectMonths, seasons, monthDays } = dyn;
   if (entry.kind === "single") {
     const { def } = entry;
     const achieved = grantedMap.has(def.key);
@@ -156,6 +186,19 @@ function tileModel(
       progress: any
         ? seasons.map(() => ({ rank: "gold" as const, done: true }))
         : [{ rank: "gold" as const, done: false }],
+    };
+  }
+  if (entry.kind === "monthDays") {
+    // 月間投稿日数（毎月増える。獲得した段の数ぶん銀ドットを並べる）
+    const any = monthDays.length > 0;
+    return {
+      icon: "CalendarCheck",
+      name: "月間投稿",
+      rank: any ? "silver" : null,
+      achieved: any,
+      progress: any
+        ? monthDays.map(() => ({ rank: "silver" as const, done: true }))
+        : [{ rank: "silver" as const, done: false }],
     };
   }
   // perfectMonth（段数は固定でなく毎月増えるので、獲得した月の数ぶん金ドットを並べる）
@@ -236,16 +279,14 @@ function DetailBody({
   entry,
   grantedMap,
   ladderValues,
-  perfectMonths,
-  seasons,
+  dyn,
   currentMonthPerfect,
   celebrate = false,
 }: {
   entry: Entry;
   grantedMap: Map<string, string>;
   ladderValues: Record<string, number>;
-  perfectMonths: GrantedItem[];
-  seasons: GrantedItem[];
+  dyn: DynamicGranted;
   /** 当月の穴埋めルール（説明文の出し分けに使う）。 */
   currentMonthPerfect: CurrentMonthPerfect;
   /** 獲得演出中はアイコンをポップさせる（ディープリンク到達時のみ true） */
@@ -341,8 +382,44 @@ function DetailBody({
     );
   }
 
+  if (entry.kind === "monthDays") {
+    const months = groupMonthDays(dyn.monthDays);
+    const any = months.length > 0;
+    return (
+      <DetailShell
+        icon="CalendarCheck"
+        title="月間投稿"
+        rank={any ? "silver" : null}
+        achieved={any}
+        celebrate={celebrate}
+        description={MONTH_DAYS_DESCRIPTION}
+      >
+        {any ? (
+          <ul className="space-y-1.5">
+            {months.map((mo) => (
+              <li key={mo.ym} className="flex items-center justify-between gap-2 text-xs">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <RankBadge rank="silver" className="h-3.5 w-3.5" />
+                  {ymLabel(mo.ym)}
+                  <span className="tabular-nums text-muted-foreground">
+                    （{mo.tiers[mo.tiers.length - 1]}日投稿）
+                  </span>
+                </span>
+                <span className="text-[11px] text-amber-700 dark:text-amber-400">
+                  {formatDate(mo.grantedAt)} に獲得
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-muted-foreground">まだ獲得していません</p>
+        )}
+      </DetailShell>
+    );
+  }
+
   if (entry.kind === "season") {
-    const sorted = [...seasons].sort((a, b) => b.grantedAt.localeCompare(a.grantedAt)); // 新しい獲得順
+    const sorted = [...dyn.seasons].sort((a, b) => b.grantedAt.localeCompare(a.grantedAt)); // 新しい獲得順
     const any = sorted.length > 0;
     return (
       <DetailShell
@@ -378,7 +455,7 @@ function DetailBody({
   }
 
   // perfectMonth
-  const sorted = [...perfectMonths].sort((a, b) => b.key.localeCompare(a.key)); // 新しい月順
+  const sorted = [...dyn.perfectMonths].sort((a, b) => b.key.localeCompare(a.key)); // 新しい月順
   const any = sorted.length > 0;
   return (
     <DetailShell
@@ -494,15 +571,14 @@ export function AchievementsView({
     [granted]
   );
 
-  // 皆勤賞（動的・毎月+1）
-  const perfectMonths = useMemo(
-    () => granted.filter((g) => g.category === PERFECT_MONTH_CATEGORY),
-    [granted]
-  );
-
-  // シーズン（動的・参加シーズンごとに+1）
-  const seasons = useMemo(
-    () => granted.filter((g) => g.category === SEASON_CATEGORY),
+  // 動的キーの実績: 皆勤賞（毎月+1）・月間投稿日数（皆勤賞を取れなかった月の到達点）・シーズン（参加シーズンごとに+1）
+  const dyn = useMemo<DynamicGranted>(
+    () => ({
+      perfectMonths: granted.filter((g) => g.category === PERFECT_MONTH_CATEGORY),
+      // 同じ月の上位（皆勤賞・20日）に吸収されたものは出さない（行は残っている。monthDays.ts）
+      monthDays: withoutAbsorbedMonthDays(granted).filter((g) => g.category === MONTH_DAYS_CATEGORY),
+      seasons: granted.filter((g) => g.category === SEASON_CATEGORY),
+    }),
     [granted]
   );
 
@@ -515,6 +591,9 @@ export function AchievementsView({
           .map((block): Entry | null => {
             if (block.kind === "perfectMonth") {
               return { id: "perfect-month", kind: "perfectMonth" };
+            }
+            if (block.kind === "monthDays") {
+              return { id: "month-days", kind: "monthDays" };
             }
             if (block.kind === "season") {
               return { id: "season", kind: "season" };
@@ -556,7 +635,7 @@ export function AchievementsView({
     () =>
       celebrateParam &&
       initialEntry != null &&
-      isEntryAchieved(initialEntry, grantedMap, perfectMonths, seasons)
+      isEntryAchieved(initialEntry, grantedMap, dyn)
   );
 
   const openTile = (entry: Entry) => {
@@ -571,6 +650,10 @@ export function AchievementsView({
   };
   const openPerfect = () => {
     const entry = sections.flatMap((s) => s.entries).find((e) => e.kind === "perfectMonth");
+    if (entry) openTile(entry);
+  };
+  const openMonthDays = () => {
+    const entry = sections.flatMap((s) => s.entries).find((e) => e.kind === "monthDays");
     if (entry) openTile(entry);
   };
 
@@ -592,6 +675,7 @@ export function AchievementsView({
         isOwner={isOwner}
         onOpen={openByKey}
         onOpenPerfect={openPerfect}
+        onOpenMonthDays={openMonthDays}
       />
 
       <section>
@@ -607,7 +691,7 @@ export function AchievementsView({
                 {section.entries.map((entry) => (
                   <Tile
                     key={entry.id}
-                    model={tileModel(entry, grantedMap, perfectMonths, seasons)}
+                    model={tileModel(entry, grantedMap, dyn)}
                     onClick={() => openTile(entry)}
                   />
                 ))}
@@ -651,8 +735,7 @@ export function AchievementsView({
               entry={selected}
               grantedMap={grantedMap}
               ladderValues={ladderValues}
-              perfectMonths={perfectMonths}
-              seasons={seasons}
+              dyn={dyn}
               currentMonthPerfect={currentMonthPerfect}
               celebrate={celebrate}
             />

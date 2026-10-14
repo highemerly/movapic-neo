@@ -13,12 +13,14 @@ import prisma from "@/lib/db";
 import { toJstDateString } from "@/lib/streak";
 import { formatYm, jstMonthRange } from "@/lib/jst";
 import { donorRange, donorTargetYm } from "@/lib/makeup/donor";
+import { isMakeupEditable } from "@/lib/makeup/points";
 import {
   canPromptMakeup,
   currentMonthMakeupStatus,
   daysInMonthOf,
   isPerfectMonth,
 } from "@/lib/achievements/perfectMonth";
+import { daysLeftToPost, monthDaysGoal, type MonthDaysGoal } from "@/lib/achievements/monthDays";
 
 /**
  * 当月の穴埋め促しコールアウト（本人表示用）。
@@ -89,6 +91,17 @@ export interface ResolvedCalendarMonth {
    * 過去月は月の全日が対象。
    */
   unfilledDays: number;
+  /**
+   * この月の皆勤賞にまだ手が届くか（達成済みの月も true）。未来月は true。
+   * - 当月: 今日より前の未投稿日が、月内に付与されうる分も含めた上限（potentialCap）以内
+   * - 過去月: 穴埋めの締切前で、未投稿日が上限（makeupCap）以内
+   * false の月は、本人向けの案内を皆勤賞から月間投稿日数の目標に切り替える。
+   */
+  perfectAchievable: boolean;
+  /** 1枚以上投稿した日数（穴埋めは数えない＝月間投稿日数の実績と同じ数え方）。 */
+  postedDays: number;
+  /** 月間投稿日数の次の目標（過去月は届いた段で確定）。未来月は none。 */
+  monthDaysGoal: MonthDaysGoal;
 }
 
 /**
@@ -297,6 +310,9 @@ export function resolveCalendarMonth(args: {
   let callout: MakeupCallout | null = null;
   let makeupRemaining = 0;
   let unfilledDays = 0;
+  let perfectAchievable = true;
+  const postedDays = Object.keys(dayCounts).length;
+  let goal: MonthDaysGoal = { kind: "none" };
 
   if (!isFutureMonth) {
     filledHoleDays = donorRows.map((d) => d.holeDay).filter((h) => !days[h]);
@@ -338,6 +354,17 @@ export function resolveCalendarMonth(args: {
         else if (status.todayPosts >= 2) callout = "ready";
         else callout = "today";
       }
+      perfectAchievable = isPerfectAttendance || status.stillAchievable;
+      goal = monthDaysGoal({
+        postedDays,
+        daysLeft: daysLeftToPost({ daysInMonth, todayDayNum, postedToday: status.todayPosts >= 1 }),
+      });
+    } else {
+      // 過去月は上限が凍結しているので、締切前かつ未投稿日が上限以内なら穴埋めで届く。
+      perfectAchievable =
+        isPerfectAttendance ||
+        (isMakeupEditable(ym, now) && daysInMonth - postedDays <= makeupCap);
+      goal = monthDaysGoal({ postedDays, daysLeft: 0 });
     }
   }
 
@@ -353,5 +380,8 @@ export function resolveCalendarMonth(args: {
     callout,
     makeupRemaining,
     unfilledDays,
+    perfectAchievable,
+    postedDays,
+    monthDaysGoal: goal,
   };
 }

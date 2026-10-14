@@ -20,11 +20,13 @@ import { notifyMakeupProgressOnPost } from "@/lib/makeup/notify";
 import { isPointEra } from "@/lib/makeup/points";
 import {
   CATALOG,
+  evaluateMonthDays,
   evaluatePerfectMonth,
   evaluateSeason,
   isPostAchievement,
   isProfileAchievement,
   isReactionAchievement,
+  MONTH_DAYS_CATEGORY,
   PERFECT_MONTH_CATEGORY,
   SEASON_CATEGORY,
   type AchStats,
@@ -75,6 +77,10 @@ export function selectNewlyGranted(
   const pm = evaluatePerfectMonth(stats, post, grace);
   if (pm && !ownedKeys.has(pm)) {
     out.push({ key: pm, category: PERFECT_MONTH_CATEGORY });
+  }
+  // 月間投稿日数（10日・20日）: 投稿した月に到達している段のうち未付与のもの。
+  for (const key of evaluateMonthDays(stats, post)) {
+    if (!ownedKeys.has(key)) out.push({ key, category: MONTH_DAYS_CATEGORY });
   }
   // シーズン（期間限定）: この投稿が season を持てば、そのシーズンのバッジを付与。
   const season = evaluateSeason(post);
@@ -166,10 +172,14 @@ async function grantAll(
     });
     // 穴埋めポイント: その月に実績を1つでも達成したら+1pt（月1回）。実績付与の唯一の入口なので
     // ここに1つだけ置く（投稿・リアクション・プロフィール・皆勤賞の再判定がすべて通る）。
+    // ただし月間投稿日数は対象外: 月10日投稿する人は毎月ほぼ確実に届き、実質全員の穴埋め枠が
+    // 毎月+1されてポイント制の設計が変わるため（monthDays.ts）。
     // ポイントの失敗で実績の結果を失わないよう握りつぶす。
-    await maybeGrantAchievementPoint({ userId, now: new Date() }).catch((e) =>
-      console.error("Achievement makeup point failed:", e)
-    );
+    if (granted.some((g) => g.category !== MONTH_DAYS_CATEGORY)) {
+      await maybeGrantAchievementPoint({ userId, now: new Date() }).catch((e) =>
+        console.error("Achievement makeup point failed:", e)
+      );
+    }
   }
   return granted;
 }

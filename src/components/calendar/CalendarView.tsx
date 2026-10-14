@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { parseApiError, formatErrorMessage } from "@/lib/errors";
 import { isJapaneseHoliday } from "@/lib/holidays";
 import { PERFECT_MONTH_GRACE_DEFAULT } from "@/lib/achievements/perfectMonth";
+import { MONTH_DAYS_TIERS } from "@/lib/achievements/monthDays";
 import { formatYm } from "@/lib/jst";
 import { isPointEra } from "@/lib/makeup/points";
 import Link from "@/components/Link";
@@ -485,7 +486,13 @@ export function CalendarView({
       >
         {/* 本人向け: 穴埋めポイントの案内（残り・消費済み・付与履歴）。値は月ごとにAPIから受け取る */}
         {isOwner && data?.perfectMonth?.makeup?.pointEra && (
-          <MakeupPointsCallout month={month} makeup={data.perfectMonth.makeup} favorServers={favorServers} isFavorUser={isFavorUser} />
+          <MakeupPointsCallout
+            month={month}
+            isCurrentMonth={data.perfectMonth.isCurrentMonth}
+            makeup={data.perfectMonth.makeup}
+            favorServers={favorServers}
+            isFavorUser={isFavorUser}
+          />
         )}
         {/* 2026-09 以前の月: 従来の穴埋め促しコールアウト */}
         {isOwner && data?.perfectMonth && !isPointEra(formatYm(year, month)) && (
@@ -624,6 +631,7 @@ export function CalendarView({
         </p>
         <p>
           1ヶ月間毎日投稿すれば、カレンダーが埋まって皆勤賞の称号が得られます。皆勤賞はSHAMEZOにおける最高の栄誉です。
+          毎日が難しくても、1ヶ月に{MONTH_DAYS_TIERS.join("日・")}日投稿すれば実績を獲得できます。
         </p>
         {isPointEra(formatYm(year, month)) ? (
           // 本人のポイント制の月は、穴埋めの説明とルールを上部の案内（とモーダル）に出しているので重ねない

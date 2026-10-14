@@ -28,10 +28,13 @@ import {
 import {
   CATALOG,
   CATALOG_BY_KEY,
+  MONTH_DAYS_CATEGORY,
+  PERFECT_MONTH_CATEGORY,
   SECTIONS,
   resolveAchievement,
   type AchievementRank,
 } from "@/lib/achievements/catalog";
+import { absorbedMonthDaysKeys } from "@/lib/achievements/monthDays";
 
 /** 公開面に出ている投稿の共通フィルタ。 */
 const PUBLIC_WHERE = { isPublic: true, isDisabled: false } as const;
@@ -168,18 +171,36 @@ export interface AchievementStats {
 
 /** 実績の取得状況（サービス全体・key ごとの保有ユーザー数）。 */
 async function getAchievementStats(): Promise<AchievementStats> {
-  const [totalUsers, grouped] = await Promise.all([
+  const [totalUsers, grouped, monthlyRows] = await Promise.all([
     prisma.user.count(),
     prisma.achievement.groupBy({ by: ["key"], _count: { _all: true } }),
+    // 月間投稿日数の吸収判定には、ユーザーごとに同じ月の皆勤賞・上位の段の有無が要る
+    prisma.achievement.findMany({
+      where: { category: { in: [MONTH_DAYS_CATEGORY, PERFECT_MONTH_CATEGORY] } },
+      select: { userId: true, key: true },
+    }),
   ]);
   const holders = new Map(grouped.map((g) => [g.key, g._count._all]));
 
+  // 同じ月の上位（皆勤賞・20日）に吸収された月間投稿日数は、実績タブと同じく持っていない扱いにする
+  // （行は残っている。monthDays.ts）。数えると「10日投稿」の取得率に皆勤賞の人が全員入ってしまう。
+  const monthlyByUser = new Map<string, string[]>();
+  for (const r of monthlyRows) {
+    const arr = monthlyByUser.get(r.userId) ?? [];
+    arr.push(r.key);
+    monthlyByUser.set(r.userId, arr);
+  }
+  for (const userKeys of monthlyByUser.values()) {
+    for (const k of absorbedMonthDaysKeys(userKeys)) holders.set(k, (holders.get(k) ?? 0) - 1);
+  }
+
   // ラダー（段階実績）は「ユーザー分布」（getDistributionStats）で実数値を見せるため、
-  // ここでは単発実績と動的キー（皆勤賞・シーズン）だけを取得率として扱う。
+  // ここでは単発実績と動的キー（皆勤賞・月間投稿日数・シーズン）だけを取得率として扱う。
+  // 動的キーは保有者がいるものだけ並べる（吸収で0人になった段は出さない）。
   const isLadder = (key: string) => !!CATALOG_BY_KEY.get(key)?.ladderKey;
   const keys = new Set<string>([
     ...CATALOG.filter((d) => !d.ladderKey).map((d) => d.key),
-    ...[...holders.keys()].filter((k) => !isLadder(k)),
+    ...[...holders.entries()].filter(([k, n]) => !isLadder(k) && n > 0).map(([k]) => k),
   ]);
 
   const rows: (AchievementStatRow & { section: string })[] = [...keys].map((key) => {

@@ -5,6 +5,7 @@ import {
   selectNewlyGrantedReaction,
 } from "./engine";
 import {
+  MONTH_DAYS_CATEGORY,
   PERFECT_MONTH_CATEGORY,
   SEASON_CATEGORY,
   type AchStats,
@@ -153,7 +154,7 @@ describe("selectNewlyGranted: 単発・シークレット述語", () => {
   });
 });
 
-describe("selectNewlyGranted: 動的キー（皆勤賞・シーズン）", () => {
+describe("selectNewlyGranted: 動的キー（皆勤賞・月間投稿日数・シーズン）", () => {
   it("皆勤月は perfect-month:YYYY-MM を付与する", () => {
     // 2026年6月（30日）を全日投稿
     const dayCounts: Record<number, number> = {};
@@ -166,6 +167,20 @@ describe("selectNewlyGranted: 動的キー（皆勤賞・シーズン）", () =>
     );
     const pm = cands.find((c) => c.key === "perfect-month:2026-06");
     expect(pm?.category).toBe(PERFECT_MONTH_CATEGORY);
+  });
+
+  it("月10日投稿で month-days:YYYY-MM:10 を付与し、取得済みの段は重複しない", () => {
+    const cands = selectNewlyGranted(stats({ distinctDaysInPostMonth: 10 }), post(), new Set(), GRACE);
+    expect(cands.find((c) => c.key === "month-days:2026-06:10")?.category).toBe(MONTH_DAYS_CATEGORY);
+    expect(cands.map((c) => c.key)).not.toContain("month-days:2026-06:20");
+
+    const at20 = keysOf(
+      stats({ distinctDaysInPostMonth: 20 }),
+      post(),
+      new Set(["month-days:2026-06:10"])
+    );
+    expect(at20).toContain("month-days:2026-06:20");
+    expect(at20).not.toContain("month-days:2026-06:10");
   });
 
   it("season 投稿は season:<key> を付与し、取得済みなら重複しない", () => {

@@ -8,6 +8,7 @@
 |---|---|
 | `catalog.ts` | 実績定義（カタログ）・カテゴリ／表示順（`ACHIEVEMENT_LAYOUT`）・皆勤賞の動的評価。**サーバー/クライアント両方から import されるので React・サーバー専用APIを入れない**（型・`@/lib/streak`・`@/types` のみ） |
 | `perfectMonth.ts` | **皆勤賞ロジックの単一ソース**。上限 `grace`（＝その月に穴埋めできる日数。出所は問わない）を受け取る純粋関数群: 穴埋め割当の貪欲決定（`pickMakeupHole` / `assignMonthMakeups`）・達成判定（`isPerfectMonth`）・当月進捗（`currentMonthMakeupStatus`）・今すぐ割当可能か（`hasAssignableMakeup`）・促してよいか（`canPromptMakeup`）・日別集計。2026-09 以前の固定値 `PERFECT_MONTH_GRACE_*` と旧通知ゲート `shouldRemindMakeup` もここ。catalog 同様 React/サーバー専用APIを入れない。**穴埋め割当は Image.makeupTargetDay に永続化し、表示（カレンダー）も判定（皆勤賞）も同じ永続値を読む**＝表示と👑が食い違わない |
+| `monthDays.ts` | **月間投稿日数（10日・20日）の単一ソース**。動的キー `month-days:YYYY-MM:N`・しきい値・「次の目標」（`monthDaysGoal`）。皆勤賞が不可能になった月の案内（実績タブの次のステップ・カレンダー上部）もここから組む。catalog 同様 React/サーバー専用APIを入れない |
 | `grace.ts` | 2026-09 以前の月の固定上限（`perfectMonthGrace(domain)` ＝ 特典サーバー4・その他3）。env を読むので perfectMonth.ts から分離。**月を問わず上限が欲しいときは `@/lib/makeup/ledger` の `resolveMakeupCap` を使う** |
 | `makeupAssign.ts` | 2026-09 以前の月専用の自動穴埋め（`assignMakeupForNewPost` / `recomputeMonthMakeups`）。2026-10 以降は呼ばれない（[cleanup-2026-10](../../../docs/cleanup-2026-10.md) で削除予定） |
 | `../makeup/*` | **穴埋めポイント制（2026-10〜）**。`points.ts`（純粋: era・付与量・締切・potentialCap）/ `donor.ts`（純粋: donor になれる範囲＝月またぎ・割当がどの月の穴を指すかの解決・月の割当状況の組み立て）/ `ledger.ts`（上限の解決・付与・直列化ロック）/ `awards.ts`（登録時・実績時の付与）/ `events.ts`（イベント一覧）/ `monthlyGrants.ts`（定期ジョブの月次・イベント付与）/ `notify.ts`（穴埋めを促す通知）/ `notificationTypes.ts`（通知の type・文言・遷移先）/ `selfHeal.ts`（画像削除後の失効掃除） |
@@ -153,7 +154,7 @@ npm run build             # 本番ビルド（新ルート・静的解析）
   | `favor-monthly` | 定期ジョブ＋登録時 | FAVOR_SERVERS 所属（登録月も付与） | 1 | `monthlyGrants.ts` / `awards.grantSignupMakeupPoints` |
   | `monthly-catchup` | 定期ジョブ（11日以降） | 当月1日より前に登録・先月が皆勤でない（**データから再計算**） | 1 | `monthlyGrants.ts` |
   | `signup` | 登録時 | 常に（0pt なら行を作らない） | `min(登録日-1, 8)` | `awards.grantSignupMakeupPoints` |
-  | `achievement` | 実績を付与した瞬間 | その月に1回 | 1 | `grantAll` → `awards.maybeGrantAchievementPoint` |
+  | `achievement` | 実績を付与した瞬間 | その月に1回（**月間投稿日数の実績だけでは発火しない**） | 1 | `grantAll` → `awards.maybeGrantAchievementPoint` |
   | `event:<key>` | 定期ジョブ（イベントの期間中） | イベントごと（例: 開始時点で登録済み） | イベントごと | `events.ts` の一覧 → `monthlyGrants.ts` |
 
   - イベントは `src/lib/makeup/events.ts` に1件足すだけで配られる（キー・名前・付与先の月・量・開始日時・対象）。付与は開始日時以降かつ付与先の月の間だけ。表示名（付与履歴・通知）は一覧から引くので、**終わったイベントも一覧から消さない**。キーは台帳の reason になるのでリネーム・使い回し禁止。
@@ -209,6 +210,18 @@ donor を同月に限ると**月末日を忘れた人だけが構造的に救済
 - カレンダーAPI（`/api/v1/public/users/[username]/calendar`）は永続割当を読んで代表サムネ・穴埋め表示・👑を返す（オンザフライ貪欲は使わない）。上限は**持ち主について**解決するので、非ownerの公開キャッシュは安全。
 - 本人（owner）にだけ `perfectMonth.makeup`（上限・使用・残り・締切・付与履歴）と編集用の候補（`ownerEdit`）を返し、キャッシュは private。UI はカレンダー上部の `MakeupPointsCallout` でこの値を使う（ページから固定の数字を渡さない＝月送りに追従）。常に出すのは「未投稿◯日 / 残り◯pt」の1行だけで、説明と「詳細なルール」「穴埋めポイント（獲得方法・付与と消費・持ち越し不可）」のモーダルは折りたたむ（スマホで上部が長くならないように）。カレンダー上の獲得方法・ルールは簡略版で、正確な条件は /docs/spec。
 - 当月コールアウト `callout`: `today`（今日あと1枚で埋められる）/ `ready`（今日2枚済み・未割当＝今すぐ埋められる）/ `tomorrow`（今日は donor 使用済み）/ `no-points`（達成可能だがポイント0）。**画面に出すのは 2026-09 以前の月だけ**（ポイント制の月は上部を穴埋めポイントの案内に置き換えた）。
+
+## 特殊: 月間投稿日数（動的キー・皆勤賞の手前の目標）
+
+月ごとにリセットされる目標が皆勤賞（0か100か）しか無いと、皆勤賞が不可能になった瞬間にその月の目標が消え、残りの日に投稿する理由が無くなる。そこで皆勤賞の手前に「その月に10日・20日投稿」の実績を置き、皆勤賞が不可能になった月は案内をこちらの目標に切り替える。単一ソースは `monthDays.ts`。
+
+- キーは `month-days:YYYY-MM:N`（N=10/20）・category `month-days`・**銀固定**（皆勤賞👑との格差を保つ）。
+- **同じ月の上位に吸収する**（`absorbedMonthDaysKeys` / `withoutAbsorbedMonthDays`）: 皆勤賞の月は10日・20日とも、20日の月は10日を、**実績タブ・金銀の数（`countRanks`）・XP（`totalXp`）・/stats の取得人数**から外す＝その月の到達点1つだけを見せる。10日・20日は投稿の瞬間に付与され、皆勤賞は締切まで確定しないので付与時点では避けられないため、**行は消さず**表示・集計の入口で外す（剥奪しない不変条件を保つ）。付与時の通知と画像詳細の「この投稿で獲得した実績」はその時点の記録として残す。
+  - 渡すのは**1ユーザーぶんの全件**（一部だけだと上位の有無を見落とす）。実績を数える箇所を増やすときも必ず通す。
+  - 上位の段ほどXPが小さくならない（20日 >= 10日・皆勤賞 >= 20日）ことがXP単調増加の前提。ランクやしきい値を変えるときは崩さないこと。皆勤賞と同じく CATALOG に入れず `evaluateMonthDays` で評価し、実績タブは `{ kind: "monthDays" }` ブロック。
+- **数えるのは実際に投稿した日数（`AchStats.distinctDaysInPostMonth`）だけ。穴埋めは数えない**。穴埋めは皆勤賞のための救済で、編集モード（PATCH）で後から付け外しされるため、数えると投稿以外の評価経路が要る。投稿した日数は投稿の瞬間にしか増えないので、評価は投稿起点だけで閉じる（live=`selectNewlyGranted`・backfill=`replayUser` が同じ関数を呼ぶ）。
+- **実績pt（`achievement` +1pt）の対象外**（`grantAll` で月間投稿日数だけの付与なら呼ばない）。月10日投稿する人は毎月ほぼ確実に届くため、対象にすると実質的に全員の穴埋め枠が毎月+1されてポイント制の設計が変わる。
+- 「皆勤賞が不可能か」は既存の判定を使う: 当月は `currentMonthMakeupStatus().stillAchievable`（`potentialCap` 基準）、過去月は「締切前かつ未投稿日が上限以内」（`resolveCalendarMonth.perfectAchievable`）。不可能な月は、実績タブの「次のステップ」のトップカードとカレンダー上部の `MakeupPointsCallout` を `monthDaysGoal` の表示に切り替える。
 
 ## スキーマを変える場合（カラム追加など。通常は不要）
 

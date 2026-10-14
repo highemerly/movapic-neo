@@ -300,3 +300,62 @@ describe("resolveCalendarMonth: 今月/未来月とコールアウト", () => {
     expect(resolve(images, NOW, 1, 2).callout).toBeNull();
   });
 });
+
+describe("resolveCalendarMonth: 皆勤賞が不可能な月と月間投稿日数の目標", () => {
+  const days = (from: number, to: number) =>
+    Array.from({ length: to - from + 1 }, (_, i) => row(from + i));
+
+  it("当月: 未投稿日が potentialCap を超えたら不可能。目標は月内に届く次の段", () => {
+    const NOW = new Date("2024-06-20T03:00:00Z"); // JST 6/20・今日は未投稿
+    const r = resolve(days(1, 5), NOW, 3, 3); // 6〜19日の14日欠け
+    expect(r.perfectAchievable).toBe(false);
+    expect(r.postedDays).toBe(5);
+    // 今日を含めて残り11日 → 10日には届く
+    expect(r.monthDaysGoal).toEqual({ kind: "next", tier: 10, remaining: 5, reached: null });
+  });
+
+  it("当月: 未投稿日が potentialCap 以内なら、今の残高が0でもまだ可能", () => {
+    const NOW = new Date("2024-06-10T03:00:00Z");
+    const r = resolve([...days(1, 3), ...days(5, 9)], NOW, 0, 2); // 4日だけ欠け
+    expect(r.perfectAchievable).toBe(true);
+  });
+
+  it("当月: 今日投稿済みなら今日は残りに数えない", () => {
+    const NOW = new Date("2024-06-25T03:00:00Z"); // JST 6/25
+    const r = resolve([...days(1, 4), row(25)], NOW, 0, 0); // 5日投稿・今日投稿済み
+    // 26〜30日の5日しか足せない → 10日にちょうど届く
+    expect(r.monthDaysGoal).toEqual({ kind: "next", tier: 10, remaining: 5, reached: null });
+  });
+
+  it("過去月: 締切前でも未投稿日が上限を超えていれば不可能。目標は届いた段で確定", () => {
+    const r = resolve(days(1, 25), PAST_NOW, 3); // 26〜30日の5日欠け
+    expect(r.perfectAchievable).toBe(false);
+    expect(r.monthDaysGoal).toEqual({ kind: "reached", tier: 20 });
+  });
+
+  it("過去月: 締切前で未投稿日が上限以内なら、穴埋めでまだ届く", () => {
+    const r = resolve(days(1, 28), PAST_NOW, 3);
+    expect(r.perfectAchievable).toBe(true);
+  });
+
+  it("過去月: 締切（翌月10日）を過ぎたら、未投稿日が上限以内でも不可能", () => {
+    const AFTER_DEADLINE = new Date("2024-07-10T15:00:00Z"); // JST 7/11 00:00
+    const r = resolve(days(1, 28), AFTER_DEADLINE, 3);
+    expect(r.perfectAchievable).toBe(false);
+  });
+
+  it("達成済みの月は締切後でも可能（＝案内を切り替えない）", () => {
+    const AFTER_DEADLINE = new Date("2024-07-10T15:00:00Z");
+    expect(resolve(days(1, 30), AFTER_DEADLINE).perfectAchievable).toBe(true);
+  });
+
+  it("穴埋めした日は投稿した日数に数えない", () => {
+    const images = [
+      ...days(1, 9),
+      row(11),
+      row(11, { createdAt: jstNoon(11, 4), makeupTargetDay: 10 }), // 10日を穴埋め
+    ];
+    const r = resolve(images, PAST_NOW, 3);
+    expect(r.postedDays).toBe(10); // 1〜9日＋11日（10日は穴埋め）
+  });
+});

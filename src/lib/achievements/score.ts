@@ -18,6 +18,7 @@ import {
   countRanks,
   resolveAchievement,
 } from "./catalog";
+import { withoutAbsorbedMonthDays } from "./monthDays";
 
 /**
  * 実績1件あたりの獲得ポイント（ユーザー確定重み）。
@@ -35,10 +36,16 @@ export function achievementPoints(key: string, category?: string): number {
     : ACHIEVEMENT_POINTS.silver;
 }
 
-/** 獲得済み実績の合計XP（順位付けの基準にもなる単調増加スコア）。 */
+/**
+ * 獲得済み実績の合計XP（順位付けの基準にもなる単調増加スコア）。1ユーザーぶんの全件を渡す。
+ *
+ * 月間投稿日数は同じ月の上位に吸収したものを数えない（皆勤賞の月は10日・20日とも0・20日の月は10日が0）。
+ * 毎日投稿する人が毎月 皆勤賞＋20日＋10日 と三重にXPを得ると、XPに占める皆勤賞の比重が下がるため。
+ * 単調増加は崩れない: 10日(40)→20日(40)は差し替えで±0、→皆勤賞(100)は増える（monthDays.ts の前提）。
+ */
 export function totalXp(items: { key: string; category: string }[]): number {
   let sum = 0;
-  for (const it of items) sum += achievementPoints(it.key, it.category);
+  for (const it of withoutAbsorbedMonthDays(items)) sum += achievementPoints(it.key, it.category);
   return sum;
 }
 

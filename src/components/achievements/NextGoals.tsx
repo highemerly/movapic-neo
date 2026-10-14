@@ -1,9 +1,10 @@
-import { Footprints, Crown } from "lucide-react";
+import { Footprints, Crown, CalendarCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AchievementIcon } from "./AchievementIcon";
 import { SectionTitle } from "./SectionTitle";
 import { ladderNextGoals, type NextGoal } from "@/lib/achievements/nextGoals";
 import { coveredDays } from "@/lib/achievements/perfectMonth";
+import { daysLeftToPost, monthDaysGoal } from "@/lib/achievements/monthDays";
 import type { CurrentMonthPerfect } from "@/lib/achievements/stats";
 
 const MAX_LADDER_GOALS = 2; // 皆勤カード1枚 + ラダー2枚
@@ -84,34 +85,64 @@ function makeupHint(p: CurrentMonthPerfect, isOwner: boolean): string {
   return `残り${p.status.remaining}pt ・ 2枚投稿で穴埋めしよう`;
 }
 
-/**
- * 当月皆勤カードの表示内容を状況から決める。
- * 日数はすべて covered（投稿日＋穴埋め済みの日）基準で出す。穴埋めした日はカレンダー上も
- * 埋まって見えるため、実投稿日数で出すと「毎日埋めているのに 29/31」と食い違う。
- */
-function perfectCardProps(
-  p: CurrentMonthPerfect,
-  isOwner: boolean
-): {
+interface CardProps {
   remain: string;
   remainMuted: boolean;
   ratio: number;
   sub: string;
-} {
+}
+
+/**
+ * 皆勤賞が不可能になった月のカード（月間投稿日数の次の目標）。
+ * 以前は「今月は達成条件を達成できません」とだけ出していて、外した瞬間にその月の目標が消えていた。
+ * 日数は実際に投稿した日数（穴埋めは数えない＝月間投稿日数の実績と同じ数え方）。
+ */
+function monthDaysCardProps(p: CurrentMonthPerfect): CardProps {
+  const posted = p.distinctDays;
+  const goal = monthDaysGoal({
+    postedDays: posted,
+    daysLeft: daysLeftToPost({
+      daysInMonth: p.daysInMonth,
+      todayDayNum: p.todayDayNum,
+      postedToday: p.status.todayPosts >= 1,
+    }),
+  });
+  if (goal.kind === "next") {
+    return {
+      remain: `あと${goal.remaining}日`,
+      remainMuted: false,
+      ratio: posted / goal.tier,
+      sub: `${posted} / ${goal.tier}日投稿 ・ ${goal.tier}日投稿で実績獲得！`,
+    };
+  }
+  if (goal.kind === "reached") {
+    return {
+      remain: `${goal.tier}日 達成 🎉`,
+      remainMuted: true,
+      ratio: 1,
+      sub: `今月は${posted}日投稿 ・ 皆勤賞は来月トライしよう！`,
+    };
+  }
+  return {
+    remain: "来月トライしよう！",
+    remainMuted: true,
+    ratio: posted / p.daysInMonth,
+    sub: `今月は${posted}日投稿`,
+  };
+}
+
+/**
+ * 当月皆勤カードの表示内容を状況から決める（皆勤賞にまだ手が届く月だけ。不可能な月は monthDaysCardProps）。
+ * 日数はすべて covered（投稿日＋穴埋め済みの日）基準で出す。穴埋めした日はカレンダー上も
+ * 埋まって見えるため、実投稿日数で出すと「毎日埋めているのに 29/31」と食い違う。
+ */
+function perfectCardProps(p: CurrentMonthPerfect, isOwner: boolean): CardProps {
   const covered = coveredDays(p.distinctDays, p.status);
   const ratio = p.daysInMonth > 0 ? covered / p.daysInMonth : 0;
   // 残りは「まだ押さえていない日数」＝ 今日を含む未投稿日（月末までの日数ではない）。
   const daysLeft = Math.max(0, p.daysInMonth - covered);
   if (p.achieved) {
     return { remain: "達成 🎉", remainMuted: true, ratio: 1, sub: `${covered} / ${p.daysInMonth}日 投稿` };
-  }
-  if (!p.status.stillAchievable) {
-    return {
-      remain: "来月トライしよう！",
-      remainMuted: true,
-      ratio,
-      sub: `今月は達成条件を達成できません`,
-    };
   }
   // まだ達成可能。埋めるべき穴があれば穴埋めを最優先で促す。
   if (p.status.unfilled > 0) {
@@ -133,6 +164,7 @@ function perfectCardProps(
 /**
  * 「次のステップ」（あと少しで届く目標のナビ）。
  * 当月の皆勤賞を常にトップ固定し、残り枠を達成率の高い未獲得ラダーで埋める。
+ * 当月の皆勤賞が不可能になったら、トップは月間投稿日数の次の目標に差し替える。
  * 追加クエリは当月皆勤の集計のみ（currentMonthPerfect として親から渡す）。
  */
 export function NextGoals({
@@ -142,6 +174,7 @@ export function NextGoals({
   isOwner,
   onOpen,
   onOpenPerfect,
+  onOpenMonthDays,
 }: {
   grantedKeys: Set<string>;
   ladderValues: Record<string, number>;
@@ -152,23 +185,27 @@ export function NextGoals({
   onOpen: (achievementKey: string) => void;
   /** 皆勤カードのタップ（皆勤賞の詳細モーダルを開く）。 */
   onOpenPerfect: () => void;
+  /** 月間投稿日数カードのタップ（月間投稿の詳細モーダルを開く）。 */
+  onOpenMonthDays: () => void;
 }) {
   const goals: NextGoal[] = ladderNextGoals(grantedKeys, ladderValues).slice(0, MAX_LADDER_GOALS);
-  const pc = perfectCardProps(currentMonthPerfect, isOwner);
+  const p = currentMonthPerfect;
+  const perfectOut = !p.achieved && !p.status.stillAchievable;
+  const pc = perfectOut ? monthDaysCardProps(p) : perfectCardProps(p, isOwner);
 
   return (
     <section>
       <SectionTitle icon={Footprints} title="次のステップ" />
       <div className="space-y-2">
         <GoalCard
-          icon={<Crown className="h-5 w-5" />}
-          title="今月の皆勤賞"
+          icon={perfectOut ? <CalendarCheck className="h-5 w-5" /> : <Crown className="h-5 w-5" />}
+          title={perfectOut ? "今月の投稿日数" : "今月の皆勤賞"}
           pinned
           remain={pc.remain}
           remainMuted={pc.remainMuted}
           ratio={pc.ratio}
           sub={pc.sub}
-          onClick={onOpenPerfect}
+          onClick={perfectOut ? onOpenMonthDays : onOpenPerfect}
         />
         {goals.map((g) => (
           <GoalCard

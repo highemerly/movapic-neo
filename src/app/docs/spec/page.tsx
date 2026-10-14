@@ -14,6 +14,7 @@ import {
   PERFECT_MONTH_GRACE_DEFAULT,
   PERFECT_MONTH_GRACE_FAVORED,
 } from "@/lib/achievements/perfectMonth";
+import { MONTH_DAYS_TIERS } from "@/lib/achievements/monthDays";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
@@ -605,6 +606,14 @@ export default async function SpecPage() {
                 <li>皆勤賞は月ごとに計算されるため、毎月獲得することができます</li>
               </ul>
 
+              <p className="mt-5 text-xs text-muted-foreground font-medium mb-1">月間投稿</p>
+              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                <li>
+                  1ヶ月のうち{MONTH_DAYS_TIERS.join("日・")}日投稿すると、その月の「月間投稿」の実績を獲得できます（毎月獲得できます）
+                </li>
+                <li>数えるのは実際に投稿した日だけです（穴埋めした日は数えません）</li>
+              </ul>
+
               <p className="mt-5 text-xs text-muted-foreground font-medium mb-1">穴埋め（2026年10月分から）</p>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                 <li>
@@ -634,7 +643,7 @@ export default async function SpecPage() {
                 <li>
                   その月に新規登録した場合: 登録時に「登録日の前日までの日数」ぶん（2日の登録で+1pt、9日以降の登録で上限の+8pt）
                 </li>
-                <li>その月に何かしらの実績を獲得した場合: +1pt（月に1回まで）</li>
+                <li>その月に何かしらの実績を獲得した場合: +1pt（月に1回まで。月間投稿の実績は除く）</li>
                 <li>このほか、イベントなどで付与されることがあります</li>
               </ul>
               <p className="mt-2 text-sm text-muted-foreground">

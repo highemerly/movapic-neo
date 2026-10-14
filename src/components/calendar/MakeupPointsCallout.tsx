@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Crown } from "lucide-react";
+import { CalendarCheck, ChevronDown, ChevronRight, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "@/components/Link";
 import { LegalInfoDialog } from "@/components/legal/LegalInfoDialog";
 import { makeupPointReasonLabel } from "@/lib/makeup/notificationTypes";
+import { MONTH_DAYS_TIERS, type MonthDaysGoal } from "@/lib/achievements/monthDays";
 
 /** カレンダーAPI（perfectMonth.makeup）の形。owner のときだけ返る。 */
 export interface MakeupInfo {
@@ -22,9 +23,17 @@ export interface MakeupInfo {
   deadline: string;
   editable: boolean;
   grants: Array<{ reason: string; amount: number; grantedAt: string }>;
+  /** この月の皆勤賞にまだ手が届くか（達成済みも true）。 */
+  perfectAchievable: boolean;
+  /** 1枚以上投稿した日数（穴埋めは数えない）。 */
+  postedDays: number;
+  /** 月間投稿日数の次の目標。 */
+  monthDaysGoal: MonthDaysGoal;
 }
 
 const JST = "Asia/Tokyo";
+
+const MONTH_DAYS_TIERS_LABEL = `${MONTH_DAYS_TIERS.join("日・")}日`;
 
 /**
  * 締切の表示。API の deadline は「翌月11日 00:00 JST」の排他上限なので、
@@ -62,20 +71,35 @@ function ChipButton({ children, ...props }: React.ComponentProps<"button">) {
   );
 }
 
+/** 皆勤賞が不可能になった月の見出し（月間投稿日数の目標）。 */
+function monthDaysHeadline(goal: MonthDaysGoal, month: number, isCurrentMonth: boolean): string {
+  const when = isCurrentMonth ? "今月" : `${month}月`;
+  if (goal.kind === "next") return `${goal.tier}日投稿を目指そう！`;
+  if (goal.kind === "reached") return `${when}は${goal.tier}日投稿を達成！`;
+  return isCurrentMonth ? "来月は皆勤賞を目指そう！" : `${month}月の投稿`;
+}
+
 /**
  * 本人向けの「穴埋めポイント」案内（カレンダー上部）。
  * 常に見せるのは1行（未投稿の日数と残りポイント）だけで、説明と各モーダルへのボタンは折りたたむ
  * （スマホでカレンダーの上が縦に長くならないように）。既定は閉じた状態。
  * 値は月送りに追従させるため、ページからの固定 prop ではなくカレンダーAPIのレスポンスから受け取る
  * （ポイント制では月ごとに上限が違う）。
+ *
+ * その月の皆勤賞が不可能になったら（makeup.perfectAchievable=false）、見出しと1行を月間投稿日数の
+ * 目標に切り替える。皆勤賞を外した人に「皆勤賞を目指そう！ 未投稿◯日」を出し続けると、届かない目標と
+ * 埋まらない穴の数だけを見せることになり、その月の投稿をやめる理由になっていたため。
  */
 export function MakeupPointsCallout({
   month,
+  isCurrentMonth,
   makeup,
   favorServers,
   isFavorUser,
 }: {
   month: number;
+  /** 表示中の月が当月か（見出しの「今月」/「◯月」の出し分け）。 */
+  isCurrentMonth: boolean;
   makeup: MakeupInfo;
   /** 特典サーバー（FAVOR_SERVERS）のドメイン一覧。獲得方法の説明に使う。 */
   favorServers: string[];
@@ -83,6 +107,8 @@ export function MakeupPointsCallout({
   isFavorUser: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const perfectOut = !makeup.perfectAchievable;
+  const goal = makeup.monthDaysGoal;
 
   return (
     <div className="mb-3 rounded-lg border border-amber-300/70 bg-amber-50 text-[12px] leading-relaxed text-amber-900 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-100">
@@ -92,21 +118,51 @@ export function MakeupPointsCallout({
         aria-expanded={open}
         className="flex w-full items-center gap-2 px-3 py-2 text-left"
       >
-        <Crown className="h-4 w-4 shrink-0" />
-        <span className="min-w-0 flex-1 font-semibold">皆勤賞を目指そう！</span>
-        <span className="shrink-0 whitespace-nowrap tabular-nums">
-          未投稿<span className="mx-0.5 text-base font-extrabold leading-none">{makeup.unfilled}</span>日
-          <span className="mx-1.5 opacity-50">/</span>
-          残り<span className="mx-0.5 text-base font-extrabold leading-none">{makeup.remaining}</span>pt
-        </span>
+        {perfectOut ? (
+          <>
+            <CalendarCheck className="h-4 w-4 shrink-0" />
+            <span className="min-w-0 flex-1 font-semibold">
+              {monthDaysHeadline(goal, month, isCurrentMonth)}
+            </span>
+            <span className="shrink-0 whitespace-nowrap tabular-nums">
+              投稿<span className="mx-0.5 text-base font-extrabold leading-none">{makeup.postedDays}</span>日
+              {goal.kind === "next" && (
+                <>
+                  <span className="mx-1.5 opacity-50">/</span>
+                  あと<span className="mx-0.5 text-base font-extrabold leading-none">{goal.remaining}</span>日
+                </>
+              )}
+            </span>
+          </>
+        ) : (
+          <>
+            <Crown className="h-4 w-4 shrink-0" />
+            <span className="min-w-0 flex-1 font-semibold">皆勤賞を目指そう！</span>
+            <span className="shrink-0 whitespace-nowrap tabular-nums">
+              未投稿<span className="mx-0.5 text-base font-extrabold leading-none">{makeup.unfilled}</span>日
+              <span className="mx-1.5 opacity-50">/</span>
+              残り<span className="mx-0.5 text-base font-extrabold leading-none">{makeup.remaining}</span>pt
+            </span>
+          </>
+        )}
         <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", open && "rotate-180")} />
       </button>
 
       {open && (
         <div className="px-3 pb-2 pl-9">
-          <p>
-            1ヶ月間毎日投稿すれば、皆勤賞が獲得できます。投稿を忘れた日があっても、穴埋めポイントを使って後日の投稿で穴埋めすることもできます。
-          </p>
+          {perfectOut ? (
+            <p>
+              {isCurrentMonth
+                ? "今月は皆勤賞の条件を満たせなくなりましたが、"
+                : `${month}月の皆勤賞は獲得できませんでしたが、`}
+              1ヶ月に{MONTH_DAYS_TIERS_LABEL}投稿すると実績を獲得できます（穴埋めした日は数えません）。
+              {isCurrentMonth && "皆勤賞は来月また目指しましょう！"}
+            </p>
+          ) : (
+            <p>
+              1ヶ月間毎日投稿すれば、皆勤賞が獲得できます。投稿を忘れた日があっても、穴埋めポイントを使って後日の投稿で穴埋めすることもできます。
+            </p>
+          )}
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             <LegalInfoDialog title="皆勤賞のルール" trigger={<ChipButton>詳細なルール</ChipButton>}>
               <PerfectMonthRules month={month} makeup={makeup} />
@@ -183,7 +239,7 @@ function MakeupPointConditions({ favorServers }: { favorServers: string[] }) {
     <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
       {favorServers.length > 0 && <li>{favorServers.join("・")} のユーザー: 毎月+1pt</li>}
       <li>先月の皆勤賞を獲得しなかった場合: +1pt（毎月11日頃に付与）</li>
-      <li>その月に何かしらの実績を獲得した場合: +1pt（月に1回まで）</li>
+      <li>その月に何かしらの実績を獲得した場合: +1pt（月に1回まで・月間投稿の実績は除く）</li>
       <li>このほか、イベントなどでもらえることがあります</li>
     </ul>
   );

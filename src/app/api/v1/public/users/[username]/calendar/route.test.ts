@@ -113,6 +113,11 @@ describe("GET calendar - 穴埋め枠", () => {
         { reason: "favor-monthly", amount: 1, grantedAt: "2026-10-01T00:10:00.000Z" },
         { reason: "monthly-catchup", amount: 1, grantedAt: "2026-10-11T00:10:00.000Z" },
       ],
+      // 20日までに17日欠け（2日は穴埋め済みでも欠けに数える）＞ potentialCap 3 → 皆勤賞は不可能
+      perfectAchievable: false,
+      // 投稿した日は1日・3日だけ（穴埋めした2日は数えない）。今日を含めて残り12日 → 10日に届く
+      postedDays: 2,
+      monthDaysGoal: { kind: "next", tier: 10, remaining: 8, reached: null },
     });
   });
 

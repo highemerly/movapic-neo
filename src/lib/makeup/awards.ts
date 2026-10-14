@@ -43,6 +43,7 @@ export async function grantSignupMakeupPoints(args: {
 
 /**
  * 実績を1件以上付与した直後に呼ぶ。当月の achievement ポイント(+1)を付与する（月1回）。
+ * 月間投稿日数の実績だけを付与したときは呼ばない（engine.grantAll が判定。理由は achievements/monthDays.ts）。
  * 実績付与の経路は engine.grantAll と calendar/reevaluate の2つがあり、両方から呼ぶこと
  * （reevaluate は grantAll を通らないため、片方だけだと皆勤賞経由の+1ptが漏れる）。
  * backfill（過去日の実績の一括付与）からは呼ばない＝ポイントは遡及しない。

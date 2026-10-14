@@ -17,6 +17,12 @@ import {
   isPerfectMonth,
   perfectMonthKey,
 } from "./perfectMonth";
+import {
+  MONTH_DAYS_CATEGORY,
+  parseMonthDaysKey,
+  reachedMonthDaysKeys,
+  withoutAbsorbedMonthDays,
+} from "./monthDays";
 
 // シーズン（期間限定）実績の系列キーと安定キーの接頭辞。
 // 皆勤賞と同じ「動的キー」方式: シーズン投稿1回でそのシーズンのバッジを獲得し、
@@ -33,6 +39,8 @@ import {
 
 // 皆勤賞の系列キーは perfectMonth.ts を単一ソースとし、互換のため catalog からも re-export する。
 export { PERFECT_MONTH_CATEGORY };
+// 月間投稿日数の系列キーも monthDays.ts を単一ソースとし、皆勤賞に揃えて catalog から re-export する。
+export { MONTH_DAYS_CATEGORY };
 
 /** 投稿後の集計値。live はDBから、backfill はメモリ上のリプレイから同じ形で渡す。 */
 export interface AchStats {
@@ -766,11 +774,13 @@ export const CATALOG_BY_KEY: Map<string, AchievementDef> = new Map(
  * - ladder: 段階実績（閾値違い）を1枚にまとめる（ladderKey で CATALOG を引く）
  * - single: 単発実績（key で1件）
  * - perfectMonth: 皆勤賞（動的キー。獲得月ぶんカードを並べる）
+ * - monthDays: 月間投稿日数（動的キー。獲得月ごとに到達した段を並べる）
  */
 export type AchievementBlock =
   | { kind: "ladder"; ladderKey: string }
   | { kind: "single"; key: string }
   | { kind: "perfectMonth" }
+  | { kind: "monthDays" }
   | { kind: "season" };
 
 export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[] = [
@@ -795,6 +805,7 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
       { kind: "ladder", ladderKey: "streak" },
       { kind: "ladder", ladderKey: "months" },
       { kind: "perfectMonth" },
+      { kind: "monthDays" },
     ],
   },
   {
@@ -862,6 +873,14 @@ export function evaluatePerfectMonth(s: AchStats, post: PostFacts, grace: number
 }
 
 /**
+ * 月間投稿日数（動的キー）。投稿した月に到達している段のキーを返す（付与済みの除外は呼び出し側）。
+ * 穴埋めは数えず実際に投稿した日数だけで決まる（理由は monthDays.ts）ので、投稿起点だけで評価が閉じる。
+ */
+export function evaluateMonthDays(s: AchStats, post: PostFacts): string[] {
+  return reachedMonthDaysKeys(toJstDateString(post.createdAt).slice(0, 7), s.distinctDaysInPostMonth);
+}
+
+/**
  * シーズン（期間限定）実績（動的キー）。シーズン投稿をした瞬間にそのシーズンのバッジを獲得。
  * 集計（AchStats）は不要 — その投稿が season を持つかだけで決まる。2枚目以降は
  * ownedKeys 重複で自動的に二重付与されない。返すキーは season:<seasonKey>。
@@ -924,6 +943,21 @@ export function resolveAchievement(key: string, category?: string): ResolvedAchi
       icon: "Crown",
     };
   }
+  // 動的: 月間投稿日数（銀ランク固定＝皆勤賞👑との格差を保つ）
+  const md = parseMonthDaysKey(key);
+  if (md) {
+    const [y, m] = md.ym.split("-");
+    const label = `${y}年${Number(m)}月`;
+    return {
+      key,
+      category: MONTH_DAYS_CATEGORY,
+      rank: "silver",
+      section: "投稿数",
+      title: `${label}の${md.tier}日投稿`,
+      description: `${label}に${md.tier}日投稿しました`,
+      icon: "CalendarCheck",
+    };
+  }
   // フォールバック（未知キー）
   return {
     key,
@@ -936,13 +970,16 @@ export function resolveAchievement(key: string, category?: string): ResolvedAchi
   };
 }
 
-/** 獲得済み実績リストを金/銀で集計する（純粋関数）。 */
+/**
+ * 獲得済み実績リストを金/銀で集計する（純粋関数）。1ユーザーぶんの全件を渡す。
+ * 同じ月の上位に吸収された月間投稿日数は数えない（monthDays.ts）。
+ */
 export function countRanks(
   items: { key: string; category: string }[]
 ): { gold: number; silver: number } {
   let gold = 0;
   let silver = 0;
-  for (const it of items) {
+  for (const it of withoutAbsorbedMonthDays(items)) {
     if (resolveAchievement(it.key, it.category).rank === "gold") gold++;
     else silver++;
   }

@@ -22,6 +22,7 @@ import { formatYm } from "@/lib/jst";
 import { resolveMakeupLimits } from "@/lib/makeup/ledger";
 import { allowsPrevMonthDonor, donorTargetYm } from "@/lib/makeup/donor";
 import { isMakeupEditable, makeupDeadline } from "@/lib/makeup/points";
+import type { MonthDaysGoal } from "@/lib/achievements/monthDays";
 import {
   calendarMonthRange,
   fetchCalendarImages,
@@ -51,6 +52,12 @@ interface MakeupInfo {
   editable: boolean;
   /** 付与履歴（古い順）。従来ルールの月は空。 */
   grants: Array<{ reason: string; amount: number; grantedAt: string }>;
+  /** この月の皆勤賞にまだ手が届くか（達成済みも true）。false なら案内を月間投稿日数の目標に切り替える。 */
+  perfectAchievable: boolean;
+  /** 1枚以上投稿した日数（穴埋めは数えない）。 */
+  postedDays: number;
+  /** 月間投稿日数の次の目標。 */
+  monthDaysGoal: MonthDaysGoal;
 }
 
 /** 皆勤賞の達成状況・穴埋め進捗（UIの👑とコールアウト表示に使う）。未来月では null。 */
@@ -253,6 +260,9 @@ export async function GET(
                     amount: g.amount,
                     grantedAt: g.grantedAt.toISOString(),
                   })),
+                  perfectAchievable: resolved.perfectAchievable,
+                  postedDays: resolved.postedDays,
+                  monthDaysGoal: resolved.monthDaysGoal,
                 },
               }
             : {}),

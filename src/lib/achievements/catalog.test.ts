@@ -9,6 +9,8 @@ import {
   countRanks,
   evaluateSeason,
   evaluatePerfectMonth,
+  evaluateMonthDays,
+  MONTH_DAYS_CATEGORY,
   PERFECT_MONTH_CATEGORY,
   SEASON_CATEGORY,
   type AchStats,
@@ -42,6 +44,12 @@ describe("resolveAchievement", () => {
     expect(r.title).toBe("2026年6月の皆勤賞");
   });
 
+  it("月間投稿日数（動的キー）は silver・年月と日数のラベル", () => {
+    const r = resolveAchievement("month-days:2026-10:20");
+    expect(r).toMatchObject({ category: MONTH_DAYS_CATEGORY, rank: "silver", section: "投稿数" });
+    expect(r.title).toBe("2026年10月の20日投稿");
+  });
+
   it("未知キーは silver フォールバック（category 引数を尊重）", () => {
     const r = resolveAchievement("mystery-key", "weird");
     expect(r).toMatchObject({ rank: "silver", category: "weird", title: "mystery-key" });
@@ -58,6 +66,16 @@ describe("countRanks", () => {
       { key: "season:tanabata", category: SEASON_CATEGORY }, // gold
     ];
     expect(countRanks(items)).toEqual({ gold: 3, silver: 2 });
+  });
+
+  it("同じ月の上位に吸収された月間投稿日数は銀に数えない", () => {
+    const items = [
+      { key: "perfect-month:2026-10", category: PERFECT_MONTH_CATEGORY }, // gold
+      { key: "month-days:2026-10:10", category: MONTH_DAYS_CATEGORY }, // 皆勤賞に吸収
+      { key: "month-days:2026-10:20", category: MONTH_DAYS_CATEGORY }, // 皆勤賞に吸収
+      { key: "month-days:2026-11:10", category: MONTH_DAYS_CATEGORY }, // silver
+    ];
+    expect(countRanks(items)).toEqual({ gold: 1, silver: 1 });
   });
 
   it("空なら 0/0", () => {
@@ -84,6 +102,24 @@ describe("evaluatePerfectMonth", () => {
     delete holey[12];
     delete holey[13]; // 4日欠け（grace=3超）
     expect(evaluatePerfectMonth(bareStats(holey), barePost(), 3)).toBeNull();
+  });
+});
+
+describe("evaluateMonthDays", () => {
+  const withDays = (n: number) => ({ distinctDaysInPostMonth: n } as unknown as AchStats);
+
+  it("投稿した月の distinct 日数で到達した段を返す", () => {
+    expect(evaluateMonthDays(withDays(9), barePost())).toEqual([]);
+    expect(evaluateMonthDays(withDays(10), barePost())).toEqual(["month-days:2026-06:10"]);
+    expect(evaluateMonthDays(withDays(20), barePost())).toEqual([
+      "month-days:2026-06:10",
+      "month-days:2026-06:20",
+    ]);
+  });
+
+  it("月は JST で決める（UTC では前月末でも JST の翌月1日なら翌月のキー）", () => {
+    const post = barePost({ createdAt: new Date("2026-06-30T15:30:00Z") }); // JST 7/1 00:30
+    expect(evaluateMonthDays(withDays(10), post)).toEqual(["month-days:2026-07:10"]);
   });
 });
 
@@ -153,7 +189,7 @@ describe("カタログ構造の不変条件（key の永続性・参照整合）
     const known = new Set<string>(SECTIONS);
     for (const d of CATALOG) expect(known.has(d.section), d.key).toBe(true);
     // 動的キー（皆勤賞・シーズン）と未知キーのフォールバックも並べる対象になる。
-    for (const key of ["perfect-month:2026-06", "season:tanabata-2026", "mystery-key"]) {
+    for (const key of ["perfect-month:2026-06", "month-days:2026-06:10", "season:tanabata-2026", "mystery-key"]) {
       expect(known.has(resolveAchievement(key).section), key).toBe(true);
     }
   });

@@ -9,7 +9,7 @@
  *    通知の createdAt は実績の grantedAt（過去日）にするため、フィードには履歴が並ぶが
  *    ベルの赤ドットは初回アクセス時の now 基準なので光らない。
  *
- * 評価ロジックは live と同じ CATALOG / evaluatePerfectMonth を共有する。
+ * 評価ロジックは live と同じ CATALOG / evaluatePerfectMonth / evaluateMonthDays を共有する。
  * 違いは stats の作り方だけ（live はDBクエリ、backfill はメモリ上のリプレイ）。
  *
  * 使用方法:
@@ -25,11 +25,13 @@ import { Pool } from "pg";
 import { toJstDateString, toJstHour } from "@/lib/streak";
 import {
   CATALOG,
+  evaluateMonthDays,
   evaluatePerfectMonth,
   evaluateSeason,
   isPostAchievement,
   isProfileAchievement,
   isReactionAchievement,
+  MONTH_DAYS_CATEGORY,
   PERFECT_MONTH_CATEGORY,
   SEASON_CATEGORY,
   type AchStats,
@@ -268,6 +270,18 @@ function replayUser(userId: string, images: ReplayImage[], capOf: (ym: string) =
           grantedAt: img.createdAt,
         });
       }
+    }
+    // 月間投稿日数（動的）: その月の distinct 日数がしきい値に届いた投稿で付与（live と同じ投稿起点）
+    for (const key of evaluateMonthDays(stats, post)) {
+      if (grantedKeys.has(key)) continue;
+      grantedKeys.add(key);
+      grants.push({
+        userId,
+        key,
+        category: MONTH_DAYS_CATEGORY,
+        imageId: img.id,
+        grantedAt: img.createdAt,
+      });
     }
     // シーズン（期間限定・動的）
     const season = evaluateSeason(post);
