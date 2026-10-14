@@ -8,10 +8,12 @@
 
 import prisma from "@/lib/db";
 import { EmojiManager, type AdminEmoji } from "./EmojiManager";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminEmojisPage() {
+  await requireAdmin();
   const rows = await prisma.customEmoji.findMany({
     orderBy: [{ enabled: "desc" }, { category: "asc" }, { name: "asc" }],
     select: {

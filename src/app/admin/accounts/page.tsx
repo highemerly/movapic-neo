@@ -21,6 +21,7 @@ import {
   EmptyBox,
 } from "../_components/ui";
 import { normalizeParams, parsePage } from "../_components/query";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export default async function AdminAccountsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireAdmin();
   const params = normalizeParams(await searchParams);
   const sort = normalizeAccountSort(params.sort);
   const page = parsePage(params.page);

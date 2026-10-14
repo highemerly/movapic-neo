@@ -20,6 +20,7 @@ import { Pagination } from "../_components/Pagination";
 import { DonutChart, type DonutSegment } from "../_components/DonutChart";
 import { TableWrap, theadRowCls, fmt, EmptyBox } from "../_components/ui";
 import { normalizeParams, parsePage, withParams } from "../_components/query";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,7 @@ export default async function AdminFavoritesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireAdmin();
   const params = normalizeParams(await searchParams);
   const period = normalizePeriod(params.window, "24h");
   const server = params.server?.trim() || null;

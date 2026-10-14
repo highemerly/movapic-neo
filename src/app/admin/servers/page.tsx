@@ -11,6 +11,7 @@ import { SortHeader } from "../_components/SortHeader";
 import { Pagination } from "../_components/Pagination";
 import { TableWrap, theadRowCls, EmptyBox } from "../_components/ui";
 import { normalizeParams, parsePage } from "../_components/query";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function AdminServersPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireAdmin();
   const params = normalizeParams(await searchParams);
   const sort = normalizeServerSort(params.sort);
   const page = parsePage(params.page);

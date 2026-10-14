@@ -8,10 +8,12 @@
 import { getSystemInfo } from "@/lib/admin/system";
 import { StatCard } from "../_components/StatCard";
 import { TableWrap, theadRowLeftCls, fmtBytes } from "../_components/ui";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminSystemPage() {
+  await requireAdmin();
   const info = await getSystemInfo();
 
   return (

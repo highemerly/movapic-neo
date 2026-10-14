@@ -17,6 +17,7 @@ import { normalizeParams } from "../_components/query";
 import { PostTimeSeriesChart } from "./_components/PostTimeSeriesChart";
 import { UserTimeSeriesChart } from "./_components/UserTimeSeriesChart";
 import { HealthPanel } from "./_components/HealthPanel";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +51,7 @@ export default async function AdminStatsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireAdmin();
   const params = normalizeParams(await searchParams);
   const period = normalizePeriod(params.range, "7d");
 

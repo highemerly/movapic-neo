@@ -17,6 +17,7 @@ import { ReportActions } from "./ReportActions";
 import { Pagination } from "../_components/Pagination";
 import { EmptyBox } from "../_components/ui";
 import { normalizeParams, parsePage, PAGE_SIZE } from "../_components/query";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export default async function AdminReportsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await requireAdmin();
   const params = normalizeParams(await searchParams);
   const page = parsePage(params.page);
 

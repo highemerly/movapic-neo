@@ -8,6 +8,7 @@
 
 import { getAllAnnouncementsForAdmin } from "@/lib/announcements.server";
 import { AnnouncementsManager } from "./AnnouncementsManager";
+import { requireAdmin } from "@/lib/auth/requireAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ function serverNowMs(): number {
 }
 
 export default async function AdminAnnouncementsPage() {
+  await requireAdmin();
   const announcements = await getAllAnnouncementsForAdmin();
 
   return (
