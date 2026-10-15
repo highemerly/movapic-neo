@@ -176,6 +176,24 @@ async function getSharpVersions(): Promise<{ sharp: string; vips: string } | nul
   }
 }
 
+/**
+ * 画像処理で実際に使われている sharp / libvips の版（/admin/system の表用）。取得できなければ null。
+ * web pod は sharp を積まないので compute の /api/health から読む（all-in-one は in-process）。
+ * pitfall: libvips は system ビルド（8.18.2）と同梱 prebuilt（8.18.3）で HEIC 対応が変わるため、
+ * package.json の宣言値ではなく compute が実際に読み込んでいる値を出す。
+ */
+export async function getComputeImageLibVersions(): Promise<{ sharp: string; vips: string } | null> {
+  if (isAllInOne) return getSharpVersions();
+  const base = process.env.COMPUTE_SERVICE_URL?.replace(/\/+$/, "");
+  if (!base) return null;
+  const r = await fetchJson(`${base}/api/health`);
+  if (!r?.ok || !r.body || typeof r.body !== "object") return null;
+  const b = r.body as Record<string, unknown>;
+  return typeof b.sharp === "string" && typeof b.vips === "string"
+    ? { sharp: b.sharp, vips: b.vips }
+    : null;
+}
+
 /** /api/health レスポンスから sharp / libvips バージョン行を組み立てる。 */
 function sharpMetaFrom(body: unknown): HealthMeta[] {
   if (!body || typeof body !== "object") return [];

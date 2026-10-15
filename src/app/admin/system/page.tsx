@@ -60,7 +60,8 @@ export default async function AdminSystemPage() {
           </tbody>
         </TableWrap>
         <p className="mt-2 text-xs text-muted-foreground">
-          Node.js と PostgreSQL は実行時の実値、その他は package.json 記載のバージョンです。
+          すべて実際に動いているバージョンです。sharp と libvips は画像処理（compute）から取得し、
+          接続できないときは「取得できません」と表示します。
         </p>
       </section>
     </>
