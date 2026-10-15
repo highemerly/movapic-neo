@@ -54,8 +54,6 @@ function toMisskey(v: CollageVisibility): MisskeyVisibility {
   return v === "followers" ? "followers" : v === "unlisted" ? "home" : "public";
 }
 
-const RETRY_BACKOFF_MS = 500;
-
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUserWithValidation();
@@ -168,11 +166,9 @@ export async function POST(request: NextRequest) {
       `[collage-post] user=${user.username}@${domain} type=${user.instance.type} vis=${visibility} bytes=${buffer.length}`
     );
 
-    let result = await postOnce();
-    if (result && !result.success && result.statusCode && result.statusCode >= 500) {
-      await new Promise((r) => setTimeout(r, RETRY_BACKOFF_MS));
-      result = await postOnce();
-    }
+    // 自動では再試行しない（本文作成は冪等でなく二重投稿になりうる。publishImage の
+    // postImageToFediverse と同じ方針）。失敗はそのまま返し、利用者の判断でやり直してもらう。
+    const result = await postOnce();
 
     if (!result || !result.success) {
       console.error(

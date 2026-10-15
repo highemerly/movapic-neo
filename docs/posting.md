@@ -22,11 +22,17 @@
 | Misskey | AVIF | AVIF（無変換で保存されるため利点が残る） |
 
 - 判定は [uploadFormat.ts](../src/lib/fediverse/uploadFormat.ts) の `resolveUploadFormat`（純粋ロジック）、変換は compute の `/api/internal/transcode`（sharp が要るため）。変換は `postImageToFediverse`（[publishImage.ts](../src/lib/publish/publishImage.ts)）で1回だけ行い、**web / メール / Bot / 再投稿の4経路すべてがここを通る**。
-- 変換結果は保存しない（投稿のたびに作り直す＝保存物と連合先の形式を混ぜない）。再試行時は変換済みバッファを使い回す。
+- 変換結果は保存しない（投稿のたびに作り直す＝保存物と連合先の形式を混ぜない）。
 - 変換に失敗したら投稿失敗として扱い、AVIF のまま送るフォールバックはしない（送れば Mastodon 側で必ず 500 になるため）。画像は SHAMEZO に残るので再投稿でやり直せる。
 - **Mastodon が AVIF を受け取れない理由（pitfall）**: 4.7.2 がセキュリティ対応で libvips の HEIF ローダーをブロックし、同じローダーが担当する AVIF も読めなくなった。`supported_mime_types` には `image/avif` が残るためアップロードは受理され、変換段で 500 "Error processing thumbnail for uploaded media" になる。もともと Mastodon は AVIF を受け取っても JPEG に変換して保存・配信する（`IMAGE_CONVERTIBLE_MIME_TYPES`）ので、JPEG で送っても連合側に届く画像は変わらない。
 - 入力オプションの `output`（`mastodon`/`misskey`/`none`）は DB 列・UI ラベルとしてのみ残り、**生成されるバイト列には影響しない**。
 - 例外はカレンダーのコラージュ画像（[calendarCollage.ts](../src/lib/image/calendarCollage.ts)）。`Image` レコードを作らず S3 にも保存しない別系統で、JPEG のまま直接投稿する。
+
+## 投稿失敗時（自動で再試行しない）
+- Fediverse への投稿は1回だけ行い、失敗はそのまま利用者に返す（`postImageToFediverse`・カレンダーのコラージュ投稿とも）。
+- 理由: 本文作成（Mastodon `statuses` / Misskey `notes/create`）は冪等でなく、サーバー側では作成済みなのに前段のプロキシが 502/504 を返すことがある＝自動でやり直すと二重投稿になる。Misskey には Mastodon の `Idempotency-Key` に当たる仕組みが無い。アップロードのやり直しも Misskey では利用者のドライブに重複ファイルを残す。429 は短い待機では回復しない（レート制限は分単位の窓）。
+- 画像は先に SHAMEZO に保存されているので、やり直しは利用者が自分のタイムラインを確かめてから「再投稿」で行う。
+- Bot 投稿のジョブ単位の再試行（下記「制約・出力」）は別の仕組み。
 
 ## メール投稿機能
 - **Cloudflare Email Worker** (`workers/email-forwarder/`): メールを受信しraw dataをAPIへ転送。

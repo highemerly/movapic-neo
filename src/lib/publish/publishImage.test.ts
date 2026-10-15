@@ -201,50 +201,24 @@ describe("publishImage の ALT 配管", () => {
   });
 });
 
-describe("publishImage の投稿再試行（一時的失敗のみ1回だけ）", () => {
-  it("5xx は1回だけ再試行する", async () => {
-    postToMastodon.mockResolvedValue({ success: false, error: "server error", statusCode: 503 });
-    await publishImage(baseInput({}));
-    expect(postToMastodon).toHaveBeenCalledTimes(2);
-  });
-
-  it("429（レート制限）も1回だけ再試行する", async () => {
-    postToMastodon.mockResolvedValue({ success: false, error: "rate limited", statusCode: 429 });
-    await publishImage(baseInput({}));
-    expect(postToMastodon).toHaveBeenCalledTimes(2);
-  });
-
-  it("429以外の4xxは再試行しない", async () => {
-    postToMastodon.mockResolvedValue({ success: false, error: "forbidden", statusCode: 403 });
-    await publishImage(baseInput({}));
+describe("publishImage は投稿を自動で再試行しない（本文作成は冪等でなく二重投稿になりうる）", () => {
+  it.each([
+    ["5xx（作成済みなのにプロキシが502を返すことがある）", 502],
+    ["429（1.5秒待っても分単位のレート窓では回復しない）", 429],
+    ["4xx", 403],
+  ])("%s でも1回だけ投稿し、失敗をそのまま返す", async (_label, statusCode) => {
+    postToMastodon.mockResolvedValue({ success: false, error: "failed", statusCode });
+    const result = await publishImage(baseInput({}));
     expect(postToMastodon).toHaveBeenCalledTimes(1);
+    expect(result.postError).toBe("failed");
+    expect(result.postErrorStatus).toBe(statusCode);
   });
 
-  it("timeout/接続失敗（statusCode なし）は再試行しない", async () => {
-    postToMastodon.mockResolvedValue({ success: false, error: "timeout" });
+  it("失敗しても画像は保存され、postUrl は空のまま（利用者が再投稿でやり直せる）", async () => {
+    postToMastodon.mockResolvedValue({ success: false, error: "failed", statusCode: 503 });
     await publishImage(baseInput({}));
-    expect(postToMastodon).toHaveBeenCalledTimes(1);
-  });
-
-  it("成功時は再試行しない", async () => {
-    await publishImage(baseInput({}));
-    expect(postToMastodon).toHaveBeenCalledTimes(1);
-  });
-
-  it("2回目で成功すれば postUrl/postId がDBに反映される", async () => {
-    postToMastodon
-      .mockResolvedValueOnce({ success: false, error: "server error", statusCode: 500 })
-      .mockResolvedValueOnce({
-        success: true,
-        postId: "s2",
-        postUrl: "https://mastodon.example/@alice/s2",
-      });
-    await publishImage(baseInput({}));
-    expect(postToMastodon).toHaveBeenCalledTimes(2);
-    expect(imageUpdate.mock.calls[0][0].data.postUrl).toBe(
-      "https://mastodon.example/@alice/s2"
-    );
-    expect(imageUpdate.mock.calls[0][0].data.postId).toBe("s2");
+    expect(imageCreate).toHaveBeenCalledTimes(1);
+    expect(imageUpdate).not.toHaveBeenCalled();
   });
 });
 
@@ -286,18 +260,6 @@ describe("Mastodon へのアップロード形式（保存は AVIF・送信の�
     expect(transcodeToJpeg).not.toHaveBeenCalled();
     expect(postToMastodon).not.toHaveBeenCalled();
     expect(imageCreate).toHaveBeenCalledTimes(1);
-  });
-
-  it("再試行しても変換は1回だけ（変換済みバッファを使い回す）", async () => {
-    postToMastodon.mockResolvedValue({
-      success: false,
-      error: "server error",
-      statusCode: 503,
-    });
-    await publishImage(baseInput({}));
-
-    expect(postToMastodon).toHaveBeenCalledTimes(2);
-    expect(transcodeToJpeg).toHaveBeenCalledTimes(1);
   });
 
   it("変換に失敗したら投稿失敗として返す（AVIF のまま送らない・画像は保存する）", async () => {

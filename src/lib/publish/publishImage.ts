@@ -271,9 +271,6 @@ interface PostImageInput {
   replyToPostId?: string | null;
 }
 
-/** 5xx/429 再試行前の軽いバックオフ */
-const RETRY_BACKOFF_MS = 1500;
-
 /**
  * サービスの visibility をプラットフォーム別 visibility に変換して1回だけ投稿する。
  */
@@ -344,22 +341,14 @@ async function toUploadPayload(input: PostImageInput): Promise<PostImageInput> {
   };
 }
 
-/** 再試行する価値がある一時的失敗か（5xx: 過負荷・障害 / 429: レート制限）。 */
-function isTransientPostFailure(result: PostResult): boolean {
-  if (!result.statusCode) return false;
-  return result.statusCode >= 500 || result.statusCode === 429;
-}
-
 /**
- * Fediverse へ投稿する。サーバーが 5xx（一時的な過負荷・障害）または 429（レート制限）を
- * 返したときだけ、同期でもう一度だけ再試行する。
+ * Fediverse へ1回だけ投稿する。失敗はそのまま返す（自動では再試行しない）。
  *
- * 5xx / 429 に限定する理由:
- * - timeout/接続失敗（statusCode undefined）は1回で最大30秒待つため、再試行すると
- *   /api/v1/post の応答が長引き Ingress の504に達するリスクが高い。5xx/429は即座に返るので軽い。
- * - 429 は瞬間的なレート超過なら短い待機で回復しうる（Retry-After は見ず一律 RETRY_BACKOFF_MS。
- *   長い待機が必要なケースまで追随すると応答が長引くため、1回の軽い再試行に留める）。
- * - 4xx（429を除く。権限不足・バリデーション等）は再試行しても結果が変わらない。
+ * pitfall: 以前は 5xx/429 で同期的にもう1回投稿し直していた。本文作成（statuses / notes/create）は
+ * 冪等でなく、サーバー側では作成済みなのに前段のプロキシが 502/504 を返すと二重投稿になる
+ * （Misskey には Idempotency-Key 相当の仕組みが無い）。アップロードのやり直しも Misskey では
+ * 利用者のドライブに重複ファイルを残す。429 は 1.5 秒待っても分単位のレート窓では回復しない。
+ * 画像は先に保存されているので、やり直しは利用者が自分のタイムラインを確かめてから「再投稿」で行う。
  */
 export async function postImageToFediverse(
   input: PostImageInput
@@ -370,7 +359,6 @@ export async function postImageToFediverse(
   }
 
   // 保存物は常に AVIF だが Mastodon は AVIF を受け取れないため、ここで送信形式に変換する。
-  // 再試行で二重に変換しないよう、リトライループの外で1回だけ行う。
   let payload: PostImageInput;
   try {
     payload = await toUploadPayload(input);
@@ -385,29 +373,17 @@ export async function postImageToFediverse(
     return { success: false, error: "投稿用画像の変換に失敗しました" };
   }
 
-  const first = await postImageOnce(payload);
+  const result = await postImageOnce(payload);
 
-  if (first && !first.success) {
+  if (!result.success) {
     console.error(
       `[fediverse] post failed: server=${payload.user.instance.domain} type=${payload.user.instance.type} ` +
-        `status=${first.statusCode ?? "-"} contentType=${payload.contentType} bytes=${payload.buffer.length} ` +
-        `error=${first.error}`
+        `status=${result.statusCode ?? "-"} contentType=${payload.contentType} bytes=${payload.buffer.length} ` +
+        `error=${result.error}`
     );
   }
 
-  if (first && !first.success && isTransientPostFailure(first)) {
-    await new Promise((resolve) => setTimeout(resolve, RETRY_BACKOFF_MS));
-    const second = await postImageOnce(payload);
-    if (second && !second.success) {
-      console.error(
-        `[fediverse] post retry failed: server=${input.user.instance.domain} ` +
-          `status=${second.statusCode ?? "-"} error=${second.error}`
-      );
-    }
-    return second;
-  }
-
-  return first;
+  return result;
 }
 
 function buildImagePageUrl(username: string, domain: string, imageId: string): string {
