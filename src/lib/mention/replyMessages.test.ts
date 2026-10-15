@@ -24,7 +24,8 @@ describe("federationFailedMessage", () => {
     expect(federationFailedMessage({ ...base, statusCode })).toBe(
       "SHAMEZOには投稿できましたが、mastodon.exampleへの投稿に失敗しました。" +
         "mastodon.example との連携が切れている可能性がありますので、" +
-        "SHAMEZO に一度ログインしてから再投稿してみてください。"
+        "SHAMEZO に一度ログインしてから再投稿してみてください。\n" +
+        "https://shamezo.example/u/alice@mastodon.example/status/img-1"
     );
   });
 });

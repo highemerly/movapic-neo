@@ -21,7 +21,8 @@ export function federationFailedMessage(params: {
     return (
       head +
       `${serverDomain} との連携が切れている可能性がありますので、` +
-      "SHAMEZO に一度ログインしてから再投稿してみてください。"
+      "SHAMEZO に一度ログインしてから再投稿してみてください。\n" +
+      imagePageUrl
     );
   }
   return `${head}${imagePageUrl} から再投稿することもできます。`;
