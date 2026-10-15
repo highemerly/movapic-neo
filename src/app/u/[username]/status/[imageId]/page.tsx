@@ -306,16 +306,23 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
   // ユーザーギャラリーからの場合: 同じユーザーの公開画像のみ
   const navigationSelect = navImageSelect;
 
+  // 閲覧者がミュートしている投稿者。スレッドのリプライ先/リプライと、公開TL由来の前後ナビから除き
+  // （muter の視界からだけ隠す。ミュートされた側の書き込みは拒否しない＝バレない）、メニューの文言出し分けにも使う。
+  const mutedUserIds = currentUser ? await getActiveMutedUserIds(currentUser.id) : [];
+
   // 前後ナビの対象範囲を遷移元で切り替える。
-  // - 公開（みんな/同じサーバー）: 全体、または該当サーバーに限定
+  // - 公開（みんな/同じサーバー）: 全体、または該当サーバーに限定。ミュート相手は除く（一覧の
+  //   PublicTimelineClient と同じ。以前は除いておらず、前後ナビにだけミュート相手の投稿が出た）
   // - リアクション: 閲覧者がリアクションした投稿に限定（要ログイン）
   // - それ以外（ギャラリー等）: その投稿のユーザーに限定
   let navigationScope: Prisma.ImageWhereInput;
   if (isFromPublic) {
-    navigationScope =
-      publicInstances.length > 0
+    navigationScope = {
+      ...(publicInstances.length > 0
         ? { user: { instance: { domain: { in: publicInstances } } } }
-        : {};
+        : {}),
+      ...(mutedUserIds.length > 0 ? { userId: { notIn: mutedUserIds } } : {}),
+    };
   } else if (isFromFavorite && currentUser) {
     // 前後ナビの母集合は一覧（/api/v1/favorites）と同じ条件にそろえる
     navigationScope = {
@@ -334,9 +341,6 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
     navigationScope = { userId: image.userId };
   }
 
-  // 閲覧者がミュートしている投稿者。スレッドのリプライ先/リプライから除き（muter の視界からだけ隠す。
-  // ミュートされた側の書き込みは拒否しない＝バレない）、メニューの文言出し分けにも使う。
-  const mutedUserIds = currentUser ? await getActiveMutedUserIds(currentUser.id) : [];
   // スレッドは見えるものだけ引く。削除は SET NULL・取り下げ/ミュートはここで落とす＝痕跡を出さない。
   const threadVisibleWhere: Prisma.ImageWhereInput = {
     isPublic: true,
