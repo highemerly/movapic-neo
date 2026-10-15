@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { applyViewerReaction, type ViewerReactionTarget } from "@/lib/reactions/optimistic";
 import type { ReactionUser } from "@/lib/reactions/types";
@@ -22,7 +23,9 @@ import {
  *
  * 表示は楽観更新（applyViewerReaction）で押した瞬間に差し替え、APIレスポンスが返ったら確定値へ
  * 置き換える。書き込みは Fediverse 送信＋オーナー側キャッシュ同期を伴い数秒かかることがあり、
- * 応答を待って描くと押しても無反応に見えるため。失敗したら最後の確定値へ巻き戻す。
+ * 応答を待って描くと押しても無反応に見えるため。失敗したら最後の確定値へ巻き戻し、理由をトーストで出す。
+ * トーストはここで出す（入口ごとに出すと付け忘れる。以前はズーム表示だけが出しており、チップ行と
+ * モバイルのメニューでは黙って巻き戻っていた）。失敗した入口のインスタンスだけが出すので重複しない。
  */
 export function useReactionActions(
   imageId: string,
@@ -32,7 +35,6 @@ export function useReactionActions(
 ) {
   const [snapshot, setSnapshotState] = useState<ReactionSnapshot>(initialSnapshot);
   const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const confirm = useConfirm();
 
   // 表示中の状態（楽観更新を含む）。同一フレームでの連続操作でも最新から積み上げるため ref で持つ。
@@ -97,7 +99,7 @@ export function useReactionActions(
           const body = await response.json().catch(() => null);
           const message = body?.error?.message ?? "リアクションに失敗しました";
           const suggestion = body?.error?.suggestion;
-          setErrorMessage(suggestion ? `${message}（${suggestion}）` : message);
+          toast.error(suggestion ? `${message}（${suggestion}）` : message);
           return false;
         }
         const next = toSnapshot(await response.json());
@@ -107,7 +109,7 @@ export function useReactionActions(
         if (!pendingRef.current) show(next, { confirmed: true, broadcast: true });
         return true;
       } catch {
-        setErrorMessage("リアクション中にエラーが発生しました");
+        toast.error("リアクション中にエラーが発生しました");
         return false;
       }
     },
@@ -140,7 +142,6 @@ export function useReactionActions(
   const submit = useCallback(
     (target: ViewerReactionTarget | null) => {
       if (!viewer) return;
-      setErrorMessage(null);
       const current = snapshotRef.current;
       show(
         {
@@ -210,7 +211,6 @@ export function useReactionActions(
     syncSnapshot,
     setStatusMessage,
     isLoading,
-    errorMessage,
     viewerEmoji,
     submit,
     handlePick,

@@ -237,11 +237,11 @@ SHAMEZO 上のリアクションは押した本人のトークンで Fediverse �
 
 - 押した瞬間に [`applyViewerReaction`](../src/lib/reactions/optimistic.ts) で表示を差し替え、APIレスポンスが返ったら確定値へ置き換える（[useReactionActions](../src/components/reaction/useReactionActions.tsx)）。
 - **楽観表示の組み立て規則は [`mergeReactions`](../src/lib/reactions/merge.ts) と一致させる**（件数降順・同数は既存の並び・`total` はチップ件数の総和・自分は一覧の末尾）。ズレると確定値に入れ替わった瞬間に並びが飛ぶ。片方を変えたら必ず両方直す。
-- 失敗したら最後の確定値（直近のAPIレスポンス）へ巻き戻し、エラー文言を出す。どこまで相手サーバーに届いたか分からないので、失敗後に溜まっていた操作は追撃せず捨てる。
+- 失敗したら最後の確定値（直近のAPIレスポンス）へ巻き戻し、エラー文言をトーストで出す。トーストはフック（useReactionActions）が出す＝入口（チップ行・モバイルのメニュー・ズーム表示）を問わず同じ（以前はズーム表示だけが出し、他の入口では黙って巻き戻っていた）。どこまで相手サーバーに届いたか分からないので、失敗後に溜まっていた操作は追撃せず捨てる。
 - 送信中の追加操作は**最後の意図だけを保持して直列に送る**（Fediverse への二重送信を避けるため並行させない）。送信中もボタンは押せる。
 - マウント時の GET は、送信中・送信待ちがあるときは結果を捨てる（楽観表示を古い値で上書きしないため）。
 - 楽観更新でリアクション一覧に自分を差し込むため、閲覧者の表示情報（`acct`/`displayName`/`avatarUrl`/`profileUrl`）を詳細ページから props で渡す。形は `Reaction` テーブル由来の行（[store.ts](../src/lib/reactions/store.ts)）と揃える。
-- 画像のズーム表示（全画面）にもリアクションボタンがある（[ZoomReactionButton](../src/app/u/[username]/status/[imageId]/ZoomReactionButton.tsx)）。ズームを閉じずにピッカーを重ね、選んだら絵文字を中央で弾ませてズームに戻る。チップ行が見えないので、失敗はトーストで知らせる。
+- 画像のズーム表示（全画面）にもリアクションボタンがある（[ZoomReactionButton](../src/app/u/[username]/status/[imageId]/ZoomReactionButton.tsx)）。ズームを閉じずにピッカーを重ね、選んだら絵文字を中央で弾ませてズームに戻る。
 - INP: リアクション状態が変わるとピッカー（絵文字が数千個）も再レンダー対象になる。`handlePick` の identity を安定させ `EmojiButton` を `memo` で包んであるので、**ピッカーへ渡すハンドラをインラインで作り直さないこと**（memo が丸ごと無効になり、押下の応答時間に乗る）。
 
 ## 12. 変更時のチェックリスト

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { SmilePlus } from "lucide-react";
-import { toast } from "sonner";
 import { ReactionEmojiView } from "@/components/reaction/ReactionEmojiView";
 import { ReactionPickerModal } from "@/components/reaction/ReactionPickerModal";
 import { useReactionActions } from "@/components/reaction/useReactionActions";
@@ -32,7 +31,7 @@ export function ZoomReactionButton({
   open: boolean;
   reaction: ReactionMenuData;
 }) {
-  const { snapshot, viewerEmoji, handlePick, errorMessage } = useReactionActions(
+  const { snapshot, viewerEmoji, handlePick } = useReactionActions(
     imageId,
     reaction.initialSnapshot,
     reaction.viewer
@@ -59,11 +58,6 @@ export function ZoomReactionButton({
     },
     [handlePick]
   );
-
-  // 楽観表示で先に弾ませているので、失敗したら黙って巻き戻さず知らせる（ズーム中は他に表示先が無い）。
-  useEffect(() => {
-    if (errorMessage) toast.error(errorMessage);
-  }, [errorMessage]);
 
   // 演出中にズームを閉じると animationend が来ないまま burst が残り、次に開いたとき前回の絵文字が
   // 再生される。閉じた時点で片付ける（effect ではなく描画中に前回値と比べて直す＝React 推奨の形）。
