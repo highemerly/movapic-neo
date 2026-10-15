@@ -10,6 +10,7 @@ import {
   STROKE_COLORS,
 } from "@/types";
 import { ImageProcessError } from "@/lib/errors";
+import { MAX_OUTPUT_EDGE } from "@/lib/image/decodeLimits";
 import {
   rotateImage,
   applyOutputFormat,
@@ -36,8 +37,9 @@ interface ProcessImageParams {
 export type { ProcessImageResult };
 
 // 処理用の最大サイズ（事前リサイズ）
-// 最終出力が2048pxなので、それに合わせて事前に縮小することで後続処理を高速化
-const MAX_PROCESSING_SIZE = 2048;
+// 最終出力の長辺上限に合わせて事前に縮小することで後続処理を高速化
+// （finalize が同じ値で投稿画像を確かめるため decodeLimits と共有する）
+const MAX_PROCESSING_SIZE = MAX_OUTPUT_EDGE;
 
 export async function processImage({
   imageBuffer,

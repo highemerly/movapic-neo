@@ -46,3 +46,14 @@ export function exceedsDecodePixelLimit(meta: {
 }): boolean {
   return (meta.width ?? 0) * (meta.height ?? 0) > maxDecodePixels(meta.format);
 }
+
+/**
+ * 文字入れ後の出力の長辺上限（imageProcessor がこの値まで事前縮小する）。
+ * finalize（投稿時の保存前チェック）が受け取る正規の画像は必ずこれ以下＝超えていれば
+ * /api/v1/post を直接叩いて送られた画像。縮小する側と確かめる側でこの値を共有する。
+ */
+export const MAX_OUTPUT_EDGE = 2048;
+
+export function exceedsOutputEdge(meta: { width?: number; height?: number }): boolean {
+  return Math.max(meta.width ?? 0, meta.height ?? 0) > MAX_OUTPUT_EDGE;
+}

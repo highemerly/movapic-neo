@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { verifyComputeApiKey } from "@/lib/compute/internalAuth";
+import { exceedsOutputEdge } from "@/lib/image/decodeLimits";
 import { Position, isValidPosition } from "@/types";
 
 // sharp の Metadata から必要なフィールドだけを構造的に受ける（sharp 型を import しないことで
@@ -61,6 +62,17 @@ export async function POST(request: NextRequest) {
     metadata = await sharp(imageBuffer).metadata();
   } catch {
     return NextResponse.json({ error: "画像の解析に失敗しました" }, { status: 400 });
+  }
+
+  // metadata() はヘッダだけを読む。サムネ生成（全画素の展開）より前に寸法で弾く。
+  // pitfall: 以前は形式しか見ておらず、/api/v1/post を直接叩けば巨大寸法の画像がそのまま保存・連合され
+  // （一覧は原本を縮小表示するため閲覧者に配られる）、4KB の 256MP AVIF でサムネ生成のメモリが
+  // 2.7GB に達した（ローカル実測）。
+  if (exceedsOutputEdge(metadata)) {
+    console.warn(
+      `[internal/finalize] rejected oversized image: ${metadata.format} ${metadata.width}x${metadata.height}`
+    );
+    return NextResponse.json({ error: "image too large" }, { status: 400 });
   }
 
   const detectedMime = detectSafeMimeType(metadata) ?? "";

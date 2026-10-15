@@ -5,6 +5,8 @@ import {
   maxDecodePixels,
   exceedsDecodePixelLimit,
   isSupportedInputFormat,
+  MAX_OUTPUT_EDGE,
+  exceedsOutputEdge,
 } from "./decodeLimits";
 
 describe("isSupportedInputFormat", () => {
@@ -61,5 +63,17 @@ describe("exceedsDecodePixelLimit", () => {
 
   it("寸法が取れないときは弾かない（判定不能は sharp 側の上限に任せる）", () => {
     expect(exceedsDecodePixelLimit({ format: "heif" })).toBe(false);
+  });
+});
+
+describe("exceedsOutputEdge", () => {
+  it("長辺が出力上限ちょうどなら通す（縦長・横長とも）", () => {
+    expect(exceedsOutputEdge({ width: MAX_OUTPUT_EDGE, height: 1536 })).toBe(false);
+    expect(exceedsOutputEdge({ width: 1536, height: MAX_OUTPUT_EDGE })).toBe(false);
+  });
+
+  it("長辺が出力上限を超えたら弾く（文字入れ処理では作られない画像）", () => {
+    expect(exceedsOutputEdge({ width: MAX_OUTPUT_EDGE + 1, height: 100 })).toBe(true);
+    expect(exceedsOutputEdge({ width: 100, height: 16_000 })).toBe(true);
   });
 });
