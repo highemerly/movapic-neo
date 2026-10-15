@@ -40,6 +40,8 @@ function getErrorMessage(code: string): string {
       return "認証に失敗しました。もう一度お試しください";
     case "app_invalid":
       return "サーバーとの連携情報が無効になっていました。もう一度ログインをお試しください";
+    case "invalid_username":
+      return "このアカウントのユーザー名には SHAMEZO で扱えない文字が含まれているため、ログインできません";
     default:
       return "ログイン中にエラーが発生しました。もう一度お試しください";
   }

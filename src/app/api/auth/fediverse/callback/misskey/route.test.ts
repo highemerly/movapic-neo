@@ -242,6 +242,21 @@ describe("GET /api/auth/fediverse/callback/misskey cookie照合（ログインCS
   });
 });
 
+describe("GET /api/auth/fediverse/callback/misskey ユーザー名検証", () => {
+  it("規則外のユーザー名（改行入り等）は保存せず invalid_username（robots.txt に行を差し込めた）", async () => {
+    checkMisskeySessionMock.mockResolvedValue({
+      token: PLAIN_TOKEN,
+      user: { ...MISSKEY_USER, username: "x\nUser-agent: *\nDisallow: /" },
+    });
+    primeCookie();
+    const res = await GET(req(callbackParams()));
+
+    expect(location(res)).toBe(`${BASE_URL}/?error=invalid_username`);
+    expect(userCreate).not.toHaveBeenCalled();
+    expect(userUpdate).not.toHaveBeenCalled();
+  });
+});
+
 describe("GET /api/auth/fediverse/callback/misskey ログイン成功", () => {
   it("初回ログインはユーザーを作成し /create?welcome=1 へ", async () => {
     primeCookie();

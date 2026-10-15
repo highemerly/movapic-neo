@@ -6,6 +6,7 @@ import { USER_AGENT } from "@/lib/userAgent";
 import { assertSafeRemoteHost, safeFetch, SsrfError } from "@/lib/security/ssrf";
 import { AppError } from "@/lib/errors/AppError";
 import { ErrorCodes } from "@/lib/errors/codes";
+import { normalizeServer } from "@/lib/auth/serverIdentity";
 
 const REQUEST_TIMEOUT = 15000; // 15秒
 
@@ -21,20 +22,8 @@ export interface InstanceInfo {
   version?: string;
 }
 
-/**
- * サーバー名を正規化
- */
-export function normalizeServer(server: string): string {
-  // プロトコルを除去。i フラグ必須: 大文字混じり（HTTPS://）だと除去されないまま
-  // 後段の toLowerCase() で "https://example" がドメイン名として残り、
-  // URL 解釈時にホスト名が "https" になって「サーバーが見つかりません」になる。
-  let normalized = server.replace(/^https?:\/\//i, "");
-  // 末尾のスラッシュを除去
-  normalized = normalized.replace(/\/+$/, "");
-  // 小文字に変換
-  normalized = normalized.toLowerCase();
-  return normalized;
-}
+// 利用者入力のサーバー名の扱いは serverIdentity に集約（外部通信を持たない純粋ロジック）
+export { normalizeServer };
 
 /**
  * インスタンスの種類を検出

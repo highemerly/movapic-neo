@@ -273,6 +273,19 @@ describe("GET /api/auth/fediverse/callback/mastodon OAuthセッション検証",
   });
 });
 
+describe("GET /api/auth/fediverse/callback/mastodon ユーザー名検証", () => {
+  it("規則外のユーザー名（改行入り等）は保存せず invalid_username（robots.txt に行を差し込めた）", async () => {
+    getMastodonAccountMock.mockResolvedValue({ ...ACCOUNT, username: "x\nUser-agent: *\nDisallow: /" });
+    const state = primeCookies();
+    const res = await GET(req({ code: "auth-code", state }));
+
+    expect(location(res)).toBe(`${BASE_URL}/?error=invalid_username`);
+    expect(userCreate).not.toHaveBeenCalled();
+    expect(userUpdate).not.toHaveBeenCalled();
+    expect(instanceCreate).not.toHaveBeenCalled();
+  });
+});
+
 describe("GET /api/auth/fediverse/callback/mastodon ログイン成功", () => {
   it("初回ログインはユーザーを作成し /create?welcome=1 へ", async () => {
     const state = primeCookies();

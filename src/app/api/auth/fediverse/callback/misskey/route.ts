@@ -15,6 +15,7 @@ import { createSession, getCurrentUser } from "@/lib/auth/session";
 import { extractLoginRequestInfo } from "@/lib/auth/requestInfo";
 import prisma from "@/lib/db";
 import { grantSignupMakeupPoints } from "@/lib/makeup/awards";
+import { isAcceptableUsername } from "@/lib/auth/serverIdentity";
 
 const MIAUTH_STATE_COOKIE = "miauth_state";
 
@@ -74,6 +75,13 @@ export async function GET(request: NextRequest) {
 
     // MiAuthセッションを確認してトークン取得
     const { token, user: misskeyUser } = await checkMisskeySession(server, sessionId);
+
+    // ユーザー名は User.username として URL・robots.txt 等にそのまま使うため、規則外なら保存しない
+    // （serverIdentity の pitfall 参照）。
+    if (!isAcceptableUsername(misskeyUser.username)) {
+      console.warn(`[oauth] rejected unacceptable username from ${server}: ${JSON.stringify(misskeyUser.username)}`);
+      return NextResponse.redirect(new URL("/?error=invalid_username", baseUrl));
+    }
 
     // インスタンスを取得または作成
     let instance = await prisma.instance.findUnique({

@@ -10,11 +10,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import {
   detectInstanceType,
-  normalizeServer,
   getMastodonAuthorizationUrl,
   getMisskeyAuthorizationUrl,
 } from "@/lib/auth/fediverse";
 import { getOrRegisterMastodonApp } from "@/lib/auth/mastodonApp";
+import { parseServerHostname } from "@/lib/auth/serverIdentity";
 import {
   encryptOAuthSession,
   generateOAuthState,
@@ -49,8 +49,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // サーバー名を正規化
-    const normalizedServer = normalizeServer(server);
+    // サーバー名を正規化し、ホスト名だけで構成されているか確かめる。以降の許可/拒否の照合・
+    // Instance.domain・URL・robots.txt はこの値をそのまま使う（serverIdentity の pitfall 参照）。
+    const normalizedServer = parseServerHostname(server);
+    if (!normalizedServer) {
+      return errorResponse(ErrorCodes.VALIDATION_INVALID, "サーバー名が不正です", 400, {
+        suggestion: "例: handon.club のような形式で入力ください",
+      });
+    }
 
     // 許可サーバーチェック
     const allowedServers = getAllowedServers();

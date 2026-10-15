@@ -134,6 +134,15 @@ describe("POST /api/auth/fediverse/register 入力検証", () => {
     expect(detectInstanceTypeMock).toHaveBeenCalledWith(MASTODON);
     expect((await json(res)).server).toBe(MASTODON);
   });
+
+  it("ホスト名以外を含むサーバー名は 400 で、検出フェッチを飛ばさない（改行で robots.txt に行を差し込めた）", async () => {
+    for (const server of [`${MASTODON}/\nUser-Agent: *\nDisallow: /\n#`, `${MASTODON}/x`, `user@${MASTODON}`]) {
+      const res = await POST(req({ server }));
+      expect(res.status).toBe(400);
+      expect((await json(res)).error?.code).toBe(ErrorCodes.VALIDATION_INVALID);
+    }
+    expect(detectInstanceTypeMock).not.toHaveBeenCalled();
+  });
 });
 
 describe("POST /api/auth/fediverse/register 受け入れポリシー", () => {
@@ -158,6 +167,16 @@ describe("POST /api/auth/fediverse/register 受け入れポリシー", () => {
 
     expect(res.status).toBe(403);
     expect((await json(res)).error?.code).toBe(ErrorCodes.SERVER_NOT_ALLOWED);
+    expect(detectInstanceTypeMock).not.toHaveBeenCalled();
+  });
+
+  it("DENIED_SERVERS はポート・末尾ドット付きの別表記ですり抜けられない", async () => {
+    process.env.DENIED_SERVERS = MASTODON;
+    for (const server of [`${MASTODON}:443`, `${MASTODON}.`]) {
+      const res = await POST(req({ server }));
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      expect(res.status).toBeLessThan(500);
+    }
     expect(detectInstanceTypeMock).not.toHaveBeenCalled();
   });
 
