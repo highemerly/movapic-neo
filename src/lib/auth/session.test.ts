@@ -73,6 +73,7 @@ import {
   getCurrentSessionJti,
   revokeSession,
   revokeOtherSessions,
+  revokeCurrentSession,
   type SessionIdentity,
   type LoginRequestInfo,
 } from "./session";
@@ -479,6 +480,28 @@ describe("revokeOtherSessions", () => {
       revokedAt: null,
       jti: { not: "current-jti" },
     });
+  });
+});
+
+describe("revokeCurrentSession", () => {
+  it("Cookie の JWT に対応する本人の LoginSession を失効させる（ログアウト後に写しを通さない）", async () => {
+    const jti = await login();
+    loginSessionUpdateMany.mockResolvedValue({ count: 1 });
+
+    await revokeCurrentSession();
+
+    expect(loginSessionUpdateMany).toHaveBeenCalledOnce();
+    expect(loginSessionUpdateMany.mock.calls[0][0].where).toEqual({
+      userId: USER_ID,
+      jti,
+      revokedAt: null,
+    });
+    expect(loginSessionUpdateMany.mock.calls[0][0].data.revokedAt).toBeInstanceOf(Date);
+  });
+
+  it("Cookie が無ければ何もしない", async () => {
+    await revokeCurrentSession();
+    expect(loginSessionUpdateMany).not.toHaveBeenCalled();
   });
 });
 

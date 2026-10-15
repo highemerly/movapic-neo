@@ -401,3 +401,18 @@ export async function revokeOtherSessions(
   });
   return result.count;
 }
+
+/**
+ * 現在のセッション（Cookie の JWT）を失効させる。ログアウト用。
+ * Cookie を消すだけでは、漏れた JWT の写し（共有端末・盗まれた Cookie）が有効期限まで通り、
+ * 使われ続ける限りスライディングで最長90日延びる。認証は LoginSession.revokedAt を見るので、
+ * ここで失効させれば写しも即座に無効になる。Cookie を消す前に呼ぶこと（jti を Cookie から読む）。
+ */
+export async function revokeCurrentSession(): Promise<void> {
+  const payload = await getSessionPayload();
+  if (!payload) return;
+  await prisma.loginSession.updateMany({
+    where: { userId: payload.userId, jti: payload.jti, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+}
