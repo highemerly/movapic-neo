@@ -514,7 +514,6 @@ export async function processOneMention(
         serverDomain: user.instance.domain,
         imagePageUrl: published.imagePageUrl,
         statusCode: published.postErrorStatus,
-        appUrl,
       }),
       originalVisibility
     );

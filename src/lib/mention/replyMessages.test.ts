@@ -4,7 +4,6 @@ import { federationFailedMessage } from "./replyMessages";
 const base = {
   serverDomain: "mastodon.example",
   imagePageUrl: "https://shamezo.example/u/alice@mastodon.example/status/img-1",
-  appUrl: "https://shamezo.example",
 };
 
 describe("federationFailedMessage", () => {
@@ -21,9 +20,11 @@ describe("federationFailedMessage", () => {
     );
   });
 
-  it.each([401, 403])("連携失効（%i）のときは再ログインの案内を足す（再投稿も失敗するため）", (statusCode) => {
-    const message = federationFailedMessage({ ...base, statusCode });
-    expect(message).toContain("から再投稿することもできます。\n");
-    expect(message).toContain("SHAMEZO（https://shamezo.example）に再ログインしてから再投稿してください。");
+  it.each([401, 403])("連携失効（%i）のときはログインし直してからの再投稿を案内する", (statusCode) => {
+    expect(federationFailedMessage({ ...base, statusCode })).toBe(
+      "SHAMEZOには投稿できましたが、mastodon.exampleへの投稿に失敗しました。" +
+        "mastodon.example との連携が切れている可能性がありますので、" +
+        "SHAMEZO に一度ログインしてから再投稿してみてください。"
+    );
   });
 });
