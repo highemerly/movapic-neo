@@ -314,7 +314,6 @@ export async function POST(request: NextRequest) {
       source: "web",
       visibility: publishVisibility,
       replyToImageId: replyTo,
-      persistOnPostFailure: true,
       getThumbnailAndDimensions: async () => ({
         thumbnail: finalized.thumbnail,
         width: finalized.width,

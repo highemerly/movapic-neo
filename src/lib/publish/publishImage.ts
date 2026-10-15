@@ -4,9 +4,12 @@
  * web経由(/api/v1/post) / mail経由(/api/v1/ingest/email) / bot経由(mention/processor)
  * の3経路で重複していた「保存→サムネ→メタ→DB保存→Fediverse投稿」を一本化する。
  *
- * 経路ごとに異なるのは「投稿失敗時に画像を保存するか（persistOnPostFailure）」の
- * ポリシーだけなので、それをフラグで切り替える。それ以外（visibility→プラットフォーム
- * マッピング、Mastodon/Misskey分岐、isPublic、DBフィールド）はここに集約する。
+ * 順序は全経路で「保存 → 投稿 → postUrl を記録」（投稿に失敗しても画像は残り、再投稿でやり直せる）。
+ * visibility→プラットフォームマッピング、Mastodon/Misskey分岐、isPublic、DBフィールドもここに集約する。
+ *
+ * pitfall: 以前は Bot（mention）だけ「先に投稿 → 成功時のみ保存」だった。投稿後に保存が失敗すると
+ * リンク切れの投稿が残り、Bot の「もう一度メンションして」の案内やジョブの自動やり直しで二重投稿になった。
+ * Bot のやり直しで画像が増えないことは、recordWithImage（保存と同じトランザクションで処理済みを確定）で守る。
  */
 
 import { randomUUID } from "crypto";
@@ -102,11 +105,11 @@ export interface PublishImageInput {
    */
   replyToImageId?: string | null;
   /**
-   * 投稿失敗時にも画像をDB保存するか。
-   * - web/email: true（投稿が失敗してもサービス内には保存する）
-   * - mention:   false（投稿が成功したときだけ保存し、失敗時はリトライさせる）
+   * 画像の DB 登録と同じトランザクションで実行する処理（任意）。
+   * Bot は ProcessedMention をここで「処理済み」に確定させる。登録と別にすると、その間に
+   * ジョブが例外で終わったとき、自動のやり直しが未処理と判断して2枚目を保存・投稿してしまう。
    */
-  persistOnPostFailure: boolean;
+  recordWithImage?: (tx: Prisma.TransactionClient) => Promise<unknown>;
   /** web専用の追加メタ（カメラ・位置情報） */
   extras?: {
     cameraMake?: string | null;
@@ -123,7 +126,6 @@ export interface PublishImageInput {
    * コールバックで受ける（compute を二重に呼ばない）。投稿直前の形式変換のように
    * 呼び出し側が持っていない処理は、publishImage から compute クライアントを直接呼ぶ。
    * いずれも sharp は読み込まない（worker-front / web を native フリーに保つ）。
-   * mention（persistOnPostFailure:false）では投稿成功時のみ呼ばれる＝失敗時は compute を呼ばない。
    */
   getThumbnailAndDimensions: () => Promise<{
     thumbnail: Buffer;
@@ -135,17 +137,17 @@ export interface PublishImageInput {
 }
 
 export interface PublishImageResult {
-  /** 保存に成功した場合の画像ID（投稿失敗かつ persistOnPostFailure=false の場合は undefined） */
-  imageId?: string;
-  storageKey?: string;
-  imagePageUrl?: string;
+  /** 保存した画像ID（保存は投稿の成否に依存しない） */
+  imageId: string;
+  storageKey: string;
+  imagePageUrl: string;
   postUrl?: string;
   postId?: string;
   /** 投稿に失敗した場合のエラー（保存自体は成否に依存しない） */
   postError?: string;
   /** 投稿失敗がサーバーのHTTPエラー応答だった場合のステータスコード（タイムアウト等では undefined） */
   postErrorStatus?: number;
-  /** この投稿で新規獲得した実績（web投稿の演出用。保存された場合のみ） */
+  /** この投稿で新規獲得した実績（web投稿の演出・Bot のお知らせ用） */
   newAchievements?: GrantedAchievement[];
   /**
    * Fediverse への投稿は成功したが、リプライ先に繋げられず単独投稿になった（SHAMEZO 内では繋がっている）。
@@ -156,7 +158,7 @@ export interface PublishImageResult {
 
 /**
  * 保存された投稿から実績評価用の PostFacts を作る。
- * replyToId は実際に保存した値（mention で解決時に親が消えていたら null）を受ける＝DB と一致させる。
+ * replyToId は実際に保存した値を受ける＝DB と一致させる。
  */
 function toPostFacts(input: PublishImageInput, replyToId: string | null): PostFacts {
   return {
@@ -198,8 +200,8 @@ async function notifyReplySafely(
 }
 
 /**
- * 保存が確定した後の処理。publishImage の2分岐（先保存／先投稿）の両方から呼ぶ。
- * 後処理を分岐ごとに書くと片方だけ漏れる（ALT で実際に起きた）ため、ここ1箇所に足すこと。
+ * 保存が確定した後の処理（実績評価・リプライ通知）。保存後の処理はここ1箇所に足すこと。
+ * pitfall: 以前は先保存／先投稿の2分岐があり、後処理を分岐ごとに書いて片方だけ漏れた（ALT で実例）。
  */
 async function afterSaved(
   input: PublishImageInput,
@@ -393,14 +395,13 @@ function buildImagePageUrl(username: string, domain: string, imageId: string): s
 
 /**
  * 画像をS3へ保存し、サムネイルを生成し、DBにImageレコードを作成する。
- * Fediverse投稿は行わない（postUrl/postId は引数で受け取り保存する）。
+ * Fediverse投稿は行わない（postUrl/postId は投稿後に更新する）。
  */
 async function storeAndRecord(
   input: PublishImageInput,
   imageId: string,
-  record: { postUrl?: string; postId?: string; replyToId: string | null }
+  replyToId: string | null
 ): Promise<{ imagePageUrl: string; storageKey: string }> {
-  const { postUrl, postId, replyToId } = record;
   const extension = getExtensionFromMimeType(input.contentType);
   const storageKey = generateStorageKey(imageId, extension);
   const filename = `movapic-${imageId}.${extension}`;
@@ -414,44 +415,45 @@ async function storeAndRecord(
     await input.getThumbnailAndDimensions();
   await uploadImage(thumbnail, thumbnailKey, "image/webp");
 
-  await prisma.image.create({
-    data: {
-      id: imageId,
-      userId: input.user.id,
-      storageKey,
-      filename,
-      mimeType: input.contentType,
-      fileSize: input.buffer.length,
-      width,
-      height,
-      overlayText: input.text,
-      altText: input.altText?.trim() || null,
-      position: input.options.position,
-      font: input.options.font,
-      color: input.options.color,
-      size: input.options.size,
-      outputFormat: input.options.outputFormat,
-      arrangement: input.options.arrangement,
-      season: input.options.season ?? null,
-      thumbnailKey,
-      blurDataUrl: blurDataUrl ?? null,
-      source: input.source,
-      // 仕様: public / unlisted / local いずれも公開TLに表示する（CLAUDE.md）
-      isPublic: true,
-      postUrl,
-      postId,
-      cameraMake: input.extras?.cameraMake ?? null,
-      cameraModel: input.extras?.cameraModel ?? null,
-      capturedAt: input.extras?.capturedAt ?? null,
-      // ExifDetails は固定キーの型のため Prisma の InputJsonValue（要 index signature）に
-      // 直接は代入できない。表示済み文字列の平坦なオブジェクトなのでキャストで通す。
-      exifDetails:
-        (input.extras?.exifDetails as Prisma.InputJsonValue | undefined) ??
-        undefined,
-      locationPrefecture: input.extras?.locationPrefecture ?? null,
-      locationCity: input.extras?.locationCity ?? null,
-      replyToId,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.image.create({
+      data: {
+        id: imageId,
+        userId: input.user.id,
+        storageKey,
+        filename,
+        mimeType: input.contentType,
+        fileSize: input.buffer.length,
+        width,
+        height,
+        overlayText: input.text,
+        altText: input.altText?.trim() || null,
+        position: input.options.position,
+        font: input.options.font,
+        color: input.options.color,
+        size: input.options.size,
+        outputFormat: input.options.outputFormat,
+        arrangement: input.options.arrangement,
+        season: input.options.season ?? null,
+        thumbnailKey,
+        blurDataUrl: blurDataUrl ?? null,
+        source: input.source,
+        // 仕様: public / unlisted / local いずれも公開TLに表示する（CLAUDE.md）
+        isPublic: true,
+        cameraMake: input.extras?.cameraMake ?? null,
+        cameraModel: input.extras?.cameraModel ?? null,
+        capturedAt: input.extras?.capturedAt ?? null,
+        // ExifDetails は固定キーの型のため Prisma の InputJsonValue（要 index signature）に
+        // 直接は代入できない。表示済み文字列の平坦なオブジェクトなのでキャストで通す。
+        exifDetails:
+          (input.extras?.exifDetails as Prisma.InputJsonValue | undefined) ??
+          undefined,
+        locationPrefecture: input.extras?.locationPrefecture ?? null,
+        locationCity: input.extras?.locationCity ?? null,
+        replyToId,
+      },
+    });
+    await input.recordWithImage?.(tx);
   });
 
   return {
@@ -461,12 +463,7 @@ async function storeAndRecord(
 }
 
 /**
- * 投稿パイプライン本体。
- *
- * persistOnPostFailure により、保存と投稿の順序を切り替える:
- * - true  (web/email): 先に保存 → 投稿 → postUrl を更新（投稿失敗でも画像は残る）
- * - false (mention):   先に投稿 → 成功時のみ保存（失敗時は何も残さずリトライ可能）
- *
+ * 投稿パイプライン本体。先に保存 → 投稿 → postUrl を更新（投稿失敗でも画像は残る）。
  * local の場合は投稿せず保存のみ。
  */
 export async function publishImage(
@@ -479,7 +476,7 @@ export async function publishImage(
 
   const isLocal = input.visibility === "local";
 
-  // 投稿入力は両分岐で共通。分岐ごとに組むと片方だけ項目が漏れる（ALT で実際に起きた）ため1回だけ組む。
+  // 投稿入力はここで1回だけ組む（以前の2分岐時代、分岐ごとに組んで片方だけ ALT が漏れた）。
   const basePost: PostImageInput = {
     user: input.user,
     buffer: input.buffer,
@@ -514,78 +511,39 @@ export async function publishImage(
     );
   };
 
-  if (input.persistOnPostFailure || isLocal) {
-    // 先に保存（投稿失敗でも画像を残すポリシー、または local で投稿しない）。
-    // リプライ先の解決（最大 REPLY_RESOLVE_TIMEOUT_MS）は保存と並行させ、同期 /api/v1/post の
-    // 応答時間（Ingress の504）に上乗せしない。解決は throw しないので保存の例外伝播は変わらない。
-    const [{ storageKey }, replyLink] = await Promise.all([
-      storeAndRecord(input, imageId, { replyToId: replyToImageId }),
-      resolveReply(),
-    ]);
+  // 先に保存（投稿失敗でも画像を残す。local は投稿しない）。
+  // リプライ先の解決（最大 REPLY_RESOLVE_TIMEOUT_MS）は保存と並行させ、同期 /api/v1/post の
+  // 応答時間（Ingress の504）に上乗せしない。解決は throw しないので保存の例外伝播は変わらない。
+  const [{ storageKey }, replyLink] = await Promise.all([
+    storeAndRecord(input, imageId, replyToImageId),
+    resolveReply(),
+  ]);
 
-    const postResult = await postImageToFediverse({
-      ...basePost,
-      replyToPostId: replyToPostIdOf(replyLink),
-    });
-
-    if (postResult?.success && postResult.postUrl) {
-      await prisma.image.update({
-        where: { id: imageId },
-        data: { postUrl: postResult.postUrl, postId: postResult.postId },
-      });
-    }
-    logReply(replyLink, postResult);
-
-    // 画像は保存済み（投稿失敗でも残るポリシー）なので実績評価する
-    const newAchievements = await afterSaved(input, imageId, replyToImageId);
-
-    return {
-      imageId,
-      storageKey,
-      imagePageUrl,
-      postUrl: postResult?.postUrl,
-      postId: postResult?.postId,
-      postError: postResult && !postResult.success ? postResult.error : undefined,
-      postErrorStatus:
-        postResult && !postResult.success ? postResult.statusCode : undefined,
-      newAchievements,
-      threadBroken: isThreadBroken(replyLink, postResult),
-    };
-  }
-
-  // persistOnPostFailure=false かつ 非local: 投稿が成功したときだけ保存する
-  const replyLink = await resolveReply();
   const postResult = await postImageToFediverse({
     ...basePost,
     replyToPostId: replyToPostIdOf(replyLink),
   });
 
-  if (!postResult || !postResult.success) {
-    return {
-      postError: postResult?.error ?? "投稿に失敗しました",
-      postErrorStatus: postResult?.statusCode,
-    };
+  if (postResult?.success && postResult.postUrl) {
+    await prisma.image.update({
+      where: { id: imageId },
+      data: { postUrl: postResult.postUrl, postId: postResult.postId },
+    });
   }
   logReply(replyLink, postResult);
 
-  // 解決の時点で親が既に無いなら、存在しない ID を保存しない（FK 違反になる。DB の SET NULL と同じ結果にする）。
-  const replyToId =
-    replyLink?.kind === "shamezo-only" && replyLink.reason === "parent-gone" ? null : replyToImageId;
-  const { storageKey } = await storeAndRecord(input, imageId, {
-    postUrl: postResult.postUrl,
-    postId: postResult.postId,
-    replyToId,
-  });
-
-  // 投稿成功時のみ保存されるので、ここで実績評価する
-  const newAchievements = await afterSaved(input, imageId, replyToId);
+  // 画像は保存済み（投稿失敗でも残る）なので実績評価する
+  const newAchievements = await afterSaved(input, imageId, replyToImageId);
 
   return {
     imageId,
     storageKey,
     imagePageUrl,
-    postUrl: postResult.postUrl,
-    postId: postResult.postId,
+    postUrl: postResult?.postUrl,
+    postId: postResult?.postId,
+    postError: postResult && !postResult.success ? postResult.error : undefined,
+    postErrorStatus:
+      postResult && !postResult.success ? postResult.statusCode : undefined,
     newAchievements,
     threadBroken: isThreadBroken(replyLink, postResult),
   };

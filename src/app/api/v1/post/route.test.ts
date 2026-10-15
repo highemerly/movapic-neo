@@ -79,6 +79,7 @@ beforeEach(() => {
   mockFinalize.mockResolvedValue(finalizeOk());
   mockPublish.mockResolvedValue({
     imageId: "img1",
+    storageKey: "2026/10/15/img1.avif",
     imagePageUrl: "/u/alice/status/img1",
     postUrl: "https://mastodon.example/@alice/1",
     newAchievements: [{ key: "first-post", category: "first-post", grantedAt: new Date() }],
@@ -195,6 +196,7 @@ describe("POST /api/v1/post: 成功", () => {
   it("Fediverseだけ失敗した部分成功は 200＋fediverseError", async () => {
     mockPublish.mockResolvedValue({
       imageId: "img2",
+      storageKey: "2026/10/15/img2.avif",
       imagePageUrl: "/u/alice/status/img2",
       postError: "connect timeout",
       postErrorStatus: 500,
@@ -311,6 +313,7 @@ describe("POST /api/v1/post: スレッドに投稿（replyTo）", () => {
     mockFindReplyable.mockResolvedValue(PARENT);
     mockPublish.mockResolvedValue({
       imageId: "img3",
+      storageKey: "2026/10/15/img3.avif",
       imagePageUrl: "/u/alice/status/img3",
       postUrl: "https://mastodon.example/@alice/3",
       newAchievements: [],

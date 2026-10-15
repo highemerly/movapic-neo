@@ -235,7 +235,6 @@ const processEmailTask: Task = async (payload) => {
         },
     source: "email",
     visibility: p.options.visibility,
-    persistOnPostFailure: true,
     getThumbnailAndDimensions: async () => {
       const f = await finalizeImage(result.buffer, cropPosition);
       return { thumbnail: f.thumbnail, width: f.width, height: f.height, blurDataUrl: f.blurDataUrl };

@@ -32,7 +32,7 @@
 - Fediverse への投稿は1回だけ行い、失敗はそのまま利用者に返す（`postImageToFediverse`・カレンダーのコラージュ投稿とも）。
 - 理由: 本文作成（Mastodon `statuses` / Misskey `notes/create`）は冪等でなく、サーバー側では作成済みなのに前段のプロキシが 502/504 を返すことがある＝自動でやり直すと二重投稿になる。Misskey には Mastodon の `Idempotency-Key` に当たる仕組みが無い。アップロードのやり直しも Misskey では利用者のドライブに重複ファイルを残す。429 は短い待機では回復しない（レート制限は分単位の窓）。
 - 画像は先に SHAMEZO に保存されているので、やり直しは利用者が自分のタイムラインを確かめてから「再投稿」で行う。
-- Bot 投稿のジョブ単位の再試行（下記「制約・出力」）は別の仕組み。
+- Bot 投稿も同じ（先に保存し、連合の失敗は画像ページからの再投稿を案内する。下記「Bot投稿機能」）。
 
 ## メール投稿機能
 - **Cloudflare Email Worker** (`workers/email-forwarder/`): メールを受信しraw dataをAPIへ転送。
@@ -54,7 +54,10 @@ Mastodon上でBotにメンションして画像生成・投稿する機能。
 
 ### 仕組み
 - **Botアカウント**: `@pic@handon.club`（環境変数で設定可能）。
-- **フロー**: ①画像付きメンション受信 → ②通知取得（主: Streaming API WebSocket `src/lib/mention/streamer.ts`／フォールバック: 定期ジョブによる since_id ポーリング `fetcher.ts`・`ingest.ts` で取りこぼし補完）→ ③パース `parser.ts` → ④画像処理・投稿 `processor.ts` → ⑤元投稿削除しユーザーアカウントで再投稿 → ⑥DB保存（source: "mention"）。
+- **フロー**: ①画像付きメンション受信 → ②通知取得（主: Streaming API WebSocket `src/lib/mention/streamer.ts`／フォールバック: 定期ジョブによる since_id ポーリング `fetcher.ts`・`ingest.ts` で取りこぼし補完）→ ③パース `parser.ts` → ④画像処理 `processor.ts` → ⑤SHAMEZO に保存（source: "mention"）→ ⑥ユーザーアカウントで投稿 → ⑦元投稿削除（連合に成功したときだけ）。
+- **保存が先**（web・メールと同じ）。⑤の DB 登録と同じトランザクションで `ProcessedMention` を処理済みに確定する（`publishImage` の `recordWithImage`）ので、以降にジョブが例外で終わっても自動のやり直しで同じ写真を2枚保存・二重投稿しない。
+- **連合に失敗したとき**: 画像は SHAMEZO に残る。Bot は「SHAMEZOには投稿できましたが、{サーバー}への投稿に失敗しました。{画像ページURL} から再投稿することもできます。」と返信する（連携失効 401/403 なら再ログインの案内を足す。[replyMessages.ts](../src/lib/mention/replyMessages.ts)）。やり直しはメンションし直しではなく画像ページからの再投稿（し直すと同じ写真が2枚になる）。
+- pitfall: 以前は「先に投稿 → 成功時のみ保存」で、投稿後に保存が失敗するとリンク切れの投稿が残り、「再投稿してみてください」の案内やジョブの自動やり直しで二重投稿になった。
 
 ### コマンド形式
 `@pic [オプション] テキスト`（`[...]` 内にスペース区切り）
@@ -63,7 +66,7 @@ Mastodon上でBotにメンションして画像生成・投稿する機能。
 - 例: `@pic [上 赤 大] こんにちは` / `@pic [下 ネオン debug] テスト` / `@pic [keep unlisted] 元投稿を残す`
 
 ### 制約・出力
-- 画像1枚のみ（動画・GIF不可）・テキスト1〜140文字・ユーザーは事前ログイン必須・リトライ最大2回（失敗時Botがリプライ通知）。
+- 画像1枚のみ（動画・GIF不可）・テキスト1〜140文字・ユーザーは事前ログイン必須。保存前の失敗（画像取得・文字入れ等）はやり直しの対象（`retryCount` 上限2・失敗時Botがリプライ通知）、保存後はやり直さない。
 - 生成・保存形式は連携インスタンスによらず常に AVIF。**Mastodon へ送るときだけ**投稿直前に JPEG へ変換する（web投稿・メール投稿・再投稿と共通。[出力形式](#出力形式)参照）。
 - 環境変数: `MASTODON_BOT_INSTANCE_URL` / `MASTODON_BOT_INSTANCE_DOMAIN` / `MASTODON_BOT_ACCESS_TOKEN` / `MASTODON_BOT_ACCT`。
 

@@ -74,7 +74,7 @@
 - **ミュート・削除・取り下げは読み取り時に落とす**（書き込みでは拒否しない＝ミュートされた側にバレない）。親の削除は `replyToId` の SET NULL で痕跡なく単独投稿に戻す。
 - 「連」の繋ぐ先は必ず投稿者本人（`findLatestOwnImageId` が userId で絞る）。Bot・メールは送信者ごとの `queueName` で直列化して順序を保つ。
 - Fediverse 上で繋げられないときは単独投稿にし、`ReplyLink.reason`／`replyDropped` で原因を残して `threadBroken` で利用者に知らせる（黙らない）。
-- 投稿保存後の処理は publishImage の `afterSaved` に足す（先保存／先投稿の2分岐で片方だけ漏れるのを防ぐ。ALT で実例あり）。
+- 投稿は全経路（web・メール・Bot・再投稿）「先に保存 → 投稿」。保存後の処理は publishImage の `afterSaved` に足す（以前の先保存／先投稿の2分岐で片方だけ漏れた。ALT で実例あり）。
 
 ### 皆勤賞の穴埋め（詳細: [achievements/README](src/lib/achievements/README.md)「特殊: 皆勤賞」）
 - 2026-10 分から**穴埋めポイント制**（1pt=1日・月ごと・持ち越し不可・翌月10日締切・全ユーザー手動）。2026-09 以前の月は旧ルール（固定上限3/4日・自動穴埋め）のまま。

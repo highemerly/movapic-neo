@@ -25,7 +25,7 @@
 - 返信先 ID は**投稿者自身のサーバー上の ID** が要る。[`resolveFediverseReplyTarget`](../src/lib/replies/fediverseTarget.ts) が解決する（throw しない）:
   - 同じサーバー → `Image.postId` をそのまま
   - 別サーバー → Mastodon `search?resolve=true`（[mastodon.ts](../src/lib/fediverse/mastodon.ts)）／Misskey `ap/show`（[misskey.ts](../src/lib/fediverse/misskey.ts)）。タイムアウト `REPLY_RESOLVE_TIMEOUT_MS`=5秒（同期 `/api/v1/post` の504に近づけないため、お気に入りの10秒より短い）。
-- `/api/v1/post`（先保存）では解決を S3 保存と**並行**させる（応答時間に上乗せしない）。mention（先投稿）は解決→投稿。local は解決しない。
+- 解決は S3 保存と**並行**させる（`/api/v1/post` の応答時間に上乗せしない。全経路とも先に保存する）。local は解決しない。
 - 再投稿（[repostImage.ts](../src/lib/publish/repostImage.ts)）でも親が連合済みなら繋ぐ（local で作ったスレッドを後から連合させても切れない）。
 - 本文に相手への **@メンションは入れない**。Mastodon では他人宛のメンション無しリプライは公開TL・ローカルTLに出ず、フォロワーのホームにも両方をフォローしている人にしか出にくい。相手の Fediverse 側にも通知されない（SHAMEZO の通知でお知らせする）。Misskey は親が home（非収載）だと返信も home に格下げされる。
 
@@ -59,7 +59,7 @@
 - 書き込み側・API レスポンス（`threadBroken` 等）にミュート由来の差を一切出さない。
 
 ## 通知（type `reply`）
-- 作成: [`createReplyNotification`](../src/lib/notifications/replyNotifications.ts)。publishImage の保存確定後の `afterSaved` から呼ぶ（2分岐の両方）。例外は握る（保存・連合後に例外を返すと再送・リトライで二重投稿になるため）。
+- 作成: [`createReplyNotification`](../src/lib/notifications/replyNotifications.ts)。publishImage の保存確定後の `afterSaved` から呼ぶ。例外は握る（保存・連合後に例外を返すと再送・リトライで二重投稿になるため）。
 - 自分の投稿へのリプライ（セルフスレッド・「連」）は通知しない。1リプライ1通知・id は決定的 `reply-<replyImageId>`（冪等）。
 - `Notification.imageId` は**リプライ側の画像**。data は持たず、送信者・削除・取り下げ・ミュートはリレーションから読み取り時に導出する（[`isReplyNotificationVisible`](../src/lib/notifications/muteFilter.ts)）。リプライ画像の削除・取り下げ、親の削除、送信者のミュートのいずれかで痕跡なく消える。
 - 文言は [replyNotificationType.ts](../src/lib/notifications/replyNotificationType.ts) 1か所（ベルと通知一覧で二重に書かない）。

@@ -1,11 +1,10 @@
 /**
  * publishImage の代替テキスト（ALT）配管の回帰テスト。
  *
- * 実際にあった不具合を固定する: publishImage には投稿呼び出しが2分岐ある。
- *   - persistOnPostFailure=true / local … 先に保存してから投稿（web/email）
- *   - persistOnPostFailure=false      … 先に投稿し成功時のみ保存（mention）
- * かつて後者の分岐にだけ altText を渡し忘れ、「DBには入るが投稿には反映されない」
- * という不具合が出た。両分岐とも postToMastodon/postToMisskey に altText を渡すことを検証する。
+ * 実際にあった不具合を固定する: かつて publishImage には先保存（web/email）と先投稿（mention）の
+ * 2分岐があり、後者にだけ altText を渡し忘れて「DBには入るが投稿には反映されない」不具合が出た。
+ * 今は全経路が先保存の1本だが、経路（source）によらず投稿と DB の両方に altText が渡ることを検証する。
+ * Bot の処理済み確定（recordWithImage）が画像の登録と同じトランザクションで走ることも固定する。
  *
  * ネットワーク（fediverse/post）・S3（storage）・prisma・実績評価はすべてモックする。
  *
@@ -50,7 +49,12 @@ vi.mock("@/lib/fediverse/post", () => ({
 vi.mock("@/lib/compute/client", () => ({ transcodeToJpeg }));
 
 vi.mock("@/lib/db", () => ({
-  default: { image: { create: imageCreate, update: imageUpdate } },
+  default: {
+    image: { create: imageCreate, update: imageUpdate },
+    // 画像の登録は recordWithImage と同じトランザクション。tx は同じモックを渡す。
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn({ image: { create: imageCreate } }),
+  },
 }));
 
 vi.mock("@/lib/storage/storage", () => ({
@@ -110,7 +114,6 @@ function baseInput(overrides: Partial<PublishImageInput>): PublishImageInput {
     },
     source: "web",
     visibility: "public",
-    persistOnPostFailure: true,
     getThumbnailAndDimensions: async () => ({
       thumbnail: Buffer.from("thumb"),
       width: 100,
@@ -141,8 +144,8 @@ beforeEach(() => {
 });
 
 describe("publishImage の ALT 配管", () => {
-  it("web経路（persistOnPostFailure=true）: 投稿とDBの両方にaltTextが渡る", async () => {
-    await publishImage(baseInput({ persistOnPostFailure: true, altText: "茶色い猫" }));
+  it("web経路: 投稿とDBの両方にaltTextが渡る", async () => {
+    await publishImage(baseInput({ altText: "茶色い猫" }));
 
     expect(postToMastodon).toHaveBeenCalledTimes(1);
     expect(postArgs(postToMastodon).altText).toBe("茶色い猫");
@@ -150,17 +153,17 @@ describe("publishImage の ALT 配管", () => {
     expect(imageCreate.mock.calls[0][0].data.altText).toBe("茶色い猫");
   });
 
-  it("mention経路（persistOnPostFailure=false）: 投稿にaltTextが渡る（回帰防止）", async () => {
+  it("mention経路: 投稿とDBの両方にaltTextが渡る（回帰防止）", async () => {
     await publishImage(
       baseInput({
         source: "mention",
-        persistOnPostFailure: false,
         altText: "元投稿から引き継いだALT",
       })
     );
 
     expect(postToMastodon).toHaveBeenCalledTimes(1);
     expect(postArgs(postToMastodon).altText).toBe("元投稿から引き継いだALT");
+    expect(imageCreate.mock.calls[0][0].data.altText).toBe("元投稿から引き継いだALT");
   });
 
   it("Misskeyユーザーでも altText が postToMisskey に渡る", async () => {
@@ -269,18 +272,18 @@ describe("Mastodon へのアップロード形式（保存は AVIF・送信の�
 
     expect(postToMastodon).not.toHaveBeenCalled();
     expect(result.postError).toBe("投稿用画像の変換に失敗しました");
-    // persistOnPostFailure=true なので画像自体は残る＝再投稿でやり直せる
+    // 画像自体は残る＝再投稿でやり直せる
     expect(result.imageId).toBeDefined();
     expect(imageCreate).toHaveBeenCalledTimes(1);
   });
 
-  it("mention経路（persistOnPostFailure=false）で変換に失敗したら保存しない", async () => {
+  it("mention経路でも変換に失敗したら画像は保存される（再投稿でやり直せる）", async () => {
     transcodeToJpeg.mockRejectedValue(new Error("compute down"));
 
-    const result = await publishImage(baseInput({ persistOnPostFailure: false }));
+    const result = await publishImage(baseInput({ source: "mention" }));
 
-    expect(result.imageId).toBeUndefined();
-    expect(imageCreate).not.toHaveBeenCalled();
+    expect(result.postError).toBe("投稿用画像の変換に失敗しました");
+    expect(imageCreate).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -326,85 +329,75 @@ describe("自動穴埋め（autoMakeup）は 2026-09 以前の月だけ", () => 
 });
 
 describe("リプライ（スレッド）の配管", () => {
-  // 両分岐（先保存 web/email・先投稿 mention）で同じ結果になることを固定する（ALT と同じ漏れ方を防ぐ）。
-  const branches = [
-    { name: "web経路（persistOnPostFailure=true）", persistOnPostFailure: true },
-    { name: "mention経路（persistOnPostFailure=false）", persistOnPostFailure: false },
-  ];
+  it("解決したリプライ先 ID を投稿に渡し、replyToId を保存し、通知を作る", async () => {
+    const result = await publishImage(
+      baseInput({ replyToImageId: "parent-img" })
+    );
 
-  for (const b of branches) {
-    describe(b.name, () => {
-      it("解決したリプライ先 ID を投稿に渡し、replyToId を保存し、通知を作る", async () => {
-        const result = await publishImage(
-          baseInput({ persistOnPostFailure: b.persistOnPostFailure, replyToImageId: "parent-img" })
-        );
-
-        expect(resolveFediverseReplyTarget).toHaveBeenCalledWith({
-          replyToImageId: "parent-img",
-          viewer: { domain: "mastodon.example", type: "mastodon", accessToken: "token" },
-        });
-        expect(postArgs(postToMastodon).replyToId).toBe("parent-status");
-        expect(imageCreate.mock.calls[0][0].data.replyToId).toBe("parent-img");
-        expect(createReplyNotification).toHaveBeenCalledWith({
-          replyImageId: result.imageId,
-          replierUserId: "user-1",
-          parentImageId: "parent-img",
-        });
-        expect(result.threadBroken).toBe(false);
-      });
-
-      it("親が連合していなければ返信なしで投稿し、SHAMEZO 内だけ繋ぐ（threadBroken にしない）", async () => {
-        resolveFediverseReplyTarget.mockResolvedValue({
-          kind: "shamezo-only",
-          reason: "parent-not-federated",
-        });
-        const result = await publishImage(
-          baseInput({ persistOnPostFailure: b.persistOnPostFailure, replyToImageId: "parent-img" })
-        );
-
-        expect(postArgs(postToMastodon).replyToId).toBeNull();
-        expect(imageCreate.mock.calls[0][0].data.replyToId).toBe("parent-img");
-        expect(result.threadBroken).toBe(false);
-      });
-
-      it("解決できなければ単独投稿して threadBroken=true", async () => {
-        resolveFediverseReplyTarget.mockResolvedValue({
-          kind: "shamezo-only",
-          reason: "resolve-failed",
-          status: 503,
-        });
-        const result = await publishImage(
-          baseInput({ persistOnPostFailure: b.persistOnPostFailure, replyToImageId: "parent-img" })
-        );
-
-        expect(postArgs(postToMastodon).replyToId).toBeNull();
-        expect(imageCreate.mock.calls[0][0].data.replyToId).toBe("parent-img");
-        expect(result.threadBroken).toBe(true);
-      });
-
-      it("投稿先が返信先を無効と応答し返信なしで投稿し直したら threadBroken=true", async () => {
-        postToMastodon.mockResolvedValue({
-          success: true,
-          postId: "s1",
-          postUrl: "https://mastodon.example/@alice/s1",
-          replyDropped: true,
-        });
-        const result = await publishImage(
-          baseInput({ persistOnPostFailure: b.persistOnPostFailure, replyToImageId: "parent-img" })
-        );
-        expect(result.threadBroken).toBe(true);
-      });
-
-      it("通知の作成に失敗しても投稿結果は変わらない（再送・リトライで二重投稿させない）", async () => {
-        createReplyNotification.mockRejectedValue(new Error("db down"));
-        const result = await publishImage(
-          baseInput({ persistOnPostFailure: b.persistOnPostFailure, replyToImageId: "parent-img" })
-        );
-        expect(result.imageId).toBeDefined();
-        expect(result.postError).toBeUndefined();
-      });
+    expect(resolveFediverseReplyTarget).toHaveBeenCalledWith({
+      replyToImageId: "parent-img",
+      viewer: { domain: "mastodon.example", type: "mastodon", accessToken: "token" },
     });
-  }
+    expect(postArgs(postToMastodon).replyToId).toBe("parent-status");
+    expect(imageCreate.mock.calls[0][0].data.replyToId).toBe("parent-img");
+    expect(createReplyNotification).toHaveBeenCalledWith({
+      replyImageId: result.imageId,
+      replierUserId: "user-1",
+      parentImageId: "parent-img",
+    });
+    expect(result.threadBroken).toBe(false);
+  });
+
+  it("親が連合していなければ返信なしで投稿し、SHAMEZO 内だけ繋ぐ（threadBroken にしない）", async () => {
+    resolveFediverseReplyTarget.mockResolvedValue({
+      kind: "shamezo-only",
+      reason: "parent-not-federated",
+    });
+    const result = await publishImage(
+      baseInput({ replyToImageId: "parent-img" })
+    );
+
+    expect(postArgs(postToMastodon).replyToId).toBeNull();
+    expect(imageCreate.mock.calls[0][0].data.replyToId).toBe("parent-img");
+    expect(result.threadBroken).toBe(false);
+  });
+
+  it("解決できなければ単独投稿して threadBroken=true", async () => {
+    resolveFediverseReplyTarget.mockResolvedValue({
+      kind: "shamezo-only",
+      reason: "resolve-failed",
+      status: 503,
+    });
+    const result = await publishImage(
+      baseInput({ replyToImageId: "parent-img" })
+    );
+
+    expect(postArgs(postToMastodon).replyToId).toBeNull();
+    expect(imageCreate.mock.calls[0][0].data.replyToId).toBe("parent-img");
+    expect(result.threadBroken).toBe(true);
+  });
+
+  it("投稿先が返信先を無効と応答し返信なしで投稿し直したら threadBroken=true", async () => {
+    postToMastodon.mockResolvedValue({
+      success: true,
+      postId: "s1",
+      postUrl: "https://mastodon.example/@alice/s1",
+      replyDropped: true,
+    });
+    const result = await publishImage(
+      baseInput({ replyToImageId: "parent-img" })
+    );
+    expect(result.threadBroken).toBe(true);
+  });
+
+  it("通知の作成に失敗しても投稿結果は変わらない（再送・リトライで二重投稿させない）", async () => {
+    createReplyNotification.mockRejectedValue(new Error("db down"));
+    const result = await publishImage(
+      baseInput({ replyToImageId: "parent-img" })
+    );
+    expect(result.imageId).toBeDefined();
+    expect(result.postError).toBeUndefined();
+  });
 
   it("実績評価にはスレッドへの投稿かどうか（実際に保存した replyToId）を渡す", async () => {
     await publishImage(baseInput({ replyToImageId: "parent-img" }));
@@ -412,12 +405,6 @@ describe("リプライ（スレッド）の配管", () => {
 
     vi.mocked(evaluateAndGrant).mockClear();
     await publishImage(baseInput({}));
-    expect(vi.mocked(evaluateAndGrant).mock.calls[0][0].post.isReply).toBe(false);
-  });
-
-  it("mention経路で解決時に親が既に無ければ、実績評価でもスレッド投稿として扱わない", async () => {
-    resolveFediverseReplyTarget.mockResolvedValue({ kind: "shamezo-only", reason: "parent-gone" });
-    await publishImage(baseInput({ persistOnPostFailure: false, replyToImageId: "gone-img" }));
     expect(vi.mocked(evaluateAndGrant).mock.calls[0][0].post.isReply).toBe(false);
   });
 
@@ -441,20 +428,39 @@ describe("リプライ（スレッド）の配管", () => {
     expect(result.threadBroken).toBe(false);
   });
 
-  it("mention経路で解決時に親が既に無ければ replyToId を保存せず通知もしない", async () => {
-    resolveFediverseReplyTarget.mockResolvedValue({ kind: "shamezo-only", reason: "parent-gone" });
-    await publishImage(baseInput({ persistOnPostFailure: false, replyToImageId: "gone-img" }));
-    expect(imageCreate.mock.calls[0][0].data.replyToId).toBeNull();
-    expect(createReplyNotification).not.toHaveBeenCalled();
-  });
-
-  it("mention経路で投稿に失敗したら保存も通知もしない", async () => {
+  it("mention経路でも投稿に失敗したら画像は保存し、通知も作る（web と同じ）", async () => {
     postToMastodon.mockResolvedValue({ success: false, error: "forbidden", statusCode: 403 });
     const result = await publishImage(
-      baseInput({ persistOnPostFailure: false, replyToImageId: "parent-img" })
+      baseInput({ source: "mention", replyToImageId: "parent-img" })
     );
-    expect(result.imageId).toBeUndefined();
-    expect(imageCreate).not.toHaveBeenCalled();
-    expect(createReplyNotification).not.toHaveBeenCalled();
+    expect(result.postError).toBe("forbidden");
+    expect(imageCreate).toHaveBeenCalledTimes(1);
+    expect(createReplyNotification).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("recordWithImage（Bot の処理済み確定）", () => {
+  it("画像の登録と同じトランザクションで、登録の後に実行する", async () => {
+    const order: string[] = [];
+    imageCreate.mockImplementation(async () => {
+      order.push("image.create");
+    });
+    const recordWithImage = vi.fn(async () => {
+      order.push("record");
+    });
+    await publishImage(baseInput({ source: "mention", recordWithImage }));
+
+    expect(order).toEqual(["image.create", "record"]);
+    expect(recordWithImage).toHaveBeenCalledWith({ image: { create: imageCreate } });
+  });
+
+  it("確定に失敗したら投稿しない（保存もロールバックされ、やり直しで二重にならない）", async () => {
+    const recordWithImage = vi.fn(async () => {
+      throw new Error("db down");
+    });
+    await expect(publishImage(baseInput({ source: "mention", recordWithImage }))).rejects.toThrow(
+      "db down"
+    );
+    expect(postToMastodon).not.toHaveBeenCalled();
   });
 });

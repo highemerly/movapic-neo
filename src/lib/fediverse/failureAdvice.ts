@@ -1,10 +1,10 @@
 /**
  * 連合投稿失敗時の「原因の推定」と「対処の提案」を HTTP ステータスから決める（純粋関数）。
  *
- * Web（postFlash のトースト）と Bot（メンションへのエラーリプライ）で共用する。
- * 原因説明はステータスコードから共通に決まるが、対処の文言は経路で異なる
- * （Web=「⋯」メニューから再投稿 / Bot=もう一度メンション）ため、呼び出し側から
- * suggestions として渡す。status を持たない（タイムアウト・接続失敗）場合は undefined を渡す。
+ * Web（postFlash のトースト）で使う。対処の文言は呼び出し側から suggestions として渡す。
+ * status を持たない（タイムアウト・接続失敗）場合は undefined を渡す。
+ * Bot は連合失敗時に画像ページからの再投稿を案内する（mention/replyMessages.ts）ため、
+ * 連携失効の判定（isAuthFailureStatus）だけを共用する。
  */
 
 export interface PostFailureSuggestions {
@@ -17,11 +17,11 @@ export interface PostFailureSuggestions {
 export interface PostFailureAdvice {
   explanation: string;
   suggestion: string;
-  /**
-   * 連携失効（401/403）＝再試行では直らない恒久的エラー。
-   * Bot 側はこれを見て自動リトライを打ち切る（リトライしても同じ失敗リプライが重複するだけ）。
-   */
-  authFailure: boolean;
+}
+
+/** 連携失効（401/403）か＝再ログインしないと直らない失敗か */
+export function isAuthFailureStatus(statusCode: number | undefined): boolean {
+  return statusCode === 401 || statusCode === 403;
 }
 
 export function failureAdvice(
@@ -34,7 +34,6 @@ export function failureAdvice(
     return {
       explanation: `${serverDomain} が過負荷、または障害が発生している可能性があります`,
       suggestion: suggestions.retry,
-      authFailure: false,
     };
   }
   // 429：リクエスト集中
@@ -42,15 +41,13 @@ export function failureAdvice(
     return {
       explanation: `${serverDomain} へのリクエストが集中しています`,
       suggestion: suggestions.retry,
-      authFailure: false,
     };
   }
   // 401 / 403：権限不足（連携失効など）。再試行だけでは直らないので再ログインを促す。
-  if (statusCode === 401 || statusCode === 403) {
+  if (isAuthFailureStatus(statusCode)) {
     return {
       explanation: `${serverDomain} への投稿権限が不足しています（連携が失効している可能性があります）`,
       suggestion: suggestions.relogin,
-      authFailure: true,
     };
   }
   // 404 / 410：投稿先が無い・サーバー閉鎖
@@ -58,7 +55,6 @@ export function failureAdvice(
     return {
       explanation: `${serverDomain} の投稿先が見つからないか、サーバーが閉鎖されています`,
       suggestion: suggestions.relogin,
-      authFailure: false,
     };
   }
   // 422：内容を受け付けられない
@@ -66,13 +62,11 @@ export function failureAdvice(
     return {
       explanation: `${serverDomain} が投稿内容を受け付けませんでした`,
       suggestion: suggestions.retry,
-      authFailure: false,
     };
   }
   // その他の 4xx
   return {
     explanation: `${serverDomain} への投稿でエラーが発生しました`,
     suggestion: suggestions.retry,
-    authFailure: false,
   };
 }

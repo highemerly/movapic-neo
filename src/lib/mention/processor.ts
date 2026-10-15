@@ -20,7 +20,8 @@ import {
 import { countGraphemes } from "@/lib/text/grapheme";
 import { getSeasonByKey } from "@/lib/seasons/catalog";
 import { ErrorCodes } from "@/lib/errors";
-import { failureAdvice } from "@/lib/fediverse/failureAdvice";
+import { isAuthFailureStatus } from "@/lib/fediverse/failureAdvice";
+import { federationFailedMessage } from "./replyMessages";
 import { USER_AGENT } from "@/lib/userAgent";
 import { assertSafeRemoteUrl } from "@/lib/security/ssrf";
 import { resolveAchievement } from "@/lib/achievements/catalog";
@@ -292,8 +293,8 @@ export async function processOneMention(
   const text = parsed.text;
 
   // エラーハンドリング用のヘルパー（ユーザー検索後のエラー用）。
-  // permanent=true は「再試行しても直らない恒久的エラー（連携失効など）」。即時 failed にして
-  // mention-poll の自動リトライ対象から外す（リトライしても同じ失敗リプライが重複するだけのため）。
+  // permanent=true は「再試行しても直らない恒久的エラー」。即時 failed にしてやり直しの対象から外す
+  // （ジョブが例外で終わったときの自動やり直しで、同じ失敗リプライが重複するだけのため）。
   const handleError = async (
     errorCode: string,
     errorMessage: string,
@@ -433,8 +434,7 @@ export async function processOneMention(
     );
   }
 
-  // STEP8-11: 保存→投稿（共通パイプライン）。
-  // mention は投稿成功時のみ保存し、失敗時はリトライさせる（persistOnPostFailure: false）。
+  // STEP8-11: 保存→投稿（共通パイプライン。web/email と同じく先に保存し、投稿失敗でも画像は残る）。
   let published;
   try {
     published = await publishImage({
@@ -474,8 +474,13 @@ export async function processOneMention(
       source: "mention",
       visibility: effectiveVisibility as PublishVisibility,
       replyToImageId,
-      persistOnPostFailure: false,
-      // 投稿成功時にだけ呼ばれる＝失敗時は compute(finalize)を呼ばない
+      // 画像の登録と同じトランザクションで「処理済み」に確定する。以降にジョブが例外で終わっても、
+      // 自動のやり直しは STEP1 でスキップされる＝同じ写真を2枚保存・二重投稿しない。
+      recordWithImage: (tx) =>
+        tx.processedMention.update({
+          where: { statusId },
+          data: { status: "success", errorCode: null },
+        }),
       getThumbnailAndDimensions: async () => {
         const f = await finalizeImage(processedImage.buffer, cropPosition);
         return { thumbnail: f.thumbnail, width: f.width, height: f.height, blurDataUrl: f.blurDataUrl };
@@ -486,27 +491,37 @@ export async function processOneMention(
     return handleError(ErrorCodes.INTERNAL_ERROR, "画像の保存に失敗しました。再投稿してみてください。", true);
   }
 
+  const imageId = published.imageId;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
+
   if (published.postError) {
-    console.error(`[mention] 再投稿失敗: ${published.postError}`);
-    // HTTPステータスから原因と対処を推定してリプライする（Webのトーストと共通ロジック）。
-    // 連携失効（401/403）は再ログインしないと直らないため、リトライせず打ち切る。
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-    const advice = failureAdvice(user.instance.domain, published.postErrorStatus, {
-      retry: "しばらく待ってから、もう一度メンションしてください。",
-      relogin: `SHAMEZO${appUrl ? `（${appUrl}）` : ""}に再ログインしてから、もう一度メンションしてください。`,
+    // SHAMEZO には保存済み（処理済みは recordWithImage で確定）。失敗として記録し直して案内する。
+    // やり直しは画像ページからの再投稿（メンションし直すと同じ写真が2枚になる）。元投稿は削除しない。
+    console.error(`[mention] 連合投稿失敗（SHAMEZO には保存済み）: imageId=${imageId} ${published.postError}`);
+    await prisma.processedMention.update({
+      where: { statusId },
+      data: {
+        status: "failed",
+        errorCode: isAuthFailureStatus(published.postErrorStatus)
+          ? ErrorCodes.FEDIVERSE_AUTH_FAILED
+          : ErrorCodes.INTERNAL_ERROR,
+      },
     });
-    return handleError(
-      advice.authFailure ? ErrorCodes.FEDIVERSE_AUTH_FAILED : ErrorCodes.INTERNAL_ERROR,
-      `投稿できませんでした。${advice.explanation}。\n${advice.suggestion}`,
-      true,
-      { permanent: advice.authFailure }
+    await sendBotReply(
+      statusId,
+      replyToAcct,
+      federationFailedMessage({
+        serverDomain: user.instance.domain,
+        imagePageUrl: published.imagePageUrl,
+        statusCode: published.postErrorStatus,
+        appUrl,
+      }),
+      originalVisibility
     );
   }
 
-  const imageId = published.imageId;
-
-  // STEP10: 元投稿削除（effectiveKeepがfalseの場合のみ）
-  if (!effectiveKeep) {
+  // STEP10: 元投稿削除（連合に成功し、effectiveKeepがfalseの場合のみ）
+  if (!published.postError && !effectiveKeep) {
     // URIからオリジナルの投稿ID（Mastodon=statusId / Misskey=noteId）を抽出
     const originalStatusId = extractStatusIdFromUri(
       notification.status!.uri,
@@ -530,14 +545,8 @@ export async function processOneMention(
     }
   }
 
-  // ProcessedMentionをsuccessに更新
-  await prisma.processedMention.update({
-    where: { statusId },
-    data: { status: "success", errorCode: null },
-  });
-
   // STEP12: debug完了通知
-  if (options.debug) {
+  if (!published.postError && options.debug) {
     const elapsedSeconds = ((Date.now() - startTime) / 1000).toFixed(2);
     await sendBotReply(
       statusId,
@@ -550,9 +559,9 @@ export async function processOneMention(
     );
   }
 
-  // STEP13: 実績獲得通知（この投稿で新規実績を獲得していればリプライでお知らせ）
+  // STEP13: 実績獲得通知（この投稿で新規実績を獲得していればリプライでお知らせ）。
+  // 連合に失敗しても SHAMEZO には保存され実績も付与済みなので知らせる。
   if (published.newAchievements && published.newAchievements.length > 0) {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
     const seg = userPathSegment(user.username, user.instance.domain, getHomeServer());
     const lines = published.newAchievements.map((a) => {
       const { title } = resolveAchievement(a.key, a.category);
@@ -575,6 +584,10 @@ export async function processOneMention(
       // 通知失敗は本処理の成功を妨げない
       console.error(`[mention] 実績通知リプライ失敗:`, error);
     }
+  }
+
+  if (published.postError) {
+    return { statusId, success: false, skipped: false, error: published.postError };
   }
 
   console.log(`[mention] 処理完了: statusId=${statusId}, imageId=${imageId}, requestId=${requestId}`);
