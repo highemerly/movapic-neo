@@ -560,8 +560,10 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
       repostable={repostable}
       instanceDomain={image.user.instance.domain}
       instanceType={image.user.instance.type}
+      // 再投稿ダイアログの初期値＝投稿者本人の設定。メニューは client component で props が全閲覧者の
+      // RSC ペイロードに載るため、本人以外には渡さない（以前は渡っており、既定の公開範囲が読めた）。
       defaultVisibility={
-        image.user.defaultVisibility === "unlisted" ? "unlisted" : "public"
+        isOwner && image.user.defaultVisibility === "unlisted" ? "unlisted" : "public"
       }
       canReport={!isOwner}
       canMute={!isOwner}

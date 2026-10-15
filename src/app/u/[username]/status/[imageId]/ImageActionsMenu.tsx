@@ -113,7 +113,7 @@ interface ImageActionsMenuProps {
   instanceDomain: string;
   /** 投稿先の連携サーバー種別（"mastodon" | "misskey"）。公開範囲ラベルの用語を合わせる。 */
   instanceType: string;
-  /** 再投稿ダイアログの公開範囲の初期値。 */
+  /** 再投稿ダイアログの公開範囲の初期値（投稿者本人の設定。本人以外には常に "public" が渡る）。 */
   defaultVisibility: RepostVisibility;
   /** 通報可能か（ログイン済み かつ 自分の画像でない） */
   canReport: boolean;
