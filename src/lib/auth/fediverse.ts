@@ -3,7 +3,7 @@
  */
 
 import { USER_AGENT } from "@/lib/userAgent";
-import { assertSafeRemoteHost, SsrfError } from "@/lib/security/ssrf";
+import { assertSafeRemoteHost, safeFetch, SsrfError } from "@/lib/security/ssrf";
 import { AppError } from "@/lib/errors/AppError";
 import { ErrorCodes } from "@/lib/errors/codes";
 
@@ -73,7 +73,7 @@ export async function detectInstanceType(server: string): Promise<InstanceInfo> 
 
   // Mastodonの場合
   try {
-    const mastodonResponse = await fetch(
+    const mastodonResponse = await safeFetch(
       `https://${normalizedServer}/api/v1/instance`,
       {
         headers: { "User-Agent": USER_AGENT },
@@ -96,7 +96,7 @@ export async function detectInstanceType(server: string): Promise<InstanceInfo> 
 
   // Misskeyの場合
   try {
-    const misskeyResponse = await fetch(
+    const misskeyResponse = await safeFetch(
       `https://${normalizedServer}/api/meta`,
       {
         method: "POST",
@@ -143,7 +143,7 @@ export async function registerMastodonApp(
   server: string,
   redirectUri: string
 ): Promise<MastodonAppCredentials> {
-  const response = await fetch(`https://${server}/api/v1/apps`, {
+  const response = await safeFetch(`https://${server}/api/v1/apps`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -207,7 +207,7 @@ export async function exchangeMastodonCode(
   code: string,
   redirectUri: string
 ): Promise<TokenResponse> {
-  const response = await fetch(`https://${server}/oauth/token`, {
+  const response = await safeFetch(`https://${server}/oauth/token`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -251,7 +251,7 @@ export async function getMastodonAccount(
   server: string,
   accessToken: string
 ): Promise<FediverseAccount> {
-  const response = await fetch(
+  const response = await safeFetch(
     `https://${server}/api/v1/accounts/verify_credentials`,
     {
       headers: {
@@ -285,7 +285,7 @@ export async function revokeMastodonToken(
   clientSecret: string,
   accessToken: string
 ): Promise<void> {
-  const response = await fetch(`https://${server}/oauth/revoke`, {
+  const response = await safeFetch(`https://${server}/oauth/revoke`, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -332,7 +332,7 @@ export async function checkMisskeySession(
   server: string,
   sessionId: string
 ): Promise<{ token: string; user: FediverseAccount }> {
-  const response = await fetch(
+  const response = await safeFetch(
     `https://${server}/api/miauth/${sessionId}/check`,
     {
       method: "POST",

@@ -143,3 +143,56 @@ export async function assertSafeRemoteUrl(rawUrl: string): Promise<URL> {
   await assertSafeRemoteHost(url.hostname);
   return url;
 }
+
+const REDIRECT_STATUSES: ReadonlySet<number> = new Set([301, 302, 303, 307, 308]);
+const MAX_REDIRECTS = 5;
+
+/**
+ * 利用者入力・リモート由来の URL へ fetch する。リダイレクトは自前でたどり、転送先ごとに
+ * assertSafeRemoteUrl（https 限定＋解決先IPの検査）で検証し直す。
+ *
+ * pitfall: 既定の redirect:"follow" では検証が最初の宛先にしか効かない。攻撃者のサーバーが
+ * 307 で http://127.0.0.1 やメタデータIPへ転送すると、メソッドと本文を保ったまま内部へ届いた
+ * （ログイン開始のインスタンス判定・アプリ登録で再現、2026-10-15）。
+ * リダイレクト自体は禁止しない（example.com → social.example.com のように転送する正規の
+ * インスタンスがあるため）。
+ *
+ * 本文は再送するため、string / URLSearchParams など何度でも読める値で渡すこと。
+ */
+export async function safeFetch(rawUrl: string, init: RequestInit = {}): Promise<Response> {
+  let url = await assertSafeRemoteUrl(rawUrl);
+  let method = (init.method ?? "GET").toUpperCase();
+  let body = init.body;
+  const headers = new Headers(init.headers);
+
+  for (let hop = 0; ; hop++) {
+    const res = await fetch(url, { ...init, method, body, headers, redirect: "manual" });
+    const location = res.headers.get("location");
+    if (!REDIRECT_STATUSES.has(res.status) || !location) return res;
+
+    await res.body?.cancel();
+    if (hop >= MAX_REDIRECTS) {
+      throw new SsrfError("リダイレクトが多すぎます");
+    }
+    let resolved: string;
+    try {
+      resolved = new URL(location, url).toString();
+    } catch {
+      throw new SsrfError("不正なリダイレクト先です");
+    }
+    const next = await assertSafeRemoteUrl(resolved);
+
+    // 以下は fetch 仕様と同じ扱い（redirect:"manual" で自前でたどるため再現する）。
+    // 303、または 301/302 の POST は GET に変えて本文を落とす。307/308 はメソッドと本文を保つ。
+    if (res.status === 303 || ((res.status === 301 || res.status === 302) && method === "POST")) {
+      method = "GET";
+      body = undefined;
+      headers.delete("content-type");
+    }
+    // 別オリジンへ移るときは資格情報を送らない（Bearer トークンを転送先の第三者に渡さない）。
+    if (next.origin !== url.origin) {
+      headers.delete("authorization");
+    }
+    url = next;
+  }
+}

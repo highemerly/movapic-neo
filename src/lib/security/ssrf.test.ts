@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 vi.mock("dns/promises", () => ({ lookup: vi.fn() }));
 
 import { lookup } from "dns/promises";
-import { isBlockedIP, assertSafeRemoteHost, assertSafeRemoteUrl, SsrfError } from "./ssrf";
+import { isBlockedIP, assertSafeRemoteHost, assertSafeRemoteUrl, safeFetch, SsrfError } from "./ssrf";
 
 const mockLookup = lookup as unknown as Mock;
 
@@ -182,5 +182,92 @@ describe("assertSafeRemoteUrl", () => {
     expect(url).toBeInstanceOf(URL);
     expect(url.hostname).toBe("example.com");
     expect(url.pathname).toBe("/path");
+  });
+});
+
+describe("safeFetch", () => {
+  const mockFetch = vi.fn();
+
+  // 公開ホストは公開IPに、"internal.example" だけ内部IPに解決させる
+  beforeEach(() => {
+    mockLookup.mockReset();
+    mockLookup.mockImplementation(async (host: string) =>
+      host === "internal.example" ? [{ address: "10.0.0.5" }] : [{ address: "93.184.216.34" }]
+    );
+    mockFetch.mockReset();
+    vi.stubGlobal("fetch", mockFetch);
+  });
+
+  const redirect = (status: number, location: string) =>
+    new Response(null, { status, headers: { location } });
+  const ok = () => new Response("{}", { status: 200 });
+  const calledUrl = (i: number) => String(mockFetch.mock.calls[i][0]);
+  const calledInit = (i: number) => mockFetch.mock.calls[i][1] as RequestInit;
+
+  it("リダイレクトが無ければそのまま返し、自動追従はさせない", async () => {
+    mockFetch.mockResolvedValueOnce(ok());
+    const res = await safeFetch("https://a.example/api");
+    expect(res.status).toBe(200);
+    expect(calledInit(0).redirect).toBe("manual");
+  });
+
+  it("公開ホストへの転送はたどり、転送先も名前解決して検証する", async () => {
+    mockFetch.mockResolvedValueOnce(redirect(301, "https://b.example/api")).mockResolvedValueOnce(ok());
+    const res = await safeFetch("https://a.example/api");
+    expect(res.status).toBe(200);
+    expect(calledUrl(1)).toBe("https://b.example/api");
+    expect(mockLookup).toHaveBeenCalledWith("b.example", { all: true });
+  });
+
+  it("http への転送は送らずに拒否する（https→http で内部の平文サービスへ届いた再現ケース）", async () => {
+    mockFetch.mockResolvedValueOnce(redirect(307, "http://127.0.0.1:8080/secret"));
+    await expect(safeFetch("https://a.example/api")).rejects.toBeInstanceOf(SsrfError);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("内部IPリテラル・内部に解決されるホストへの転送は拒否する", async () => {
+    mockFetch.mockResolvedValueOnce(redirect(302, "https://169.254.169.254/v1.json"));
+    await expect(safeFetch("https://a.example/api")).rejects.toBeInstanceOf(SsrfError);
+    mockFetch.mockResolvedValueOnce(redirect(302, "https://internal.example/"));
+    await expect(safeFetch("https://a.example/api")).rejects.toBeInstanceOf(SsrfError);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("最初の宛先が http なら送らない", async () => {
+    await expect(safeFetch("http://a.example/api")).rejects.toBeInstanceOf(SsrfError);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("307 はメソッドと本文を保ち、302 の POST は GET にして本文を落とす（fetch 仕様と同じ）", async () => {
+    const init = { method: "POST", body: "{}", headers: { "Content-Type": "application/json" } };
+    mockFetch.mockResolvedValueOnce(redirect(307, "/v2")).mockResolvedValueOnce(ok());
+    await safeFetch("https://a.example/v1", init);
+    expect(calledInit(1).method).toBe("POST");
+    expect(calledInit(1).body).toBe("{}");
+
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce(redirect(302, "/v2")).mockResolvedValueOnce(ok());
+    await safeFetch("https://a.example/v1", init);
+    expect(calledInit(1).method).toBe("GET");
+    expect(calledInit(1).body).toBeUndefined();
+    expect((calledInit(1).headers as Headers).has("content-type")).toBe(false);
+  });
+
+  it("別オリジンへ移るときは Authorization を外し、同一オリジン内なら保つ", async () => {
+    const init = { headers: { Authorization: "Bearer secret" } };
+    mockFetch.mockResolvedValueOnce(redirect(302, "/me")).mockResolvedValueOnce(ok());
+    await safeFetch("https://a.example/api", init);
+    expect((calledInit(1).headers as Headers).get("authorization")).toBe("Bearer secret");
+
+    mockFetch.mockReset();
+    mockFetch.mockResolvedValueOnce(redirect(302, "https://b.example/me")).mockResolvedValueOnce(ok());
+    await safeFetch("https://a.example/api", init);
+    expect((calledInit(1).headers as Headers).has("authorization")).toBe(false);
+  });
+
+  it("転送が上限（5回）を超えたら拒否する", async () => {
+    mockFetch.mockImplementation(async () => redirect(302, "https://a.example/loop"));
+    await expect(safeFetch("https://a.example/loop")).rejects.toBeInstanceOf(SsrfError);
+    expect(mockFetch).toHaveBeenCalledTimes(6);
   });
 });
