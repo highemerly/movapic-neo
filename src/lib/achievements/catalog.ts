@@ -938,7 +938,7 @@ export function resolveAchievement(key: string, category?: string): ResolvedAchi
       category: PERFECT_MONTH_CATEGORY,
       rank: "gold",
       section: "皆勤賞",
-      title: `${label}の皆勤賞`,
+      title: `皆勤賞（${label}）`,
       description: `${label}は皆勤賞を達成しました`,
       icon: "Crown",
     };
@@ -953,7 +953,7 @@ export function resolveAchievement(key: string, category?: string): ResolvedAchi
       category: MONTH_DAYS_CATEGORY,
       rank: "silver",
       section: "投稿数",
-      title: `${label}の${md.tier}日投稿`,
+      title: `月${md.tier}日投稿（${label}）`,
       description: `${label}に${md.tier}日投稿しました`,
       icon: "CalendarCheck",
     };

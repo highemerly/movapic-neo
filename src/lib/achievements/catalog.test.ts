@@ -41,13 +41,13 @@ describe("resolveAchievement", () => {
   it("皆勤賞（動的キー）は gold・年月ラベル", () => {
     const r = resolveAchievement("perfect-month:2026-06");
     expect(r).toMatchObject({ category: PERFECT_MONTH_CATEGORY, rank: "gold", section: "皆勤賞" });
-    expect(r.title).toBe("2026年6月の皆勤賞");
+    expect(r.title).toBe("皆勤賞（2026年6月）");
   });
 
   it("月間投稿日数（動的キー）は silver・年月と日数のラベル", () => {
     const r = resolveAchievement("month-days:2026-10:20");
     expect(r).toMatchObject({ category: MONTH_DAYS_CATEGORY, rank: "silver", section: "投稿数" });
-    expect(r.title).toBe("2026年10月の20日投稿");
+    expect(r.title).toBe("月20日投稿（2026年10月）");
   });
 
   it("未知キーは silver フォールバック（category 引数を尊重）", () => {
