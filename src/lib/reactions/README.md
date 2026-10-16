@@ -9,7 +9,7 @@ SHAMEZO のリアクションは「オーナーインスタンスのキャッシ
 |---|---|
 | `types.ts` | 共有の型（`ReactionChip` / `ReactionUser` / `CachedFavoriter` / `ReactionTotalsCache` / `StoredReaction`） |
 | `merge.ts` | **表示の唯一の組み立て**。件数・ユーザー一覧・閲覧者状態を1本で組む（`mergeReactions`） |
-| `store.ts` | `Reaction` テーブルの読み書き（`loadStoredReactions` / `setReaction` / `clearReaction` / 取り消し反映の `loadReactionsForReconcile` / `deleteReactions`） |
+| `store.ts` | `Reaction` テーブルの読み書き（`loadStoredReactions` / `setReaction` / `clearReaction` / 取り消し反映の `loadReactionsForReconcile`（Fediverse へ送った行＝`federatedAt` 非 null だけ） / `deleteReactions`） |
 | `reconcile.ts` | オーナー側で取り消されたリアクションを割り出す純粋ロジック（`reactionsUnfavoritedOnOwner`） |
 | `emojiKey.ts` | 正規化キー（`FAVOURITE_KEY=❤`・Unicode正規化・カスタム絵文字 `:name@host:`・選択可否判定） |
 | `unicodeCatalog.ts` | ピッカー用 Unicode 絵文字カタログ（emojibase 日本語・セクション/検索） |

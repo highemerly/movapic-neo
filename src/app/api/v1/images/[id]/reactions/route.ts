@@ -346,6 +346,8 @@ async function handleWrite(
       userId: viewer.id,
       emoji: resolved!.emoji,
       emojiImageUrl: resolved!.emojiImageUrl,
+      // ここに来た時点で送信は成功している（local 投稿は送らない）
+      federated: sendable,
     });
     // 押した側の実績（はじめてのリアクション・カスタム絵文字リアクション）は
     // この瞬間にしか確定しない。解除(clear)では件数が減るだけなので評価しない。

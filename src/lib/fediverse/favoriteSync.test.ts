@@ -314,16 +314,17 @@ describe("syncFavoriteCache - 初回“成功”sync の判定（通知誤爆の
 });
 
 describe("syncFavoriteCache - オーナー側の取り消し反映（reconcileRemovals）", () => {
-  // reconcile 用に userId/createdAt を、merge 用に emoji 等を両方満たす行
+  // reconcile 用に userId/federatedAt を、merge 用に emoji 等を両方満たす行（Fediverse へ送った行）
   function reactionRow(
     userId: string,
     username: string,
     domain: string,
-    createdAt: Date
+    federatedAt: Date
   ) {
     return {
       userId,
-      createdAt,
+      createdAt: federatedAt,
+      federatedAt,
       emoji: "❤",
       emojiImageUrl: null,
       user: { username, displayName: null, avatarUrl: null, instance: { domain } },
@@ -344,6 +345,10 @@ describe("syncFavoriteCache - オーナー側の取り消し反映（reconcileRe
     expect(reactionDeleteMany).toHaveBeenCalledWith({
       where: { imageId: "img-1", userId: { in: ["u-gone"] } },
     });
+    // 判定に読むのは Fediverse へ送った行だけ（local 時代の行は再投稿後も一覧に居ないのが正常）
+    expect(reactionFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { imageId: "img-1", federatedAt: { not: null } } })
+    );
   });
 
   it("reconcileRemovals 無し（操作直後の経路）では取り消し判定しない", async () => {
@@ -365,7 +370,7 @@ describe("syncFavoriteCache - オーナー側の取り消し反映（reconcileRe
     expect(reactionDeleteMany).not.toHaveBeenCalled();
   });
 
-  it("付けた直後（猶予内）のリアクションは一覧に無くても消さない", async () => {
+  it("送った直後（猶予内）のリアクションは一覧に無くても消さない", async () => {
     // 連合がまだ伝播していないだけの可能性があるため
     reactionFindMany.mockResolvedValue([
       reactionRow("u-fresh", "bob", "mi.hiyoko.club", new Date()),
@@ -377,7 +382,7 @@ describe("syncFavoriteCache - オーナー側の取り消し反映（reconcileRe
     expect(reactionDeleteMany).not.toHaveBeenCalled();
   });
 
-  it("30分前のリアクションも消さない（猶予は1時間。GET経由は定期より早く回るため）", async () => {
+  it("30分前に送ったリアクションも消さない（猶予は1時間。GET経由は定期より早く回るため）", async () => {
     reactionFindMany.mockResolvedValue([
       reactionRow("u-recent", "bob", "mi.hiyoko.club", new Date(Date.now() - 30 * 60 * 1000)),
     ]);

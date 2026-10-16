@@ -402,6 +402,8 @@ describe("PUT/DELETE /api/v1/images/[id]/reactions - 反映先", () => {
     expect(res.status).toBe(200);
     expect(mockSend).not.toHaveBeenCalled();
     expect(mockSetReaction).toHaveBeenCalledTimes(1);
+    // 送っていない＝取り消し検知の対象外（再投稿で連合されても誤って消さない）
+    expect(mockSetReaction).toHaveBeenCalledWith(expect.objectContaining({ federated: false }));
     expect(mockSync).not.toHaveBeenCalled();
     // 同期が走らないので合計の保存はルートの責任
     expect(mockUpdateImage).toHaveBeenCalledWith({
@@ -420,8 +422,9 @@ describe("PUT/DELETE /api/v1/images/[id]/reactions - 反映先", () => {
     const res = await PUT(req("PUT", { emoji: "🎉" }), ctx);
     expect(res.status).toBe(200);
     expect(mockSend).toHaveBeenCalledWith(expect.anything(), "🎉");
+    // 送り直したので送信時刻も更新する（取り消し検知の猶予の起点）
     expect(mockSetReaction).toHaveBeenCalledWith(
-      expect.objectContaining({ emoji: "🎉" })
+      expect.objectContaining({ emoji: "🎉", federated: true })
     );
   });
 

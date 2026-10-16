@@ -190,12 +190,16 @@ GET（`computeCacheTtl` の Infinity）と定期（fire2）は、**同じ「14�
 
 ### オーナー側で取り消されたリアクションの反映（`reconcileRemovals`）
 
-SHAMEZO 上のリアクションは押した本人のトークンで Fediverse 側にも favourite/reaction を送っている（[favorite.ts](../src/lib/fediverse/favorite.ts) `sendReaction`）。よって「SHAMEZO の Reaction テーブルには残っているが、オーナー一覧に居ない acct」＝相手サーバー側で取り消された人、と判定できる（[reconcile.ts](../src/lib/reactions/reconcile.ts) `reactionsUnfavoritedOnOwner` → [store.ts](../src/lib/reactions/store.ts) `deleteReactions`）。
+連合済みの投稿へのリアクションは、押した本人のトークンで Fediverse 側にも favourite/reaction を送っている（[favorite.ts](../src/lib/fediverse/favorite.ts) `sendReaction`）。送った行には `Reaction.federatedAt`（最後に送った時刻）が入る。よって「送った行のうち、オーナー一覧に居ない acct」＝相手サーバー側で取り消された人、と判定できる（[reconcile.ts](../src/lib/reactions/reconcile.ts) `reactionsUnfavoritedOnOwner` → [store.ts](../src/lib/reactions/store.ts) `deleteReactions`）。
+
+- **判定するのは送った行だけ**（`federatedAt` が非 null。[store.ts](../src/lib/reactions/store.ts) `loadReactionsForReconcile`）。local 投稿へのリアクションは送り先が無いので `federatedAt = null` で保存し、**あとで再投稿されて連合されても**判定の対象にしない（新しい投稿の一覧に居ないのが正常なため）。再投稿後は SHAMEZO にだけあるリアクションとして残り、マージで件数に上乗せされる（Fediverse 側の投稿には載らない）。本人が付け替える・押し直すとその時点で送られ、以後は通常の行と同じ扱いになる。
+  - pitfall: 以前は送っていない行も判定しており、再投稿した local 投稿のリアクションが1時間後に全部消えていた。
+  - 既存データの埋め直し（migration `20261016000000_add_reaction_federated_at`）は「連合済みの画像の行＝送った（`updated_at` を送信時刻とみなす）」。すでに再投稿済みの画像に残る local 時代の行は見分けられない（再投稿の時刻を記録していない）。
 
 - **判定するのは GET（§5）と定期（§6）の同期**（`syncFavoriteCache(image, { reconcileRemovals: true })`）。**route の POST/DELETE 直後だけは対象外**＝連合がまだ伝播しておらず「自分が今付けたぶんを取り消しと誤検知」するため。操作後の遅延sync（5s/30s）も同じ理由で渡さない。
   - GET でも判定する理由: 定期の発火は fire1/fire2 の設計上 **day1 と day14 の各1回だけ**で、閲覧の多い投稿は GET 側が先に成功同期して fire1 を消すため、定期だけに任せると取り消しが最大13日反映されない（14日マーク以降は両経路とも停止するので永久に残る）。
 - **一覧が40件フルの回は諦める**（41件目以降に隠れているだけかを区別できないため、その回はまるごと判定しない）。
-- **作成から1時間（`UNFAVORITE_GRACE_MS`）未満のリアクションは対象外**（連合伝播の緩衝）。GET 経由の同期は投稿直後だと TTL 1分で回る＝定期の30分間隔よりはるかに早いため、相手サーバーの配送キューが詰まっていても届く長さを取る。
+- **送ってから1時間（`UNFAVORITE_GRACE_MS`）未満のリアクションは対象外**（連合伝播の緩衝）。起点は `federatedAt`＝付け替えで送り直した直後も守られる（以前は作成時刻が起点で、付け替えると猶予が効かなかった）。GET 経由の同期は投稿直後だと TTL 1分で回る＝定期の30分間隔よりはるかに早いため、相手サーバーの配送キューが詰まっていても届く長さを取る。
 - ❤→👍 の**付け替えは対象外**（acct 自体は一覧に残るため消えない）。
 - 削除は best-effort（失敗しても sync 本体は止めない。次の同期でまた判定できる）。
 

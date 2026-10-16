@@ -71,18 +71,24 @@ export async function loadStoredReactionsByImage(
   return result;
 }
 
-/** リアクションを設定する。1ユーザー1リアクションなので、別の絵文字なら付け替えになる。 */
+/**
+ * リアクションを設定する。1ユーザー1リアクションなので、別の絵文字なら付け替えになる。
+ * federated: いま Fediverse へ送ったか（local 投稿は送り先が無いので false）。送った時刻を
+ * federatedAt に残し、取り消し検知の対象と猶予の起点にする（付け替えも送り直すので毎回更新）。
+ */
 export async function setReaction(params: {
   imageId: string;
   userId: string;
   emoji: string;
   emojiImageUrl: string | null;
+  federated: boolean;
 }): Promise<void> {
-  const { imageId, userId, emoji, emojiImageUrl } = params;
+  const { imageId, userId, emoji, emojiImageUrl, federated } = params;
+  const federatedAt = federated ? new Date() : null;
   await prisma.reaction.upsert({
     where: { imageId_userId: { imageId, userId } },
-    create: { imageId, userId, emoji, emojiImageUrl },
-    update: { emoji, emojiImageUrl },
+    create: { imageId, userId, emoji, emojiImageUrl, federatedAt },
+    update: { emoji, emojiImageUrl, federatedAt },
   });
 }
 
@@ -92,20 +98,21 @@ export async function clearReaction(imageId: string, userId: string): Promise<vo
 }
 
 /**
- * オーナー側の取り消し検知（reconcile）用に、画像の Reaction を userId・acct・作成時刻だけで読む。
+ * オーナー側の取り消し検知（reconcile）用に、Fediverse へ送った Reaction だけを userId・acct・送信時刻で読む。
+ * 送っていない行（local 投稿の時代に付いたもの）はオーナー一覧に居ないのが正常なので読まない。
  * 表示は使わないので include は最小限。
  */
 export async function loadReactionsForReconcile(
   imageId: string
 ): Promise<ReactionForReconcile[]> {
   const rows = await prisma.reaction.findMany({
-    where: { imageId },
+    where: { imageId, federatedAt: { not: null } },
     include: REACTION_INCLUDE,
   });
   return rows.map((row) => ({
     userId: row.userId,
     acct: reactionAcct(row.user.username, row.user.instance.domain),
-    createdAt: row.createdAt,
+    federatedAt: row.federatedAt!,
   }));
 }
 

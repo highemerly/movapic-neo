@@ -12,7 +12,7 @@ function reaction(
   acct: string,
   ageMs: number
 ): ReactionForReconcile {
-  return { userId, acct, createdAt: new Date(NOW.getTime() - ageMs) };
+  return { userId, acct, federatedAt: new Date(NOW.getTime() - ageMs) };
 }
 
 describe("reactionsUnfavoritedOnOwner", () => {
@@ -44,6 +44,16 @@ describe("reactionsUnfavoritedOnOwner", () => {
     const removed = reactionsUnfavoritedOnOwner({
       reactions: [reaction("u1", "alice@handon.club", 60 * 1000)], // 1分前
       ownerAccts: new Set(), // 一覧には未反映
+      now: NOW,
+      graceMs: GRACE,
+    });
+    expect(removed).toEqual([]);
+  });
+
+  it("猶予は送信時刻から数える（付け替えで送り直した直後は、作成が古くても消さない）", () => {
+    const removed = reactionsUnfavoritedOnOwner({
+      reactions: [reaction("u1", "alice@handon.club", 60 * 1000)], // 1分前に送り直した
+      ownerAccts: new Set(),
       now: NOW,
       graceMs: GRACE,
     });

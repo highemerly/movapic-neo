@@ -309,18 +309,22 @@ model Image {
 //   - Mastodonは favourite に絵文字種別を持てないため、選ばれた絵文字はここにしか残らない
 //   - visibility=local（このサービスのみ）投稿は Fediverse 上に対応するノートが無い
 model Reaction {
-  id            String   @id @default(uuid())
-  imageId       String   @map("image_id")
-  userId        String   @map("user_id")
+  id            String    @id @default(uuid())
+  imageId       String    @map("image_id")
+  userId        String    @map("user_id")
   // 正規化済みリアクションキー（src/lib/reactions/emojiKey.ts）。
   // Unicode絵文字はそのまま（異体字セレクタ除去済み）、カスタム絵文字は ":name@host:" 完全修飾。
   // host は押した時点の viewer サーバー＝連合先ノートでの表記と一致するため、
   // 同期で戻ってきたキャッシュのキーと文字列比較で突き合わせられる。
-  emoji         String   @db.VarChar(400)
+  emoji         String    @db.VarChar(400)
   // カスタム絵文字の表示用画像URL（viewerインスタンスの /api/emojis 由来）。Unicode絵文字はnull。
-  emojiImageUrl String?  @map("emoji_image_url") @db.Text
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  emojiImageUrl String?   @map("emoji_image_url") @db.Text
+  // 最後に Fediverse へ送った時刻。null = 送っていない（local 投稿の時代に付いたもの）。
+  // オーナー側の取り消し検知（reconcileRemovals）は送った行だけを対象にし、猶予もここから数える。
+  // 送っていない行まで判定すると、再投稿で連合された local 投稿のリアクションが「取り消し」と誤検知され消えた。
+  federatedAt   DateTime? @map("federated_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   image Image @relation(fields: [imageId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
