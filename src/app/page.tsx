@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import Image from "next/image";
 import { unstable_cache } from "next/cache";
+import { FEATURED_IMAGES_TAG } from "@/lib/featuredImages";
 import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/sessionConstants";
@@ -80,7 +81,8 @@ const getFeaturedImages = unstable_cache(
       .map(({ image }) => image);
   },
   ["home-featured-images"],
-  { revalidate: 300, tags: ["featured-images"] }
+  // 画像の削除・取り下げ・退会では expireFeaturedImages() で即座に破棄する
+  { revalidate: 300, tags: [FEATURED_IMAGES_TAG] }
 );
 
 export default async function HomePage() {

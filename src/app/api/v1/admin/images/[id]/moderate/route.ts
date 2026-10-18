@@ -16,6 +16,7 @@ import { isAdmin } from "@/lib/auth/admin";
 import { deleteImage } from "@/lib/storage/storage";
 import prisma from "@/lib/db";
 import { ErrorCodes, errorResponse, handleUnknownError } from "@/lib/errors";
+import { expireFeaturedImages } from "@/lib/featuredImages";
 
 type ModerateAction = "disable" | "restore" | "delete" | "dismiss";
 
@@ -72,6 +73,7 @@ export async function POST(
       }
       // 通報は onDelete: Cascade で消える
       await prisma.image.delete({ where: { id: imageId } });
+      expireFeaturedImages();
       return NextResponse.json({ success: true, action });
     }
 
@@ -86,6 +88,7 @@ export async function POST(
           data: { status: "resolved", resolvedAt: new Date() },
         }),
       ]);
+      expireFeaturedImages();
       return NextResponse.json({ success: true, action });
     }
 
@@ -95,6 +98,8 @@ export async function POST(
         where: { id: imageId },
         data: { isDisabled: false },
       });
+      // 戻した画像が注目の候補に復帰する（取り下げ時と同じく即座に作り直す）
+      expireFeaturedImages();
       return NextResponse.json({ success: true, action });
     }
 

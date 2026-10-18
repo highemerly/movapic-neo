@@ -29,6 +29,7 @@ import {
   makeupDeadline,
 } from "@/lib/makeup/points";
 import { healAfterImageDelete } from "@/lib/makeup/selfHeal";
+import { expireFeaturedImages } from "@/lib/featuredImages";
 
 /** その画像の JST 日(1-31)。 */
 function jstDay(createdAt: Date): number {
@@ -396,6 +397,7 @@ export async function DELETE(
     await prisma.image.delete({
       where: { id },
     });
+    expireFeaturedImages();
 
     // 削除後の穴埋め割当の後始末。画像削除自体は常に成功させる（プライバシー優先）ので失敗は握りつぶす。
     // 👑（Achievement 行）はどちらの経路でも剥奪しない。

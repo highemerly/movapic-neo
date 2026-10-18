@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 // 認可（isAdmin）は本物を使い、DB/ストレージだけモック。
+vi.mock("@/lib/featuredImages", () => ({ expireFeaturedImages: vi.fn() }));
 vi.mock("@/lib/auth/session", () => ({ getCurrentUser: vi.fn() }));
 vi.mock("@/lib/storage/storage", () => ({ deleteImage: vi.fn() }));
 vi.mock("@/lib/db", () => ({
@@ -17,6 +18,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { deleteImage } from "@/lib/storage/storage";
 import prisma from "@/lib/db";
 import { ErrorCodes } from "@/lib/errors";
+import { expireFeaturedImages } from "@/lib/featuredImages";
 
 const mockGetUser = vi.mocked(getCurrentUser);
 const mockDeleteImage = vi.mocked(deleteImage);
@@ -100,6 +102,8 @@ describe("POST moderate: 管理者の操作", () => {
     expect(prisma.image.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "img1" }, data: { isDisabled: true } })
     );
+    // 取り下げた画像をトップの注目画像から即座に外す
+    expect(expireFeaturedImages).toHaveBeenCalledTimes(1);
   });
 
   it("restore は isDisabled=false", async () => {
@@ -108,6 +112,7 @@ describe("POST moderate: 管理者の操作", () => {
     expect(prisma.image.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "img1" }, data: { isDisabled: false } })
     );
+    expect(expireFeaturedImages).toHaveBeenCalledTimes(1);
   });
 
   it("delete は S3（本画像＋サムネ）とDBレコードを削除", async () => {
@@ -116,6 +121,7 @@ describe("POST moderate: 管理者の操作", () => {
     expect(mockDeleteImage).toHaveBeenCalledWith("2026/1/1/key");
     expect(mockDeleteImage).toHaveBeenCalledWith("2026/1/1/thumb");
     expect(mockImageDelete).toHaveBeenCalledWith({ where: { id: "img1" } });
+    expect(expireFeaturedImages).toHaveBeenCalledTimes(1);
   });
 
   it("dismiss は通報のみ dismissed（画像は不変）", async () => {
@@ -126,5 +132,6 @@ describe("POST moderate: 管理者の操作", () => {
     );
     expect(prisma.image.update).not.toHaveBeenCalled();
     expect(mockImageDelete).not.toHaveBeenCalled();
+    expect(expireFeaturedImages).not.toHaveBeenCalled();
   });
 });

@@ -7,6 +7,7 @@ import { NextRequest } from "next/server";
 //
 // 時計: 締切（対象月の翌月10日まで）が new Date() 基準なので、Date だけを固定する（既定は 2026-03-25 JST）。
 // Promise やタイマーは本物のまま（toFake: ["Date"]）。
+vi.mock("@/lib/featuredImages", () => ({ expireFeaturedImages: vi.fn() }));
 vi.mock("@/lib/auth/session", () => ({ getCurrentUserWithValidation: vi.fn() }));
 vi.mock("@/lib/db", () => ({
   default: {
@@ -32,6 +33,7 @@ vi.mock("@/lib/makeup/selfHeal", () => ({ healAfterImageDelete: vi.fn() }));
 import { PATCH, DELETE } from "./route";
 import { getCurrentUserWithValidation } from "@/lib/auth/session";
 import { deleteImage } from "@/lib/storage/storage";
+import { expireFeaturedImages } from "@/lib/featuredImages";
 import { fediverseStatusExists } from "@/lib/fediverse/delete";
 import { recomputeMonthMakeups } from "@/lib/achievements/makeupAssign";
 import { resolveMakeupCap, withMonthMakeupLock } from "@/lib/makeup/ledger";
@@ -164,6 +166,8 @@ describe("DELETE /api/v1/images/[id]", () => {
 
     expect(mockDeleteImage).toHaveBeenCalledWith("2026/03/10/a.jpg");
     expect(mockDeleteImage).toHaveBeenCalledWith("2026/03/10/a-thumb.webp");
+    // 削除した画像をトップの注目画像から即座に外す
+    expect(expireFeaturedImages).toHaveBeenCalledTimes(1);
   });
 
   it("サムネイルが無ければ原本だけ削除する", async () => {

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
 // 境界（認証・DB・キュー）を先頭でモックして外部を一切読ませない。
+vi.mock("@/lib/featuredImages", () => ({ expireFeaturedImages: vi.fn() }));
 vi.mock("@/lib/auth/session", () => ({
   getCurrentUser: vi.fn(),
   deleteSessionCookie: vi.fn(),
@@ -18,6 +19,7 @@ import { POST } from "./route";
 import { getCurrentUser, deleteSessionCookie } from "@/lib/auth/session";
 import { enqueueDeleteAccount } from "@/lib/queue";
 import prisma from "@/lib/db";
+import { expireFeaturedImages } from "@/lib/featuredImages";
 
 const mockAuth = vi.mocked(getCurrentUser);
 const mockDeleteCookie = vi.mocked(deleteSessionCookie);
@@ -105,6 +107,8 @@ describe("POST /api/v1/me/delete", () => {
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(mockUserDelete).toHaveBeenCalledWith({ where: { id: "u1" } });
     expect(mockDeleteCookie).toHaveBeenCalled();
+    // 退会した人の画像をトップの注目画像から即座に外す
+    expect(expireFeaturedImages).toHaveBeenCalledTimes(1);
   });
 
   it("S3キーはユーザー削除より先に集める（カスケードで取得不能になるため）", async () => {

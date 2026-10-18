@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, deleteSessionCookie } from "@/lib/auth/session";
 import prisma from "@/lib/db";
 import { enqueueDeleteAccount } from "@/lib/queue";
+import { expireFeaturedImages } from "@/lib/featuredImages";
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
     // DB ユーザーを削除（Image/Notification/Achievement/LoginSession/Report はカスケード）。
     // これで即座に全一覧・プロフィールから消え、全セッションも無効になる。
     await prisma.user.delete({ where: { id: user.id } });
+    expireFeaturedImages();
 
     // 現在のセッション Cookie も破棄（即ログアウト）
     await deleteSessionCookie();
