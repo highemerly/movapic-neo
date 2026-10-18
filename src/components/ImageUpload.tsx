@@ -176,6 +176,7 @@ export function ImageUpload({
         <div className="relative">
           {displayUrl ? (
             <div className="relative overflow-hidden rounded-lg border bg-muted">
+              {/* eslint-disable-next-line @next/next/no-img-element -- 端末内のプレビュー／生成結果の blob: URL は next/image で最適化できない */}
               <img
                 src={displayUrl}
                 alt={hasGenerated ? "生成された画像" : "プレビュー"}

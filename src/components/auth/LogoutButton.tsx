@@ -36,6 +36,9 @@ export function LogoutButton({ className, variant = "destructive" }: LogoutButto
         SESSION_KEYS.flashLoggedOut,
         JSON.stringify({ variant: "success", message: "ログアウトしました" }),
       );
+      // ログアウト後はページを読み込み直してクライアントの状態（ログイン中の表示・キャッシュ）を捨てる。
+      // router.push だと状態が残る。
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- 上記のため完全な遷移が必要
       window.location.href = "/";
     } catch (error) {
       console.error("Logout error:", error);

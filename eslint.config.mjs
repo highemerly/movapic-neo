@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // テストのカバレッジ出力（npm run test:coverage が生成・git 管理外）
+    "coverage/**",
   ]),
 ]);
 

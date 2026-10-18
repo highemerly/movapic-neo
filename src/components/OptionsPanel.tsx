@@ -61,6 +61,7 @@ export function OptionsPanel({
           disabled={disabled}
           renderOption={(pos) => (
             <span className="flex items-center justify-center gap-1 text-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element -- 選択ボタン内の小さな静的アイコン。最適化配信を通すとリクエストが増えるだけ */}
               <img
                 src={`/positions/${pos}.png`}
                 alt={POSITION_LABELS[pos]}
@@ -136,6 +137,7 @@ export function OptionsPanel({
           renderOption={(f) => (
             // プレビューは字の外接矩形に切り抜いてあるので、ラベルが長いフォントほど横長になる。
             // max-w-full が無いとボタン幅を越えてセグメント自体が広がってしまう。
+            // eslint-disable-next-line @next/next/no-img-element -- 選択ボタン内の小さな静的アイコン（同上）
             <img
               src={`/fonts/${f}.png`}
               alt={FONT_LABELS[f]}
@@ -157,6 +159,7 @@ export function OptionsPanel({
             a === "none" ? (
               <span className="text-sm">{ARRANGEMENT_LABELS[a]}</span>
             ) : (
+              // eslint-disable-next-line @next/next/no-img-element -- 選択ボタン内の小さな静的アイコン（同上）
               <img
                 src={`/arrangements/${a}.png`}
                 alt={ARRANGEMENT_LABELS[a]}
