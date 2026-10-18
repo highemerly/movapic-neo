@@ -7,7 +7,7 @@
  *
  * publishImage（新規レコード作成前提）とは責務が違うので流用しない。ここは
  * 「S3 の保存済み最終画像を取得 → 投稿 → 既存レコードの postUrl/postId を更新」に特化する。
- * 投稿部分（リトライ込み）だけ postImageToFediverse を共有する。
+ * 投稿部分だけ postImageToFediverse を共有する（自動では再試行しない）。
  *
  * 実績は初回保存時に付与済み（web/email は投稿成否に関係なく付与）なので再評価しない。
  * また「Fediverseにはナイショ」(local-only) 実績は grant-only の設計上、再投稿しても剥奪されない。
@@ -96,10 +96,13 @@ export async function repostImage(params: {
       postId: true,
       createdAt: true,
       replyToId: true,
+      isDisabled: true,
     },
   });
 
-  if (!image) return { ok: false, failure: "not_found" };
+  // 管理者が取り下げた画像は本人にも存在しない扱い（画像詳細も 404）。以前は確認しておらず、
+  // API を直接叩けば取り下げ済みの画像を本人が連合できた。
+  if (!image || image.isDisabled) return { ok: false, failure: "not_found" };
   if (image.userId !== user.id) return { ok: false, failure: "forbidden" };
   if (image.postId) return { ok: false, failure: "already_posted" };
   if (!isImageRepostable({ postId: image.postId, createdAt: image.createdAt }, now)) {

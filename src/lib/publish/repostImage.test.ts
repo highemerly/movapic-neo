@@ -57,6 +57,7 @@ function baseImage(overrides: Record<string, unknown> = {}) {
     altText: "代替テキスト",
     postId: null,
     createdAt: new Date(NOW - 60 * 1000), // 1分前
+    isDisabled: false,
     ...overrides,
   };
 }
@@ -110,6 +111,12 @@ describe("repostImage", () => {
 
   it("画像が存在しなければ not_found", async () => {
     findUnique.mockResolvedValue(null);
+    expect(await call()).toEqual({ ok: false, failure: "not_found" });
+    expect(postImageToFediverse).not.toHaveBeenCalled();
+  });
+
+  it("管理者が取り下げた画像は本人でも not_found（連合させない）", async () => {
+    findUnique.mockResolvedValue(baseImage({ isDisabled: true }));
     expect(await call()).toEqual({ ok: false, failure: "not_found" });
     expect(postImageToFediverse).not.toHaveBeenCalled();
   });
