@@ -63,7 +63,6 @@ export async function PATCH(request: NextRequest) {
       mentionKeep?: boolean;
       showLocationMap?: boolean;
       blockCrawlers?: boolean;
-      autoMakeup?: boolean;
     } = {};
 
     // bioの更新
@@ -122,18 +121,6 @@ export async function PATCH(request: NextRequest) {
       updateData.blockCrawlers = body.blockCrawlers;
     }
 
-    // autoMakeupの更新（カレンダーの自動穴埋め。OFFで投稿時の自動割当を止める）
-    // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照
-    if (body.autoMakeup !== undefined) {
-      if (typeof body.autoMakeup !== "boolean") {
-        return jsonNoStore(
-          { error: "autoMakeupはboolean型である必要があります" },
-          { status: 400 }
-        );
-      }
-      updateData.autoMakeup = body.autoMakeup;
-    }
-
     // 更新するフィールドがない場合
     if (Object.keys(updateData).length === 0) {
       return jsonNoStore(
@@ -150,7 +137,6 @@ export async function PATCH(request: NextRequest) {
         mentionKeep: true,
         showLocationMap: true,
         blockCrawlers: true,
-        autoMakeup: true,
       },
     });
 
@@ -171,7 +157,6 @@ export async function PATCH(request: NextRequest) {
       mentionKeep: updatedUser.mentionKeep,
       showLocationMap: updatedUser.showLocationMap,
       blockCrawlers: updatedUser.blockCrawlers,
-      autoMakeup: updatedUser.autoMakeup,
     });
   } catch (error) {
     console.error("Failed to update profile:", error);

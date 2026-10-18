@@ -2,12 +2,11 @@
  * 皆勤賞ロジック（perfectMonth.ts）の純粋関数テスト。
  *
  * ここは「割当を決める貪欲ロジック」と「永続割当から達成/進捗を導く判定」の単一ソース。
- * live(投稿時) / backfill / カレンダーAPI / 削除後の自己修復 の4経路がすべて通るため、
- * ここが正しければ表示と👑は食い違わない。
+ * 判定はカレンダーAPI・実績・backfill がすべて通るため、ここが正しければ表示と👑は食い違わない。
  *
- * とくに削除まわり: 削除後の自己修復 recomputeMonthMakeups は assignMonthMakeups を
- * 「削除後の残り投稿」で丸ごと呼び直す。よって assignMonthMakeups が
- * 「投稿集合が変わったときに割当をどう組み直すか」を厚めに検証する。
+ * 割当の貪欲ロジック（pickMakeupHole / assignMonthMakeups）は、2026-09 以前の自動穴埋め
+ * （投稿時の割当と、削除後の再計算 recomputeMonthMakeups）が使っていた。自動穴埋めの撤去で
+ * 本番コードからは呼ばれなくなったが、関数とその検証は残している。
  */
 
 import { describe, it, expect } from "vitest";
@@ -22,8 +21,6 @@ import {
   canPromptMakeup,
   hasAssignableMakeup,
   coveredDays,
-  shouldRemindMakeup,
-  MAKEUP_REMINDER_MAX_SKIPPED,
   type CurrentMonthMakeupStatus,
 } from "./perfectMonth";
 
@@ -486,21 +483,5 @@ describe("coveredDays - 進捗表示用の押さえた日数", () => {
       ...legacy,
     });
     expect(coveredDays(30, status)).toBe(30);
-  });
-});
-
-describe("shouldRemindMakeup - 穴埋め通知ゲート", () => {
-  it("未投稿があり・未充填の穴があり・多すぎない ときだけ true", () => {
-    expect(shouldRemindMakeup(2, 1)).toBe(true);
-  });
-  it("未充填の穴が無ければ false", () => {
-    expect(shouldRemindMakeup(2, 0)).toBe(false);
-  });
-  it("未投稿ゼロなら false", () => {
-    expect(shouldRemindMakeup(0, 0)).toBe(false);
-  });
-  it("穴が多すぎる（上限超）なら false", () => {
-    expect(shouldRemindMakeup(MAKEUP_REMINDER_MAX_SKIPPED + 1, 1)).toBe(false);
-    expect(shouldRemindMakeup(MAKEUP_REMINDER_MAX_SKIPPED, 1)).toBe(true); // 境界（上限ちょうどは可）
   });
 });

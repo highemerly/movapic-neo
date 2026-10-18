@@ -17,7 +17,6 @@ import { maybeGrantAchievementPoint } from "@/lib/makeup/awards";
 import { donorRange, filledHoleOf } from "@/lib/makeup/donor";
 import { resolveMakeupCap } from "@/lib/makeup/ledger";
 import { notifyMakeupProgressOnPost } from "@/lib/makeup/notify";
-import { isPointEra } from "@/lib/makeup/points";
 import {
   CATALOG,
   evaluateMonthDays,
@@ -35,11 +34,9 @@ import {
   type ReactionStats,
 } from "./catalog";
 import {
-  currentMonthMakeupStatus,
   daysInMonthOf,
   isPerfectMonth,
   perfectMonthKey,
-  shouldRemindMakeup,
 } from "./perfectMonth";
 import { collectReactionStats, collectStats } from "./stats";
 
@@ -262,15 +259,6 @@ export async function evaluateAndGrant(opts: {
     notificationImageId: imageId,
   });
 
-  // 2026-09 以前の月の穴埋め推奨通知（makeup-reminder・月1通）。
-  // 既知の制限: 導入時からこの早期 return の後ろにあり「その投稿で新しい実績を獲得したとき」しか
-  // 評価されていない。2026-10-01 以降は到達不能になるため、従来挙動のまま残している。
-  // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（maybeNotifyMakeup ごと削除）
-  if (!isPointEra(toJstYm(post.createdAt))) {
-    await maybeNotifyMakeup(userId, post, stats, imageId, grace).catch((e) =>
-      console.error("Makeup reminder failed:", e)
-    );
-  }
   await notifyProgress();
 
   return granted;
@@ -344,45 +332,4 @@ export async function evaluateAndGrantPerfectMonth(opts: {
     notificationImageId: imageId,
   });
   return { perfect, granted: granted.length > 0, key };
-}
-
-/**
- * 2026-09 以前の月の穴埋め推奨通知。今日投稿した瞬間に評価され、条件を満たせば type="makeup-reminder" を1件作る。
- * - 穴埋めは「忘れた過去日」を「後日のダブル投稿」で埋める制度なので、日付順マッチングで
- *   「まだ埋まっていない過去の穴(unfilled)」を厳密に数える（currentMonthMakeupStatus）。
- * - 重複排除: 同月キー(perfect-month:YYYY-MM)の makeup-reminder が既にあれば送らない（月1通）。
- */
-async function maybeNotifyMakeup(
-  userId: string,
-  post: PostFacts,
-  stats: AchStats,
-  imageId: string,
-  grace: number
-): Promise<void> {
-  const jstDay = toJstDateString(post.createdAt);
-  const todayDayNum = Number(jstDay.slice(8, 10));
-  const year = Number(jstDay.slice(0, 4));
-  const month = Number(jstDay.slice(5, 7));
-  const status = currentMonthMakeupStatus({
-    daysInMonth: daysInMonthOf(year, month),
-    todayDayNum,
-    dayCounts: stats.postMonthDayCounts,
-    filledHoleDays: stats.filledHoleDays,
-    // shouldRemindMakeup は skippedSoFar / unfilled しか見ないので、donor の有無は判定に効かない。
-    todayHasDonor: false,
-    grace,
-    potentialGrace: grace,
-  });
-  if (!shouldRemindMakeup(status.skippedSoFar, status.unfilled)) return;
-
-  const key = perfectMonthKey(jstDay.slice(0, 7));
-  const existing = await prisma.notification.findFirst({
-    where: { userId, type: "makeup-reminder", achievementKey: key },
-    select: { id: true },
-  });
-  if (existing) return;
-
-  await prisma.notification.create({
-    data: { userId, type: "makeup-reminder", achievementKey: key, imageId },
-  });
 }

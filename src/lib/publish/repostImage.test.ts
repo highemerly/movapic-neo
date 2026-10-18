@@ -44,7 +44,6 @@ const OWNER = {
   username: "alice",
   accessToken: "token",
   instance: { domain: "mastodon.example", type: "mastodon" },
-  autoMakeup: false,
 };
 
 function baseImage(overrides: Record<string, unknown> = {}) {

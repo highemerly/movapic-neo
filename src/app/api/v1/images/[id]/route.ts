@@ -11,8 +11,6 @@ import { fediverseStatusExists } from "@/lib/fediverse/delete";
 import prisma from "@/lib/db";
 import { toJstDateString } from "@/lib/streak";
 import { daysInMonthOf, isPerfectMonth, perfectMonthKey } from "@/lib/achievements/perfectMonth";
-import { perfectMonthGrace } from "@/lib/achievements/grace";
-import { recomputeMonthMakeups } from "@/lib/achievements/makeupAssign";
 import { jstMonthRangeOfYm, parseYm, shiftYm, toJstYm } from "@/lib/jst";
 import { resolveMakeupCap, withMonthMakeupLock } from "@/lib/makeup/ledger";
 import {
@@ -25,7 +23,6 @@ import {
 import {
   MAKEUP_DEADLINE_DAY,
   isMakeupEditable,
-  isPointEra,
   makeupDeadline,
 } from "@/lib/makeup/points";
 import { healAfterImageDelete } from "@/lib/makeup/selfHeal";
@@ -301,10 +298,8 @@ export async function PATCH(
           if (ym === targetYm && body.makeupTargetDay !== null && filledHoleSet.size > grace) {
             return NextResponse.json(
               {
-                error: isPointEra(ym)
-                  ? `穴埋めポイントが足りません（${m}月の穴埋めポイントは${grace}ptです）`
-                  // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（従来ルールの文言ごと削除）
-                  : `穴埋めは1か月に${grace}日までです`,
+                // 旧ルール（2026-09 以前）の月は締切を過ぎており、ここまで来ない
+                error: `穴埋めポイントが足りません（${m}月の穴埋めポイントは${grace}ptです）`,
               },
               { status: 409 }
             );
@@ -400,25 +395,12 @@ export async function DELETE(
     expireFeaturedImages();
 
     // 削除後の穴埋め割当の後始末。画像削除自体は常に成功させる（プライバシー優先）ので失敗は握りつぶす。
-    // 👑（Achievement 行）はどちらの経路でも剥奪しない。
-    const deletedYm = toJstYm(image.createdAt);
-    if (!isPointEra(deletedYm) && user.autoMakeup && isMakeupEditable(deletedYm, new Date())) {
-      // 2026-09 以前の月・自動穴埋めON: 従来どおり残りの投稿で月の割当を再計算して別donorで埋め直す。
-      // 締切後の月は触らない（締切後に割当が変わると「締切後も穴埋めが動く」ことになるため）。
-      // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（この分岐ごと削除し、下の失効掃除だけにする）
-      const { year: y, month: m } = parseYm(deletedYm);
-      await recomputeMonthMakeups({
-        userId: user.id,
-        year: y,
-        month: m,
-        grace: perfectMonthGrace(user.instance.domain),
-      }).catch((e) => console.error("Makeup self-heal failed:", e));
-    } else {
-      // 手動の割当は付け替えず、2枚未満になった日の donor 割当だけを外す（selfHeal.ts 参照）。
-      await healAfterImageDelete({ userId: user.id, deletedCreatedAt: image.createdAt }).catch((e) =>
-        console.error("Makeup stale donor cleanup failed:", e)
-      );
-    }
+    // 手動の割当は付け替えず、2枚未満になった日の donor 割当だけを外す（selfHeal.ts 参照）。
+    // 👑（Achievement 行）は剥奪しない。（以前は 2026-09 以前の月・自動穴埋めONだけ月の割当を
+    // 再計算して別 donor で埋め直していた。自動穴埋めの撤去で廃止）
+    await healAfterImageDelete({ userId: user.id, deletedCreatedAt: image.createdAt }).catch((e) =>
+      console.error("Makeup stale donor cleanup failed:", e)
+    );
 
     // 連携先（Mastodon/Misskey）に投稿が残っている場合は、その情報をクライアントに返す。
     // クライアントは「連携先の投稿も削除しますか？」と尋ね、ユーザーが望めば

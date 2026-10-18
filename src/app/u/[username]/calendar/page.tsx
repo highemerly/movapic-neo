@@ -12,7 +12,6 @@ import { toJstDateString } from "@/lib/streak";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
 import { getFavorServers, getHomeServer, isFavorServer } from "@/lib/auth/serverPolicy";
-import { perfectMonthGrace } from "@/lib/achievements/grace";
 import { userPageRobotsMetadata } from "@/lib/crawlers";
 import type { Metadata } from "next";
 
@@ -123,7 +122,6 @@ export default async function CalendarPage({
             initialYear={initialYear}
             initialMonth={initialMonth}
             isOwner={isOwner}
-            legacyGrace={perfectMonthGrace(user.instance.domain)}
             serverName={user.instance.domain}
             favorServers={getFavorServers()}
             isFavorUser={isFavorServer(user.instance.domain)}

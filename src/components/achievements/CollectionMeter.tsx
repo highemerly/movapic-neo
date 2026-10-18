@@ -1,11 +1,10 @@
 import { Trophy, Crown, ListChecks, Sparkles } from "lucide-react";
 import { collectionSummary } from "@/lib/achievements/score";
 import { LegalInfoDialog } from "@/components/legal/LegalInfoDialog";
-import type { CurrentMonthPerfect } from "@/lib/achievements/stats";
 import type { GrantedItem } from "./AchievementsView";
 
 /** 皆勤賞の説明を開く「？」ボタン（ログインページの「？」と同じ体裁）。 */
-function PerfectHelp({ rule }: { rule: Pick<CurrentMonthPerfect, "pointEra" | "cap"> }) {
+function PerfectHelp() {
   return (
     <LegalInfoDialog
       title="皆勤賞とは"
@@ -21,23 +20,12 @@ function PerfectHelp({ rule }: { rule: Pick<CurrentMonthPerfect, "pointEra" | "c
     >
       <div className="space-y-3 text-sm leading-relaxed text-muted-foreground">
         <p>皆勤賞は、SHAMEZOにおける最も栄誉のある実績です。1ヶ月の間、毎日1枚以上投稿するとその月の皆勤賞を獲得できます。</p>
-        {rule.pointEra ? (
-          <>
-            <p>
-              うっかり忘れた日があっても、穴埋めポイントを使って救済できます。忘れた日より後の日に1日2枚以上投稿し、カレンダーの編集モードで埋める日を選ぶと、1ptで1日ぶん穴埋めできます。
-            </p>
-            <p>穴埋めポイントは毎月付与され、翌月には持ち越せません。穴埋めは翌月10日までできます。</p>
-            <p>残りのポイントと穴埋め状況はカレンダーで確認できます。</p>
-          </>
-        ) : (
-          // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（従来ルールの文言ごと削除）
-          <>
-            <p>
-              うっかり忘れた日があっても、月{rule.cap}日までは救済措置があります。忘れた日より後日に1日2枚以上投稿すると、投稿できなかった日の穴埋めとして使われます。
-            </p>
-            <p>穴埋め状況はカレンダーでも確認できます。</p>
-          </>
-        )}
+        {/* 当月は必ず穴埋めポイント制（2026-09 以前の旧ルールの文言は撤去済み） */}
+        <p>
+          うっかり忘れた日があっても、穴埋めポイントを使って救済できます。忘れた日より後の日に1日2枚以上投稿し、カレンダーの編集モードで埋める日を選ぶと、1ptで1日ぶん穴埋めできます。
+        </p>
+        <p>穴埋めポイントは毎月付与され、翌月には持ち越せません。穴埋めは翌月10日までできます。</p>
+        <p>残りのポイントと穴埋め状況はカレンダーで確認できます。</p>
       </div>
     </LegalInfoDialog>
   );
@@ -106,11 +94,8 @@ function Stat({
  */
 export function CollectionMeter({
   granted,
-  currentMonthPerfect,
 }: {
   granted: GrantedItem[];
-  /** 当月の穴埋めルール（皆勤賞の説明文の出し分けに使う）。 */
-  currentMonthPerfect: CurrentMonthPerfect;
 }) {
   const s = collectionSummary(granted);
   const ratio = s.level.span > 0 ? s.level.intoLevel / s.level.span : 1;
@@ -139,7 +124,7 @@ export function CollectionMeter({
           label={
             <span className="flex items-center gap-1">
               皆勤賞
-              <PerfectHelp rule={currentMonthPerfect} />
+              <PerfectHelp />
             </span>
           }
           icon={<Crown className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />}

@@ -69,11 +69,6 @@ model User {
   // 検索エンジン/AI Botのクロール拒否オプトイン。デフォルトoff（=従来どおり許可）。
   // ON → /u/[username] 配下を検索エンジンに noindex（generateMetadata）し、AI BotをrobotsでDisallow。
   blockCrawlers       Boolean @default(false) @map("block_crawlers")
-  // カレンダーの自動穴埋め。true(既定)=投稿の瞬間にダブル投稿を過去の穴へ自動割当（従来挙動）。
-  // false=自動割当せず、カレンダー編集モードで明示指定した穴だけ埋める。過去の割当・皆勤賞には影響しない
-  // （未来の投稿の自動判定のみを切り替える）。詳細は docs/穴埋め設計は achievements/README.md 参照。
-  // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（2026-09 以前の月専用。列ごと削除する）
-  autoMakeup          Boolean @default(true) @map("auto_makeup")
 
   // 利用規約・プライバシーポリシーへの同意日時。null=未同意。
   // 初回ログイン直後に /welcome で同意を取り記録する（以降は再提示しない）。

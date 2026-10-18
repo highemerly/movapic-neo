@@ -10,10 +10,6 @@ import Link from "@/components/Link";
 import { ChevronRight } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getFavorServers } from "@/lib/auth/serverPolicy";
-import {
-  PERFECT_MONTH_GRACE_DEFAULT,
-  PERFECT_MONTH_GRACE_FAVORED,
-} from "@/lib/achievements/perfectMonth";
 import { MONTH_DAYS_TIERS } from "@/lib/achievements/monthDays";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
@@ -649,21 +645,6 @@ export default async function SpecPage() {
               <p className="mt-2 text-sm text-muted-foreground">
                 ポイントの残りと付与の履歴は、カレンダータブ（ご自身のカレンダーのみ）で確認できます。付与されたときは通知でもお知らせします。
               </p>
-
-              {/* TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（従来ルールの説明ごと削除） */}
-              <p className="mt-5 text-xs text-muted-foreground font-medium mb-1">2026年9月分までの穴埋め</p>
-              <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                <li>
-                  投稿できなかった日が月{PERFECT_MONTH_GRACE_DEFAULT}日以下
-                  {getFavorServers().length > 0 &&
-                    `（${getFavorServers().join("・")} のユーザーは月${PERFECT_MONTH_GRACE_FAVORED}日以下）`}
-                  であれば救済措置があり、同月中の後日2枚以上投稿すると、投稿できなかった日の穴埋めとして処理されます
-                </li>
-                <li>
-                  「カレンダーを自動穴埋めする」設定がオンの場合、穴埋めは古い未投稿日から自動で行われます（1日のダブル投稿で1日分）
-                </li>
-                <li>2026年9月分の穴埋めも、10月10日 23:59 までに締め切られます</li>
-              </ul>
             </SpecSection>
 
             <SpecSection id="calendar">

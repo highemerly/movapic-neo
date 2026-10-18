@@ -112,7 +112,6 @@ function dbUser(overrides: Record<string, unknown> = {}) {
     instanceId: INSTANCE_ID,
     instance: INSTANCE,
     accessToken: "encrypted-token",
-    autoMakeup: true,
     defaultPosition: "bottom",
     defaultFont: "gothic",
     defaultColor: "white",
@@ -359,7 +358,7 @@ describe("getCurrentUser（DB失効チェック付き）", () => {
 });
 
 describe("getCurrentUserWithValidation", () => {
-  it("accessToken と autoMakeup を含めて返す", async () => {
+  it("accessToken を含めて返す", async () => {
     await login();
     userFindFirst.mockResolvedValue(dbUser());
 
@@ -368,7 +367,6 @@ describe("getCurrentUserWithValidation", () => {
     expect(user).toMatchObject({
       id: USER_ID,
       accessToken: "encrypted-token",
-      autoMakeup: true,
       instance: INSTANCE,
     });
   });

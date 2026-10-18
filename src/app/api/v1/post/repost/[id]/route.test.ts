@@ -32,7 +32,6 @@ const USER = {
   id: "user-1",
   username: "alice",
   accessToken: "enc",
-  autoMakeup: false,
   instance: { domain: "mastodon.example", type: "mastodon" },
 } as unknown as NonNullable<SessionUser>;
 

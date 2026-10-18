@@ -87,9 +87,6 @@ export type SessionUser = {
 // getCurrentUserWithValidationの戻り値の型（accessToken含む）
 export type SessionUserWithToken = SessionUser & {
   accessToken: string;
-  /** カレンダーの自動穴埋め設定（投稿時の穴埋め自動割当の要否）。 */
-  // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照
-  autoMakeup: boolean;
 };
 
 /**
@@ -291,8 +288,6 @@ export async function getCurrentUserWithValidation(): Promise<SessionUserWithTok
     instanceId: user.instanceId,
     instance: user.instance,
     accessToken: user.accessToken,
-    // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照
-    autoMakeup: user.autoMakeup,
   };
 }
 

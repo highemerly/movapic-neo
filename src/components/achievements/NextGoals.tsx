@@ -79,8 +79,7 @@ function GoalCard({
  * 残ポイントは本人にだけ出す（カレンダーAPIも makeup 枠を owner にしか返さない＝出し分けを揃える）。
  */
 function makeupHint(p: CurrentMonthPerfect, isOwner: boolean): string {
-  // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（pointEra の分岐ごと削除）
-  if (!p.pointEra || !isOwner) return "2枚投稿で穴埋めしよう";
+  if (!isOwner) return "2枚投稿で穴埋めしよう";
   if (p.status.remaining === 0) return "ポイントが付与されると穴埋めできます";
   return `残り${p.status.remaining}pt ・ 2枚投稿で穴埋めしよう`;
 }

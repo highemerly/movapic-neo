@@ -7,12 +7,10 @@
  * Bot の処理済み確定（recordWithImage）が画像の登録と同じトランザクションで走ることも固定する。
  *
  * ネットワーク（fediverse/post）・S3（storage）・prisma・実績評価はすべてモックする。
- *
- * あわせて、自動穴埋め（autoMakeup）が 2026-09 以前の月の投稿にだけ効くことも固定する
- *（2026-10 以降は穴埋めポイント制で手動のみ。9月中は設定どおり自動で動かす）。
+
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   DEFAULT_POSITION,
   DEFAULT_FONT,
@@ -72,18 +70,7 @@ vi.mock("@/lib/achievements/engine", () => ({
   evaluateAndGrant: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("@/lib/achievements/makeupAssign", () => ({
-  assignMakeupForNewPost: vi.fn().mockResolvedValue(undefined),
-}));
-
-// perfectMonthGrace の定義は grace.ts（env を読む）。以前は perfectMonth.ts をモックしていたが、
-// 自動穴埋めの分岐を通るテストが無かったため誤りが表に出ていなかった。
-vi.mock("@/lib/achievements/grace", () => ({
-  perfectMonthGrace: vi.fn(() => 3),
-}));
-
 import { publishImage, type PublishImageInput } from "@/lib/publish/publishImage";
-import { assignMakeupForNewPost } from "@/lib/achievements/makeupAssign";
 import { evaluateAndGrant } from "@/lib/achievements/engine";
 
 /** postToMastodon/postToMisskey はオブジェクト引数。n 回目の呼び出しの引数を返す。 */
@@ -100,7 +87,6 @@ function baseInput(overrides: Partial<PublishImageInput>): PublishImageInput {
       username: "alice",
       accessToken: "token",
       instance: { domain: "mastodon.example", type: "mastodon" },
-      autoMakeup: false,
     },
     text: "本文",
     options: {
@@ -174,7 +160,6 @@ describe("publishImage の ALT 配管", () => {
           username: "bob",
           accessToken: "token",
           instance: { domain: "misskey.example", type: "misskey" },
-          autoMakeup: false,
         },
         altText: "犬の写真",
       })
@@ -246,7 +231,6 @@ describe("Mastodon へのアップロード形式（保存は AVIF・送信の�
           username: "alice",
           accessToken: "token",
           instance: { domain: "misskey.example", type: "misskey" },
-          autoMakeup: false,
         },
       })
     );
@@ -284,47 +268,6 @@ describe("Mastodon へのアップロード形式（保存は AVIF・送信の�
 
     expect(result.postError).toBe("投稿用画像の変換に失敗しました");
     expect(imageCreate).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("自動穴埋め（autoMakeup）は 2026-09 以前の月だけ", () => {
-  const autoOn = (): PublishImageInput["user"] => ({
-    id: "user-1",
-    username: "alice",
-    accessToken: "token",
-    instance: { domain: "mastodon.example", type: "mastodon" },
-    autoMakeup: true,
-  });
-
-  beforeEach(() => {
-    vi.useFakeTimers({ toFake: ["Date"] });
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("9月30日 23:59 JST の投稿は、設定がONなら自動で割り当てる", async () => {
-    vi.setSystemTime(new Date("2026-09-30T14:59:00Z"));
-
-    await publishImage(baseInput({ user: autoOn() }));
-
-    expect(assignMakeupForNewPost).toHaveBeenCalledTimes(1);
-  });
-
-  it("10月1日 00:00 JST 以降の投稿は、設定がONでも自動で割り当てない", async () => {
-    vi.setSystemTime(new Date("2026-09-30T15:00:00Z"));
-
-    await publishImage(baseInput({ user: autoOn() }));
-
-    expect(assignMakeupForNewPost).not.toHaveBeenCalled();
-  });
-
-  it("9月でも設定がOFFなら割り当てない（従来どおり）", async () => {
-    vi.setSystemTime(new Date("2026-09-20T03:00:00Z"));
-
-    await publishImage(baseInput({}));
-
-    expect(assignMakeupForNewPost).not.toHaveBeenCalled();
   });
 });
 

@@ -14,8 +14,7 @@
  *   `${publicUrl}/${storageKey}` の生連結なので '#' がそのままフラグメントになる）。
  *
  * やること（対象ユーザー・対象月に対して）:
- *  1. autoMakeup=false にする（＝③OFF。2026-09 以前の月で reevaluate が実際に効くのはこのケースだけ）。
- *     2026-10 以降（穴埋めポイント制）の月なら、穴を埋められるよう台帳に dev 用のポイントを1pt 入れる
+ *  1. 2026-10 以降（穴埋めポイント制）の月なら、穴を埋められるよう台帳に dev 用のポイントを1pt 入れる
  *     （reason="event:dev-seed"。CLEAN=1 で削除）。ポイント制の月は実投稿が無い未来月になりがちなので、
  *     実際に試すときは SEED_YEAR/SEED_MONTH で実投稿の無い月を選ぶこと。
  *  2. その月に「1日だけ穴が空いた・後日ダブル投稿で埋められる」ダミー投稿を作る。
@@ -77,7 +76,7 @@ const monthEnd = new Date(Date.UTC(YEAR, MONTH, 1, -9, 0, 0));
 async function main() {
   const user = await prisma.user.findFirst({
     where: { username: USERNAME, instance: { domain: DOMAIN } },
-    select: { id: true, autoMakeup: true, instance: { select: { domain: true } } },
+    select: { id: true, instance: { select: { domain: true } } },
   });
   if (!user) throw new Error(`user @${USERNAME}@${DOMAIN} not found`);
 
@@ -184,10 +183,6 @@ async function main() {
   let poolIdx = 0;
   const nextSrc = () => realPool[poolIdx++ % realPool.length];
 
-  // 1) ③OFF に
-  // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（autoMakeup 列の削除と一緒に消す）
-  await prisma.user.update({ where: { id: user.id }, data: { autoMakeup: false } });
-
   // 2) この月のダミーを作り直す
   await prisma.image.deleteMany({
     where: { userId: user.id, storageKey: { contains: `${DUMMY_MARK}${YEAR}-${mm}-` } },
@@ -253,7 +248,7 @@ async function main() {
   console.log("──────────────────────────────────────");
   console.log(`@${USERNAME}@${DOMAIN} / ${YEAR}年${MONTH}月  category=${PERFECT_MONTH_CATEGORY}`);
   console.log(
-    `autoMakeup=false（③OFF）${pointEra ? `穴埋めポイント=${grace}pt` : `grace=${grace}`} 穴=${HOLE_DAY}日 donor=${DONOR_DAY}日（別々の実画像2枚）`
+    `${pointEra ? `穴埋めポイント=${grace}pt` : `grace=${grace}`} 穴=${HOLE_DAY}日 donor=${DONOR_DAY}日（別々の実画像2枚）`
   );
   console.log(`モード: ${UNFILL ? "UNFILL（アプリ上で手動穴埋めする）" : "既定（穴埋め済み・離脱するだけで👑）"}`);
   console.log(`投稿=${distinctDays}日 / 穴=${HOLE_DAY}日 / filled=${JSON.stringify(filledHoleDays)} → isPerfectMonth=${perfect}`);

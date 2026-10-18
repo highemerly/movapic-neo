@@ -7,7 +7,7 @@
  * どちらも 1日1通（受信者×type で JST の今日 00:00 以降に既にあれば送らない）。
  * 付与通知（makeup-point）は ledger.grantMakeupPoints が台帳と同一トランザクションで作る。
  *
- * 2026-09 以前の月は従来の makeup-reminder（engine.maybeNotifyMakeup）の担当で、ここは何もしない。
+ * 2026-09 以前の月（旧ルール・締切済み）では何もしない（旧通知 makeup-reminder の作成は撤去済み）。
  * 集計対象は「全投稿」（collectStats と同一。isPublic/isDisabled で絞らない＝実績の判定と揃える）。
  */
 

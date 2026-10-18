@@ -25,7 +25,9 @@ export const MAKEUP_NOTIFICATION_TYPES = {
   READY: "makeup-ready",
   /**
    * 2026-09 以前の月の穴埋め推奨（月1通）。既存行の表示互換のため type 自体は残す。
-   * 新規作成は 2026-10-01 以降起きない。
+   * 作成側（engine.maybeNotifyMakeup）は自動穴埋めの撤去で削除済み。
+   * TODO(2026-12-29): 最後の行は 2026-09-30 作成で、通知は90日間一覧に出る。2026-12-29 以降に
+   * この type と表示の分岐（下の2か所）を削除してよい。
    */
   LEGACY_REMINDER: "makeup-reminder",
 } as const;

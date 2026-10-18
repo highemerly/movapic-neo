@@ -18,8 +18,6 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/storage/storage", () => ({ deleteImage: vi.fn() }));
 vi.mock("@/lib/auth/tokens", () => ({ decryptToken: vi.fn((t: string) => `dec:${t}`) }));
 vi.mock("@/lib/fediverse/delete", () => ({ fediverseStatusExists: vi.fn() }));
-vi.mock("@/lib/achievements/makeupAssign", () => ({ recomputeMonthMakeups: vi.fn() }));
-vi.mock("@/lib/achievements/grace", () => ({ perfectMonthGrace: vi.fn(() => 3) }));
 // ロックは「渡された関数をモックの prisma をトランザクションとして実行する」だけにする。
 vi.mock("@/lib/makeup/ledger", async () => {
   const db = (await import("@/lib/db")).default;
@@ -35,7 +33,6 @@ import { getCurrentUserWithValidation } from "@/lib/auth/session";
 import { deleteImage } from "@/lib/storage/storage";
 import { expireFeaturedImages } from "@/lib/featuredImages";
 import { fediverseStatusExists } from "@/lib/fediverse/delete";
-import { recomputeMonthMakeups } from "@/lib/achievements/makeupAssign";
 import { resolveMakeupCap, withMonthMakeupLock } from "@/lib/makeup/ledger";
 import { healAfterImageDelete } from "@/lib/makeup/selfHeal";
 import prisma from "@/lib/db";
@@ -48,7 +45,6 @@ const mockDelete = vi.mocked(prisma.image.delete);
 const mockAchievementFindFirst = vi.mocked(prisma.achievement.findFirst);
 const mockDeleteImage = vi.mocked(deleteImage);
 const mockStatusExists = vi.mocked(fediverseStatusExists);
-const mockRecompute = vi.mocked(recomputeMonthMakeups);
 const mockResolveCap = vi.mocked(resolveMakeupCap);
 const mockLock = vi.mocked(withMonthMakeupLock);
 const mockHeal = vi.mocked(healAfterImageDelete);
@@ -63,7 +59,6 @@ const OWNER = {
   id: "u1",
   username: "alice",
   accessToken: "enc",
-  autoMakeup: false,
   instance: { domain: "handon.club", type: "mastodon" },
 } as unknown as SessionUser;
 
@@ -190,62 +185,21 @@ describe("DELETE /api/v1/images/[id]", () => {
     errorSpy.mockRestore();
   });
 
-  it("autoMakeup が有効なユーザーは、削除した月の穴埋めを再計算する", async () => {
-    mockAuth.mockResolvedValue({ ...OWNER, autoMakeup: true } as SessionUser);
-    mockRecompute.mockResolvedValue(undefined as never);
+  it.each([
+    ["従来ルールの月（2026-09 以前）", "2026-03-20T03:00:00Z", 3],
+    ["ポイント制の月", "2026-10-25T03:00:00Z", 10],
+  ])("%s でも、失効した donor 割当を外すだけ（月の割当は組み直さない＝自動穴埋めは撤去済み）", async (_label, nowIso, month) => {
+    setNow(nowIso);
+    const createdAt = month === 3 ? jst(10) : jst(10, 10);
+    mockFindUnique.mockResolvedValue(image({ createdAt }));
 
     await DELETE(deleteReq(), params());
 
-    expect(mockRecompute).toHaveBeenCalledWith({
-      userId: "u1",
-      year: 2026,
-      month: 3,
-      grace: 3,
-    });
-  });
-
-  it("autoMakeup が無効なユーザーは再計算せず、失効した donor 割当だけを外す", async () => {
-    await DELETE(deleteReq(), params());
-
-    expect(mockRecompute).not.toHaveBeenCalled();
-    expect(mockHeal).toHaveBeenCalledWith({ userId: "u1", deletedCreatedAt: jst(10) });
-  });
-
-  it("ポイント制の月（2026-10 以降）は autoMakeup でも再計算せず、失効掃除だけ行う", async () => {
-    // 自動穴埋めは廃止。システムが別の写真で埋め直すと「自動穴埋めの復活」になるため
-    setNow("2026-10-25T03:00:00Z");
-    mockAuth.mockResolvedValue({ ...OWNER, autoMakeup: true } as SessionUser);
-    mockFindUnique.mockResolvedValue(image({ createdAt: jst(10, 10) }));
-
-    await DELETE(deleteReq(), params());
-
-    expect(mockRecompute).not.toHaveBeenCalled();
-    expect(mockHeal).toHaveBeenCalledWith({ userId: "u1", deletedCreatedAt: jst(10, 10) });
-  });
-
-  it("締切を過ぎた従来ルールの月は autoMakeup でも再計算しない（締切後に割当を動かさない）", async () => {
-    setNow("2026-05-01T03:00:00Z"); // 3月分の締切（4/10）後
-    mockAuth.mockResolvedValue({ ...OWNER, autoMakeup: true } as SessionUser);
-
-    await DELETE(deleteReq(), params());
-
-    expect(mockRecompute).not.toHaveBeenCalled();
-    expect(mockHeal).toHaveBeenCalled();
+    expect(mockHeal).toHaveBeenCalledWith({ userId: "u1", deletedCreatedAt: createdAt });
   });
 
   it("失効掃除が失敗しても画像削除は成功させる", async () => {
     mockHeal.mockRejectedValue(new Error("heal failed"));
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    const res = await DELETE(deleteReq(), params());
-
-    expect(res.status).toBe(200);
-    errorSpy.mockRestore();
-  });
-
-  it("穴埋め再計算が失敗しても画像削除は成功させる", async () => {
-    mockAuth.mockResolvedValue({ ...OWNER, autoMakeup: true } as SessionUser);
-    mockRecompute.mockRejectedValue(new Error("recompute failed"));
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const res = await DELETE(deleteReq(), params());
@@ -520,7 +474,7 @@ describe("PATCH /api/v1/images/[id]", () => {
       });
     });
 
-    it("上限（従来ルールの月は3日）を超える新規割当は409で拒否する", async () => {
+    it("上限（ledger から解決した値）を超える新規割当は409で拒否する", async () => {
       // 既に3つの穴（2,3,4日）を埋めている状態で、4つ目（5日）を足そうとする。
       mockFindMany.mockResolvedValue(
         monthImages([
@@ -535,7 +489,10 @@ describe("PATCH /api/v1/images/[id]", () => {
       const res = await PATCH(patchReq({ makeupTargetDay: 5 }), params());
 
       expect(res.status).toBe(409);
-      await expect(res.json()).resolves.toEqual({ error: "穴埋めは1か月に3日までです" });
+      // 文言はポイント制のもの（旧ルールの月は締切を過ぎ、実際にはここまで来ない）
+      await expect(res.json()).resolves.toEqual({
+        error: "穴埋めポイントが足りません（3月の穴埋めポイントは3ptです）",
+      });
     });
 
     it("上限は画像の月（今月ではない）で ledger から解決する", async () => {

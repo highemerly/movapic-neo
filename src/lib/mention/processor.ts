@@ -53,8 +53,6 @@ interface UserWithInstance {
   accessToken: string;
   defaultVisibility: string;
   mentionKeep: boolean;
-  // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照
-  autoMakeup: boolean;
   instance: {
     domain: string;
     type: string;
@@ -187,7 +185,6 @@ async function findUserByAcct(acct: string, botInstanceDomain: string): Promise<
     accessToken: decryptedToken,
     defaultVisibility: user.defaultVisibility ?? "public",
     mentionKeep: user.mentionKeep ?? false,
-    autoMakeup: user.autoMakeup,
     instance: {
       domain: user.instance.domain,
       type: user.instance.type,
@@ -445,7 +442,6 @@ export async function processOneMention(
         username: user.username,
         accessToken: user.accessToken, // findUserByAcct で復号済み
         instance: { domain: user.instance.domain, type: user.instance.type },
-        autoMakeup: user.autoMakeup,
       },
       text,
       // ALTは元投稿の添付画像に設定されていた代替テキストをそのまま引き継ぐ（未設定なら null）。

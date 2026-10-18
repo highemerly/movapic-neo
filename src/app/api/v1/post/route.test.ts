@@ -32,7 +32,6 @@ const USER = {
   id: "u1",
   username: "alice",
   accessToken: "enc-token",
-  autoMakeup: false,
   instance: { domain: "mastodon.example", type: "mastodon" },
 } as unknown as SessionUser;
 

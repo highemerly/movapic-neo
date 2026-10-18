@@ -42,10 +42,6 @@ import {
   Arrangement,
 } from "@/types";
 import { evaluateAndGrant, GrantedAchievement } from "@/lib/achievements/engine";
-import { assignMakeupForNewPost } from "@/lib/achievements/makeupAssign";
-import { perfectMonthGrace } from "@/lib/achievements/grace";
-import { toJstYm } from "@/lib/jst";
-import { isPointEra } from "@/lib/makeup/points";
 import { userPathSegment } from "@/lib/userHandle";
 import { getHomeServer } from "@/lib/auth/serverPolicy";
 import type { PostFacts } from "@/lib/achievements/catalog";
@@ -65,12 +61,6 @@ export interface PublishUser {
   /** 復号済みアクセストークン（呼び出し側で decryptToken 済み） */
   accessToken: string;
   instance: { domain: string; type: string };
-  /**
-   * カレンダーの自動穴埋め設定。true=投稿の瞬間にダブル投稿を過去の穴へ自動割当（既定）。
-   * 2026-09 以前の月の投稿にだけ効く（2026-10 以降は穴埋めポイント制で手動のみ）。
-   * TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照
-   */
-  autoMakeup: boolean;
 }
 
 export interface PublishImageInput {
@@ -233,20 +223,8 @@ async function evaluateAchievementsSafely(
   replyToId: string | null
 ): Promise<GrantedAchievement[]> {
   try {
-    // 自動穴埋め: 実績評価の「前」に割当を書き、書いた割当を含めて皆勤賞を判定させる。
-    // autoMakeup=false のユーザーは投稿時に自動割当しない（カレンダー編集で明示指定した穴だけ埋まる）。
-    // 2026-10 以降の月は穴埋めポイント制で全ユーザー手動のみ。投稿は必ず当月に入るので、
-    // 2026-10-01 00:00 JST 以降この分岐には到達しない。
-    // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（この分岐ごと削除）
-    const now = new Date();
-    if (!isPointEra(toJstYm(now)) && input.user.autoMakeup) {
-      await assignMakeupForNewPost({
-        userId: input.user.id,
-        imageId,
-        createdAt: now,
-        grace: perfectMonthGrace(input.user.instance.domain),
-      });
-    }
+    // 穴埋めは全ユーザー手動（ポイント制）。投稿時に自動では割り当てない
+    // （2026-09 以前の自動穴埋めは撤去済み）。
     return await evaluateAndGrant({
       userId: input.user.id,
       post: toPostFacts(input, replyToId),

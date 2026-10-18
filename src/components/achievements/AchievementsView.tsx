@@ -280,15 +280,12 @@ function DetailBody({
   grantedMap,
   ladderValues,
   dyn,
-  currentMonthPerfect,
   celebrate = false,
 }: {
   entry: Entry;
   grantedMap: Map<string, string>;
   ladderValues: Record<string, number>;
   dyn: DynamicGranted;
-  /** 当月の穴埋めルール（説明文の出し分けに使う）。 */
-  currentMonthPerfect: CurrentMonthPerfect;
   /** 獲得演出中はアイコンをポップさせる（ディープリンク到達時のみ true） */
   celebrate?: boolean;
 }) {
@@ -464,7 +461,7 @@ function DetailBody({
       rank={any ? "gold" : null}
       achieved={any}
       celebrate={celebrate}
-      description={perfectMonthDescription(currentMonthPerfect)}
+      description={PERFECT_MONTH_DESCRIPTION}
     >
       {any ? (
         <ul className="space-y-1.5">
@@ -544,14 +541,9 @@ function DetailShell({
   );
 }
 
-/** 皆勤賞の説明文（穴埋めの救済ルールは当月のルールで出し分ける）。 */
-function perfectMonthDescription(p: CurrentMonthPerfect): string {
-  if (!p.pointEra) {
-    // TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（従来ルールの文言ごと削除）
-    return `1ヶ月の間毎日1枚以上投稿すると獲得できます（月${p.cap}日までは救済措置があり、別日に穴埋め投稿も可能です）`;
-  }
-  return "1ヶ月の間毎日1枚以上投稿すると獲得できます（投稿を忘れた日は、穴埋めポイントを使って後日の2枚目の投稿で穴埋めできます）";
-}
+/** 皆勤賞の説明文（当月は必ず穴埋めポイント制。2026-09 以前の旧ルールの文言は撤去済み）。 */
+const PERFECT_MONTH_DESCRIPTION =
+  "1ヶ月の間毎日1枚以上投稿すると獲得できます（投稿を忘れた日は、穴埋めポイントを使って後日の2枚目の投稿で穴埋めできます）";
 
 export function AchievementsView({
   granted,
@@ -666,7 +658,7 @@ export function AchievementsView({
 
   return (
     <div className="space-y-6">
-      <CollectionMeter granted={granted} currentMonthPerfect={currentMonthPerfect} />
+      <CollectionMeter granted={granted} />
 
       <NextGoals
         grantedKeys={new Set(grantedMap.keys())}
@@ -736,7 +728,6 @@ export function AchievementsView({
               grantedMap={grantedMap}
               ladderValues={ladderValues}
               dyn={dyn}
-              currentMonthPerfect={currentMonthPerfect}
               celebrate={celebrate}
             />
           )}

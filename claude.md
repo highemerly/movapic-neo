@@ -40,7 +40,6 @@
 | [docs/periodic-jobs.md](docs/periodic-jobs.md) | 定期ジョブ（graphile-worker crontab内蔵の30分毎メンテ） |
 | [docs/SETUP.md](docs/SETUP.md) | 環境構築 |
 | [src/lib/achievements/README.md](src/lib/achievements/README.md) | 実績の追加手順・不変条件 |
-| [docs/cleanup-2026-10.md](docs/cleanup-2026-10.md) | **2026-10-11以降に実施**: 自動穴埋め（旧ルール・`User.autoMakeup`）の撤去チェックリスト。コード内マーカー `TODO(cleanup-2026-10)` |
 
 ## 常に守るルール
 
@@ -77,7 +76,7 @@
 - 投稿は全経路（web・メール・Bot・再投稿）「先に保存 → 投稿」。保存後の処理は publishImage の `afterSaved` に足す（以前の先保存／先投稿の2分岐で片方だけ漏れた。ALT で実例あり）。
 
 ### 皆勤賞の穴埋め（詳細: [achievements/README](src/lib/achievements/README.md)「特殊: 皆勤賞」）
-- 2026-10 分から**穴埋めポイント制**（1pt=1日・月ごと・持ち越し不可・翌月10日締切・全ユーザー手動）。2026-09 以前の月は旧ルール（固定上限3/4日・自動穴埋め）のまま。
+- 2026-10 分から**穴埋めポイント制**（1pt=1日・月ごと・持ち越し不可・翌月10日締切・全ユーザー手動）。2026-09 以前の月の旧ルール（固定上限3/4日・自動穴埋め）は締切済みで、自動穴埋めのコードと `User.autoMakeup` は撤去済み（過去月の👑判定と表示のため、固定上限 `perfectMonthGrace` と割当は残す）。
 - **donor（穴を埋める写真）は締切までなら翌月1〜10日の投稿でもよい**（`Image.makeupTargetMonthDelta`＝0同月/-1前月。規則は [donor.ts](src/lib/makeup/donor.ts) が単一ソース）。月末日を忘れた人だけが救済不能になる非対称を無くすため。ポイント制の月だけ。**1日1donor は月をまたいで共有**（共有しないと1回のダブル投稿で2日ぶん埋まる）。読む側は `donorRange` で読み `filledHoleOf` で振り分け、**対象月の外の行は donor としてだけ効かせる**（11/3 を 10/3 の投稿として数えない）。
 - **その月の上限は必ず [`resolveMakeupCap`/`resolveMakeupLimits`](src/lib/makeup/ledger.ts) で解決**して `perfectMonth.ts` に渡す（`perfectMonthGrace` を直接呼ばない＝旧ルールの月にしか正しくない）。
 - ポイント台帳（`MakeupPointGrant`）は**付与のみ・追記のみ**。消費は `Image.makeupTargetDay` から導出する（消費を別に持たない）。剥奪・マイナス補正は禁止（過去月の👑が揺れる）。

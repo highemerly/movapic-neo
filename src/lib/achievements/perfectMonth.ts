@@ -37,14 +37,6 @@ export const PERFECT_MONTH_GRACE_FAVORED = 4;
 /** 特典サーバー以外のインスタンス所属ユーザーの未投稿許容日数。 */
 export const PERFECT_MONTH_GRACE_DEFAULT = 3;
 
-/**
- * 2026-09 以前の月の穴埋め推奨通知（makeup-reminder）を送る「過ぎた未投稿日数」の上限。超えたら出さない。
- * ポイント制の月では使わない: 9日登録の新規ユーザー（8pt・穴8日）が最も救済したい層なのに、
- * この上限だと通知が一切出なくなる。ポイント制では残高と達成可能性（canPromptMakeup）が役目を引き継ぐ。
- */
-// TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照（shouldRemindMakeup と一緒に削除）
-export const MAKEUP_REMINDER_MAX_SKIPPED = 5;
-
 /** "2026-06" → "perfect-month:2026-06" */
 export function perfectMonthKey(ym: string): string {
   return `${PERFECT_MONTH_CATEGORY}:${ym}`;
@@ -309,17 +301,4 @@ export function canPromptMakeup(status: CurrentMonthMakeupStatus): boolean {
  */
 export function coveredDays(distinctDays: number, status: CurrentMonthMakeupStatus): number {
   return distinctDays + Math.max(0, status.skippedSoFar - status.unfilled);
-}
-
-/**
- * 2026-09 以前の月の穴埋め推奨通知（makeup-reminder）を送るべきか（純粋）。
- * ポイント制の月は canPromptMakeup を使う。投稿は必ず当月に入るので、2026-10-01 以降は呼ばれない。
- * - 1日以上の未投稿がある（skippedSoFar >= 1）
- * - まだ埋まっていない穴がある（unfilled > 0）
- * - 穴が多すぎない（skippedSoFar <= MAKEUP_REMINDER_MAX_SKIPPED）
- * 「今日投稿した」「同月内で未送信」の条件は呼び出し側で担保する。
- */
-// TODO(cleanup-2026-10): docs/cleanup-2026-10.md 参照
-export function shouldRemindMakeup(skippedSoFar: number, unfilled: number): boolean {
-  return skippedSoFar >= 1 && unfilled > 0 && skippedSoFar <= MAKEUP_REMINDER_MAX_SKIPPED;
 }
