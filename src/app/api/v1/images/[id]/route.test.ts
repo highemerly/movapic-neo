@@ -338,6 +338,14 @@ describe("PATCH /api/v1/images/[id]", () => {
     expect(res.status).toBe(401);
   });
 
+  it.each([null, [], "text", 1])(
+    "本文がオブジェクトでなければ（%j）400（null で TypeError の 500 になっていた）",
+    async (body) => {
+      const res = await PATCH(patchReq(body), params());
+      expect(res.status).toBe(400);
+    }
+  );
+
   it("画像が無ければ404を返す", async () => {
     mockFindUnique.mockResolvedValue(null as never);
 

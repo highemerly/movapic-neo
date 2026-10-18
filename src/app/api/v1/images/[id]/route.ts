@@ -109,6 +109,11 @@ export async function PATCH(
     }
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
+    // .catch が効くのは壊れた JSON だけ。本文 "null" は null のまま来て、下の body.xxx が
+    // TypeError（500）になっていたので、オブジェクト以外はここで弾く。
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      return NextResponse.json({ error: "リクエストの形式が不正です" }, { status: 400 });
+    }
 
     const image = await prisma.image.findUnique({
       where: { id },

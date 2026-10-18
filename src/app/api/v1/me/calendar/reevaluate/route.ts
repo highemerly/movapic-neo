@@ -24,6 +24,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}));
+    // .catch が効くのは壊れた JSON だけ。本文 "null" は null のまま来て body.year が TypeError（500）になる。
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      return NextResponse.json({ error: "year と month が不正です" }, { status: 400 });
+    }
     const year = Number(body.year);
     const month = Number(body.month);
     if (!isValidYearMonth(year, month)) {

@@ -54,6 +54,8 @@ describe("POST /api/v1/me/calendar/reevaluate", () => {
     // 年が4桁でないと "YYYY-MM" の切り出しが壊れる（Invalid Date のまま DB へ行き 500 になる）
     ["年が5桁", { year: 12345, month: 10 }],
     ["年が3桁", { year: 999, month: 10 }],
+    // 本文 "null" は .catch を素通りして body.year が TypeError（500）になっていた
+    ["本文が null", null],
   ])("年月が不正なら400を返す（%s）", async (_label, body) => {
     const res = await POST(req(body));
 
