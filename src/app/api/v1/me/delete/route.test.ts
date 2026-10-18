@@ -14,18 +14,21 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 vi.mock("@/lib/queue", () => ({ enqueueDeleteAccount: vi.fn() }));
+vi.mock("@/lib/auth/mastodonApp", () => ({ revokeUserMastodonToken: vi.fn() }));
 
 import { POST } from "./route";
 import { getCurrentUser, deleteSessionCookie } from "@/lib/auth/session";
 import { enqueueDeleteAccount } from "@/lib/queue";
 import prisma from "@/lib/db";
 import { expireFeaturedImages } from "@/lib/featuredImages";
+import { revokeUserMastodonToken } from "@/lib/auth/mastodonApp";
 
 const mockAuth = vi.mocked(getCurrentUser);
 const mockDeleteCookie = vi.mocked(deleteSessionCookie);
 const mockImageFindMany = vi.mocked(prisma.image.findMany);
 const mockUserDelete = vi.mocked(prisma.user.delete);
 const mockEnqueue = vi.mocked(enqueueDeleteAccount);
+const mockRevoke = vi.mocked(revokeUserMastodonToken);
 
 type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
 const ME = {
@@ -151,6 +154,35 @@ describe("POST /api/v1/me/delete", () => {
     expect(res.status).toBe(200);
     expect(mockUserDelete).toHaveBeenCalled();
     errorSpy.mockRestore();
+  });
+
+  it("連携先のトークンは、ユーザー削除の前に失効させる（トークンはユーザー行にあるため）", async () => {
+    const order: string[] = [];
+    mockRevoke.mockImplementation(async () => {
+      order.push("revoke");
+      return true;
+    });
+    mockUserDelete.mockImplementation((async () => {
+      order.push("userDelete");
+    }) as never);
+
+    await POST(req({ confirmName: REQUIRED_NAME }));
+
+    expect(mockRevoke).toHaveBeenCalledWith("u1");
+    expect(order).toEqual(["revoke", "userDelete"]);
+  });
+
+  it("トークンの失効に失敗しても、退会はそのまま続ける", async () => {
+    mockRevoke.mockRejectedValue(new Error("トークン無効化に失敗しました: forbidden"));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const res = await POST(req({ confirmName: REQUIRED_NAME }));
+
+    expect(res.status).toBe(200);
+    expect(mockUserDelete).toHaveBeenCalledWith({ where: { id: "u1" } });
+    expect(mockDeleteCookie).toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it("ユーザー削除が失敗したら500を返し、Cookieは破棄しない", async () => {

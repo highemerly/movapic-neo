@@ -7,6 +7,7 @@
  *    LoginSession/Report も即消える＝全一覧・プロフィールから即時消滅、全セッション無効化）。
  *  - 遅い S3 オブジェクト削除だけをバックグラウンドジョブに逃がす。
  *  - 操作ミス防止のため、確認入力（アカウント名 = username）の完全一致を必須にする（type to delete）。
+ *  - Mastodon は連携先サーバーのアクセストークンも失効させる（ベストエフォート。失敗しても退会は続ける）。
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,6 +15,7 @@ import { getCurrentUser, deleteSessionCookie } from "@/lib/auth/session";
 import prisma from "@/lib/db";
 import { enqueueDeleteAccount } from "@/lib/queue";
 import { expireFeaturedImages } from "@/lib/featuredImages";
+import { revokeUserMastodonToken } from "@/lib/auth/mastodonApp";
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,6 +47,18 @@ export async function POST(request: NextRequest) {
     const storageKeys = images.flatMap((img) =>
       img.thumbnailKey ? [img.storageKey, img.thumbnailKey] : [img.storageKey]
     );
+
+    // 連携先サーバーのトークンを失効させる。トークンはユーザー行にあるので削除の前に行う。
+    // 相手サーバーの停止・アプリの再登録で資格情報が変わった等で失敗しても、退会はそのまま続ける
+    // （本人は SHAMEZO から消えることを求めている。失効できなかったトークンは相手サーバーの設定から解除できる）。
+    try {
+      await revokeUserMastodonToken(user.id);
+    } catch (e) {
+      console.warn(
+        `[delete-account] Mastodon トークンの失効に失敗（退会は続行）: server=${user.instance.domain}`,
+        e instanceof Error ? e.message : e
+      );
+    }
 
     // DB ユーザーを削除（Image/Notification/Achievement/LoginSession/Report はカスケード）。
     // これで即座に全一覧・プロフィールから消え、全セッションも無効になる。

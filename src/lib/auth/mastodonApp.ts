@@ -8,7 +8,11 @@
  */
 
 import prisma from "@/lib/db";
-import { registerMastodonApp, type MastodonAppCredentials } from "@/lib/auth/fediverse";
+import {
+  registerMastodonApp,
+  revokeMastodonToken,
+  type MastodonAppCredentials,
+} from "@/lib/auth/fediverse";
 import { encryptToken, decryptToken } from "@/lib/auth/tokens";
 
 /**
@@ -71,4 +75,34 @@ export async function clearMastodonAppCredentials(domain: string): Promise<void>
     where: { domain },
     data: { clientId: null, clientSecret: null, appRedirectUri: null },
   });
+}
+
+/**
+ * 退会時に、本人の Mastodon アクセストークンを連携先サーバーで失効させる（ユーザー削除の前に呼ぶ）。
+ * 失効させないと、SHAMEZO から消えたあとも相手サーバーの「認証済みアプリ」にトークンが生き続ける。
+ * 失効には保存済みのアプリ資格情報が要る（トークンを発行したアプリでないと受け付けられない）。
+ * Misskey には第三者アプリのトークンを失効させる API が無いので対象外。
+ *
+ * @returns 失効させた=true / 対象外（Misskey・資格情報なし）=false。通信やサーバーの失敗は throw する
+ *          （呼び出し側は失敗しても退会を続ける）。
+ */
+export async function revokeUserMastodonToken(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      accessToken: true,
+      instance: { select: { type: true, domain: true, clientId: true, clientSecret: true } },
+    },
+  });
+  if (!user || user.instance.type !== "mastodon") return false;
+  const { domain, clientId, clientSecret } = user.instance;
+  if (!clientId || !clientSecret) return false;
+
+  await revokeMastodonToken(
+    domain,
+    decryptToken(clientId),
+    decryptToken(clientSecret),
+    decryptToken(user.accessToken)
+  );
+  return true;
 }
