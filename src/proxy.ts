@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { maybeSlideSession } from "@/lib/auth/slidingSession";
+import { buildContentSecurityPolicy, generateCspNonce } from "@/lib/security/csp";
 
 // 状態変更を伴うHTTPメソッド（CSRF検証の対象）
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -93,7 +94,20 @@ export async function proxy(request: NextRequest) {
   const csrfRejection = rejectCrossSiteMutation(request);
   if (csrfRejection) return csrfRejection;
 
-  const response = NextResponse.next();
+  // CSP の nonce はリクエストごとに作り、リクエスト側にも CSP と x-nonce を載せる。Next.js は
+  // リクエストの CSP から nonce を読んで自分のスクリプトに付け、layout は x-nonce を自前の
+  // インラインスクリプトと next-themes に渡す（詳細は src/lib/security/csp.ts）。
+  const nonce = generateCspNonce();
+  const csp = buildContentSecurityPolicy({
+    nonce,
+    isDev: process.env.NODE_ENV === "development",
+    mediaProxyOrigin: process.env.MEDIA_PROXY_BASE_URL ?? "",
+    storagePublicOrigin: (process.env.S3_PUBLIC_URL ?? "").replace(/\/$/, ""),
+  });
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy", csp);
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
 
   // X-Content-Type-Options: MIMEタイプスニッフィング防止
   response.headers.set("X-Content-Type-Options", "nosniff");
@@ -113,25 +127,7 @@ export async function proxy(request: NextRequest) {
     "geolocation=(), microphone=(), camera=(), payment=()"
   );
 
-  // Content-Security-Policy
-  const mediaProxyOrigin = process.env.MEDIA_PROXY_BASE_URL ?? "";
-  const storagePublicOrigin = (process.env.S3_PUBLIC_URL ?? "").replace(/\/$/, "");
-  const isDev = process.env.NODE_ENV === "development";
-  // RUM（beacon.js・web-vitals.js・rum-config.json・collect）は同一オリジンの /_n-rum/ から
-  // 配るため 'self' で足りる（rum.ts）。別オリジン配信に戻すなら script-src への追加が要る。
-  const csp = [
-    "default-src 'self'",
-    `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`, // dev時のみReactデバッグ用にunsafe-eval許可
-    "style-src 'self' 'unsafe-inline'", // Tailwind等で必要
-    `img-src 'self' data: blob: ${mediaProxyOrigin} ${storagePublicOrigin}`, // 画像: アバターproxy・投稿画像
-    "font-src 'self'",
-    "connect-src 'self' https:", // Fediverseインスタンスは任意のため https: を維持
-    "object-src 'none'", // <object>/<embed>/<applet> 系プラグイン埋め込みを封じる（default-srcより厳格に明示）
-    "frame-ancestors 'none'", // iframe埋め込み禁止
-    "base-uri 'self'",
-    "form-action 'self'",
-  ].join("; ");
-
+  // Content-Security-Policy（中身は src/lib/security/csp.ts）
   response.headers.set("Content-Security-Policy", csp);
 
   // スライディングセッション: 有効なJWTがアクティブに使われている限り

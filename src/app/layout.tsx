@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { ConfirmProvider } from "@/components/providers/ConfirmProvider";
@@ -114,6 +115,9 @@ export default async function RootLayout({
   );
   // RUMビーコン（RUM_ENABLED 未設定なら null＝配信しない）。同一オリジンの /_n-rum/ から配る（rum.ts）。
   const rumBeaconUrl = getRumBeaconUrl();
+  // CSP の nonce（proxy.ts がリクエストごとに作る）。自前のインラインスクリプトと next-themes に付ける。
+  // Next.js 自身のスクリプトにはリクエストの CSP から自動で付く（src/lib/security/csp.ts）。
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
     <html
@@ -129,11 +133,13 @@ export default async function RootLayout({
         {/* standalone判定（<body>先頭のネイティブ script でペイント前に同期実行）。上部コメント参照。 */}
         <script
           id="standalone-detect"
+          nonce={nonce}
           dangerouslySetInnerHTML={{ __html: STANDALONE_DETECT_SCRIPT }}
         />
         {/* 旧キーの localStorage 値を新キーへ移して旧キーを消す（一時コード。上部コメント参照）。 */}
         <script
           id="legacy-storage-migration"
+          nonce={nonce}
           dangerouslySetInnerHTML={{ __html: LEGACY_STORAGE_MIGRATION_SCRIPT }}
         />
         {/* RUMビーコン。`/_n-rum/` は Next へ届かない（Ingress がコレクタへ回す。rum.ts）。
@@ -148,6 +154,7 @@ export default async function RootLayout({
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
+          nonce={nonce}
         >
           {/* ヘッダーのハンバーガーと下部ナビ「メニュー」の両方から開く共有スライドメニュー。
               開閉状態は Context で共有し、Sheet 本体は MenuProvider 内に1つだけ描画する。
