@@ -50,8 +50,8 @@ const image = (id: string, day: number, makeupTargetDay: number | null = null) =
   makeupTargetMonthDelta: 0,
 });
 
-function req(): NextRequest {
-  return new NextRequest("http://localhost/api/v1/public/users/alice@handon.club/calendar?year=2026&month=10");
+function req(query = "year=2026&month=10"): NextRequest {
+  return new NextRequest(`http://localhost/api/v1/public/users/alice@handon.club/calendar?${query}`);
 }
 const params = { params: Promise.resolve({ username: "alice@handon.club" }) };
 
@@ -76,6 +76,16 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe("GET calendar - 入力検証", () => {
+  it.each(["year=50&month=1", "year=99999&month=1", "year=2026&month=13", "year=abc&month=1"])(
+    "%s は 400（4桁でない年は YYYY-MM の切り出しが壊れ 500 になっていた）",
+    async (query) => {
+      const res = await GET(req(query), params);
+      expect(res.status).toBe(400);
+    }
+  );
 });
 
 describe("GET calendar - 穴埋め枠", () => {

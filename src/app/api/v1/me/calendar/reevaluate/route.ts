@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserWithValidation } from "@/lib/auth/session";
 import { evaluateAndGrantPerfectMonth } from "@/lib/achievements/engine";
-import { formatYm } from "@/lib/jst";
+import { formatYm, isValidYearMonth } from "@/lib/jst";
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,16 +26,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const year = Number(body.year);
     const month = Number(body.month);
-    // 年は4桁に限る: "YYYY-MM" は formatYm / parseYm が4桁前提で切り出すため、桁が違うと
-    // 月の切り出しが壊れて Invalid Date のまま DB クエリへ渡り 500 になる。
-    if (
-      !Number.isInteger(year) ||
-      !Number.isInteger(month) ||
-      year < 1000 ||
-      year > 9999 ||
-      month < 1 ||
-      month > 12
-    ) {
+    if (!isValidYearMonth(year, month)) {
       return NextResponse.json({ error: "year と month が不正です" }, { status: 400 });
     }
 

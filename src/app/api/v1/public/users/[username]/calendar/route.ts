@@ -18,7 +18,7 @@ import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { getCurrentUser } from "@/lib/auth/session";
 import { toJstDateString } from "@/lib/streak";
 import { CACHE_PUBLIC_MEDIUM } from "@/lib/http";
-import { formatYm } from "@/lib/jst";
+import { formatYm, isValidYearMonth } from "@/lib/jst";
 import { resolveMakeupLimits } from "@/lib/makeup/ledger";
 import { allowsPrevMonthDonor, donorTargetYm } from "@/lib/makeup/donor";
 import { isMakeupEditable, makeupDeadline } from "@/lib/makeup/points";
@@ -128,7 +128,7 @@ export async function GET(
     const year = parseInt(yearParam, 10);
     const month = parseInt(monthParam, 10);
 
-    if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+    if (!isValidYearMonth(year, month)) {
       return NextResponse.json({ error: "Invalid year or month" }, { status: 400 });
     }
 

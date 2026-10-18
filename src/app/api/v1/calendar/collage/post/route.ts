@@ -23,7 +23,7 @@ import {
   buildCollageCaption,
   buildCollageAltText,
 } from "@/lib/calendar/resolveMonth";
-import { formatYm } from "@/lib/jst";
+import { formatYm, isValidYearMonth } from "@/lib/jst";
 import { resolveMakeupCap } from "@/lib/makeup/ledger";
 import {
   postToMastodon,
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     if (!imageBlob) {
       return NextResponse.json({ error: "画像がありません" }, { status: 400 });
     }
-    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    if (!isValidYearMonth(year, month)) {
       return NextResponse.json({ error: "年月が不正です" }, { status: 400 });
     }
     if (!visibility) {

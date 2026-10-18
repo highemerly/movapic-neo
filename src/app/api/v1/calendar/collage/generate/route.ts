@@ -17,7 +17,7 @@ import {
   resolveCalendarMonth,
   buildCollageCaption,
 } from "@/lib/calendar/resolveMonth";
-import { formatYm } from "@/lib/jst";
+import { formatYm, isValidYearMonth } from "@/lib/jst";
 import { resolveMakeupCap } from "@/lib/makeup/ledger";
 import { getImage } from "@/lib/storage/storage";
 import { renderCalendarCollage } from "@/lib/compute/client";
@@ -83,7 +83,7 @@ async function generateCollage(
     }
     const year = Number(body.year);
     const month = Number(body.month);
-    if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    if (!isValidYearMonth(year, month)) {
       return NextResponse.json({ error: "年月が不正です" }, { status: 400 });
     }
     // 配色テーマ（未指定・不正値は light）。

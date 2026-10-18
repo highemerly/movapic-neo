@@ -24,6 +24,22 @@ export function jstDayOf(d: Date): number {
   return Number(toJstDateString(d).slice(8, 10));
 }
 
+/**
+ * API で受け取った年月として扱えるか。年は4桁に限る: "YYYY-MM" は formatYm / parseYm が4桁前提で
+ * 切り出すため、桁が違うと月の切り出しが壊れて Invalid Date のまま DB クエリへ渡り 500 になる
+ * （year=50 で実際に起きた）。
+ */
+export function isValidYearMonth(year: number, month: number): boolean {
+  return (
+    Number.isInteger(year) &&
+    Number.isInteger(month) &&
+    year >= 1000 &&
+    year <= 9999 &&
+    month >= 1 &&
+    month <= 12
+  );
+}
+
 /** "2026-10" → { year: 2026, month: 10 }（month は1始まり）。 */
 export function parseYm(ym: string): { year: number; month: number } {
   return { year: Number(ym.slice(0, 4)), month: Number(ym.slice(5, 7)) };

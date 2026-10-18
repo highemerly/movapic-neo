@@ -13,6 +13,7 @@ import {
   toJstYm,
   jstDayOf,
   parseYm,
+  isValidYearMonth,
   formatYm,
   shiftYm,
   jstMonthRange,
@@ -38,6 +39,28 @@ describe("toJstYm / jstDayOf - UTCとJSTで日がずれる境界", () => {
     const d = new Date("2026-10-05T03:00:00Z");
     expect(toJstYm(d)).toBe("2026-10");
     expect(jstDayOf(d)).toBe(5);
+  });
+});
+
+describe("isValidYearMonth - API で受け取る年月", () => {
+  it("4桁の年と1〜12月は受け付ける", () => {
+    expect(isValidYearMonth(2026, 10)).toBe(true);
+    expect(isValidYearMonth(1000, 1)).toBe(true);
+    expect(isValidYearMonth(9999, 12)).toBe(true);
+  });
+
+  it("4桁でない年は弾く（YYYY-MM の切り出しが壊れて 500 になっていた）", () => {
+    expect(isValidYearMonth(50, 1)).toBe(false);
+    expect(isValidYearMonth(999, 1)).toBe(false);
+    expect(isValidYearMonth(10000, 1)).toBe(false);
+  });
+
+  it("範囲外の月・整数でない値・NaN は弾く", () => {
+    expect(isValidYearMonth(2026, 0)).toBe(false);
+    expect(isValidYearMonth(2026, 13)).toBe(false);
+    expect(isValidYearMonth(2026.5, 1)).toBe(false);
+    expect(isValidYearMonth(NaN, 1)).toBe(false);
+    expect(isValidYearMonth(2026, NaN)).toBe(false);
   });
 });
 
