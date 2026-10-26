@@ -30,6 +30,7 @@
 ```bash
 git clone <repository-url>
 cd movapic-neo
+git config core.hooksPath .githooks   # main への直接コミットを止める（docs/development.md）
 npm install
 ```
 
