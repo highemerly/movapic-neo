@@ -116,7 +116,7 @@ jobs:
           skip-extraction: false
 
       - name: Build and push Docker image (production)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: runner
