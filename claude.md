@@ -4,6 +4,7 @@
 - 本番環境でも実行するコマンド（DBマイグレーション、バックフィルスクリプトなど）は、手順確認も兼ね、必ずユーザーが実行する。検証環境であっても、勝手にやらない。
 - 上記にかかわらず、値の確認や値を変更しないコマンドは勝手にやる。Prisma クライアントの再生成は勝手にやる。
 - 勝手に git コミットしない。
+- main へは直接コミットしない。作業を始めるときにブランチを切り、PR で取り込む（[docs/development.md](docs/development.md)）。
 - リバート時は git コマンドを使わず、ファイルをひとつひとつ修正。
 - 問題は常に root cause を調べ、直接解決する。フォールバック処理を作ってごまかさない。原因がわからない、または実害があるかわからない段階で「念のため」の処理を作らない。
 - コメントにはWhat/HowでなくWhyを残す。ただし、過去の pitfall および対策内容は残す。
@@ -39,6 +40,7 @@
 | [docs/favorite.md](docs/favorite.md) | リアクション（Mastodon favourite / Misskey reaction連携）のマージ表示・絵文字・TTL・定期同期・取り消し反映など全仕様 |
 | [docs/periodic-jobs.md](docs/periodic-jobs.md) | 定期ジョブ（graphile-worker crontab内蔵の30分毎メンテ） |
 | [docs/SETUP.md](docs/SETUP.md) | 環境構築 |
+| [docs/development.md](docs/development.md) | 開発フロー（ブランチ → PR・main の ruleset・ローカル hook・リリース手順） |
 | [src/lib/achievements/README.md](src/lib/achievements/README.md) | 実績の追加手順・不変条件 |
 
 ## 常に守るルール
