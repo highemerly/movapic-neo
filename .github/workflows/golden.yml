@@ -19,10 +19,10 @@ jobs:
       contents: read
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Checkout fonts (private repository)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: highemerly/movapic-fonts
           token: ${{ secrets.FONT_REPO_TOKEN }}

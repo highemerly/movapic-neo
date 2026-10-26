@@ -42,12 +42,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Checkout fonts (private repository)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: highemerly/movapic-fonts
           token: ${{ secrets.FONT_REPO_TOKEN }}
@@ -136,7 +136,7 @@ jobs:
 
     steps:
       - name: Checkout k8s repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ env.K8S_REPO }}
           token: ${{ secrets.K8SG1_PAT }}
