@@ -54,7 +54,7 @@ jobs:
       # 失敗時のみ actual/expected/diff PNG をアーティファクト化（目視用）。
       - name: Upload golden diffs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: golden-diffs
           path: golden-out
