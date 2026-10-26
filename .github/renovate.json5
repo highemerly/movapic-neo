@@ -1,0 +1,74 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  // docker:pinDigests: node:22-alpine を digest で固定する。タグのままだと Alpine の更新（apk の
+  // vips/libheif の版が変わる）がリリース時のビルドで無言で入る。固定すると digest 更新が PR になり、
+  // golden（deps ステージで sharp を system libvips にソースビルドする）を通してから取り込める。
+  extends: ['config:recommended', 'docker:pinDigests'],
+  timezone: 'Asia/Tokyo',
+  // 週2回にまとめる（毎日 PR が来ると確認が追いつかず、週1だと間隔が空きすぎる）。
+  schedule: ['before 9am on monday and thursday'],
+  labels: ['dependencies'],
+  // npm 10.9.2 は vitest の peer 解決で lockfile 更新がクラッシュする（arborist の
+  // `Cannot read properties of null (reading 'edgesOut')`）。lockfile は npm 11 で更新させる。
+  constraints: {
+    npm: '>=11',
+  },
+  // 間接依存（lockfile だけにある版）も週1で更新する。
+  lockFileMaintenance: {
+    enabled: true,
+  },
+  // メジャーはコード側の対応が要るので、着手するときに Dependency Dashboard で承認して PR を作らせる
+  // （自動で並ぶと、対応できないまま毎週 rebase される PR が溜まる）。
+  major: {
+    dependencyDashboardApproval: true,
+  },
+  packageRules: [
+    {
+      // package.json の範囲（^x.y.z）の下限も上げる。範囲内の更新でも PR になり、
+      // package.json を見れば実際に入っている版が分かる状態を保つ。
+      // npm に限る（Docker の node:22-alpine や setup-node の 22 まで 22.x.y に固定されるため）。
+      matchManagers: ['npm'],
+      rangeStrategy: 'bump',
+    },
+    {
+      // 乗っ取られて公開された版は数日以内に取り下げられることが多いため、公開から3日待つ。
+      matchDatasources: ['npm'],
+      minimumReleaseAge: '3 days',
+    },
+    {
+      // sharp は HEIC のため system libvips（Alpine の apk）にソースビルドしている。0.35 系は
+      // libvips 8.18.3 以上を要求し、Alpine 3.24 の 8.18.2 ではビルドできず golden が落ちる。
+      // Alpine 側が上がるまでは、Dependency Dashboard で承認したときだけ PR を作る。
+      matchPackageNames: ['sharp'],
+      matchUpdateTypes: ['major', 'minor'],
+      dependencyDashboardApproval: true,
+    },
+    {
+      // Node のメジャーは Dockerfile（node:22-alpine）・CI（setup-node）・.tool-versions・@types/node を
+      // 揃えて上げる必要があるため1つの PR にまとめる。
+      matchDepNames: ['node', '@types/node'],
+      matchUpdateTypes: ['major'],
+      groupName: 'Node.js major',
+    },
+    {
+      // prisma CLI と @prisma/client（と adapter）は同じ版でないと動かないため1つの PR にする。
+      matchPackageNames: ['prisma', '@prisma/**'],
+      groupName: 'prisma',
+    },
+    {
+      // 型定義は本体と同じ PR で上げる（React のメジャー/マイナーで型だけずれるのを防ぐ）。
+      matchPackageNames: ['@types/react', '@types/react-dom'],
+      groupName: 'react monorepo',
+    },
+    {
+      // ローカル開発用の DB。本番の共有 Postgres（別リポジトリで管理）の版に合わせて手で上げる。
+      matchFileNames: ['docker-compose.yml'],
+      enabled: false,
+    },
+    {
+      // Cloudflare Email Worker は CI が無く、デプロイも手動（wrangler deploy）のため対象外。
+      matchFileNames: ['workers/**'],
+      enabled: false,
+    },
+  ],
+}
