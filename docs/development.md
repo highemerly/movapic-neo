@@ -13,7 +13,7 @@
 |---|---|---|
 | PR 必須 | 承認数 0 | 一人運用で、自分の PR は自分で承認できないため |
 | マージ方式 | squash のみ＋linear history | 従来の「1変更＝1コミット」の履歴を保つ |
-| 必須チェック | `checks / check`（vitest / eslint / tsc） | ブランチ push で [ci.yml](../.github/workflows/ci.yml) が付ける |
+| 必須チェック | `checks / check`（vitest / eslint / tsc）・`golden / test`（ゴールデン画像テスト） | ブランチ push で [ci.yml](../.github/workflows/ci.yml) が付ける。golden は sharp/skia/libvips の依存更新がイメージで壊れないかも兼ねる。本番イメージのビルドはタグ時だけ |
 | 最新化の強制 | しない（strict=false） | Renovate の PR が複数並んだとき、1件マージするたびに全件を rebase・再 CI させないため |
 | force push・削除 | 禁止 | |
 | バイパス | なし（管理者も対象） | |
