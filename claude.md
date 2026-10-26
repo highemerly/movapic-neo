@@ -40,7 +40,7 @@
 | [docs/favorite.md](docs/favorite.md) | リアクション（Mastodon favourite / Misskey reaction連携）のマージ表示・絵文字・TTL・定期同期・取り消し反映など全仕様 |
 | [docs/periodic-jobs.md](docs/periodic-jobs.md) | 定期ジョブ（graphile-worker crontab内蔵の30分毎メンテ） |
 | [docs/SETUP.md](docs/SETUP.md) | 環境構築 |
-| [docs/development.md](docs/development.md) | 開発フロー（ブランチ → PR・main の ruleset・ローカル hook・リリース手順） |
+| [docs/development.md](docs/development.md) | 開発フロー（ブランチ → PR・main の ruleset・ローカル hook・依存更新（Renovate）・リリース手順） |
 | [src/lib/achievements/README.md](src/lib/achievements/README.md) | 実績の追加手順・不変条件 |
 
 ## 常に守るルール
