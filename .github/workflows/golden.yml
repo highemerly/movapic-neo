@@ -37,7 +37,7 @@ jobs:
       # 本番イメージと同じ deps/prisma レイヤを共有するので、タグ時の build-and-push が積む
       # buildcache を再利用してソースビルド（sharp 等）をスキップできる。
       - name: Build golden-test image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: golden-test
