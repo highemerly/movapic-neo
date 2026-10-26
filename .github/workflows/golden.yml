@@ -1,0 +1,61 @@
+name: Golden
+
+# ゴールデン画像テスト（skia 実描画の見た目回帰）を回す再利用可能ワークフロー。
+# ci.yml（全ブランチ push）と docker-build.yml（タグ push でビルドと並走）の両方から呼ぶ。
+# 本番同一ランタイムの golden-test ステージを build して docker run で比較する。
+# golden-test は deps ステージ（sharp の system libvips ソースビルド・skia ネイティブ）の上に載るため、
+# PR の時点で sharp/skia/libvips 系の依存更新がイメージで壊れないかもここで分かる。
+# 本番 runner（next build・push）はタグ時だけ docker-build.yml が作る。
+on:
+  workflow_call:
+    secrets:
+      FONT_REPO_TOKEN:
+        required: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout fonts (private repository)
+        uses: actions/checkout@v4
+        with:
+          repository: highemerly/movapic-fonts
+          token: ${{ secrets.FONT_REPO_TOKEN }}
+          path: fonts
+          # 既定(true)だとトークンが fonts/.git/config に残り、COPY で公開イメージへ混入する
+          # （v1.4.12 以前のイメージで実際に漏洩した）。checkout 後に git 操作はしないので不要。
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 本番イメージと同じ deps/prisma レイヤを共有するので、タグ時の build-and-push が積む
+      # buildcache を再利用してソースビルド（sharp 等）をスキップできる。
+      - name: Build golden-test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: golden-test
+          load: true
+          tags: movapic-golden:ci
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache
+          platforms: linux/amd64
+
+      - name: Run golden image tests
+        run: |
+          mkdir -p golden-out
+          docker run --rm -e GOLDEN_DIFF_DIR=/out -v "$PWD/golden-out:/out" movapic-golden:ci
+
+      # 失敗時のみ actual/expected/diff PNG をアーティファクト化（目視用）。
+      - name: Upload golden diffs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-diffs
+          path: golden-out
+          if-no-files-found: ignore

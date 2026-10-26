@@ -91,9 +91,9 @@
 ### テスト / CI
 - **Vitest**（`environment: node`・`globals: true`・alias `@`＝[vitest.config.ts](vitest.config.ts)）。テストは対象と**同じ階層に併置**（`src/**/foo.ts` → `src/**/foo.test.ts`）。書式は `describe`/`it`/`expect`、`it` の説明は日本語。
 - **対象は純粋ロジック（`src/lib/**`）と API ルート（`src/app/api/**`）**。IO/インフラ層（db/compute/storage/queue/periodic/pwa/bot/fonts）はモックコスト過多で**unit対象外と割り切る**。
-- **画像の実描画はunitで呼ばない**。`overlay/stamp/neon/rotate/format/fonts/seasons/calendarCollage` は skia 実描画が要るため **ゴールデン画像テスト**（`*.golden.test.ts`）で別建て。実行は本番同一Dockerでのみ（`npm run test:golden`）。通常CIからは除外。
+- **画像の実描画はunitで呼ばない**。`overlay/stamp/neon/rotate/format/fonts/seasons/calendarCollage` は skia 実描画が要るため **ゴールデン画像テスト**（`*.golden.test.ts`）で別建て。実行は本番同一Dockerでのみ（`npm run test:golden`）。unit の vitest からは除外し、CI では別ジョブ（[golden.yml](.github/workflows/golden.yml)・全ブランチ push）で回す。
 - **APIルートのテスト**: 境界（DB/ストレージ/Fediverse/compute/逆ジオコーディング等）を先頭で `vi.mock` して外部を一切読ませず、`import { POST } from "./route"` → `vi.mocked()` で型付きに扱う（例: [post/route.test.ts](src/app/api/v1/post/route.test.ts)）。
-- **CI**（[ci.yml](.github/workflows/ci.yml)→[checks.yml](.github/workflows/checks.yml)）: 全ブランチpushで vitest → eslint → tsc。`npm ci --ignore-scripts`（sharp/skiaのネイティブビルドをスキップ）＋`prisma generate` で回すため、**unitテストが sharp/skia を import すると CI が壊れる**（純粋ロジックのみに保つ）。
+- **CI**（[ci.yml](.github/workflows/ci.yml)→[checks.yml](.github/workflows/checks.yml)・[golden.yml](.github/workflows/golden.yml)）: 全ブランチpushで vitest → eslint → tsc とゴールデン（どちらも main の必須チェック）。本番イメージのビルドはタグ時だけ。checks は`npm ci --ignore-scripts`（sharp/skiaのネイティブビルドをスキップ）＋`prisma generate` で回すため、**unitテストが sharp/skia を import すると CI が壊れる**（純粋ロジックのみに保つ）。
 - ローカルは `npm test`（=`vitest run`）／`npm run test:watch`／`npm run test:coverage`。**変更後は `npm test`・`npm run lint`・`npm run typecheck` を通す**。カバレッジ母数は lib＋api（実描画・インフラは意図的に除外し「本当の穴」だけ可視化）。
 
 ### RSCプリフェッチ（`?_rsc=` クエリ）
