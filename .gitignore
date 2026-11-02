@@ -14,6 +14,7 @@
 /coverage
 /e2e/test-results/
 /e2e/playwright-report/
+/e2e/fakeverse/certs/
 
 # next.js
 /.next/

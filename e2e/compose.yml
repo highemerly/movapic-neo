@@ -1,18 +1,29 @@
-# E2E スモークテストの起動構成（CI の e2e.yml と手元で共用）。
+# E2E テストの起動構成（CI の e2e.yml と手元で共用）。
 # 本番イメージ（runner ステージ）を all-in-one（COMPONENT_ROLE 未設定）で起動する。
 # compute へは自分自身を HTTP で呼び返す（COMPUTE_SERVICE_URL はコンテナ内の 3000）。
 # コンテナ内から自分を指すときは localhost でなく 127.0.0.1 を使う。サーバーは IPv4 の 0.0.0.0 で
 # 待ち受けるが、Alpine では localhost が先に ::1 へ解決され接続拒否になる（ヘルスチェックで実際に起きた）。
 #
+# Fediverse 連携は偽サーバー（fakeverse/server.mjs）を mastodon.test / misskey.test として置く。
+# ネットワークを TEST-NET-2（198.51.100.0/24）にしているのは、SSRF ガード（src/lib/security/ssrf.ts）が
+# プライベート IP 宛てを止めるため。Docker 既定の 172.16.0.0/12 だと本番イメージのまま偽サーバーへ繋げない。
+#
 # 手元での実行（リポジトリ直下で）:
 #   docker build --target runner -t movapic-neo:e2e .
+#   e2e/fakeverse/gen-certs.sh
 #   docker compose -f e2e/compose.yml up -d --wait db
 #   DATABASE_URL=postgresql://postgres:postgres@localhost:55432/movapic npx prisma migrate deploy
-#   docker compose -f e2e/compose.yml up -d --wait app
+#   docker compose -f e2e/compose.yml up -d --wait
 #   npx playwright install chromium   # 初回のみ
 #   npx playwright test -c e2e/playwright.config.ts
 #   docker compose -f e2e/compose.yml down -v
 name: movapic-e2e
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 198.51.100.0/24
 
 services:
   db:
@@ -30,20 +41,73 @@ services:
       timeout: 5s
       retries: 30
 
+  # S3 互換ストレージ（投稿は先に保存してから Fediverse へ送るため要る）。
+  # MinIO はコミュニティ版のイメージ配布が終わったため versitygw を使う。
+  # アプリの S3 クライアントはバケットをホスト名に含める形（e2e.s3.test）で呼ぶので、
+  # --virtual-domain とネットワーク別名で合わせる。posix バックエンドは直下のディレクトリがバケットになる。
+  s3:
+    image: versity/versitygw:v1.10.0
+    entrypoint:
+      - sh
+      - -c
+      - mkdir -p /data/e2e && exec versitygw --access e2e-access --secret e2e-secret --virtual-domain s3.test --health /health posix /data
+    networks:
+      default:
+        aliases: [s3.test, e2e.s3.test]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7070/health"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  fakeverse:
+    image: node:22-alpine
+    command: ["node", "/srv/server.mjs"]
+    volumes:
+      - ./fakeverse/server.mjs:/srv/server.mjs:ro
+      - ./fakeverse/certs:/certs:ro
+    networks:
+      default:
+        ipv4_address: 198.51.100.10
+        aliases: [mastodon.test, misskey.test]
+    ports:
+      # 受けたリクエストの記録をテストから読む管理口（TLS なし）。
+      - "58080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
   app:
     image: ${E2E_IMAGE:-movapic-neo:e2e}
     depends_on:
       db:
         condition: service_healthy
+      s3:
+        condition: service_healthy
+      fakeverse:
+        condition: service_healthy
     # 秘密情報はすべて E2E 専用のダミー値。
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/movapic
       JWT_SECRET: e2e-jwt-secret-0123456789abcdef0123456789abcdef
-      TOKEN_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      # 引用符必須。数字だけの値は YAML で整数になり、"0" として渡る（実際に起きた）。
+      TOKEN_ENCRYPTION_KEY: "e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0"
       INTERNAL_API_KEY: e2e-internal-api-key
       COMPUTE_SERVICE_URL: http://127.0.0.1:3000
       COMPUTE_API_KEY: e2e-compute-api-key
       NEXT_PUBLIC_APP_URL: http://localhost:3100
+      S3_ENDPOINT: http://s3.test:7070
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY_ID: e2e-access
+      S3_SECRET_ACCESS_KEY: e2e-secret
+      S3_BUCKET_NAME: e2e
+      S3_PUBLIC_URL: http://localhost:3100/e2e-images-not-served
+      # 偽サーバーの自己署名 CA を信頼させる（gen-certs.sh が作る）。
+      NODE_EXTRA_CA_CERTS: /certs/ca.pem
+    volumes:
+      - ./fakeverse/certs/ca.pem:/certs/ca.pem:ro
     ports:
       - "3100:3000"
     healthcheck:
