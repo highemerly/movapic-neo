@@ -1,0 +1,53 @@
+# E2E スモークテストの起動構成（CI の e2e.yml と手元で共用）。
+# 本番イメージ（runner ステージ）を all-in-one（COMPONENT_ROLE 未設定）で起動する。
+# compute へは自分自身を HTTP で呼び返す（COMPUTE_SERVICE_URL はコンテナ内の 3000）。
+# コンテナ内から自分を指すときは localhost でなく 127.0.0.1 を使う。サーバーは IPv4 の 0.0.0.0 で
+# 待ち受けるが、Alpine では localhost が先に ::1 へ解決され接続拒否になる（ヘルスチェックで実際に起きた）。
+#
+# 手元での実行（リポジトリ直下で）:
+#   docker build --target runner -t movapic-neo:e2e .
+#   docker compose -f e2e/compose.yml up -d --wait db
+#   DATABASE_URL=postgresql://postgres:postgres@localhost:55432/movapic npx prisma migrate deploy
+#   docker compose -f e2e/compose.yml up -d --wait app
+#   npx playwright install chromium   # 初回のみ
+#   npx playwright test -c e2e/playwright.config.ts
+#   docker compose -f e2e/compose.yml down -v
+name: movapic-e2e
+
+services:
+  db:
+    # 本番の共有 Postgres に合わせる（Renovate の対象外）。
+    image: postgres:17.5
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: movapic
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  app:
+    image: ${E2E_IMAGE:-movapic-neo:e2e}
+    depends_on:
+      db:
+        condition: service_healthy
+    # 秘密情報はすべて E2E 専用のダミー値。
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/movapic
+      JWT_SECRET: e2e-jwt-secret-0123456789abcdef0123456789abcdef
+      TOKEN_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      INTERNAL_API_KEY: e2e-internal-api-key
+      COMPUTE_SERVICE_URL: http://127.0.0.1:3000
+      COMPUTE_API_KEY: e2e-compute-api-key
+      NEXT_PUBLIC_APP_URL: http://localhost:3100
+    ports:
+      - "3100:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 2s
+      timeout: 5s
+      retries: 60

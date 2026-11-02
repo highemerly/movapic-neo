@@ -1,0 +1,87 @@
+name: E2E
+
+# E2E スモークテストの再利用可能ワークフロー。ci.yml（全ブランチ push）から呼ぶ。
+# 本番イメージ（runner ステージ）を build し（push はしない）、e2e/compose.yml で Postgres と一緒に
+# 起動して Playwright を回す。主要ページが開けるか（CSP の nonce を含む）と、本番イメージでの
+# プレビュー生成（HEIC デコード・skia 描画・compute 呼び出し）を見る。
+on:
+  workflow_call:
+    secrets:
+      FONT_REPO_TOKEN:
+        required: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout fonts (private repository)
+        uses: actions/checkout@v4
+        with:
+          repository: highemerly/movapic-fonts
+          token: ${{ secrets.FONT_REPO_TOKEN }}
+          path: fonts
+          # 既定(true)だとトークンが fonts/.git/config に残り、COPY でイメージへ混入する
+          # （v1.4.12 以前のイメージで実際に漏洩した）。checkout 後に git 操作はしないので不要。
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # タグ時の build-and-push が積む buildcache を再利用する（lockfile が同じなら deps の
+      # sharp ソースビルドはスキップされ、実質 next build だけになる）。
+      - name: Build production image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runner
+          load: true
+          tags: movapic-neo:e2e
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}:buildcache
+          platforms: linux/amd64
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Playwright と prisma CLI（マイグレーション用）を使うだけなので、ネイティブビルドは不要。
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Start database
+        run: docker compose -f e2e/compose.yml up -d --wait db
+
+      - name: Migrate database
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:55432/movapic
+
+      - name: Start app
+        run: docker compose -f e2e/compose.yml up -d --wait app
+
+      - name: Run E2E smoke tests
+        run: npx playwright test -c e2e/playwright.config.ts
+
+      # 失敗時のみ、Playwright のレポート（trace 付き）とアプリのログを残す。
+      - name: Collect app logs on failure
+        if: failure()
+        run: docker compose -f e2e/compose.yml logs app > e2e/app.log 2>&1 || true
+
+      - name: Upload E2E artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            e2e/playwright-report
+            e2e/app.log
+          if-no-files-found: ignore

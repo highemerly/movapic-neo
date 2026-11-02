@@ -1,10 +1,11 @@
 name: CI
 
-# テストゲート。全ブランチへの push で checks.yml（vitest / eslint / tsc）と
-# golden.yml（ゴールデン画像テスト）を回す。どちらも main の ruleset の必須チェック。
+# テストゲート。全ブランチへの push で checks.yml（vitest / eslint / tsc）・
+# golden.yml（ゴールデン画像テスト）・e2e.yml（本番イメージを起動してのスモーク）を回す。
+# checks と golden は main の ruleset の必須チェック。
 # タグ push（リリース）は branches フィルタに一致しないためここでは発動せず、
-# docker-build.yml 側が同じ2本をビルドと並走させる（＝二重実行しない）。
-# 本番イメージのビルドはタグ時だけ（PR では golden-test ステージまでで依存の破損は分かるため）。
+# docker-build.yml 側が checks と golden をビルドと並走させる（＝二重実行しない）。
+# 本番イメージの push はタグ時だけ（e2e は build して手元の docker に load するだけ）。
 on:
   push:
     branches:
@@ -22,5 +23,11 @@ jobs:
   # 必須チェックにするため paths で絞らない（スキップされると結果が付かず PR がマージできなくなる）。
   golden:
     uses: ./.github/workflows/golden.yml
+    secrets:
+      FONT_REPO_TOKEN: ${{ secrets.FONT_REPO_TOKEN }}
+
+  # 本番イメージを起動してのスモークテスト。本番イメージの build（push なし）を含む。
+  e2e:
+    uses: ./.github/workflows/e2e.yml
     secrets:
       FONT_REPO_TOKEN: ${{ secrets.FONT_REPO_TOKEN }}

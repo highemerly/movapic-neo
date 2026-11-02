@@ -7,7 +7,8 @@ export default defineConfig({
     globals: true,
     // ゴールデン画像テストは skia-canvas 実描画が要る＝本番同一の Docker 環境でのみ実行する。
     // 高速 CI（--ignore-scripts で skia ネイティブ無し）では走らせない。専用 config で別建て。
-    exclude: [...configDefaults.exclude, "**/*.golden.test.ts"],
+    // e2e/ は Playwright（本番イメージを起動して回す）の担当。
+    exclude: [...configDefaults.exclude, "**/*.golden.test.ts", "e2e/**"],
 
     // カバレッジは「unit テストで守る対象」を母数にする（--coverage 指定時のみ有効）。
     // include を指定すると未 import ファイルも 0% として可視化され、本当の穴を隠さない
