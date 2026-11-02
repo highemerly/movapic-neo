@@ -106,7 +106,7 @@ jobs:
       # BuildKit の --mount=type=cache（.next/cache・npm）は type=gha では永続化されないため、
       # actions/cache 経由でラウンドトリップさせて Next.js のビルドを差分化する
       - name: Restore build cache mounts
-        uses: reproducible-containers/buildkit-cache-dance@v3.1.0
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
         with:
           cache-map: |
             {
