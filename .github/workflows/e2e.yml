@@ -31,7 +31,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # タグ時の build-and-push が積む buildcache を再利用する（lockfile が同じなら deps の
       # sharp ソースビルドはスキップされ、実質 next build だけになる）。
