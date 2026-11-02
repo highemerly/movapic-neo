@@ -36,7 +36,7 @@ jobs:
       # タグ時の build-and-push が積む buildcache を再利用する（lockfile が同じなら deps の
       # sharp ソースビルドはスキップされ、実質 next build だけになる）。
       - name: Build production image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: runner
