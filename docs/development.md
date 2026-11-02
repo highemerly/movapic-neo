@@ -67,7 +67,7 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
 - 手元で `npm update` はしない（Renovate の PR とぶつかる）。依存の追加（`npm install <新しいパッケージ>`）はブランチを切って PR で。
 
 ## リリース
-1. バージョンの Bump・リリースノート（[releaseNotes.ts](../src/data/releaseNotes.ts)）もブランチ → PR でマージする。
+1. バージョンの Bump・リリースノート（[releaseNotes.ts](../src/data/releaseNotes.ts)）もブランチ → PR でマージする。Claude Code に `/bump-version [X.Y.Z]`（または「1.5.2 を出したい」）と頼めば PR 作成まで行う（[SKILL.md](../.claude/skills/bump-version/SKILL.md)）。
 2. マージ後の main を pull し、タグを push する（タグは ruleset の対象外）:
    ```bash
    git switch main && git pull
