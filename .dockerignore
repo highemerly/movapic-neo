@@ -8,3 +8,6 @@ npm-debug.log
 .gitignore
 .next
 .env*.local
+# E2E はイメージの外（CI ランナー/手元）から叩く。含めるとテストを直すたびに
+# builder の COPY が変わり next build のキャッシュが効かなくなる。
+e2e

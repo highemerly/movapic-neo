@@ -61,8 +61,8 @@
       groupName: 'react monorepo',
     },
     {
-      // ローカル開発用の DB。本番の共有 Postgres（別リポジトリで管理）の版に合わせて手で上げる。
-      matchFileNames: ['docker-compose.yml'],
+      // ローカル開発用・E2E 用の DB。本番の共有 Postgres（別リポジトリで管理）の版に合わせて手で上げる。
+      matchFileNames: ['docker-compose.yml', 'e2e/compose.yml'],
       enabled: false,
     },
     {
