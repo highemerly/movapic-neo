@@ -59,17 +59,7 @@ describe("toMakeupPointNotificationData", () => {
   });
 });
 
-describe("makeupNotificationText / makeupPointReasonLabel", () => {
-  it("付与通知は月・量・理由の表示名を出す", () => {
-    expect(
-      makeupNotificationText(MAKEUP_NOTIFICATION_TYPES.POINT, "2026-10", {
-        reason: "monthly-catchup",
-        amount: 1,
-        label: "皆勤賞応援プレゼント",
-      })
-    ).toBe("10月の穴埋めポイントを1pt獲得しました！（皆勤賞応援プレゼント）");
-  });
-
+describe("makeupPointReasonLabel", () => {
   it("特典サーバーの付与は、特典サーバー名つきの表示名になる", () => {
     expect(makeupPointReasonLabel("favor-monthly", ["handon.club"])).toBe("handon.club 所属特典");
     // 特典サーバーが未設定の環境では名前を出せない
@@ -91,9 +81,25 @@ describe("makeupNotificationText / makeupPointReasonLabel", () => {
   it("一覧に無いイベント（dev 用など）は「イベント」", () => {
     expect(makeupPointReasonLabel("event:dev-seed", [])).toBe("イベント");
   });
+});
+
+describe("makeupNotificationText", () => {
+  it("月・理由を省いて、量とやることだけ短く出す", () => {
+    const point = { reason: "monthly-catchup", amount: 2 };
+    expect(makeupNotificationText(MAKEUP_NOTIFICATION_TYPES.POINT, point)).toBe(
+      "穴埋めポイント ＋2pt"
+    );
+    expect(makeupNotificationText(MAKEUP_NOTIFICATION_TYPES.POINT, null)).toBe(
+      "穴埋めポイント獲得"
+    );
+    expect(makeupNotificationText(MAKEUP_NOTIFICATION_TYPES.NEED_SECOND, null)).toBe(
+      "今日2枚目を投稿すると穴埋めできます"
+    );
+    expect(makeupNotificationText(MAKEUP_NOTIFICATION_TYPES.READY, null)).toBe("穴埋めできます");
+  });
 
   it("旧 makeup-reminder の文言は従来のまま", () => {
-    expect(makeupNotificationText(MAKEUP_NOTIFICATION_TYPES.LEGACY_REMINDER, null, null)).toBe(
+    expect(makeupNotificationText(MAKEUP_NOTIFICATION_TYPES.LEGACY_REMINDER, null)).toBe(
       "皆勤賞まであと少し！1日2枚投稿して、穴埋めしよう。"
     );
   });

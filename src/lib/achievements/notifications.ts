@@ -5,7 +5,7 @@
 
 import prisma from "@/lib/db";
 import { userPathSegment } from "@/lib/userHandle";
-import { getFavorServers, getHomeServer } from "@/lib/auth/serverPolicy";
+import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { getAvatarUrl, getEmojiImageUrl } from "@/lib/avatar";
 import { getMutedAuthorKeys } from "@/lib/mutes";
 import {
@@ -21,9 +21,8 @@ import {
   MAKEUP_NOTIFICATION_TYPES,
   isMakeupNotificationType,
   makeupNotificationYm,
-  makeupPointReasonLabel,
   toMakeupPointNotificationData,
-  type MakeupPointFeedData,
+  type MakeupPointNotificationData,
 } from "@/lib/makeup/notificationTypes";
 
 export const NOTIFICATION_WINDOW_DAYS = 90;
@@ -54,7 +53,7 @@ export interface NotificationFeedItem {
   /** type="favorite" のとき、お気に入りした相手と総数。 */
   favorite: FavoriteFeedData | null;
   /** 穴埋め系（makeup-*）のとき。ym は対象月（旧通知で取れなければ null）、point は makeup-point の付与内容。 */
-  makeup: { ym: string | null; point: MakeupPointFeedData | null } | null;
+  makeup: { ym: string | null; point: MakeupPointNotificationData | null } | null;
   /** type="reply" のとき、スレッドに投稿した相手（image はリプライ側の写真）。 */
   reply: ReplyFeedData | null;
   /** 受信者の /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）。
@@ -100,6 +99,7 @@ export async function getRecentNotifications(
             select: {
               username: true,
               displayName: true,
+              avatarUrl: true,
               instance: { select: { domain: true } },
             },
           },
@@ -117,6 +117,9 @@ export async function getRecentNotifications(
   for (const r of rows) {
     let favorite: FavoriteFeedData | null = null;
     if (r.type === "favorite") {
+      // 写真が削除された（imageId が SET NULL）リアクション通知は、見せる写真も飛び先も無いので
+      // 通知ごと隠す（リプライ通知の isReplyNotificationVisible と同じく読み取り時に落とす）。
+      if (!r.image) continue;
       const raw = toFavoriteFeedData(r.data);
       const filtered = raw ? filterFavoriteFeedByMuted(raw, mutedAccts) : raw;
       // 完全にミュート相手のみの通知（filtered=null）は通知ごと隠す。
@@ -142,17 +145,19 @@ export async function getRecentNotifications(
         mutedAccts
       );
       if (!visible) continue;
-      reply = { displayName: r.image?.user.displayName ?? null, acct: authorAcct };
+      reply = {
+        displayName: r.image?.user.displayName ?? null,
+        acct: authorAcct,
+        avatarUrl: getAvatarUrl(r.image?.user.avatarUrl),
+      };
     }
-    const pointData =
-      r.type === MAKEUP_NOTIFICATION_TYPES.POINT ? toMakeupPointNotificationData(r.data) : null;
     const makeup = isMakeupNotificationType(r.type)
       ? {
           ym: makeupNotificationYm(r.achievementKey),
-          // 付与理由の表示名は特典サーバー名（env）を含むので、クライアントに渡す前にここで解決する
-          point: pointData
-            ? { ...pointData, label: makeupPointReasonLabel(pointData.reason, getFavorServers()) }
-            : null,
+          point:
+            r.type === MAKEUP_NOTIFICATION_TYPES.POINT
+              ? toMakeupPointNotificationData(r.data)
+              : null,
         }
       : null;
     items.push({

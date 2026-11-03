@@ -17,38 +17,36 @@ export function formatNotificationDate(value: string | Date): string {
   });
 }
 
-/**
- * リアクションした相手の表示（ID/acct は出さず表示名のみ）。複数人は「他N人」にまとめる。
- * 通知一覧の説明行用。例: 「dev02さん 他5人」
- */
-export function favoriteNotificationWho(fav: FavoriteFeedData | null): string {
-  const latest = fav?.favoriters[0];
-  // 表示名がなければ acct のローカル部（@より前）で代替し、ドメインID は出さない
-  const name = latest?.displayName?.trim() || latest?.acct?.split("@")[0] || null;
-  const count = fav?.count ?? 0;
+/** 通知に並べるリアクション絵文字の最大数。 */
+export const NOTIFICATION_REACTION_EMOJI_LIMIT = 3;
 
-  if (!name) {
-    return count > 1 ? `${count}人がリアクションしました` : "リアクションされました";
-  }
-  const others = count - 1;
-  return others > 0 ? `${name}さん、他${others}人` : `${name}さん`;
+/**
+ * 通知に並べる直近のリアクション絵文字（最新順）。favoriters は最新順で保存されている
+ * （favoriteNotifications.ts の orderByRecency）。同じ絵文字が続いてもまとめず、件数どおり並べる。
+ * 絵文字を持たない旧通知の行は飛ばす（全部無ければ空＝呼び出し側で既定アイコン）。
+ */
+export function latestReactionEmojis(
+  fav: FavoriteFeedData | null,
+  limit = NOTIFICATION_REACTION_EMOJI_LIMIT
+): { emoji: string; imageUrl: string | null }[] {
+  return (fav?.favoriters ?? [])
+    .filter((f) => f.emoji)
+    .slice(0, limit)
+    .map((f) => ({ emoji: f.emoji!, imageUrl: f.emojiImageUrl }));
 }
 
-/** 「○○さんがリアクションしました」本文（1行表示・ベル用）。複数人は「他N人」にまとめる。 */
-export function favoriteNotificationText(fav: FavoriteFeedData | null): string {
-  const latest = fav?.favoriters[0];
-  const name = latest?.displayName?.trim() || latest?.acct || null;
-  const count = fav?.count ?? 0;
+/** アイコンの代替テキスト用の名前。表示名が無ければ acct のローカル部（@より前）で代替し、ドメインは出さない。 */
+export function favoriterName(f: FavoriteFeedData["favoriters"][number]): string {
+  return f.displayName?.trim() || f.acct.split("@")[0];
+}
 
-  // 表示できる名前が無い（remoteユーザーで一覧が取れない等）場合は人数のみ
-  if (!name) {
-    return count > 1
-      ? `😊 あなたの写真が${count}人にリアクションされました`
-      : `😊 あなたの写真が`;
-  }
-
-  const others = count - 1;
-  return others > 0
-    ? `😊 ${name}さん 他${others}人があなたの写真にリアクションしました`
-    : `😊 ${name}さんがあなたの写真にリアクションしました`;
+/**
+ * 並べた絵文字に収まらなかった件数（「＋N」）。並べた数を合計から引くだけ。
+ * 文章は出さない（絵文字だけでリアクション通知と分かり、左にサムネもあるため）。
+ */
+export function favoriteNotificationOverflow(
+  fav: FavoriteFeedData | null,
+  shown: number
+): number {
+  return Math.max(0, (fav?.count ?? 0) - shown);
 }

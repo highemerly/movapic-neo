@@ -48,11 +48,6 @@ export interface MakeupPointNotificationData {
   amount: number;
 }
 
-/** 通知フィードに載せる makeup-point の表示用データ（label はサーバーで解決済み）。 */
-export interface MakeupPointFeedData extends MakeupPointNotificationData {
-  label: string;
-}
-
 /**
  * 付与理由の表示名。`event:<key>` はイベント一覧（events.ts）の名前、一覧に無ければ「イベント」。
  * 特典サーバー名は env（FAVOR_SERVERS）由来でクライアントからは読めないので、呼び出し側が渡す
@@ -75,24 +70,21 @@ export function makeupPointReasonLabel(reason: string, favorServers: readonly st
 }
 
 /**
- * 穴埋め系通知の表示文言。ym は achievementKey（perfect-month:YYYY-MM）から取った対象月。
+ * 穴埋め系通知の1行本文（ベルと通知一覧の1行目で共用）。やること・量だけを短く出す
+ * （対象月は遷移先のカレンダー、付与理由はカレンダーの付与履歴で分かる）。
  * point は makeup-point のときだけ使う。
  */
 export function makeupNotificationText(
   type: MakeupNotificationType,
-  ym: string | null,
-  point: MakeupPointFeedData | null
+  point: MakeupPointNotificationData | null
 ): string {
-  const monthLabel = ym ? `${parseYm(ym).month}月の` : "";
   switch (type) {
     case MAKEUP_NOTIFICATION_TYPES.POINT:
-      return point
-        ? `${monthLabel}穴埋めポイントを${point.amount}pt獲得しました！（${point.label}）`
-        : `${monthLabel}穴埋めポイントを獲得しました！`;
+      return point ? `穴埋めポイント ＋${point.amount}pt` : "穴埋めポイント獲得";
     case MAKEUP_NOTIFICATION_TYPES.NEED_SECOND:
-      return "穴埋めできる日があります。今日2枚目を投稿しよう！";
+      return "今日2枚目を投稿すると穴埋めできます";
     case MAKEUP_NOTIFICATION_TYPES.READY:
-      return "穴埋めできるようになりました。カレンダーから今すぐ穴埋めしよう！";
+      return "穴埋めできます";
     case MAKEUP_NOTIFICATION_TYPES.LEGACY_REMINDER:
       return "皆勤賞まであと少し！1日2枚投稿して、穴埋めしよう。";
   }

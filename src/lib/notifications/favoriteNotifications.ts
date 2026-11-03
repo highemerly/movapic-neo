@@ -14,6 +14,7 @@
  * - 通知ができた後の「新規」判定は data.seenAccts（通知済み acct の集合）を基準にする。
  *   Mastodon の favourited_by は remote ユーザー等で一時的に空/部分的に返ることがあり、
  *   画像キャッシュ基準だと取得のブレで再通知・名前消失が起きるため、安定した集合で持つ。
+ * - favoriters / seenAccts は最新順に保つ（先頭が通知に出る絵文字・名前。orderByRecency 参照）。
  * - 新規 acct があれば createdAt を now に更新（＝未読の赤ドットが点く）。
  *   取得が空でも、表示用の名前（favoriters）は前回分を保持して消さない。
  */
@@ -31,7 +32,7 @@ const MAX_SEEN_ACCTS = 200;
 
 /** Notification.data に格納する type="favorite" のペイロード。 */
 export interface FavoriteNotificationData {
-  /** Mastodon 上の総お気に入り数（上位40件外を含む）。「他N人」表示に使う。 */
+  /** Mastodon 上の総お気に入り数（上位40件外を含む）。通知の「＋N」表示に使う。 */
   count: number;
   /** 表示用の最新お気に入り相手（最大 MAX_STORED_FAVORITERS 件、最新順）。 */
   favoriters: CachedFavoriter[];
@@ -83,6 +84,31 @@ function asJson(data: FavoriteNotificationData): Prisma.InputJsonValue {
   return data as unknown as Prisma.InputJsonValue;
 }
 
+/**
+ * 通知に保存する並び（最新順）を組む。先頭が通知の絵文字・名前として表示される。
+ *
+ * currentFavoriters はマージ後のチップ順（件数の多い絵文字が先）で、新しさの順ではない。
+ * 以前はこれをそのまま保存していたため、連合の favourite（常に❤）が最多になりがちな
+ * Mastodon 投稿では、新しく押された絵文字・人ではなく❤と古い人が出続けた。
+ * 今回新しく現れた人（added）を先頭に置き、残りは前回までの順（seenAccts＝最新順）を保つ。
+ */
+function orderByRecency(
+  current: CachedFavoriter[],
+  added: CachedFavoriter[],
+  previousOrder: string[]
+): CachedFavoriter[] {
+  const addedAccts = new Set(added.map((f) => f.acct));
+  const rank = new Map(previousOrder.map((acct, i) => [acct, i]));
+  const rest = current
+    .filter((f) => !addedAccts.has(f.acct))
+    .sort(
+      (a, b) =>
+        (rank.get(a.acct) ?? Number.MAX_SAFE_INTEGER) -
+        (rank.get(b.acct) ?? Number.MAX_SAFE_INTEGER)
+    );
+  return [...added, ...rest];
+}
+
 async function reconcileFavoriteNotification({
   imageId,
   ownerUserId,
@@ -112,6 +138,7 @@ async function reconcileFavoriteNotification({
     const added = current.filter((f) => !prevCacheAccts.has(f.acct));
     if (added.length === 0) return;
 
+    const ordered = orderByRecency(current, added, []);
     await prisma.notification.create({
       data: {
         id,
@@ -120,8 +147,8 @@ async function reconcileFavoriteNotification({
         imageId,
         data: asJson({
           count,
-          favoriters: current.slice(0, MAX_STORED_FAVORITERS),
-          seenAccts: current.map((f) => f.acct).slice(0, MAX_SEEN_ACCTS),
+          favoriters: ordered.slice(0, MAX_STORED_FAVORITERS),
+          seenAccts: ordered.map((f) => f.acct).slice(0, MAX_SEEN_ACCTS),
         }),
       },
     });
@@ -131,15 +158,17 @@ async function reconcileFavoriteNotification({
   // ── 既存通知あり ─────────────────────────────────────────────────
   const prev = existing.data as unknown as FavoriteNotificationData | null;
   // seenAccts が無い旧データは favoriters から復元
-  const seen = new Set(prev?.seenAccts ?? prev?.favoriters?.map((f) => f.acct) ?? []);
+  const previousOrder = prev?.seenAccts ?? prev?.favoriters?.map((f) => f.acct) ?? [];
+  const seen = new Set(previousOrder);
   const added = current.filter((f) => !seen.has(f.acct));
+  const ordered = orderByRecency(current, added, previousOrder);
 
   // 表示用の名前: 取得が空のときは前回分を保持して消さない（favourited_by のブレ対策）
   const favoriters =
-    current.length > 0 ? current.slice(0, MAX_STORED_FAVORITERS) : prev?.favoriters ?? [];
-  // seenAccts は最新を前に積んで重複排除＋上限カット
+    current.length > 0 ? ordered.slice(0, MAX_STORED_FAVORITERS) : prev?.favoriters ?? [];
+  // seenAccts は最新を前に積んで重複排除＋上限カット（上限で落ちるのは古い acct）
   const seenAccts = Array.from(
-    new Set([...current.map((f) => f.acct), ...(prev?.seenAccts ?? [])])
+    new Set([...ordered.map((f) => f.acct), ...previousOrder])
   ).slice(0, MAX_SEEN_ACCTS);
 
   const data = asJson({ count, favoriters, seenAccts });

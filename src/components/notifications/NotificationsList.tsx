@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "@/components/Link";
-import { SmilePlus } from "lucide-react";
 import type { NotificationFeedItem } from "@/lib/achievements/notifications";
 import { resolveAchievement } from "@/lib/achievements/catalog";
-import { favoriteNotificationWho, formatNotificationDate } from "@/lib/notifications/format";
-import { ReactionEmojiView } from "@/components/reaction/ReactionEmojiView";
+import { favoriterName, formatNotificationDate } from "@/lib/notifications/format";
+import { ReactionSummary } from "@/components/notifications/ReactionSummary";
+import { FavoriterAvatars, type FavoriterAvatarItem } from "@/components/user/FavoriterAvatars";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import {
   isMakeupNotificationType,
@@ -17,8 +17,8 @@ import {
 } from "@/lib/makeup/notificationTypes";
 import {
   REPLY_NOTIFICATION_TYPE,
-  replyNotificationTitle,
-  replyNotificationWho,
+  replierName,
+  replyNotificationText,
 } from "@/lib/notifications/replyNotificationType";
 
 type Category = "favorite" | "reply" | "achievement" | "other";
@@ -99,11 +99,12 @@ export function NotificationsList({
             const isReminder = makeupType !== null;
             const isFavorite = n.type === "favorite";
             const isReply = n.type === REPLY_NOTIFICATION_TYPE;
-            // 直近のリアクション（絵文字が無い旧通知は既定のアイコンで出す）
-            const latestFavoriter = n.favorite?.favoriters[0];
-            const latestReaction = latestFavoriter?.emoji
-              ? { emoji: latestFavoriter.emoji, imageUrl: latestFavoriter.emojiImageUrl }
-              : null;
+            // 2行目は名前の代わりにアイコンを並べる（リアクションは最新順・スレッドは投稿者1人）
+            const avatars: FavoriterAvatarItem[] = isFavorite
+              ? (n.favorite?.favoriters ?? []).map((f) => ({ ...f, label: favoriterName(f) }))
+              : isReply && n.reply
+                ? [{ ...n.reply, label: replierName(n.reply), profileUrl: null }]
+                : [];
             const a = !isReminder && !isFavorite && !isReply && n.achievementKey ? resolveAchievement(n.achievementKey) : null;
             const href = makeupType
               ? makeupNotificationHref(selfSeg, n.makeup?.ym ?? null)
@@ -121,10 +122,6 @@ export function NotificationsList({
                       alt=""
                       className="h-12 w-12 shrink-0 rounded-md object-cover"
                     />
-                  ) : isFavorite ? (
-                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-300">
-                      <SmilePlus className="h-7 w-7" />
-                    </span>
                   ) : (
                     <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
                       <AchievementIcon
@@ -136,34 +133,26 @@ export function NotificationsList({
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium leading-snug line-clamp-2">
                       {isFavorite ? (
-                        <span className="flex items-center gap-1">
-                          {latestReaction ? (
-                            <ReactionEmojiView
-                              emoji={latestReaction.emoji}
-                              imageUrl={latestReaction.imageUrl}
-                            />
-                          ) : (
-                            <SmilePlus className="h-4 w-4" />
-                          )}
-                          リアクションされました
-                        </span>
+                        <ReactionSummary favorite={n.favorite} />
                       ) : isReply ? (
-                        <>💬 {replyNotificationTitle()}</>
+                        replyNotificationText()
                       ) : makeupType ? (
-                        makeupNotificationText(makeupType, n.makeup?.ym ?? null, n.makeup?.point ?? null)
+                        makeupNotificationText(makeupType, n.makeup?.point ?? null)
                       ) : (
                         <>🏆 「<span className="font-semibold">{a?.title ?? "?"}</span>」を獲得</>
                       )}
                     </p>
-                    <p className="mt-1 text-xs leading-snug text-muted-foreground line-clamp-2">
-                      {isFavorite
-                        ? favoriteNotificationWho(n.favorite)
-                        : isReply
-                          ? replyNotificationWho(n.reply)
-                          : makeupType
-                          ? makeupNotificationDetail(makeupType)
-                          : a?.description ?? ""}
-                    </p>
+                    {isFavorite || isReply ? (
+                      avatars.length > 0 && (
+                        <div className="mt-1 flex">
+                          <FavoriterAvatars items={avatars} linked={false} />
+                        </div>
+                      )
+                    ) : (
+                      <p className="mt-1 text-xs leading-snug text-muted-foreground line-clamp-2">
+                        {makeupType ? makeupNotificationDetail(makeupType) : a?.description ?? ""}
+                      </p>
+                    )}
                     <p className="mt-1.5 text-[11px] text-muted-foreground">
                       {formatNotificationDate(n.createdAt)}
                     </p>

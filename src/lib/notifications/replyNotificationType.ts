@@ -16,28 +16,18 @@ export interface ReplyFeedData {
   displayName: string | null;
   /** リプライした人の username@domain */
   acct: string;
+  /** リプライした人のアバター（プロキシ経由に変換済み。未設定なら null） */
+  avatarUrl: string | null;
 }
 
-/** 表示名。無ければ acct のローカル部（@より前）で代替し、ドメインは出さない。 */
-function replierName(reply: ReplyFeedData | null): string | null {
-  return reply?.displayName?.trim() || reply?.acct.split("@")[0] || null;
+/** アイコンの代替テキスト用の名前。表示名が無ければ acct のローカル部（@より前）で代替し、ドメインは出さない。 */
+export function replierName(reply: ReplyFeedData): string {
+  return reply.displayName?.trim() || reply.acct.split("@")[0];
 }
 
-/** ベル用の1行本文。 */
-export function replyNotificationText(reply: ReplyFeedData | null): string {
-  const name = replierName(reply);
-  return name
-    ? `💬 ${name}さんがあなたの写真にスレッドで投稿しました`
-    : "💬 あなたの写真にスレッドで投稿されました";
-}
-
-/** 通知一覧の1行目。 */
-export function replyNotificationTitle(): string {
-  return "スレッドに投稿されました";
-}
-
-/** 通知一覧の2行目（誰から）。 */
-export function replyNotificationWho(reply: ReplyFeedData | null): string {
-  const name = replierName(reply);
-  return name ? `${name}さんがあなたの写真に続けて投稿しました` : "あなたの写真に続けて投稿されました";
+/**
+ * 1行本文（ベルと通知一覧の1行目で共用）。種別だけ伝え、誰からかは通知一覧の2行目のアイコンで出す。
+ */
+export function replyNotificationText(): string {
+  return "💬 スレッドに投稿";
 }

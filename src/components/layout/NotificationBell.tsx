@@ -3,7 +3,7 @@
 import { useCallback } from "react";
 import Link from "@/components/Link";
 import { RetryImg } from "@/components/RetryImg";
-import { Bell, ChevronRight, Heart } from "lucide-react";
+import { Bell, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -18,11 +18,12 @@ import {
   makeupNotificationIcon,
   makeupNotificationText,
 } from "@/lib/makeup/notificationTypes";
-import { favoriteNotificationText, formatNotificationDate } from "@/lib/notifications/format";
+import { formatNotificationDate } from "@/lib/notifications/format";
 import {
   REPLY_NOTIFICATION_TYPE,
   replyNotificationText,
 } from "@/lib/notifications/replyNotificationType";
+import { ReactionSummary } from "@/components/notifications/ReactionSummary";
 import { useUnseenNotifications, useUnseenBadge } from "./useUnseenNotifications";
 
 export function NotificationBell() {
@@ -80,10 +81,6 @@ export function NotificationBell() {
                         alt=""
                         className="mt-0.5 h-9 w-9 shrink-0 rounded-md object-cover"
                       />
-                    ) : isFavorite ? (
-                      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-300">
-                        <Heart className="h-4 w-4 fill-current" />
-                      </span>
                     ) : (
                       <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
                         <AchievementIcon
@@ -95,12 +92,12 @@ export function NotificationBell() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium leading-tight">
                         {isFavorite
-                          ? favoriteNotificationText(n.favorite)
+                          ? <ReactionSummary favorite={n.favorite} />
                           : isReply
-                            ? replyNotificationText(n.reply)
+                            ? replyNotificationText()
                             : makeupType
-                            ? makeupNotificationText(makeupType, n.makeup?.ym ?? null, n.makeup?.point ?? null)
-                            : `🏆 実績「${a?.title ?? "?"}」を獲得`}
+                            ? makeupNotificationText(makeupType, n.makeup?.point ?? null)
+                            : `🏆 ${a?.title ?? "?"}`}
                       </p>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">
                         {formatNotificationDate(n.createdAt)}
