@@ -34,6 +34,11 @@ import { ToastFlasher } from "@/components/ToastFlasher";
 import { buildPostFlash } from "./postFlash";
 import { AchievementCelebration } from "./AchievementCelebration";
 import { InstallSuggestModal } from "@/components/pwa/InstallSuggestModal";
+import {
+  toWelcomeBackNotificationData,
+  welcomeBackNotificationId,
+  welcomeBackNotificationText,
+} from "@/lib/notifications/welcomeBackNotificationType";
 import { EarnedAchievementChips } from "./EarnedAchievementChips";
 import { PrefectureScrollLink } from "@/components/ScrollIntoViewOnSelect";
 import { resolveAchievement } from "@/lib/achievements/catalog";
@@ -431,6 +436,16 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
       select: { id: true },
     })) !== null;
 
+  // 投稿直後の「おかえり」トースト。判定は投稿時の1回だけ（publishImage の afterSaved が通知を作る）で、
+  // ここでは前回の投稿を引き直さず、その通知があるかだけを見る（後から過去の写真を消しても揺れない）。
+  const welcomeBack =
+    justPosted && isOwner
+      ? await prisma.notification.findUnique({
+          where: { id: welcomeBackNotificationId(image.id) },
+          select: { data: true },
+        })
+      : null;
+
   // ミートボールの「詳細情報（EXIF）を表示」用。機種名があるときだけ項目を出す
   // （インラインの機種名ボタンと同じ内容・同じダイアログを共有）。
   const exif = image.cameraModel
@@ -614,6 +629,16 @@ export default async function ImageDetailPage({ params, searchParams }: PageProp
             threadBroken,
           })}
           clearParams={["posted", "federr", "fedstatus", "thread"]}
+        />
+      )}
+      {/* 投稿完了のトーストより後に出す＝重なったとき手前に来る。pitfall: 以前は画像の上のバナーで、
+          投稿完了のトーストに隠れて読めなかった。クエリは上の ToastFlasher が外すのでここでは外さない。 */}
+      {welcomeBack && (
+        <ToastFlasher
+          flash={{
+            variant: "success",
+            message: welcomeBackNotificationText(toWelcomeBackNotificationData(welcomeBack.data)),
+          }}
         />
       )}
       {justPosted && (

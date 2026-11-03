@@ -18,6 +18,7 @@ import { isFavoriteSyncDue } from "@/lib/fediverse/favoritePolicy";
 import { FAVORITE_SYNC_WHERE } from "@/lib/fediverse/favoriteSyncQuery";
 import { runMonthlyMakeupGrants } from "@/lib/makeup/monthlyGrants";
 import { cleanupEmptyJobQueues } from "@/lib/queue";
+import { runMonthlyCollageNotifications } from "@/lib/notifications/monthlyCollageNotifications";
 
 interface PeriodicJob {
   /** ログ識別用の名前 */
@@ -227,6 +228,16 @@ const makeupPoints: PeriodicJob = {
 };
 
 /**
+ * 月初に「先月の月次画像を作れます」通知を、先月に投稿したユーザーへ送る。
+ * crontab は UTC 基準なので「JST の1日」を cron 式で書かず、当月に入っていて先月分が未送信なら送る。
+ * 詳細は src/lib/notifications/monthlyCollageNotifications.ts。
+ */
+const monthlyCollage: PeriodicJob = {
+  name: "monthly-collage",
+  run: () => runMonthlyCollageNotifications(),
+};
+
+/**
  * 空になったジョブキュー行の掃除。Bot・メール投稿は「連」の順序を保つため送信者ごとの
  * queueName で直列化しており（src/lib/queue/index.ts）、キュー行が送信者の数だけ残るため。
  */
@@ -244,6 +255,7 @@ const periodicJobs: PeriodicJob[] = [
   favoriteSyncJob,
   muteCleanup,
   makeupPoints,
+  monthlyCollage,
   queueCleanup,
 ];
 

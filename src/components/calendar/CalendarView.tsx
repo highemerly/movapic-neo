@@ -13,6 +13,7 @@ import { isJapaneseHoliday } from "@/lib/holidays";
 import { MONTH_DAYS_TIERS } from "@/lib/achievements/monthDays";
 import { formatYm } from "@/lib/jst";
 import { isPointEra } from "@/lib/makeup/points";
+import { COLLAGE_OPEN_QUERY } from "@/lib/notifications/monthlyCollageNotificationType";
 import Link from "@/components/Link";
 import { DayCell } from "./DayCell";
 import { MakeupPointsCallout, formatMakeupDeadline, type MakeupInfo } from "./MakeupPointsCallout";
@@ -88,6 +89,11 @@ interface CalendarViewProps {
   isFavorUser: boolean;
   /** ログイン中インスタンスの種別（"mastodon" | "misskey"）。投稿ボタンのロゴ出し分けに使う。 */
   instanceType: string;
+  /**
+   * 月次画像（コラージュ）のダイアログを開いた状態で表示するか（owner のみ）。
+   * 月初の「先月の月次画像を作れます」通知（`?collage=1`）から来たとき、ボタンを探させずに作成まで運ぶ。
+   */
+  initialCollageOpen?: boolean;
 }
 
 /**
@@ -126,6 +132,7 @@ export function CalendarView({
   favorServers,
   isFavorUser,
   instanceType,
+  initialCollageOpen = false,
 }: CalendarViewProps) {
   const router = useRouter();
   const [year, setYear] = useState(initialYear);
@@ -143,7 +150,15 @@ export function CalendarView({
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState(initialYear);
   // カレンダー画像（コラージュ）の共有ダイアログの開閉。
-  const [shareOpen, setShareOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(initialCollageOpen);
+
+  // 通知から開いたダイアログは1回きり。クエリを残すとリロード・戻るのたびに開き直すので外す。
+  useEffect(() => {
+    if (!initialCollageOpen) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete(COLLAGE_OPEN_QUERY);
+    window.history.replaceState({}, "", url.toString());
+  }, [initialCollageOpen]);
 
   // 離脱時（アンマウント / タブ離脱）に「今どの月を編集中か」をハンドラから読むための ref。
   // クロージャに焼き付くと古い年月で reevaluate してしまうため常に最新へ同期する。

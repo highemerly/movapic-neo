@@ -51,6 +51,7 @@ import {
   type ReplyLink,
 } from "@/lib/replies/fediverseTarget";
 import { createReplyNotification } from "@/lib/notifications/replyNotifications";
+import { createWelcomeBackNotification } from "@/lib/notifications/welcomeBackNotifications";
 
 // PublishVisibility は @/lib/visibility に集約。後方互換のため再エクスポートする。
 export type { PublishVisibility } from "@/lib/visibility";
@@ -190,7 +191,18 @@ async function notifyReplySafely(
 }
 
 /**
- * 保存が確定した後の処理（実績評価・リプライ通知）。保存後の処理はここ1箇所に足すこと。
+ * しばらく空いた後の投稿なら「おかえり」通知を作る。リプライ通知と同じ理由で例外を握る。
+ */
+async function notifyWelcomeBackSafely(input: PublishImageInput, imageId: string): Promise<void> {
+  try {
+    await createWelcomeBackNotification({ userId: input.user.id, imageId });
+  } catch (error) {
+    console.error("Welcome back notification failed:", error);
+  }
+}
+
+/**
+ * 保存が確定した後の処理（実績評価・リプライ通知・おかえり通知）。保存後の処理はここ1箇所に足すこと。
  * pitfall: 以前は先保存／先投稿の2分岐があり、後処理を分岐ごとに書いて片方だけ漏れた（ALT で実例）。
  */
 async function afterSaved(
@@ -200,6 +212,7 @@ async function afterSaved(
 ): Promise<GrantedAchievement[]> {
   const newAchievements = await evaluateAchievementsSafely(input, imageId, replyToId);
   await notifyReplySafely(input, imageId, replyToId);
+  await notifyWelcomeBackSafely(input, imageId);
   return newAchievements;
 }
 
