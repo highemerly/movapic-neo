@@ -84,16 +84,20 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
 - **リリース（タグ push）では [docker-build.yml](../.github/workflows/docker-build.yml) が checks・golden・e2e を全部回す**。e2e は push したばかりの本番イメージ（＝デプロイするもの）で回す。全部緑で初めて k8s マニフェストへ PR が出る。ブランチで省いた検査で壊れていたら、ここで止まる（直す PR を出してタグを打ち直す）。
 
 ## リリース
-1. バージョンの Bump・リリースノート（[releaseNotes.ts](../src/data/releaseNotes.ts)）もブランチ → PR でマージする。Claude Code に `/bump-version [X.Y.Z]`（または「1.5.2 を出したい」）と頼めば PR 作成まで行う（[SKILL.md](../.claude/skills/bump-version/SKILL.md)）。
+1. バージョンの Bump もブランチ（`release/vX.Y.Z`）→ PR でマージする。Claude Code に `/release [X.Y.Z]`（または「1.5.2 を出したい」）と頼めば PR 作成まで行い、タグを打つコマンドも案内する（ユーザー共通の release スキル。このリポジトリ固有の作業は下の「Bump で行うこと」）。
 2. マージ後の main を pull し、タグを push する（タグは ruleset の対象外）:
    ```bash
-   git switch main && git pull
-   git tag vX.Y.Z && git push origin vX.Y.Z
+   git switch main && git pull && git tag vX.Y.Z && git push origin vX.Y.Z
    ```
 3. タグ push で [docker-build.yml](../.github/workflows/docker-build.yml) がイメージをビルド・push し、checks・golden・e2e（そのイメージで）が全部通ったら GitHub Release を作り、k8s マニフェスト（k8sg1-repo の `manifests/movapic-neo/prd/` の web・worker・compute）へ PR を出す。
 4. k8sg1 の PR を確かめてマージする。k8sg1 は Flux 同期なので、**マージがそのまま本番へのデプロイ**（約1分で反映）。
    - `requires-migration` ラベルが付いていたら、**マージ前に**本番 DB へマイグレーションを当てる（手順は PR 本文と [architecture.md](architecture.md#本番dbマイグレーション)）。
    - k8sg1 は必須チェックを設定できない（Free プランの非公開リポジトリ）ので、k8sg1 側の CI（yamllint・kubeconform）が緑かは目で見る。
+
+### Bump で行うこと
+- 版は package.json（`npm version X.Y.Z --no-git-tag-version` で package-lock.json とそろえる）。
+- **アプリ内のリリースノート**（[releaseNotes.ts](../src/data/releaseNotes.ts)・利用者向け・日本語）は**マイナー単位**（"1.5"）で書く。パッチの bump では追記しない。マイナー・メジャーを上げるときは、前回のタグからのコミットで add / fix / change の下書きを作り、確認してから先頭に追記する（文体は既存の項目に合わせる。日付は JST の今日）。
+- マイグレーションは `prisma/migrations/`。前回のタグから差分があれば、本番のマイグレーションが要る（[architecture.md](architecture.md#本番dbマイグレーション)。当てるのは k8sg1 の PR のマージ前）。
 
 ### k8sg1 への PR
 - 書式は k8sg1 に PR を出す全アプリで共通（英語）: タイトル `Update movapic-neo to X.Y.Z`、ラベル `app-update`（アプリの版上げを Renovate などの PR と見分ける）と、マイグレーションがあるときの `requires-migration`。本文はイメージとビルドのリンク・GitHub Release と同じノート（下）、マイグレーションがあるときはその手順。
