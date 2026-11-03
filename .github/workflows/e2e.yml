@@ -1,12 +1,19 @@
 name: E2E
 
-# E2E スモークテストの再利用可能ワークフロー。ci.yml（全ブランチ push）から呼ぶ。
+# E2E スモークテストの再利用可能ワークフロー。ci.yml（ブランチ push・差分で必要なときだけ）と
+# docker-build.yml（タグ push・push 済みの本番イメージで）から呼ぶ。
 # 本番イメージ（runner ステージ）を build し（push はしない）、e2e/compose.yml で Postgres・S3 互換
 # （versitygw）・偽 Fediverse サーバーと一緒に起動して Playwright を回す。主要ページが開けるか
 # （CSP の nonce を含む）、本番イメージでのプレビュー生成（HEIC デコード・skia 描画・compute 呼び出し）、
 # Mastodon / Misskey へのログインと投稿（変換済み画像・本文・公開範囲が届くか）を見る。
 on:
   workflow_call:
+    inputs:
+      # 指定するとビルドせず、このイメージ（push 済み・public）で回す。タグ時に、デプロイするイメージ
+      # そのものを確かめるため（作り直したイメージで通っても、本番に出すものの確認にならない）。
+      image:
+        type: string
+        default: ''
     secrets:
       FONT_REPO_TOKEN:
         required: true
@@ -16,11 +23,15 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      # e2e/compose.yml の app が使うイメージ
+      E2E_IMAGE: ${{ inputs.image || 'movapic-neo:e2e' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
       - name: Checkout fonts (private repository)
+        if: ${{ !inputs.image }}
         uses: actions/checkout@v7
         with:
           repository: highemerly/movapic-fonts
@@ -31,11 +42,13 @@ jobs:
           persist-credentials: false
 
       - name: Set up Docker Buildx
+        if: ${{ !inputs.image }}
         uses: docker/setup-buildx-action@v4
 
       # タグ時の build-and-push が積む buildcache を再利用する（lockfile が同じなら deps の
       # sharp ソースビルドはスキップされ、実質 next build だけになる）。
       - name: Build production image
+        if: ${{ !inputs.image }}
         uses: docker/build-push-action@v7
         with:
           context: .

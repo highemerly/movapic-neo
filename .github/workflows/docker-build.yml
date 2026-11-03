@@ -31,6 +31,16 @@ jobs:
     secrets:
       FONT_REPO_TOKEN: ${{ secrets.FONT_REPO_TOKEN }}
 
+  # E2E スモーク。push したばかりの本番イメージそのもの（＝デプロイするもの）で回す。ブランチの CI は
+  # 差分で E2E を省くことがあるので、リリースではここで必ず通してから k8s マニフェストへ PR する。
+  e2e:
+    needs: build-and-push
+    uses: ./.github/workflows/e2e.yml
+    with:
+      image: ${{ needs.build-and-push.outputs.image }}
+    secrets:
+      FONT_REPO_TOKEN: ${{ secrets.FONT_REPO_TOKEN }}
+
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
@@ -38,6 +48,8 @@ jobs:
       packages: write
     outputs:
       version: ${{ steps.version.outputs.version }}
+      # E2E が pull するイメージ（metadata-action の {{version}} / workflow_dispatch の tag と同じ値）
+      image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
       has_migration: ${{ steps.migration.outputs.has_migration }}
 
     steps:
@@ -128,8 +140,8 @@ jobs:
           platforms: linux/amd64
 
   create-k8s-pr:
-    # ビルド・CI・ゴールデン画像テストが全て成功したときだけ k8s マニフェストへ PR する。
-    needs: [build-and-push, checks, golden]
+    # ビルド・CI・ゴールデン画像テスト・E2E が全て成功したときだけ k8s マニフェストへ PR する。
+    needs: [build-and-push, checks, golden, e2e]
     runs-on: ubuntu-latest
     permissions:
       contents: read
