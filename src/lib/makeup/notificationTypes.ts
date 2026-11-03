@@ -75,24 +75,21 @@ export function makeupPointReasonLabel(reason: string, favorServers: readonly st
 }
 
 /**
- * 穴埋め系通知の表示文言。ym は achievementKey（perfect-month:YYYY-MM）から取った対象月。
+ * 穴埋め系通知の1行本文（ベルと通知一覧の1行目で共用）。やること・量だけを短く出す
+ * （対象月は遷移先のカレンダー、付与理由は通知一覧の2行目 makeupNotificationDetail で出す）。
  * point は makeup-point のときだけ使う。
  */
 export function makeupNotificationText(
   type: MakeupNotificationType,
-  ym: string | null,
-  point: MakeupPointFeedData | null
+  point: MakeupPointNotificationData | null
 ): string {
-  const monthLabel = ym ? `${parseYm(ym).month}月の` : "";
   switch (type) {
     case MAKEUP_NOTIFICATION_TYPES.POINT:
-      return point
-        ? `${monthLabel}穴埋めポイントを${point.amount}pt獲得しました！（${point.label}）`
-        : `${monthLabel}穴埋めポイントを獲得しました！`;
+      return point ? `穴埋めポイント ＋${point.amount}pt` : "穴埋めポイント獲得";
     case MAKEUP_NOTIFICATION_TYPES.NEED_SECOND:
-      return "穴埋めできる日があります。今日2枚目を投稿しよう！";
+      return "今日2枚目を投稿すると穴埋めできます";
     case MAKEUP_NOTIFICATION_TYPES.READY:
-      return "穴埋めできるようになりました。カレンダーから今すぐ穴埋めしよう！";
+      return "穴埋めできます";
     case MAKEUP_NOTIFICATION_TYPES.LEGACY_REMINDER:
       return "皆勤賞まであと少し！1日2枚投稿して、穴埋めしよう。";
   }
@@ -122,11 +119,16 @@ export function toMakeupPointNotificationData(data: unknown): MakeupPointNotific
   return typeof reason === "string" && typeof amount === "number" ? { reason, amount } : null;
 }
 
-/** 通知一覧の2行目（補足説明）。 */
-export function makeupNotificationDetail(type: MakeupNotificationType): string {
+/** 通知一覧の2行目（補足説明）。付与理由は1行目（ベルと共用で短く保つ）ではなくここで出す。 */
+export function makeupNotificationDetail(
+  type: MakeupNotificationType,
+  point: MakeupPointFeedData | null
+): string {
   switch (type) {
     case MAKEUP_NOTIFICATION_TYPES.POINT:
-      return "残りのポイントと付与履歴はカレンダーで確認できます";
+      return point
+        ? `${point.label}。残ポイントはカレンダーで確認できます。`
+        : "残ポイントはカレンダーで確認できます。";
     case MAKEUP_NOTIFICATION_TYPES.NEED_SECOND:
       return "今日もう1枚投稿すると、その写真で投稿を忘れた日を埋められます";
     case MAKEUP_NOTIFICATION_TYPES.READY:

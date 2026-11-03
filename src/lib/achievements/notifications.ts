@@ -21,8 +21,8 @@ import {
   MAKEUP_NOTIFICATION_TYPES,
   isMakeupNotificationType,
   makeupNotificationYm,
-  makeupPointReasonLabel,
   toMakeupPointNotificationData,
+  makeupPointReasonLabel,
   type MakeupPointFeedData,
 } from "@/lib/makeup/notificationTypes";
 
@@ -100,6 +100,7 @@ export async function getRecentNotifications(
             select: {
               username: true,
               displayName: true,
+              avatarUrl: true,
               instance: { select: { domain: true } },
             },
           },
@@ -117,6 +118,9 @@ export async function getRecentNotifications(
   for (const r of rows) {
     let favorite: FavoriteFeedData | null = null;
     if (r.type === "favorite") {
+      // 写真が削除された（imageId が SET NULL）リアクション通知は、見せる写真も飛び先も無いので
+      // 通知ごと隠す（リプライ通知の isReplyNotificationVisible と同じく読み取り時に落とす）。
+      if (!r.image) continue;
       const raw = toFavoriteFeedData(r.data);
       const filtered = raw ? filterFavoriteFeedByMuted(raw, mutedAccts) : raw;
       // 完全にミュート相手のみの通知（filtered=null）は通知ごと隠す。
@@ -142,7 +146,11 @@ export async function getRecentNotifications(
         mutedAccts
       );
       if (!visible) continue;
-      reply = { displayName: r.image?.user.displayName ?? null, acct: authorAcct };
+      reply = {
+        displayName: r.image?.user.displayName ?? null,
+        acct: authorAcct,
+        avatarUrl: getAvatarUrl(r.image?.user.avatarUrl),
+      };
     }
     const pointData =
       r.type === MAKEUP_NOTIFICATION_TYPES.POINT ? toMakeupPointNotificationData(r.data) : null;
