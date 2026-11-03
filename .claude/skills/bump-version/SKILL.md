@@ -32,5 +32,5 @@ argument-hint: "[X.Y.Z（省略時はパッチを1つ上げる）]"
 6. **コミット・push・PR**
    - コミットメッセージは `Bump vX.Y.Z`（attribution の行を付ける）。
    - `git push -u origin release/vX.Y.Z`
-   - `gh pr create` でタイトル `Bump vX.Y.Z`。本文は既存 PR に合わせて `## 概要` から始め、前回のタグからの変更（PR 番号付き。Renovate の依存更新はまとめて1行でよい）と、マイグレーションの要否を書く。
+   - `gh pr create` でタイトル `Bump vX.Y.Z`。本文は**英語**で `## Summary` から始め、前回のタグからの変更（PR 番号付き。Renovate の依存更新はまとめて1行でよい）と、マイグレーションの要否を書く（GitHub に出す PR・Release は英語に揃える）。
 7. **報告**: PR の URL と、次にユーザーがやること（CI の `ci-result` が通ったら squash マージ（`release/*` はテストを省くので数十秒で緑になる。検査はタグ push 時に docker-build.yml が全部回す） → `git switch main && git pull` → `git tag vX.Y.Z && git push origin vX.Y.Z`）を伝える。前回のタグからの差分に、タグ時にしか動かない Actions（docs/development.md の表）の更新が入っていれば、タグ push 後に docker-build.yml のログを見るよう添える。

@@ -35,6 +35,9 @@ postinstall は `npm rebuild` の終了コードだけでなく、prebuilt 除�
 - `heic-convert` の再導入（純JS/WASMで遅く生成が504タイムアウトしたため廃止。commit `aec8325`）。
 
 ## 本番DBマイグレーション
+共有 Postgres（`shared-postgres-prd`）に port-forward して手元から当てる。リリースに含まれるときは k8sg1 の PR に `requires-migration` が付き、本文にも同じ手順が出る（[development.md](development.md#リリース)）。**PR のマージ（＝イメージの差し替え）より前に当てる**。
 ```bash
-DATABASE_URL="postgresql://..." npx prisma migrate deploy
+kubectl port-forward -n shared-postgres-prd svc/postgres-rw 15432:5432
+DATABASE_URL="postgresql://<username>:<password>@localhost:15432/movapic?sslmode=disable&schema=public" npx prisma migrate status
+DATABASE_URL="postgresql://<username>:<password>@localhost:15432/movapic?sslmode=disable&schema=public" npx prisma migrate deploy
 ```

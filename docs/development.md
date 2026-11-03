@@ -75,7 +75,7 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
 | `e2e/**` | ✓ | – | ✓ |
 | `workers/**`（本番イメージに入らないが tsc・eslint の対象） | ✓ | – | – |
 | ワークフロー（checks.yml / golden.yml / e2e.yml） | そのワークフローのジョブだけ | 同左 | 同左 |
-| ドキュメント（`*.md`・`docs/**`）・`.claude/**`・`.githooks/**`・ruleset・Renovate 設定・docker-build.yml | – | – | – |
+| ドキュメント（`*.md`・`docs/**`）・`.claude/**`・`.githooks/**`・ruleset・Renovate 設定・リリースノートの分類（`.github/release.yml`）・docker-build.yml | – | – | – |
 | `release/*` ブランチ（バージョンの bump だけ） | – | – | – |
 
 - **一覧に無い種類のファイルは3つとも回す**（知らない変更を素通しさせない）。`src/**` は golden・e2e も必ず回す: 描画は src のどこから壊れるか分からず、E2E が壊れたまま進むと以後の依存更新を確かめられなくなるため。
@@ -90,4 +90,21 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
    git switch main && git pull
    git tag vX.Y.Z && git push origin vX.Y.Z
    ```
-3. タグ push で [docker-build.yml](../.github/workflows/docker-build.yml) がイメージをビルド・push し、checks・golden・e2e（そのイメージで）が全部通ったら k8s マニフェストへ PR を出す。
+3. タグ push で [docker-build.yml](../.github/workflows/docker-build.yml) がイメージをビルド・push し、checks・golden・e2e（そのイメージで）が全部通ったら GitHub Release を作り、k8s マニフェスト（k8sg1-repo の `manifests/movapic-neo/prd/` の web・worker・compute）へ PR を出す。
+4. k8sg1 の PR を確かめてマージする。k8sg1 は Flux 同期なので、**マージがそのまま本番へのデプロイ**（約1分で反映）。
+   - `requires-migration` ラベルが付いていたら、**マージ前に**本番 DB へマイグレーションを当てる（手順は PR 本文と [architecture.md](architecture.md#本番dbマイグレーション)）。
+   - k8sg1 は必須チェックを設定できない（Free プランの非公開リポジトリ）ので、k8sg1 側の CI（yamllint・kubeconform）が緑かは目で見る。
+
+### k8sg1 への PR
+- 書式は k8sg1 に PR を出す全アプリで共通（英語）: タイトル `Update movapic-neo to X.Y.Z`、ラベル `app-update`（アプリの版上げを Renovate などの PR と見分ける）と、マイグレーションがあるときの `requires-migration`。本文はイメージとビルドのリンク・GitHub Release と同じノート（下）、マイグレーションがあるときはその手順。
+- **PR が出なかったとき**は docker-build.yml の `create-k8s-pr` のログを見る。マニフェストの `image:` 行が書き換わらなかった（k8sg1 側で書式が変わった）ときはジョブが赤くなる。黙って PR が出ないこと（書き換わらず差分が無いと create-pull-request は何もせず成功する）を防ぐため。
+- イメージは検査の結果を待たずに push され、`latest` タグも動く。本番のマニフェストは版を固定しており、**`latest` はデプロイに使わない**。
+
+### GitHub Release
+- **タグごと（パッチも含む）に自動で作る**。全検査が通ったときだけ作るので、Release がある版＝デプロイしてよい版。
+- ノートは GitHub の自動生成（英語）: 前回のタグからマージされた PR の一覧と差分（Full Changelog）のリンク。見出しは [.github/release.yml](../.github/release.yml) で `Changes` と `Dependencies`（Renovate の PR＝`dependencies` ラベル）に分ける。main は squash マージだけなので、PR の一覧＝コミットの一覧。
+- 起点（前回のタグ）は明示している。省くと GitHub は前回の Release を起点にするが、v1.5.3 以前は Release をマイナーごとにしか作っていない（手書き。そのまま残す）。
+- 利用者向けのリリースノート（[releaseNotes.ts](../src/data/releaseNotes.ts)・日本語・マイナーごと）とは別物。
+
+### 作り直し（workflow_dispatch）
+docker-build.yml は Actions の画面から手動でも動かせる（同じ版のイメージを作り直したいとき）。入力の tag はそのままイメージのタグとマニフェストの版になるので、**`v` を付けずに** `X.Y.Z` で入れる。検査が全部通れば同じ書式で k8sg1 に PR が出る（GitHub Release は作らない）。
