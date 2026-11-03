@@ -5,7 +5,7 @@
 
 import prisma from "@/lib/db";
 import { userPathSegment } from "@/lib/userHandle";
-import { getHomeServer } from "@/lib/auth/serverPolicy";
+import { getFavorServers, getHomeServer } from "@/lib/auth/serverPolicy";
 import { getAvatarUrl, getEmojiImageUrl } from "@/lib/avatar";
 import { getMutedAuthorKeys } from "@/lib/mutes";
 import {
@@ -22,7 +22,8 @@ import {
   isMakeupNotificationType,
   makeupNotificationYm,
   toMakeupPointNotificationData,
-  type MakeupPointNotificationData,
+  makeupPointReasonLabel,
+  type MakeupPointFeedData,
 } from "@/lib/makeup/notificationTypes";
 
 export const NOTIFICATION_WINDOW_DAYS = 90;
@@ -53,7 +54,7 @@ export interface NotificationFeedItem {
   /** type="favorite" のとき、お気に入りした相手と総数。 */
   favorite: FavoriteFeedData | null;
   /** 穴埋め系（makeup-*）のとき。ym は対象月（旧通知で取れなければ null）、point は makeup-point の付与内容。 */
-  makeup: { ym: string | null; point: MakeupPointNotificationData | null } | null;
+  makeup: { ym: string | null; point: MakeupPointFeedData | null } | null;
   /** type="reply" のとき、スレッドに投稿した相手（image はリプライ側の写真）。 */
   reply: ReplyFeedData | null;
   /** 受信者の /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）。
@@ -151,13 +152,15 @@ export async function getRecentNotifications(
         avatarUrl: getAvatarUrl(r.image?.user.avatarUrl),
       };
     }
+    const pointData =
+      r.type === MAKEUP_NOTIFICATION_TYPES.POINT ? toMakeupPointNotificationData(r.data) : null;
     const makeup = isMakeupNotificationType(r.type)
       ? {
           ym: makeupNotificationYm(r.achievementKey),
-          point:
-            r.type === MAKEUP_NOTIFICATION_TYPES.POINT
-              ? toMakeupPointNotificationData(r.data)
-              : null,
+          // 付与理由の表示名は特典サーバー名（env）を含むので、クライアントに渡す前にここで解決する
+          point: pointData
+            ? { ...pointData, label: makeupPointReasonLabel(pointData.reason, getFavorServers()) }
+            : null,
         }
       : null;
     items.push({

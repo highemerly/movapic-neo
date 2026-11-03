@@ -48,6 +48,11 @@ export interface MakeupPointNotificationData {
   amount: number;
 }
 
+/** 通知フィードに載せる makeup-point の表示用データ（label はサーバーで解決済み）。 */
+export interface MakeupPointFeedData extends MakeupPointNotificationData {
+  label: string;
+}
+
 /**
  * 付与理由の表示名。`event:<key>` はイベント一覧（events.ts）の名前、一覧に無ければ「イベント」。
  * 特典サーバー名は env（FAVOR_SERVERS）由来でクライアントからは読めないので、呼び出し側が渡す
@@ -71,7 +76,7 @@ export function makeupPointReasonLabel(reason: string, favorServers: readonly st
 
 /**
  * 穴埋め系通知の1行本文（ベルと通知一覧の1行目で共用）。やること・量だけを短く出す
- * （対象月は遷移先のカレンダー、付与理由はカレンダーの付与履歴で分かる）。
+ * （対象月は遷移先のカレンダー、付与理由は通知一覧の2行目 makeupNotificationDetail で出す）。
  * point は makeup-point のときだけ使う。
  */
 export function makeupNotificationText(
@@ -114,11 +119,16 @@ export function toMakeupPointNotificationData(data: unknown): MakeupPointNotific
   return typeof reason === "string" && typeof amount === "number" ? { reason, amount } : null;
 }
 
-/** 通知一覧の2行目（補足説明）。 */
-export function makeupNotificationDetail(type: MakeupNotificationType): string {
+/** 通知一覧の2行目（補足説明）。付与理由は1行目（ベルと共用で短く保つ）ではなくここで出す。 */
+export function makeupNotificationDetail(
+  type: MakeupNotificationType,
+  point: MakeupPointFeedData | null
+): string {
   switch (type) {
     case MAKEUP_NOTIFICATION_TYPES.POINT:
-      return "残りのポイントと付与履歴はカレンダーで確認できます";
+      return point
+        ? `${point.label}。残ポイントはカレンダーで確認できます。`
+        : "残ポイントはカレンダーで確認できます。";
     case MAKEUP_NOTIFICATION_TYPES.NEED_SECOND:
       return "今日もう1枚投稿すると、その写真で投稿を忘れた日を埋められます";
     case MAKEUP_NOTIFICATION_TYPES.READY:

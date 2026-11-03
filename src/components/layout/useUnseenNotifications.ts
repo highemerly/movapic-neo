@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { markNotificationsSeen } from "@/app/actions/notifications";
-import type { MakeupPointNotificationData } from "@/lib/makeup/notificationTypes";
+import type { MakeupPointFeedData } from "@/lib/makeup/notificationTypes";
 import type { ReplyFeedData } from "@/lib/notifications/replyNotificationType";
 
 const COOKIE_NAME = "not";
@@ -36,7 +36,7 @@ export type NotificationItem = {
   image: { id: string; pageUrl: string; thumbnailUrl: string } | null;
   favorite: FavoriteFeedData | null;
   /** 穴埋め系（makeup-*）の通知のとき、対象月と付与内容（NotificationFeedItem.makeup と同形）。 */
-  makeup: { ym: string | null; point: MakeupPointNotificationData | null } | null;
+  makeup: { ym: string | null; point: MakeupPointFeedData | null } | null;
   /** type="reply" のとき、スレッドに投稿した相手（NotificationFeedItem.reply と同形）。 */
   reply: ReplyFeedData | null;
   recipientUsername: string;

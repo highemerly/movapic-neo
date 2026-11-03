@@ -11,6 +11,7 @@ import {
   MAKEUP_NOTIFICATION_TYPES,
   isMakeupNotificationType,
   makeupNotificationHref,
+  makeupNotificationDetail,
   makeupNotificationText,
   makeupNotificationYm,
   makeupPointReasonLabel,
@@ -101,6 +102,18 @@ describe("makeupNotificationText", () => {
   it("旧 makeup-reminder の文言は従来のまま", () => {
     expect(makeupNotificationText(MAKEUP_NOTIFICATION_TYPES.LEGACY_REMINDER, null)).toBe(
       "皆勤賞まであと少し！1日2枚投稿して、穴埋めしよう。"
+    );
+  });
+});
+
+describe("makeupNotificationDetail", () => {
+  it("付与通知の2行目は理由の表示名と残ポイントの案内", () => {
+    const point = { reason: "monthly-catchup", amount: 1, label: "皆勤賞応援プレゼント" };
+    expect(makeupNotificationDetail(MAKEUP_NOTIFICATION_TYPES.POINT, point)).toBe(
+      "皆勤賞応援プレゼント。残ポイントはカレンダーで確認できます。"
+    );
+    expect(makeupNotificationDetail(MAKEUP_NOTIFICATION_TYPES.POINT, null)).toBe(
+      "残ポイントはカレンダーで確認できます。"
     );
   });
 });

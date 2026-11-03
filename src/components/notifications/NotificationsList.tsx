@@ -150,7 +150,7 @@ export function NotificationsList({
                       )
                     ) : (
                       <p className="mt-1 text-xs leading-snug text-muted-foreground line-clamp-2">
-                        {makeupType ? makeupNotificationDetail(makeupType) : a?.description ?? ""}
+                        {makeupType ? makeupNotificationDetail(makeupType, n.makeup?.point ?? null) : a?.description ?? ""}
                       </p>
                     )}
                     <p className="mt-1.5 text-[11px] text-muted-foreground">
