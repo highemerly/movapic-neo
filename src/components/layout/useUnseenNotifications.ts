@@ -14,6 +14,7 @@ import { markNotificationsSeen } from "@/app/actions/notifications";
 import type { MakeupPointFeedData } from "@/lib/makeup/notificationTypes";
 import type { ReplyFeedData } from "@/lib/notifications/replyNotificationType";
 import type { WelcomeBackNotificationData } from "@/lib/notifications/welcomeBackNotificationType";
+import type { MonthlyCollageNotificationData } from "@/lib/notifications/monthlyCollageNotificationType";
 
 const COOKIE_NAME = "not";
 
@@ -42,6 +43,8 @@ export type NotificationItem = {
   reply: ReplyFeedData | null;
   /** type="welcome-back" のとき、何日ぶりの投稿か（NotificationFeedItem.welcomeBack と同形）。 */
   welcomeBack: WelcomeBackNotificationData | null;
+  /** type="monthly-collage" のとき、対象月（NotificationFeedItem.monthlyCollage と同形）。 */
+  monthlyCollage: MonthlyCollageNotificationData | null;
   recipientUsername: string;
 };
 

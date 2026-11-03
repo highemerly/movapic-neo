@@ -16,6 +16,7 @@
 - **穴埋め**: 忘れた日を、同月の後日のダブル投稿で埋める。2026-10 分からは**穴埋めポイント制**（1pt=1日・月ごと・持ち越し不可・翌月10日締切・全ユーザー手動）。上限の解決・付与・通知・締切・不変条件は [achievements/README](../src/lib/achievements/README.md) の「特殊: 皆勤賞」を正とする。本人にはカレンダーに残りポイントと付与履歴を出す。
   - **月間投稿日数**: その月に10日・20日投稿で実績（銀・穴埋めは数えない）。皆勤賞が不可能になった月は、本人向けのカレンダー上部の案内と実績タブの「次のステップ」をこの目標に切り替える（[monthDays.ts](../src/lib/achievements/monthDays.ts)）。
   - 2026-09 以前の月の旧ルール（固定上限・自動穴埋め `User.autoMakeup`）は撤去済み。過去月の👑判定と表示のために固定上限（`perfectMonthGrace`）と割当（`makeupTargetDay`）だけ残る。
+- **月次画像（コラージュ）**: 本人がカレンダーの「月次画像を作成」から、その月の写真を1枚にまとめた画像を作って共有できる（[CollageShareDialog](../src/components/calendar/CollageShareDialog.tsx)）。月初には先月に投稿した人へ `monthly-collage` 通知を送り、`?collage=1` 付きのカレンダー（ダイアログを開いた状態・本人のみ）へ誘導する。クエリは開いた直後に URL から外す（リロード・戻るで開き直さない）。
 - **サムネイル**: 128x128px WebP・quality 80。投稿時（`/api/v1/post`内）に生成。クロップ位置は文字位置に応じた角基準（top/left→左上、bottom→左下、right→右上）。既存画像は `npx tsx scripts/generate-thumbnails.ts`。
 
 ## 実績・通知機能
@@ -24,7 +25,7 @@
 - 例外はリアクション起点の実績（`trigger: "reaction"`）。投稿と無関係に増減するため、**リアクションの書き込み（PUT）と `Image.favoriteCount` を更新した瞬間**だけで評価する（[reactionTriggers.ts](../src/lib/achievements/reactionTriggers.ts)）。
 - **追加・変更の手順と不変条件は [`src/lib/achievements/README.md`](../src/lib/achievements/README.md) に集約**（keyは永続でリネーム禁止、しきい値は `>=`、live と backfill の集計を必ず同期 等）。
 - 既存ユーザーへの反映: `DATABASE_URL=... npx tsx scripts/backfill-achievements.ts`（冪等）。
-- 通知の種別（`Notification.type`）: `achievement` / `favorite` / `makeup-*` / `reply`（スレッドに投稿された。[リプライ仕様](./reply.md)）/ `welcome-back`（下記「おかえり」）。表示文言は種別ごとに1モジュールへ集約し、ベル（[NotificationBell](../src/components/layout/NotificationBell.tsx)）と通知一覧（[NotificationsList](../src/components/notifications/NotificationsList.tsx)）で二重に書かない。ミュート相手の通知と、写真が削除されたリアクション・スレッド通知は読み取り時（[getRecentNotifications](../src/lib/achievements/notifications.ts)）に落とす（実績通知は写真が消えても実績が残るので出す）。
+- 通知の種別（`Notification.type`）: `achievement` / `favorite` / `makeup-*` / `reply`（スレッドに投稿された。[リプライ仕様](./reply.md)）/ `welcome-back`（下記「おかえり」）/ `monthly-collage`（月初に先月の月次画像を作れると知らせる。[定期ジョブ](./periodic-jobs.md)）。表示文言は種別ごとに1モジュールへ集約し、ベル（[NotificationBell](../src/components/layout/NotificationBell.tsx)）と通知一覧（[NotificationsList](../src/components/notifications/NotificationsList.tsx)）で二重に書かない。ミュート相手の通知と、写真が削除されたリアクション・スレッド通知は読み取り時（[getRecentNotifications](../src/lib/achievements/notifications.ts)）に落とす（実績通知は写真が消えても実績が残るので出す）。
 
 ### おかえり（しばらく空いた後の投稿）
 - 前回の投稿から **JST の暦日で30日以上** 空いた投稿で、本人に `welcome-back` 通知を作る（何日ぶりか・その投稿の写真付き）。習慣が途切れた人が戻ってきたとき、途切れた事実ではなく戻ってきたことを肯定するため。

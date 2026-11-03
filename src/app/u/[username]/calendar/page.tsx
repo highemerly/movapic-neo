@@ -13,13 +13,14 @@ import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect"
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
 import { getFavorServers, getHomeServer, isFavorServer } from "@/lib/auth/serverPolicy";
 import { userPageRobotsMetadata } from "@/lib/crawlers";
+import { COLLAGE_OPEN_QUERY } from "@/lib/notifications/monthlyCollageNotificationType";
 import type { Metadata } from "next";
 
 export const dynamic = "force-dynamic";
 
 interface CalendarPageProps {
   params: Promise<{ username: string }>;
-  searchParams: Promise<{ year?: string; month?: string }>;
+  searchParams: Promise<{ year?: string; month?: string; collage?: string }>;
 }
 
 export async function generateMetadata({
@@ -126,6 +127,7 @@ export default async function CalendarPage({
             favorServers={getFavorServers()}
             isFavorUser={isFavorServer(user.instance.domain)}
             instanceType={user.instance.type}
+            initialCollageOpen={isOwner && query[COLLAGE_OPEN_QUERY] === "1"}
           />
         </TabTransition>
 

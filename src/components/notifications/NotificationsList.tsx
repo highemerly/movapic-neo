@@ -26,6 +26,13 @@ import {
   welcomeBackNotificationDetail,
   welcomeBackNotificationText,
 } from "@/lib/notifications/welcomeBackNotificationType";
+import {
+  MONTHLY_COLLAGE_NOTIFICATION_ICON,
+  MONTHLY_COLLAGE_NOTIFICATION_TYPE,
+  monthlyCollageNotificationDetail,
+  monthlyCollageNotificationHref,
+  monthlyCollageNotificationText,
+} from "@/lib/notifications/monthlyCollageNotificationType";
 
 type Category = "favorite" | "reply" | "achievement" | "other";
 
@@ -106,6 +113,7 @@ export function NotificationsList({
             const isFavorite = n.type === "favorite";
             const isReply = n.type === REPLY_NOTIFICATION_TYPE;
             const isWelcomeBack = n.type === WELCOME_BACK_NOTIFICATION_TYPE;
+            const isMonthlyCollage = n.type === MONTHLY_COLLAGE_NOTIFICATION_TYPE;
             // 2行目は名前の代わりにアイコンを並べる（リアクションは最新順・スレッドは投稿者1人）
             const avatars: FavoriterAvatarItem[] = isFavorite
               ? (n.favorite?.favoriters ?? []).map((f) => ({ ...f, label: favoriterName(f) }))
@@ -115,7 +123,9 @@ export function NotificationsList({
             const a = !isReminder && !isFavorite && !isReply && n.achievementKey ? resolveAchievement(n.achievementKey) : null;
             const href = makeupType
               ? makeupNotificationHref(selfSeg, n.makeup?.ym ?? null)
-              : n.image?.pageUrl ?? `/u/${selfSeg}/achievements`;
+              : isMonthlyCollage
+                ? monthlyCollageNotificationHref(selfSeg, n.monthlyCollage)
+                : n.image?.pageUrl ?? `/u/${selfSeg}/achievements`;
             return (
               <li key={n.id}>
                 <Link
@@ -137,7 +147,9 @@ export function NotificationsList({
                             ? makeupNotificationIcon(makeupType)
                             : isWelcomeBack
                               ? WELCOME_BACK_NOTIFICATION_ICON
-                              : a?.icon ?? "Trophy"
+                              : isMonthlyCollage
+                                ? MONTHLY_COLLAGE_NOTIFICATION_ICON
+                                : a?.icon ?? "Trophy"
                         }
                         className="h-7 w-7"
                       />
@@ -151,6 +163,8 @@ export function NotificationsList({
                         replyNotificationText()
                       ) : isWelcomeBack ? (
                         welcomeBackNotificationText(n.welcomeBack)
+                      ) : isMonthlyCollage ? (
+                        monthlyCollageNotificationText(n.monthlyCollage)
                       ) : makeupType ? (
                         makeupNotificationText(makeupType, n.makeup?.point ?? null)
                       ) : (
@@ -169,7 +183,9 @@ export function NotificationsList({
                           ? makeupNotificationDetail(makeupType, n.makeup?.point ?? null)
                           : isWelcomeBack
                             ? welcomeBackNotificationDetail()
-                            : a?.description ?? ""}
+                            : isMonthlyCollage
+                              ? monthlyCollageNotificationDetail()
+                              : a?.description ?? ""}
                       </p>
                     )}
                     <p className="mt-1.5 text-[11px] text-muted-foreground">

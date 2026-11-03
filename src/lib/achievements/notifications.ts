@@ -1,6 +1,6 @@
 /**
  * 通知フィードの取得。Notification テーブルを直近90日で読み、表示に必要な情報へ整形する。
- * 種別(type)で情報ソースを区別する（実績・リアクション・皆勤賞の穴埋め・スレッド・おかえり）。
+ * 種別(type)で情報ソースを区別する（実績・リアクション・皆勤賞の穴埋め・スレッド・おかえり・月次画像）。
  */
 
 import prisma from "@/lib/db";
@@ -22,6 +22,11 @@ import {
   toWelcomeBackNotificationData,
   type WelcomeBackNotificationData,
 } from "@/lib/notifications/welcomeBackNotificationType";
+import {
+  MONTHLY_COLLAGE_NOTIFICATION_TYPE,
+  toMonthlyCollageNotificationData,
+  type MonthlyCollageNotificationData,
+} from "@/lib/notifications/monthlyCollageNotificationType";
 import {
   MAKEUP_NOTIFICATION_TYPES,
   isMakeupNotificationType,
@@ -64,6 +69,8 @@ export interface NotificationFeedItem {
   reply: ReplyFeedData | null;
   /** type="welcome-back" のとき、何日ぶりの投稿か（image はその投稿）。 */
   welcomeBack: WelcomeBackNotificationData | null;
+  /** type="monthly-collage" のとき、対象月（読めない旧形式なら null）。 */
+  monthlyCollage: MonthlyCollageNotificationData | null;
   /** 受信者の /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）。
    *  makeup-reminder のカレンダー遷移などのリンク生成に使う。 */
   recipientUsername: string;
@@ -192,6 +199,10 @@ export async function getRecentNotifications(
       reply,
       welcomeBack:
         r.type === WELCOME_BACK_NOTIFICATION_TYPE ? toWelcomeBackNotificationData(r.data) : null,
+      monthlyCollage:
+        r.type === MONTHLY_COLLAGE_NOTIFICATION_TYPE
+          ? toMonthlyCollageNotificationData(r.data)
+          : null,
     });
   }
   return items;
