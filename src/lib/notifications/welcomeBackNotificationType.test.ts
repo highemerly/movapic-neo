@@ -51,10 +51,12 @@ describe("toWelcomeBackNotificationData", () => {
 
 describe("welcomeBackNotificationText", () => {
   it("日数があれば何日ぶりかを出す", () => {
-    expect(welcomeBackNotificationText({ days: 45 })).toBe("おかえりなさい！45日ぶりの投稿です");
+    expect(welcomeBackNotificationText({ days: 45 })).toBe(
+      "おかえりなさい！45日ぶりの投稿です。戻ってきてくれてうれしいです！"
+    );
   });
 
-  it("日数が読めなければ挨拶だけ出す", () => {
-    expect(welcomeBackNotificationText(null)).toBe("おかえりなさい！");
+  it("日数が読めなければ日数を出さない", () => {
+    expect(welcomeBackNotificationText(null)).toBe("おかえりなさい！戻ってきてくれてうれしいです！");
   });
 });

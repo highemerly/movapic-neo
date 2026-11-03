@@ -31,8 +31,8 @@
 - 前回の投稿から **JST の暦日で30日以上** 空いた投稿で、本人に `welcome-back` 通知を作る（何日ぶりか・その投稿の写真付き）。習慣が途切れた人が戻ってきたとき、途切れた事実ではなく戻ってきたことを肯定するため。
 - **実績にはしない**（一度きりの付与では2回目以降の復帰を迎えられない）。復帰のたびに1通。
 - 作成は `publishImage` の `afterSaved`（[welcomeBackNotifications.ts](../src/lib/notifications/welcomeBackNotifications.ts)）＝web・メール・Bot の全経路。再投稿は通らない。通知 id は `welcome-back-<imageId>` で決定的（二重に作らない）。
-- Web 投稿直後の画像詳細（`?posted=1`・本人のみ）には、**その通知があるときだけ**バナーを出す（[WelcomeBackBanner](../src/app/u/%5Busername%5D/status/%5BimageId%5D/WelcomeBackBanner.tsx)）。判定は投稿時の1回だけで、表示側で前回の投稿を引き直さない。モーダルにしないのは、投稿直後の割り込み（実績のお祝い・PWA のおすすめ）は1つまでという排他と競合させないため。
-- 判定・文言は [welcomeBackNotificationType.ts](../src/lib/notifications/welcomeBackNotificationType.ts) が単一ソース（ベル・通知一覧・バナーで共用）。
+- Web 投稿直後の画像詳細（`?posted=1`・本人のみ）では、**その通知があるときだけ**トーストを出す（投稿完了のトーストの後に出して手前に重ねる）。判定は投稿時の1回だけで、表示側で前回の投稿を引き直さない。モーダルにしないのは、投稿直後の割り込み（実績のお祝い・PWA のおすすめ）は1つまでという排他と競合させないため。pitfall: 最初は画像の上のバナーにしたが、投稿完了のトーストに隠れて読めなかった。
+- 文言は「おかえりなさい！◯日ぶりの投稿です。戻ってきてくれてうれしいです！」の1文だけ（通知一覧でも2行目を出さない）。判定・文言は [welcomeBackNotificationType.ts](../src/lib/notifications/welcomeBackNotificationType.ts) が単一ソース（ベル・通知一覧・トーストで共用）。
 
 ## PWA対応
 ホーム画面追加対応のPWA。Push通知は**やらない**。

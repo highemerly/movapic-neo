@@ -2,7 +2,7 @@
  * 「おかえり」通知の作成（サーバー専用）。type・判定・文言は welcomeBackNotificationType.ts。
  *
  * 投稿後のフック（publishImage の afterSaved）から呼ぶ＝web・メール・Bot の全経路で作られる。
- * Web 投稿は投稿直後の画面でバナーも出すが、メール・Bot には投稿直後の画面が無く、通知でしか伝わらない。
+ * Web 投稿は投稿直後の画面でトーストも出すが、メール・Bot には投稿直後の画面が無く、通知でしか伝わらない。
  */
 
 import prisma from "@/lib/db";

@@ -23,7 +23,6 @@ import {
 import {
   WELCOME_BACK_NOTIFICATION_ICON,
   WELCOME_BACK_NOTIFICATION_TYPE,
-  welcomeBackNotificationDetail,
   welcomeBackNotificationText,
 } from "@/lib/notifications/welcomeBackNotificationType";
 import {
@@ -177,15 +176,14 @@ export function NotificationsList({
                           <FavoriterAvatars items={avatars} linked={false} />
                         </div>
                       )
-                    ) : (
+                    ) : isWelcomeBack ? null : (
+                      // おかえりは1行目の1文だけで伝える（2行目は持たない）
                       <p className="mt-1 text-xs leading-snug text-muted-foreground line-clamp-2">
                         {makeupType
                           ? makeupNotificationDetail(makeupType, n.makeup?.point ?? null)
-                          : isWelcomeBack
-                            ? welcomeBackNotificationDetail()
-                            : isMonthlyCollage
-                              ? monthlyCollageNotificationDetail()
-                              : a?.description ?? ""}
+                          : isMonthlyCollage
+                            ? monthlyCollageNotificationDetail()
+                            : a?.description ?? ""}
                       </p>
                     )}
                     <p className="mt-1.5 text-[11px] text-muted-foreground">
