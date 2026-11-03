@@ -164,14 +164,15 @@ model Notification {
   // 通知の受信者
   userId         String   @map("user_id")
   // 種別 / 情報ソース。"achievement" | "favorite" | 皆勤賞の穴埋め系（"makeup-point" | "makeup-need-second" |
-  // "makeup-ready" | 2026-09 以前の "makeup-reminder"。src/lib/makeup/notificationTypes.ts）
+  // "makeup-ready" | 2026-09 以前の "makeup-reminder"。src/lib/makeup/notificationTypes.ts）| "reply" |
+  // "welcome-back"（しばらく空いた後の投稿。src/lib/notifications/welcomeBackNotificationType.ts）
   type           String   @db.VarChar(40)
   // type="achievement" のとき、獲得した実績のキー（表示文言は CATALOG から解決）。
   // 穴埋め系のとき、対象月キー perfect-month:YYYY-MM（通知から対象月のカレンダーへ飛ぶため）。
   achievementKey String?  @map("achievement_key") @db.VarChar(64)
   // 関連画像（実績のきっかけ写真 / 将来: お気に入りされた写真）。画像削除時は null。
   imageId        String?  @map("image_id")
-  // 種別ごとの追加情報（favorite: 相手の表示名・acct 等 / makeup-point: 付与理由と量）
+  // 種別ごとの追加情報（favorite: 相手の表示名・acct 等 / makeup-point: 付与理由と量 / welcome-back: 何日ぶりか）
   data           Json?
   createdAt      DateTime @default(now()) @map("created_at")
 

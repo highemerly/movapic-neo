@@ -28,6 +28,7 @@ const {
   transcodeToJpeg,
   resolveFediverseReplyTarget,
   createReplyNotification,
+  createWelcomeBackNotification,
 } = vi.hoisted(() => ({
   postToMastodon: vi.fn(),
   postToMisskey: vi.fn(),
@@ -36,6 +37,7 @@ const {
   transcodeToJpeg: vi.fn(),
   resolveFediverseReplyTarget: vi.fn(),
   createReplyNotification: vi.fn(),
+  createWelcomeBackNotification: vi.fn(),
 }));
 
 vi.mock("@/lib/fediverse/post", () => ({
@@ -65,6 +67,9 @@ vi.mock("@/lib/storage/storage", () => ({
 // リプライ先の解決（DB＋Fediverse 往復）と通知（DB）は境界としてモックする。
 vi.mock("@/lib/replies/fediverseTarget", () => ({ resolveFediverseReplyTarget }));
 vi.mock("@/lib/notifications/replyNotifications", () => ({ createReplyNotification }));
+vi.mock("@/lib/notifications/welcomeBackNotifications", () => ({
+  createWelcomeBackNotification,
+}));
 
 vi.mock("@/lib/achievements/engine", () => ({
   evaluateAndGrant: vi.fn().mockResolvedValue([]),
@@ -127,6 +132,7 @@ beforeEach(() => {
   transcodeToJpeg.mockResolvedValue(Buffer.from("jpeg"));
   resolveFediverseReplyTarget.mockResolvedValue({ kind: "linked", postId: "parent-status" });
   createReplyNotification.mockResolvedValue(undefined);
+  createWelcomeBackNotification.mockResolvedValue(undefined);
 });
 
 describe("publishImage の ALT 配管", () => {
@@ -379,6 +385,32 @@ describe("リプライ（スレッド）の配管", () => {
     expect(result.postError).toBe("forbidden");
     expect(imageCreate).toHaveBeenCalledTimes(1);
     expect(createReplyNotification).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("おかえり通知", () => {
+  it.each(["web", "email", "mention"] as const)(
+    "%s 経路でも保存した画像で判定する（投稿直後の画面が無い経路は通知でしか伝わらない）",
+    async (source) => {
+      const result = await publishImage(baseInput({ source }));
+      expect(createWelcomeBackNotification).toHaveBeenCalledWith({
+        userId: "user-1",
+        imageId: result.imageId,
+      });
+    }
+  );
+
+  it("連合投稿に失敗しても判定する（画像は保存済み）", async () => {
+    postToMastodon.mockResolvedValue({ success: false, error: "forbidden", statusCode: 403 });
+    await publishImage(baseInput({}));
+    expect(createWelcomeBackNotification).toHaveBeenCalledTimes(1);
+  });
+
+  it("通知の作成に失敗しても投稿結果は変わらない", async () => {
+    createWelcomeBackNotification.mockRejectedValue(new Error("db down"));
+    const result = await publishImage(baseInput({}));
+    expect(result.imageId).toBeDefined();
+    expect(result.postError).toBeUndefined();
   });
 });
 

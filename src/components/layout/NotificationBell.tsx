@@ -23,6 +23,11 @@ import {
   REPLY_NOTIFICATION_TYPE,
   replyNotificationText,
 } from "@/lib/notifications/replyNotificationType";
+import {
+  WELCOME_BACK_NOTIFICATION_ICON,
+  WELCOME_BACK_NOTIFICATION_TYPE,
+  welcomeBackNotificationText,
+} from "@/lib/notifications/welcomeBackNotificationType";
 import { ReactionSummary } from "@/components/notifications/ReactionSummary";
 import { useUnseenNotifications, useUnseenBadge } from "./useUnseenNotifications";
 
@@ -68,6 +73,7 @@ export function NotificationBell() {
               const isReminder = makeupType !== null;
               const isFavorite = n.type === "favorite";
               const isReply = n.type === REPLY_NOTIFICATION_TYPE;
+              const isWelcomeBack = n.type === WELCOME_BACK_NOTIFICATION_TYPE;
               const a = !isReminder && !isFavorite && !isReply && n.achievementKey ? resolveAchievement(n.achievementKey) : null;
               const href = makeupType
                 ? makeupNotificationHref(n.recipientUsername, n.makeup?.ym ?? null)
@@ -84,7 +90,13 @@ export function NotificationBell() {
                     ) : (
                       <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
                         <AchievementIcon
-                          name={makeupType ? makeupNotificationIcon(makeupType) : a?.icon ?? "Trophy"}
+                          name={
+                            makeupType
+                              ? makeupNotificationIcon(makeupType)
+                              : isWelcomeBack
+                                ? WELCOME_BACK_NOTIFICATION_ICON
+                                : a?.icon ?? "Trophy"
+                          }
                           className="h-4 w-4"
                         />
                       </span>
@@ -95,6 +107,8 @@ export function NotificationBell() {
                           ? <ReactionSummary favorite={n.favorite} />
                           : isReply
                             ? replyNotificationText()
+                            : isWelcomeBack
+                            ? welcomeBackNotificationText(n.welcomeBack)
                             : makeupType
                             ? makeupNotificationText(makeupType, n.makeup?.point ?? null)
                             : `🏆 ${a?.title ?? "?"}`}

@@ -20,6 +20,12 @@ import {
   replierName,
   replyNotificationText,
 } from "@/lib/notifications/replyNotificationType";
+import {
+  WELCOME_BACK_NOTIFICATION_ICON,
+  WELCOME_BACK_NOTIFICATION_TYPE,
+  welcomeBackNotificationDetail,
+  welcomeBackNotificationText,
+} from "@/lib/notifications/welcomeBackNotificationType";
 
 type Category = "favorite" | "reply" | "achievement" | "other";
 
@@ -99,6 +105,7 @@ export function NotificationsList({
             const isReminder = makeupType !== null;
             const isFavorite = n.type === "favorite";
             const isReply = n.type === REPLY_NOTIFICATION_TYPE;
+            const isWelcomeBack = n.type === WELCOME_BACK_NOTIFICATION_TYPE;
             // 2行目は名前の代わりにアイコンを並べる（リアクションは最新順・スレッドは投稿者1人）
             const avatars: FavoriterAvatarItem[] = isFavorite
               ? (n.favorite?.favoriters ?? []).map((f) => ({ ...f, label: favoriterName(f) }))
@@ -125,7 +132,13 @@ export function NotificationsList({
                   ) : (
                     <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
                       <AchievementIcon
-                        name={makeupType ? makeupNotificationIcon(makeupType) : a?.icon ?? "Trophy"}
+                        name={
+                          makeupType
+                            ? makeupNotificationIcon(makeupType)
+                            : isWelcomeBack
+                              ? WELCOME_BACK_NOTIFICATION_ICON
+                              : a?.icon ?? "Trophy"
+                        }
                         className="h-7 w-7"
                       />
                     </span>
@@ -136,6 +149,8 @@ export function NotificationsList({
                         <ReactionSummary favorite={n.favorite} />
                       ) : isReply ? (
                         replyNotificationText()
+                      ) : isWelcomeBack ? (
+                        welcomeBackNotificationText(n.welcomeBack)
                       ) : makeupType ? (
                         makeupNotificationText(makeupType, n.makeup?.point ?? null)
                       ) : (
@@ -150,7 +165,11 @@ export function NotificationsList({
                       )
                     ) : (
                       <p className="mt-1 text-xs leading-snug text-muted-foreground line-clamp-2">
-                        {makeupType ? makeupNotificationDetail(makeupType, n.makeup?.point ?? null) : a?.description ?? ""}
+                        {makeupType
+                          ? makeupNotificationDetail(makeupType, n.makeup?.point ?? null)
+                          : isWelcomeBack
+                            ? welcomeBackNotificationDetail()
+                            : a?.description ?? ""}
                       </p>
                     )}
                     <p className="mt-1.5 text-[11px] text-muted-foreground">

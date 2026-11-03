@@ -1,6 +1,6 @@
 /**
  * 通知フィードの取得。Notification テーブルを直近90日で読み、表示に必要な情報へ整形する。
- * 種別(type)で情報ソースを区別する（実績・リアクション・皆勤賞の穴埋め）。
+ * 種別(type)で情報ソースを区別する（実績・リアクション・皆勤賞の穴埋め・スレッド・おかえり）。
  */
 
 import prisma from "@/lib/db";
@@ -17,6 +17,11 @@ import {
   type ReplyFeedData,
 } from "@/lib/notifications/replyNotificationType";
 import type { FavoriteNotificationData } from "@/lib/notifications/favoriteNotifications";
+import {
+  WELCOME_BACK_NOTIFICATION_TYPE,
+  toWelcomeBackNotificationData,
+  type WelcomeBackNotificationData,
+} from "@/lib/notifications/welcomeBackNotificationType";
 import {
   MAKEUP_NOTIFICATION_TYPES,
   isMakeupNotificationType,
@@ -57,6 +62,8 @@ export interface NotificationFeedItem {
   makeup: { ym: string | null; point: MakeupPointFeedData | null } | null;
   /** type="reply" のとき、スレッドに投稿した相手（image はリプライ側の写真）。 */
   reply: ReplyFeedData | null;
+  /** type="welcome-back" のとき、何日ぶりの投稿か（image はその投稿）。 */
+  welcomeBack: WelcomeBackNotificationData | null;
   /** 受信者の /u/ パスセグメント（既定インスタンスは素のusername、他は username@domain）。
    *  makeup-reminder のカレンダー遷移などのリンク生成に使う。 */
   recipientUsername: string;
@@ -183,6 +190,8 @@ export async function getRecentNotifications(
       favorite,
       makeup,
       reply,
+      welcomeBack:
+        r.type === WELCOME_BACK_NOTIFICATION_TYPE ? toWelcomeBackNotificationData(r.data) : null,
     });
   }
   return items;

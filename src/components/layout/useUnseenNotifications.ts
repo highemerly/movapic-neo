@@ -13,6 +13,7 @@ import {
 import { markNotificationsSeen } from "@/app/actions/notifications";
 import type { MakeupPointFeedData } from "@/lib/makeup/notificationTypes";
 import type { ReplyFeedData } from "@/lib/notifications/replyNotificationType";
+import type { WelcomeBackNotificationData } from "@/lib/notifications/welcomeBackNotificationType";
 
 const COOKIE_NAME = "not";
 
@@ -39,6 +40,8 @@ export type NotificationItem = {
   makeup: { ym: string | null; point: MakeupPointFeedData | null } | null;
   /** type="reply" のとき、スレッドに投稿した相手（NotificationFeedItem.reply と同形）。 */
   reply: ReplyFeedData | null;
+  /** type="welcome-back" のとき、何日ぶりの投稿か（NotificationFeedItem.welcomeBack と同形）。 */
+  welcomeBack: WelcomeBackNotificationData | null;
   recipientUsername: string;
 };
 

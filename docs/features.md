@@ -24,7 +24,14 @@
 - 例外はリアクション起点の実績（`trigger: "reaction"`）。投稿と無関係に増減するため、**リアクションの書き込み（PUT）と `Image.favoriteCount` を更新した瞬間**だけで評価する（[reactionTriggers.ts](../src/lib/achievements/reactionTriggers.ts)）。
 - **追加・変更の手順と不変条件は [`src/lib/achievements/README.md`](../src/lib/achievements/README.md) に集約**（keyは永続でリネーム禁止、しきい値は `>=`、live と backfill の集計を必ず同期 等）。
 - 既存ユーザーへの反映: `DATABASE_URL=... npx tsx scripts/backfill-achievements.ts`（冪等）。
-- 通知の種別（`Notification.type`）: `achievement` / `favorite` / `makeup-*` / `reply`（スレッドに投稿された。[リプライ仕様](./reply.md)）。表示文言は種別ごとに1モジュールへ集約し、ベル（[NotificationBell](../src/components/layout/NotificationBell.tsx)）と通知一覧（[NotificationsList](../src/components/notifications/NotificationsList.tsx)）で二重に書かない。ミュート相手の通知と、写真が削除されたリアクション・スレッド通知は読み取り時（[getRecentNotifications](../src/lib/achievements/notifications.ts)）に落とす（実績通知は写真が消えても実績が残るので出す）。
+- 通知の種別（`Notification.type`）: `achievement` / `favorite` / `makeup-*` / `reply`（スレッドに投稿された。[リプライ仕様](./reply.md)）/ `welcome-back`（下記「おかえり」）。表示文言は種別ごとに1モジュールへ集約し、ベル（[NotificationBell](../src/components/layout/NotificationBell.tsx)）と通知一覧（[NotificationsList](../src/components/notifications/NotificationsList.tsx)）で二重に書かない。ミュート相手の通知と、写真が削除されたリアクション・スレッド通知は読み取り時（[getRecentNotifications](../src/lib/achievements/notifications.ts)）に落とす（実績通知は写真が消えても実績が残るので出す）。
+
+### おかえり（しばらく空いた後の投稿）
+- 前回の投稿から **JST の暦日で30日以上** 空いた投稿で、本人に `welcome-back` 通知を作る（何日ぶりか・その投稿の写真付き）。習慣が途切れた人が戻ってきたとき、途切れた事実ではなく戻ってきたことを肯定するため。
+- **実績にはしない**（一度きりの付与では2回目以降の復帰を迎えられない）。復帰のたびに1通。
+- 作成は `publishImage` の `afterSaved`（[welcomeBackNotifications.ts](../src/lib/notifications/welcomeBackNotifications.ts)）＝web・メール・Bot の全経路。再投稿は通らない。通知 id は `welcome-back-<imageId>` で決定的（二重に作らない）。
+- Web 投稿直後の画像詳細（`?posted=1`・本人のみ）には、**その通知があるときだけ**バナーを出す（[WelcomeBackBanner](../src/app/u/%5Busername%5D/status/%5BimageId%5D/WelcomeBackBanner.tsx)）。判定は投稿時の1回だけで、表示側で前回の投稿を引き直さない。モーダルにしないのは、投稿直後の割り込み（実績のお祝い・PWA のおすすめ）は1つまでという排他と競合させないため。
+- 判定・文言は [welcomeBackNotificationType.ts](../src/lib/notifications/welcomeBackNotificationType.ts) が単一ソース（ベル・通知一覧・バナーで共用）。
 
 ## PWA対応
 ホーム画面追加対応のPWA。Push通知は**やらない**。
