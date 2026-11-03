@@ -13,7 +13,7 @@
 |---|---|---|
 | PR 必須 | 承認数 0 | 一人運用で、自分の PR は自分で承認できないため |
 | マージ方式 | squash のみ＋linear history | 従来の「1変更＝1コミット」の履歴を保つ |
-| 必須チェック | `checks / check`（vitest / eslint / tsc）・`golden / test`（ゴールデン画像テスト） | ブランチ push で [ci.yml](../.github/workflows/ci.yml) が付ける。golden は sharp/skia/libvips の依存更新がイメージで壊れないかも兼ねる。本番イメージのビルドはタグ時だけ |
+| 必須チェック | `ci-result`（checks / golden / e2e のうち走ったものの結果をまとめたもの） | ブランチ push で [ci.yml](../.github/workflows/ci.yml) が付ける。ジョブは差分で間引く（下の「CI」）ので、個別に必須にするとスキップされたジョブに結果が付かずマージできなくなる |
 | 最新化の強制 | しない（strict=false） | Renovate の PR が複数並んだとき、1件マージするたびに全件を rebase・再 CI させないため |
 | force push・削除 | 禁止 | |
 | バイパス | なし（管理者も対象） | |
@@ -35,7 +35,7 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
 - `node:22-alpine` は digest 固定。Alpine や Node のパッチ更新は digest 更新の PR として来る（apk の vips/libheif の版が変わり得るので golden を必ず見る）。
 
 ### PR が来たら
-1. CI（`checks / check`・`golden / test`・`e2e / smoke`）が緑か見る。赤ならマージしない（checks と golden は ruleset でマージできない。e2e はまだ必須でないので目で見る）。
+1. CI（`ci-result`）が緑か見る。赤なら ruleset でマージできない。依存の更新は checks・golden・e2e が全部走る。
 2. PR 本文の変更履歴（Renovate が載せる）を読む。
 3. 種類に応じて確認を足す。CI が見ているのは unit・lint・型・ゴールデン（描画）と、E2E スモーク（本番イメージで主要ページが開くか・プレビュー生成が通るか）まで。**ログイン・投稿・Fediverse 連携・ジョブは見ていない**:
 
@@ -66,6 +66,23 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
 - 衝突した PR は Renovate が自動で rebase する。急ぐときは PR 本文の rebase チェックボックスを入れる。
 - 手元で `npm update` はしない（Renovate の PR とぶつかる）。依存の追加（`npm install <新しいパッケージ>`）はブランチを切って PR で。
 
+## CI
+[ci.yml](../.github/workflows/ci.yml) が main 以外のブランチへの push で、**差分が影響しうるジョブだけ**を回す。判定は [ci-targets.sh](../.github/scripts/ci-targets.sh)（main との merge-base からの差分ファイルで決める）。
+
+| 変更 | checks（vitest / eslint / tsc） | golden | e2e |
+|---|---|---|---|
+| `src/**`・依存（package.json・lockfile）・Dockerfile・next.config・prisma など、下に無いもの全部 | ✓ | ✓ | ✓ |
+| `e2e/**` | ✓ | – | ✓ |
+| `workers/**`（本番イメージに入らないが tsc・eslint の対象） | ✓ | – | – |
+| ワークフロー（checks.yml / golden.yml / e2e.yml） | そのワークフローのジョブだけ | 同左 | 同左 |
+| ドキュメント（`*.md`・`docs/**`）・`.claude/**`・`.githooks/**`・ruleset・Renovate 設定・docker-build.yml | – | – | – |
+| `release/*` ブランチ（バージョンの bump だけ） | – | – | – |
+
+- **一覧に無い種類のファイルは3つとも回す**（知らない変更を素通しさせない）。`src/**` は golden・e2e も必ず回す: 描画は src のどこから壊れるか分からず、E2E が壊れたまま進むと以後の依存更新を確かめられなくなるため。
+- 必須チェックは結果をまとめる `ci-result` だけ。成功・スキップは通し、失敗・キャンセルは落とす。
+- **main への push では回さない**。マージ前に同じ中身をブランチで通しており、リリースのタグで全部回すため（以前は main でも回していたが、マージが続くと concurrency で途中の実行が捨てられ、ほぼ二重実行だった）。
+- **リリース（タグ push）では [docker-build.yml](../.github/workflows/docker-build.yml) が checks・golden・e2e を全部回す**。e2e は push したばかりの本番イメージ（＝デプロイするもの）で回す。全部緑で初めて k8s マニフェストへ PR が出る。ブランチで省いた検査で壊れていたら、ここで止まる（直す PR を出してタグを打ち直す）。
+
 ## リリース
 1. バージョンの Bump・リリースノート（[releaseNotes.ts](../src/data/releaseNotes.ts)）もブランチ → PR でマージする。Claude Code に `/bump-version [X.Y.Z]`（または「1.5.2 を出したい」）と頼めば PR 作成まで行う（[SKILL.md](../.claude/skills/bump-version/SKILL.md)）。
 2. マージ後の main を pull し、タグを push する（タグは ruleset の対象外）:
@@ -73,4 +90,4 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
    git switch main && git pull
    git tag vX.Y.Z && git push origin vX.Y.Z
    ```
-3. タグ push で [docker-build.yml](../.github/workflows/docker-build.yml) がイメージをビルド・push し、k8s マニフェストへ PR を出す。
+3. タグ push で [docker-build.yml](../.github/workflows/docker-build.yml) がイメージをビルド・push し、checks・golden・e2e（そのイメージで）が全部通ったら k8s マニフェストへ PR を出す。

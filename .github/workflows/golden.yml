@@ -1,7 +1,7 @@
 name: Golden
 
 # ゴールデン画像テスト（skia 実描画の見た目回帰）を回す再利用可能ワークフロー。
-# ci.yml（全ブランチ push）と docker-build.yml（タグ push でビルドと並走）の両方から呼ぶ。
+# ci.yml（ブランチ push・差分で必要なときだけ）と docker-build.yml（タグ push でビルドと並走）の両方から呼ぶ。
 # 本番同一ランタイムの golden-test ステージを build して docker run で比較する。
 # golden-test は deps ステージ（sharp の system libvips ソースビルド・skia ネイティブ）の上に載るため、
 # PR の時点で sharp/skia/libvips 系の依存更新がイメージで壊れないかもここで分かる。
