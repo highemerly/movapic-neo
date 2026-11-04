@@ -11,8 +11,7 @@ import {
   MAKEUP_NOTIFICATION_TYPES,
   isMakeupNotificationType,
   makeupNotificationHref,
-  makeupNotificationDetail,
-  makeupNotificationText,
+  makeupNotificationLines,
   makeupNotificationYm,
   makeupPointReasonLabel,
   toMakeupPointNotificationData,
@@ -84,36 +83,52 @@ describe("makeupPointReasonLabel", () => {
   });
 });
 
-describe("makeupNotificationText", () => {
-  it("月・理由を省いて、量とやることだけ短く出す", () => {
-    const point = { reason: "monthly-catchup", amount: 2 };
-    expect(makeupNotificationText(MAKEUP_NOTIFICATION_TYPES.POINT, point)).toBe(
-      "穴埋めポイント ＋2pt"
-    );
-    expect(makeupNotificationText(MAKEUP_NOTIFICATION_TYPES.POINT, null)).toBe(
-      "穴埋めポイント獲得"
-    );
-    expect(makeupNotificationText(MAKEUP_NOTIFICATION_TYPES.NEED_SECOND, null)).toBe(
-      "今日2枚目を投稿すると穴埋めできます"
-    );
-    expect(makeupNotificationText(MAKEUP_NOTIFICATION_TYPES.READY, null)).toBe("穴埋めできます");
+describe("makeupNotificationLines", () => {
+  const { POINT, NEED_SECOND, READY, LEGACY_REMINDER } = MAKEUP_NOTIFICATION_TYPES;
+
+  it("付与通知は1行目に量、通知ページの2行目だけ理由の表示名を（）で添える", () => {
+    const point = { reason: "monthly-catchup", amount: 2, label: "皆勤賞応援プレゼント" };
+    expect(makeupNotificationLines(POINT, point, "bell")).toEqual({
+      title: "🎫＋2pt",
+      detail: "皆勤賞の穴埋めポイントを獲得",
+    });
+    expect(makeupNotificationLines(POINT, point, "page")).toEqual({
+      title: "🎫＋2pt",
+      detail: "皆勤賞の穴埋めポイントを獲得しました（理由：皆勤賞応援プレゼント）。",
+    });
   });
 
-  it("旧 makeup-reminder の文言は従来のまま", () => {
-    expect(makeupNotificationText(MAKEUP_NOTIFICATION_TYPES.LEGACY_REMINDER, null)).toBe(
-      "皆勤賞まであと少し！1日2枚投稿して、穴埋めしよう。"
+  it("付与内容が読めない旧通知は量も理由も出さない", () => {
+    expect(makeupNotificationLines(POINT, null, "page")).toEqual({
+      title: "🎫",
+      detail: "皆勤賞の穴埋めポイントを獲得しました。",
+    });
+  });
+
+  it("促しの通知は1行目で種類を、2行目でやることを出す", () => {
+    expect(makeupNotificationLines(NEED_SECOND, null, "bell")).toEqual({
+      title: "👑穴埋めのススメ",
+      detail: "今日もう1枚投稿しませんか？",
+    });
+    expect(makeupNotificationLines(NEED_SECOND, null, "page").detail).toBe(
+      "投稿を忘れた日の穴埋めとして、今日もう1枚投稿しませんか？皆勤賞に近づきます！"
+    );
+    expect(makeupNotificationLines(READY, null, "bell")).toEqual({
+      title: "👑穴埋め設定",
+      detail: "カレンダーから穴埋めできます",
+    });
+    expect(makeupNotificationLines(READY, null, "page").detail).toBe(
+      "皆勤賞に向けて穴埋めできるようになりました。カレンダーの「編集」から埋める日を選べます。"
     );
   });
-});
 
-describe("makeupNotificationDetail", () => {
-  it("付与通知の2行目は理由の表示名と残ポイントの案内", () => {
-    const point = { reason: "monthly-catchup", amount: 1, label: "皆勤賞応援プレゼント" };
-    expect(makeupNotificationDetail(MAKEUP_NOTIFICATION_TYPES.POINT, point)).toBe(
-      "皆勤賞応援プレゼント。残ポイントはカレンダーで確認できます。"
-    );
-    expect(makeupNotificationDetail(MAKEUP_NOTIFICATION_TYPES.POINT, null)).toBe(
-      "残ポイントはカレンダーで確認できます。"
+  it("旧 makeup-reminder も同じ形で出す", () => {
+    expect(makeupNotificationLines(LEGACY_REMINDER, null, "bell")).toEqual({
+      title: "👑穴埋めのススメ",
+      detail: "1日2枚で穴埋めできます",
+    });
+    expect(makeupNotificationLines(LEGACY_REMINDER, null, "page").detail).toBe(
+      "皆勤賞まであと少し！別日に2枚以上投稿すると、未投稿の日を穴埋めできます。"
     );
   });
 });

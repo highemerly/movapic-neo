@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   monthlyCollageNotificationHref,
   monthlyCollageNotificationId,
-  monthlyCollageNotificationText,
+  monthlyCollageNotificationLines,
   toMonthlyCollageNotificationData,
 } from "./monthlyCollageNotificationType";
 
@@ -32,14 +32,24 @@ describe("toMonthlyCollageNotificationData", () => {
   });
 });
 
-describe("monthlyCollageNotificationText", () => {
-  it("対象月を出す（先頭0なし）", () => {
-    expect(monthlyCollageNotificationText({ ym: "2026-09" })).toBe("9月の月次画像を作れます");
-    expect(monthlyCollageNotificationText({ ym: "2026-12" })).toBe("12月の月次画像を作れます");
+describe("monthlyCollageNotificationLines", () => {
+  it("1行目に対象月（先頭0なし）。2行目はベルは短く、通知ページは説明つきの文章", () => {
+    expect(monthlyCollageNotificationLines({ ym: "2026-09" }, "bell")).toEqual({
+      title: "🖼️9月のまとめ",
+      detail: "月次画像を作れます",
+    });
+    expect(monthlyCollageNotificationLines({ ym: "2026-12" }, "page")).toEqual({
+      title: "🖼️12月のまとめ",
+      detail:
+        "12月の月次画像を作れます（ひと月の写真を1枚にまとめて、振り返ったり共有したりできます）。",
+    });
   });
 
   it("対象月が読めなければ月を出さない", () => {
-    expect(monthlyCollageNotificationText(null)).toBe("月次画像を作れます");
+    expect(monthlyCollageNotificationLines(null, "bell").title).toBe("🖼️まとめ");
+    expect(monthlyCollageNotificationLines(null, "page").detail).toBe(
+      "月次画像を作れます（ひと月の写真を1枚にまとめて、振り返ったり共有したりできます）。"
+    );
   });
 });
 

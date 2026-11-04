@@ -3,6 +3,7 @@ import {
   WELCOME_BACK_MIN_DAYS,
   toWelcomeBackNotificationData,
   welcomeBackDays,
+  welcomeBackNotificationLines,
   welcomeBackNotificationText,
 } from "./welcomeBackNotificationType";
 
@@ -58,5 +59,23 @@ describe("welcomeBackNotificationText", () => {
 
   it("日数が読めなければ日数を出さない", () => {
     expect(welcomeBackNotificationText(null)).toBe("おかえりなさい！戻ってきてくれてうれしいです！");
+  });
+});
+
+describe("welcomeBackNotificationLines", () => {
+  it("1行目で「おかえりなさい！」と言い、2行目では繰り返さない", () => {
+    expect(welcomeBackNotificationLines({ days: 45 }, "bell")).toEqual({
+      title: "👋おかえりなさい！",
+      detail: "45日ぶりの投稿です。",
+    });
+    expect(welcomeBackNotificationLines({ days: 45 }, "page")).toEqual({
+      title: "👋おかえりなさい！",
+      detail: "45日ぶりの投稿です。戻ってきてくれてうれしいです！",
+    });
+  });
+
+  it("日数が読めなければ日数を出さない", () => {
+    expect(welcomeBackNotificationLines(null, "bell").detail).toBe("戻ってきてくれてうれしいです！");
+    expect(welcomeBackNotificationLines(null, "page").detail).toBe("戻ってきてくれてうれしいです！");
   });
 });
