@@ -40,7 +40,7 @@
     "skia-canvas": "^3.0.8",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.7.0",
-    "ws": "^8.22.0"
+    "ws": "^8.22.1"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
