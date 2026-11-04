@@ -4,33 +4,23 @@ import { useMemo, useState } from "react";
 import Link from "@/components/Link";
 import type { NotificationFeedItem } from "@/lib/achievements/notifications";
 import { resolveAchievement } from "@/lib/achievements/catalog";
-import { favoriterName, formatNotificationDate } from "@/lib/notifications/format";
-import { ReactionSummary } from "@/components/notifications/ReactionSummary";
-import { FavoriterAvatars, type FavoriterAvatarItem } from "@/components/user/FavoriterAvatars";
+import { formatNotificationDate } from "@/lib/notifications/format";
+import { NotificationBody } from "@/components/notifications/NotificationBody";
 import { AchievementIcon } from "@/components/achievements/AchievementIcon";
 import {
   isMakeupNotificationType,
-  makeupNotificationDetail,
   makeupNotificationHref,
   makeupNotificationIcon,
-  makeupNotificationText,
 } from "@/lib/makeup/notificationTypes";
-import {
-  REPLY_NOTIFICATION_TYPE,
-  replierName,
-  replyNotificationText,
-} from "@/lib/notifications/replyNotificationType";
+import { REPLY_NOTIFICATION_TYPE } from "@/lib/notifications/replyNotificationType";
 import {
   WELCOME_BACK_NOTIFICATION_ICON,
   WELCOME_BACK_NOTIFICATION_TYPE,
-  welcomeBackNotificationText,
 } from "@/lib/notifications/welcomeBackNotificationType";
 import {
   MONTHLY_COLLAGE_NOTIFICATION_ICON,
   MONTHLY_COLLAGE_NOTIFICATION_TYPE,
-  monthlyCollageNotificationDetail,
   monthlyCollageNotificationHref,
-  monthlyCollageNotificationText,
 } from "@/lib/notifications/monthlyCollageNotificationType";
 
 type Category = "favorite" | "reply" | "achievement" | "other";
@@ -113,12 +103,6 @@ export function NotificationsList({
             const isReply = n.type === REPLY_NOTIFICATION_TYPE;
             const isWelcomeBack = n.type === WELCOME_BACK_NOTIFICATION_TYPE;
             const isMonthlyCollage = n.type === MONTHLY_COLLAGE_NOTIFICATION_TYPE;
-            // 2行目は名前の代わりにアイコンを並べる（リアクションは最新順・スレッドは投稿者1人）
-            const avatars: FavoriterAvatarItem[] = isFavorite
-              ? (n.favorite?.favoriters ?? []).map((f) => ({ ...f, label: favoriterName(f) }))
-              : isReply && n.reply
-                ? [{ ...n.reply, label: replierName(n.reply), profileUrl: null }]
-                : [];
             const a = !isReminder && !isFavorite && !isReply && n.achievementKey ? resolveAchievement(n.achievementKey) : null;
             const href = makeupType
               ? makeupNotificationHref(selfSeg, n.makeup?.ym ?? null)
@@ -155,37 +139,7 @@ export function NotificationsList({
                     </span>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium leading-snug line-clamp-2">
-                      {isFavorite ? (
-                        <ReactionSummary favorite={n.favorite} />
-                      ) : isReply ? (
-                        replyNotificationText()
-                      ) : isWelcomeBack ? (
-                        welcomeBackNotificationText(n.welcomeBack)
-                      ) : isMonthlyCollage ? (
-                        monthlyCollageNotificationText(n.monthlyCollage)
-                      ) : makeupType ? (
-                        makeupNotificationText(makeupType, n.makeup?.point ?? null)
-                      ) : (
-                        <>🏆 「<span className="font-semibold">{a?.title ?? "?"}</span>」を獲得</>
-                      )}
-                    </p>
-                    {isFavorite || isReply ? (
-                      avatars.length > 0 && (
-                        <div className="mt-1 flex">
-                          <FavoriterAvatars items={avatars} linked={false} />
-                        </div>
-                      )
-                    ) : isWelcomeBack ? null : (
-                      // おかえりは1行目の1文だけで伝える（2行目は持たない）
-                      <p className="mt-1 text-xs leading-snug text-muted-foreground line-clamp-2">
-                        {makeupType
-                          ? makeupNotificationDetail(makeupType, n.makeup?.point ?? null)
-                          : isMonthlyCollage
-                            ? monthlyCollageNotificationDetail()
-                            : a?.description ?? ""}
-                      </p>
-                    )}
+                    <NotificationBody n={n} variant="page" />
                     <p className="mt-1.5 text-[11px] text-muted-foreground">
                       {formatNotificationDate(n.createdAt)}
                     </p>

@@ -8,6 +8,8 @@
  * クライアントからも import されるため React・サーバー専用 API・env を import しないこと。
  */
 
+import type { NotificationVariant } from "./lines";
+
 export const REPLY_NOTIFICATION_TYPE = "reply";
 
 /** 通知フィードに載せるリプライの表示用データ（送信者はリプライ画像の投稿者から導出）。 */
@@ -25,9 +27,14 @@ export function replierName(reply: ReplyFeedData): string {
   return reply.displayName?.trim() || reply.acct.split("@")[0];
 }
 
+/** 1行目。絵文字だけで、何の通知かは2行目の文で言う。 */
+export const REPLY_NOTIFICATION_TITLE = "💬";
+
 /**
- * 1行本文（ベルと通知一覧の1行目で共用）。種別だけ伝え、誰からかは通知一覧の2行目のアイコンで出す。
+ * 2行目で、投稿した人のアイコンの後ろに続く文。
+ * 投稿者が取れない（hasActor=false）ときは主語を省く。
  */
-export function replyNotificationText(): string {
-  return "💬 スレッドに投稿";
+export function replyNotificationDetail(variant: NotificationVariant, hasActor: boolean): string {
+  if (variant === "bell") return hasActor ? "さんがスレッドに投稿" : "スレッドに投稿されました";
+  return hasActor ? "さんがあなたのスレッドに投稿しました。" : "あなたのスレッドに投稿されました。";
 }

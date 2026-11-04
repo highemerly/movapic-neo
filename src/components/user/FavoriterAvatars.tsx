@@ -26,17 +26,13 @@ const SIZE = {
  * サーバー描画では収まる数が測れず overflow-hidden だとアイコンが途中で切れてしまうため、
  * マウント後に実幅を測り、はみ出す分は描かず末尾に「…」を出す。幅はカードのレイアウトで
  * 変わりうるので ResizeObserver で追従する。総数は左の数字が示すのでここでは出さない。
- *
- * linked=false はプロフィールへのリンクを張らない（行全体が既にリンクの通知一覧で、<a> の入れ子を避けるため）。
  */
 export function FavoriterAvatars({
   items,
   size = "sm",
-  linked = true,
 }: {
   items: FavoriterAvatarItem[];
   size?: keyof typeof SIZE;
-  linked?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   // SSR とクライアント初回描画を一致させるため初期値は全件（マウント後に実測で絞る）。
@@ -84,7 +80,7 @@ export function FavoriterAvatars({
             {f.label.charAt(0)}
           </div>
         );
-        return linked && f.profileUrl ? (
+        return f.profileUrl ? (
           <a
             key={f.acct}
             href={f.profileUrl}

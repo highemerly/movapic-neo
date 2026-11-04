@@ -11,6 +11,7 @@
  */
 
 import { parseYm } from "@/lib/jst";
+import type { NotificationLines, NotificationVariant } from "./lines";
 
 export const MONTHLY_COLLAGE_NOTIFICATION_TYPE = "monthly-collage";
 
@@ -40,14 +41,18 @@ export function toMonthlyCollageNotificationData(
   return typeof ym === "string" && /^\d{4}-\d{2}$/.test(ym) ? { ym } : null;
 }
 
-/** 1行本文（ベルと通知一覧の1行目で共用）。 */
-export function monthlyCollageNotificationText(data: MonthlyCollageNotificationData | null): string {
-  return data ? `${parseYm(data.ym).month}月の月次画像を作れます` : "月次画像を作れます";
-}
-
-/** 通知一覧の2行目。 */
-export function monthlyCollageNotificationDetail(): string {
-  return "ひと月の写真を1枚にまとめて、振り返ったり共有したりできます";
+/** 本文。対象月が読めない旧形式の行は月を出さない。 */
+export function monthlyCollageNotificationLines(
+  data: MonthlyCollageNotificationData | null,
+  variant: NotificationVariant
+): NotificationLines {
+  const month = data ? `${parseYm(data.ym).month}月` : null;
+  const title = month ? `🖼️${month}のまとめ` : "🖼️まとめ";
+  if (variant === "bell") return { title, detail: "月次画像を作れます" };
+  return {
+    title,
+    detail: `${month ? `${month}の` : ""}月次画像を作れます（ひと月の写真を1枚にまとめて、振り返ったり共有したりできます）。`,
+  };
 }
 
 /**

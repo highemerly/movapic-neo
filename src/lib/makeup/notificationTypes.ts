@@ -12,6 +12,7 @@ import { PERFECT_MONTH_CATEGORY } from "@/lib/achievements/perfectMonth";
 import { parseYm } from "@/lib/jst";
 import { findMakeupEventByReason } from "./events";
 import { MAKEUP_POINT_REASONS } from "./points";
+import type { NotificationLines, NotificationVariant } from "@/lib/notifications/lines";
 
 /** achievementKey の接頭辞（perfectMonthKey が作る perfect-month:YYYY-MM の前半）。 */
 const PERFECT_MONTH_KEY_PREFIX = `${PERFECT_MONTH_CATEGORY}:`;
@@ -27,7 +28,7 @@ export const MAKEUP_NOTIFICATION_TYPES = {
    * 2026-09 以前の月の穴埋め推奨（月1通）。既存行の表示互換のため type 自体は残す。
    * 作成側（engine.maybeNotifyMakeup）は自動穴埋めの撤去で削除済み。
    * TODO(2026-12-29): 最後の行は 2026-09-30 作成で、通知は90日間一覧に出る。2026-12-29 以降に
-   * この type と表示の分岐（下の2か所）を削除してよい。
+   * この type と表示の分岐（makeupNotificationLines）を削除してよい。
    */
   LEGACY_REMINDER: "makeup-reminder",
 } as const;
@@ -75,23 +76,46 @@ export function makeupPointReasonLabel(reason: string, favorServers: readonly st
 }
 
 /**
- * 穴埋め系通知の1行本文（ベルと通知一覧の1行目で共用）。やること・量だけを短く出す
- * （対象月は遷移先のカレンダー、付与理由は通知一覧の2行目 makeupNotificationDetail で出す）。
- * point は makeup-point のときだけ使う。
+ * 穴埋め系通知の本文。point は makeup-point のときだけ使う（付与理由は通知ページだけ（）で添える）。
+ * 対象月は出さない（遷移先が対象月のカレンダー）。
  */
-export function makeupNotificationText(
+export function makeupNotificationLines(
   type: MakeupNotificationType,
-  point: MakeupPointNotificationData | null
-): string {
+  point: MakeupPointFeedData | null,
+  variant: NotificationVariant
+): NotificationLines {
+  const bell = variant === "bell";
   switch (type) {
     case MAKEUP_NOTIFICATION_TYPES.POINT:
-      return point ? `穴埋めポイント ＋${point.amount}pt` : "穴埋めポイント獲得";
+      return {
+        title: point ? `🎫＋${point.amount}pt` : "🎫",
+        detail: bell
+          ? "皆勤賞の穴埋めポイントを獲得"
+          : point
+            ? `皆勤賞の穴埋めポイントを獲得しました（理由：${point.label}）。`
+            : "皆勤賞の穴埋めポイントを獲得しました。",
+      };
     case MAKEUP_NOTIFICATION_TYPES.NEED_SECOND:
-      return "今日2枚目を投稿すると穴埋めできます";
+      return {
+        title: "👑穴埋めのススメ",
+        detail: bell
+          ? "今日もう1枚投稿しませんか？"
+          : "投稿を忘れた日の穴埋めとして、今日もう1枚投稿しませんか？皆勤賞に近づきます！",
+      };
     case MAKEUP_NOTIFICATION_TYPES.READY:
-      return "穴埋めできます";
+      return {
+        title: "👑穴埋め設定",
+        detail: bell
+          ? "カレンダーから穴埋めできます"
+          : "皆勤賞に向けて穴埋めできるようになりました。カレンダーの「編集」から埋める日を選べます。",
+      };
     case MAKEUP_NOTIFICATION_TYPES.LEGACY_REMINDER:
-      return "皆勤賞まであと少し！1日2枚投稿して、穴埋めしよう。";
+      return {
+        title: "👑穴埋めのススメ",
+        detail: bell
+          ? "1日2枚で穴埋めできます"
+          : "皆勤賞まであと少し！別日に2枚以上投稿すると、未投稿の日を穴埋めできます。",
+      };
   }
 }
 
@@ -117,25 +141,6 @@ export function toMakeupPointNotificationData(data: unknown): MakeupPointNotific
   if (typeof data !== "object" || data === null) return null;
   const { reason, amount } = data as Record<string, unknown>;
   return typeof reason === "string" && typeof amount === "number" ? { reason, amount } : null;
-}
-
-/** 通知一覧の2行目（補足説明）。付与理由は1行目（ベルと共用で短く保つ）ではなくここで出す。 */
-export function makeupNotificationDetail(
-  type: MakeupNotificationType,
-  point: MakeupPointFeedData | null
-): string {
-  switch (type) {
-    case MAKEUP_NOTIFICATION_TYPES.POINT:
-      return point
-        ? `${point.label}。残ポイントはカレンダーで確認できます。`
-        : "残ポイントはカレンダーで確認できます。";
-    case MAKEUP_NOTIFICATION_TYPES.NEED_SECOND:
-      return "今日もう1枚投稿すると、その写真で投稿を忘れた日を埋められます";
-    case MAKEUP_NOTIFICATION_TYPES.READY:
-      return "カレンダーの「編集」から、埋める日を選べます";
-    case MAKEUP_NOTIFICATION_TYPES.LEGACY_REMINDER:
-      return "別日に2枚以上投稿すると、未投稿の日を穴埋めできます";
-  }
 }
 
 /** 通知のアイコン名（AchievementIcon に登録済みの lucide アイコン名）。 */

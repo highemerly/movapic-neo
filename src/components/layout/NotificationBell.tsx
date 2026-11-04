@@ -16,25 +16,19 @@ import {
   isMakeupNotificationType,
   makeupNotificationHref,
   makeupNotificationIcon,
-  makeupNotificationText,
 } from "@/lib/makeup/notificationTypes";
 import { formatNotificationDate } from "@/lib/notifications/format";
-import {
-  REPLY_NOTIFICATION_TYPE,
-  replyNotificationText,
-} from "@/lib/notifications/replyNotificationType";
+import { REPLY_NOTIFICATION_TYPE } from "@/lib/notifications/replyNotificationType";
 import {
   WELCOME_BACK_NOTIFICATION_ICON,
   WELCOME_BACK_NOTIFICATION_TYPE,
-  welcomeBackNotificationText,
 } from "@/lib/notifications/welcomeBackNotificationType";
 import {
   MONTHLY_COLLAGE_NOTIFICATION_ICON,
   MONTHLY_COLLAGE_NOTIFICATION_TYPE,
   monthlyCollageNotificationHref,
-  monthlyCollageNotificationText,
 } from "@/lib/notifications/monthlyCollageNotificationType";
-import { ReactionSummary } from "@/components/notifications/ReactionSummary";
+import { NotificationBody } from "@/components/notifications/NotificationBody";
 import { useUnseenNotifications, useUnseenBadge } from "./useUnseenNotifications";
 
 export function NotificationBell() {
@@ -113,19 +107,7 @@ export function NotificationBell() {
                       </span>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium leading-tight">
-                        {isFavorite
-                          ? <ReactionSummary favorite={n.favorite} />
-                          : isReply
-                            ? replyNotificationText()
-                            : isWelcomeBack
-                            ? welcomeBackNotificationText(n.welcomeBack)
-                            : isMonthlyCollage
-                            ? monthlyCollageNotificationText(n.monthlyCollage)
-                            : makeupType
-                            ? makeupNotificationText(makeupType, n.makeup?.point ?? null)
-                            : `🏆 ${a?.title ?? "?"}`}
-                      </p>
+                      <NotificationBody n={n} variant="bell" />
                       <p className="mt-0.5 text-[11px] text-muted-foreground">
                         {formatNotificationDate(n.createdAt)}
                       </p>

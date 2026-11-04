@@ -11,6 +11,7 @@
  */
 
 import { toJstDateString } from "@/lib/streak";
+import type { NotificationLines, NotificationVariant } from "./lines";
 
 export const WELCOME_BACK_NOTIFICATION_TYPE = "welcome-back";
 
@@ -58,14 +59,26 @@ export function toWelcomeBackNotificationData(data: unknown): WelcomeBackNotific
 }
 
 /**
- * 本文（ベル・通知一覧・投稿直後のトーストで共用）。補足の2行目は持たず、この1文だけで伝える
- * （トーストに2行目を足すと長くなり、投稿完了のトーストと重なって読みにくいため）。
+ * 投稿直後のトーストの本文。トーストは1文だけで伝える（2行に分けると長くなり、投稿完了の
+ * トーストと重なって読みにくいため）。ベル・通知ページは welcomeBackNotificationLines。
  */
 export function welcomeBackNotificationText(data: WelcomeBackNotificationData | null): string {
   const thanks = "戻ってきてくれてうれしいです！";
   return data
     ? `おかえりなさい！${data.days}日ぶりの投稿です。${thanks}`
     : `おかえりなさい！${thanks}`;
+}
+
+/** ベル・通知ページの本文。「おかえりなさい！」は1行目に出すので2行目では繰り返さない。 */
+export function welcomeBackNotificationLines(
+  data: WelcomeBackNotificationData | null,
+  variant: NotificationVariant
+): NotificationLines {
+  const title = "👋おかえりなさい！";
+  const thanks = "戻ってきてくれてうれしいです！";
+  if (!data) return { title, detail: thanks };
+  const since = `${data.days}日ぶりの投稿です。`;
+  return { title, detail: variant === "bell" ? since : `${since}${thanks}` };
 }
 
 /** 写真が削除されたときに出すアイコン名（AchievementIcon に登録済みの lucide アイコン名）。 */

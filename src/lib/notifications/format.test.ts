@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import type { FavoriteFeedData } from "@/components/layout/useUnseenNotifications";
-import { favoriteNotificationOverflow, favoriterName, latestReactionEmojis } from "./format";
+import {
+  achievementNotificationLines,
+  favoriteNotificationOverflow,
+  favoriterName,
+  latestReactionEmojis,
+  reactionNotificationDetail,
+} from "./format";
 
 function feed(emojis: (string | null)[]): FavoriteFeedData {
   return {
@@ -51,5 +57,39 @@ describe("favoriterName", () => {
     const base = { avatarUrl: null, profileUrl: null, emoji: null, emojiImageUrl: null };
     expect(favoriterName({ ...base, acct: "bob@ex.com", displayName: "ボブ" })).toBe("ボブ");
     expect(favoriterName({ ...base, acct: "bob@ex.com", displayName: " " })).toBe("bob");
+  });
+});
+
+describe("reactionNotificationDetail", () => {
+  it("アイコンの後ろに続く文。ベルは短く、通知ページは文章", () => {
+    expect(reactionNotificationDetail("bell", true)).toBe("さんからリアクションを受信");
+    expect(reactionNotificationDetail("page", true)).toBe("さんからのリアクションを受信しました。");
+  });
+
+  it("名前の一覧が取れていなければ主語を省く", () => {
+    expect(reactionNotificationDetail("bell", false)).toBe("リアクションを受信");
+    expect(reactionNotificationDetail("page", false)).toBe("リアクションを受信しました。");
+  });
+});
+
+describe("achievementNotificationLines", () => {
+  const a = { title: "はじめの一歩", description: "記念すべき1枚目を投稿しました" };
+
+  it("1行目は実績名。説明は通知ページだけ（）で添える", () => {
+    expect(achievementNotificationLines(a, "bell")).toEqual({
+      title: "🏆はじめの一歩",
+      detail: "実績を獲得",
+    });
+    expect(achievementNotificationLines(a, "page")).toEqual({
+      title: "🏆はじめの一歩",
+      detail: "実績を獲得しました（記念すべき1枚目を投稿しました）。",
+    });
+  });
+
+  it("実績が解決できなければ ? と、説明なしの文", () => {
+    expect(achievementNotificationLines(null, "page")).toEqual({
+      title: "🏆?",
+      detail: "実績を獲得しました。",
+    });
   });
 });
