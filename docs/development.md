@@ -79,24 +79,38 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
 | `e2e/**` | ✓ | – | ✓ |
 | `workers/**`（本番イメージに入らないが tsc・eslint の対象） | ✓ | – | – |
 | ワークフロー（checks.yml / golden.yml / e2e.yml） | そのワークフローのジョブだけ | 同左 | 同左 |
-| ドキュメント（`*.md`・`docs/**`）・`.claude/**`・`.githooks/**`・ruleset・Renovate 設定・リリースノートの分類（`.github/release.yml`）・docker-build.yml | – | – | – |
+| ドキュメント（`*.md`・`docs/**`）・`.claude/**`・`.githooks/**`・ruleset・Renovate 設定・リリースノートの分類（`.github/release.yml`）・docker-build.yml・tag-release.yml | – | – | – |
 | `release/*` ブランチ（リリースの準備＝アプリ内のリリースノートだけ） | – | – | – |
 
 - **一覧に無い種類のファイルは3つとも回す**（知らない変更を素通しさせない）。`src/**` は golden・e2e も必ず回す: 描画は src のどこから壊れるか分からず、E2E が壊れたまま進むと以後の依存更新を確かめられなくなるため。
 - 必須チェックは結果をまとめる `ci-result` だけ。成功・スキップは通し、失敗・キャンセルは落とす。
 - **main への push では回さない**。マージ前に同じ中身をブランチで通しており、リリースのタグで全部回すため（以前は main でも回していたが、マージが続くと concurrency で途中の実行が捨てられ、ほぼ二重実行だった）。
-- **リリース（タグ push）では [docker-build.yml](../.github/workflows/docker-build.yml) が checks・golden・e2e を全部回す**。e2e は push したばかりの本番イメージ（＝デプロイするもの）で回す。全部緑で初めて k8s マニフェストへ PR が出る。ブランチで省いた検査で壊れていたら、ここで止まる（直す PR を出してタグを打ち直す）。
+- **リリース（タグ push・Tag a release）では [docker-build.yml](../.github/workflows/docker-build.yml) が checks・golden・e2e を全部回す**。e2e は push したばかりの本番イメージ（＝デプロイするもの）で回す。全部緑で初めてデプロイ PR が出る。ブランチで省いた検査で壊れていたら、ここで止まる（直す PR を出して次の版を出す）。
 
 ## リリース
-1. 版はタグだけに持つので、パッチは PR なしでタグを打てる。マイナー・メジャーはアプリ内のリリースノートを足す PR（`release/vX.Y.Z`）を先にマージする（下の「リリースの準備で行うこと」）。Claude Code に `/release [X.Y.Z]`（または「1.5.2 を出したい」）と頼めば、差分から版を提案し、要るなら PR を作り、タグを打つコマンドも案内する（ユーザー共通の release スキル）。
-2. main を pull し、タグを push する（タグは ruleset の対象外）:
+1. 版はタグだけに持つので、パッチは PR なしで出せる。マイナー・メジャーはアプリ内のリリースノートを足す PR（`release/vX.Y.Z`）を先にマージする（下の「リリースの準備で行うこと」）。Claude Code に `/release [X.Y.Z]`（または「1.5.2 を出したい」）と頼めば、差分から版を提案し、要るなら PR を作り、リリースのコマンドも案内する（ユーザー共通の release スキル）。
+2. Actions の画面の **Tag a release**（[tag-release.yml](../.github/workflows/tag-release.yml)）で、上げ方（patch・minor・major）を選んで実行する。main の先頭に次の版のタグを打ち、docker-build.yml を呼ぶ。コマンドなら:
+   ```bash
+   gh workflow run tag-release.yml --ref main -f bump=patch
+   ```
+   飛び番の版を出すときは、手元でタグを push する（タグは ruleset の対象外。push でも同じことが起きる）:
    ```bash
    git switch main && git pull && git tag vX.Y.Z && git push origin vX.Y.Z
    ```
-3. タグ push で [docker-build.yml](../.github/workflows/docker-build.yml) がイメージをビルド・push し、checks・golden・e2e（そのイメージで）が全部通ったら GitHub Release を作り、マニフェストのリポジトリ（非公開）へイメージの版を上げる PR（デプロイ PR。web・worker-front・compute の3つ）を出す。
+3. [docker-build.yml](../.github/workflows/docker-build.yml) がイメージをビルド・push し、checks・golden・e2e（そのイメージで）が全部通ったら GitHub Release を作り、マニフェストのリポジトリ（非公開）へイメージの版を上げる PR（デプロイ PR。web・worker-front・compute の3つ）を出す。
 4. デプロイ PR を確かめてマージする。マニフェストのリポジトリは Flux 同期なので、**マージがそのまま本番へのデプロイ**（約1分で反映）。
    - `requires-migration` ラベルが付いていたら、**マージ前に**本番 DB へマイグレーションを当てる（手順は PR 本文と [architecture.md](architecture.md#本番dbマイグレーション)）。
    - マニフェストのリポジトリは必須チェックを設定できない（Free プランの非公開リポジトリ）ので、そちらの CI（yamllint・kubeconform）が緑かは目で見る。
+
+### 版の上げ方
+| 上げ方 | いつ |
+|---|---|
+| patch | 修正と依存の更新だけ |
+| minor | 新しい機能（利用者・運用者から見てできることが増えた） |
+| major | 互換性を崩す |
+
+- Tag a release は前回のタグ（`vX.Y.Z` の形のもの）から計算する。main 以外から実行したとき・前回のタグからコミットが無いときは止まる。2つ同時には走らない（同じ版を打たないよう concurrency で1つずつ）。
+- **GITHUB_TOKEN で push したタグでは、ほかのワークフロー（docker-build.yml の `on: push`）は起動しない**。だから tag-release.yml が docker-build.yml を `workflow_call` で直接呼ぶ（PAT も要らず、二重にも走らない）。呼ぶときの `permissions` は呼ばれる側の権限の和（`contents: write`＝Release・`packages: write`＝イメージ）。
 
 ### リリースの準備で行うこと
 - **版はタグだけに持つ**（package.json に `version` を持たない＝版上げの PR が要らない）。docker-build.yml がタグの版をビルド引数 `APP_VERSION` で渡し、[next.config.ts](../next.config.ts) がバンドルへ埋め込む。読むのは [version.ts](../src/lib/version.ts) の `APP_VERSION` だけ（/docs の表記・User-Agent・`/api/health`・/admin）。タグ以外のビルド（ブランチの e2e・golden、手元の dev）は `dev.YYYYMMDDHHMMSS`（ビルドした JST の時刻）になる。
@@ -121,5 +135,5 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
 - 起点（前回のタグ）は明示している。省くと GitHub は前回の Release を起点にするが、v1.5.3 以前は Release をマイナーごとにしか作っていない（手書き。そのまま残す）。
 - 利用者向けのリリースノート（[releaseNotes.ts](../src/data/releaseNotes.ts)・日本語・マイナーごと）とは別物。
 
-### 作り直し（workflow_dispatch）
-docker-build.yml は Actions の画面から手動でも動かせる（同じ版のイメージを作り直したいとき）。入力の tag はそのままイメージのタグとマニフェストの版になるので、**`v` を付けずに** `X.Y.Z` で入れる。検査が全部通れば同じ書式でデプロイ PR が出る（GitHub Release は作らない）。
+### 作り直し
+失敗した実行は Actions の画面で **Re-run**（失敗したジョブだけ・全部）する。以前の docker-build.yml の手動実行（workflow_dispatch）はやめた: 任意のブランチ・任意の版の文字列で、デプロイ PR まで出せてしまうため。
