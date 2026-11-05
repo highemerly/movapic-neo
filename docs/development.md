@@ -2,9 +2,12 @@
 
 ## ブランチと PR
 - **main へは直接コミット・push しない**。変更は必ずブランチを切り、PR → CI 緑 → squash マージで取り込む（依存更新を Renovate の PR で回すため、人の変更も同じ経路に揃える）。
-- 手元: [.githooks/pre-commit](../.githooks/pre-commit) が main 上のコミットを拒否する。clone ごとに1回有効化する:
+- 手元: [.githooks/pre-commit](../.githooks/pre-commit) が main 上のコミットを拒否する。clone ごとに1回有効化する。
+  あわせてコミットの作者のメールを GitHub の noreply にする（公開リポジトリなので、ブランチのコミットの作者は PR の画面で誰でも見られる。
+  squash のコミットは GitHub の設定のメールになるが、ブランチのコミットは手元の設定のまま残る）:
   ```bash
   git config core.hooksPath .githooks
+  git config user.email 3039555+highemerly@users.noreply.github.com
   ```
 - サーバー側: GitHub の ruleset（定義は [.github/rulesets/main.json](../.github/rulesets/main.json)）が main への push を拒否する。
 
