@@ -31,6 +31,7 @@
 git clone <repository-url>
 cd movapic-neo
 git config core.hooksPath .githooks   # main への直接コミットを止める（docs/development.md）
+git config user.email 3039555+highemerly@users.noreply.github.com   # コミットの作者を noreply に（docs/development.md）
 npm install
 ```
 

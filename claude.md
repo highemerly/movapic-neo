@@ -9,6 +9,9 @@
 - 問題は常に root cause を調べ、直接解決する。フォールバック処理を作ってごまかさない。原因がわからない、または実害があるかわからない段階で「念のため」の処理を作らない。
 - コメントにはWhat/HowでなくWhyを残す。ただし、過去の pitfall および対策内容は残す。
 
+## 公開リポジトリ
+- コミットの作者のメールは GitHub の noreply（`3039555+highemerly@users.noreply.github.com`）にする（設定は [docs/development.md](docs/development.md)「ブランチと PR」）。
+
 ## 概要
 画像に文字（コメント）を入れて生成し、Fediverseに同時投稿するWebアプリ。昔の携帯百景。
 入力オプションの各値・文字レンダリングの概要は [README](README.md) 参照。
