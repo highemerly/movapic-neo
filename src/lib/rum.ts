@@ -5,7 +5,7 @@
  *
  * ビーコンは自サイトと同じオリジンの `/_n-rum/` から配る。このパスは Next へ届かない —
  * Ingress が `/_n-rum/{beacon.js,web-vitals.js,rum-config.json,collect}` の4パスだけを
- * コレクタ（next-rum）へ回し、プレフィックスを剥がす（k8s/worker-front-deployment.yaml 末尾の例）。
+ * コレクタ（next-rum）へ回し、プレフィックスを剥がす（IngressRoute はマニフェストのリポジトリ）。
  * 同一オリジンなので CSP は script-src / connect-src とも 'self' で足り、緩和は要らない。
  *
  * 有効/無効を NODE_ENV で決めないのは、Ingress にルートが無い環境（検証環境・ローカルの

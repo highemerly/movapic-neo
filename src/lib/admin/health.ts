@@ -14,7 +14,7 @@
  * dev の all-in-one（COMPONENT_ROLE 未設定）は compute も streaming も同一プロセスなので、
  * HTTP を張らず in-process 参照で確認する（＝ローカルでもそのまま動く）。
  *
- * 本番の web deployment（外部 K8S_REPO 管理）に WORKER_FRONT_INTERNAL_URL /
+ * 本番の web deployment（マニフェストのリポジトリで管理）に WORKER_FRONT_INTERNAL_URL /
  * COMPUTE_SERVICE_URL が未設定でも壊れず、「確認できません（unknown）」として表示する。
  */
 

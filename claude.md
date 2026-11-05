@@ -10,6 +10,7 @@
 - コメントにはWhat/HowでなくWhyを残す。ただし、過去の pitfall および対策内容は残す。
 
 ## 公開リポジトリ
+- インフラの非公開の情報（マニフェストのリポジトリ名・パス、namespace・クラスタ内の名前や IP）をコード・docs・コメント・コミットメッセージ・PR に書かない。ワークフローで要るものはシークレットに置く（Actions のログも公開される）。k8s のマニフェストとクラスタ側の手順は、非公開のマニフェストのリポジトリにある。
 - コミットの作者のメールは GitHub の noreply（`3039555+highemerly@users.noreply.github.com`）にする（設定は [docs/development.md](docs/development.md)「ブランチと PR」）。
 
 ## 概要
