@@ -260,6 +260,8 @@ jobs:
           token: ${{ secrets.K8SG1_PAT }}
           branch: update-movapic-neo-${{ needs.build-and-push.outputs.version }}
           delete-branch: true
+          # マニフェストのリポジトリには PR が大量に来るので、自分に assign して「Assigned to you」で見落とさないようにする
+          assignees: ${{ github.repository_owner }}
           commit-message: Update movapic-neo to ${{ needs.build-and-push.outputs.version }}
           title: Update movapic-neo to ${{ needs.build-and-push.outputs.version }}
           body-path: ${{ runner.temp }}/pr-body.md

@@ -8,6 +8,8 @@
   // 週2回にまとめる（毎日 PR が来ると確認が追いつかず、週1だと間隔が空きすぎる）。
   schedule: ['before 9am on monday and thursday'],
   labels: ['dependencies'],
+  // PR が多くのリポジトリに来て見落とすので、自分に assign して github.com/pulls の「Assigned to you」にまとめる。
+  assignees: ['highemerly'],
   // npm 10.9.2 は vitest の peer 解決で lockfile 更新がクラッシュする（arborist の
   // `Cannot read properties of null (reading 'edgesOut')`）。lockfile は npm 11 で更新させる。
   constraints: {

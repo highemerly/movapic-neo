@@ -2,6 +2,7 @@
 
 ## ブランチと PR
 - **main へは直接コミット・push しない**。変更は必ずブランチを切り、PR → CI 緑 → squash マージで取り込む（依存更新を Renovate の PR で回すため、人の変更も同じ経路に揃える）。
+- PR は自分に assign する（`gh pr create --assignee @me`）。Renovate の PR とマニフェストのリポジトリへのデプロイ PR も自動で assign される。どのリポジトリの PR も github.com/pulls の「Assigned to you」にまとまるので、見落とさない。
 - 手元: [.githooks/pre-commit](../.githooks/pre-commit) が main 上のコミットを拒否する。clone ごとに1回有効化する。
   あわせてコミットの作者のメールを GitHub の noreply にする（公開リポジトリなので、ブランチのコミットの作者は PR の画面で誰でも見られる。
   squash のコミットは GitHub の設定のメールになるが、ブランチのコミットは手元の設定のまま残る）:
