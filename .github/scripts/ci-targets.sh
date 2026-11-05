@@ -23,7 +23,7 @@ if [[ "$branch" != release/* ]]; then
       # 動作に影響しないもの（ドキュメント・Claude Code のスキル・ローカル hook・GitHub の設定）
       *.md | docs/* | .claude/* | .githooks/* | .github/rulesets/* | .github/renovate.json5 | .github/release.yml | LICENSE) ;;
       # タグ push でしか動かない（ブランチでは確かめようがない）
-      .github/workflows/docker-build.yml) ;;
+      .github/workflows/docker-build.yml | .github/workflows/tag-release.yml) ;;
       # ワークフロー単体の変更（Actions の更新など）は、それを使うジョブだけ
       .github/workflows/checks.yml) checks=true ;;
       .github/workflows/golden.yml) golden=true ;;

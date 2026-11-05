@@ -4,13 +4,16 @@ on:
   push:
     tags:
       - 'v*'
-  # 作り直し用。入力はそのままイメージタグと k8s マニフェストの版になる（`v` は外れない）ので、
-  # タグ push 時と揃えて `v` を付けずに入れる。既定値は置かない（以前は latest で、そのまま実行すると
-  # マニフェストが :latest になり得た）。
-  workflow_dispatch:
+  # tag-release.yml（Actions の画面から手で実行）がタグを打ってから呼ぶ。GITHUB_TOKEN で push したタグでは
+  # ワークフローが起動しないため、push を待たずに直接呼んでもらう。そのタグは github.sha に付いているので、
+  # checkout（既定で github.sha）・checks・golden・e2e もそのタグと同じコミットを見る。
+  # 失敗した実行の作り直しは、Actions の画面の Re-run で行う（以前の workflow_dispatch はやめた。任意の
+  # ブランチ・任意の版の文字列でデプロイ PR まで出せてしまうため）。
+  workflow_call:
     inputs:
-      tag:
-        description: 'Image tag without "v" (e.g., 1.5.3)'
+      version:
+        description: 'Version without "v" (e.g., 1.2.3). The tag vX.Y.Z must already point at github.sha'
+        type: string
         required: true
 
 env:
@@ -18,12 +21,12 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # CI（vitest / eslint / tsc）。build-and-push と並走し、両方緑になって初めて
+  # CI（vitest / eslint / tsc）。build と並走し、両方緑になって初めて
   # create-k8s-pr が走る（下の needs 参照）。定義は checks.yml に集約。
   checks:
     uses: ./.github/workflows/checks.yml
 
-  # ゴールデン画像テスト（skia 実描画の見た目回帰）。build-and-push と並走し、退行があれば
+  # ゴールデン画像テスト（skia 実描画の見た目回帰）。build と並走し、退行があれば
   # create-k8s-pr を止める。定義は golden.yml に集約。
   golden:
     uses: ./.github/workflows/golden.yml
@@ -33,21 +36,21 @@ jobs:
   # E2E スモーク。push したばかりの本番イメージそのもの（＝デプロイするもの）で回す。ブランチの CI は
   # 差分で E2E を省くことがあるので、リリースではここで必ず通してから k8s マニフェストへ PR する。
   e2e:
-    needs: build-and-push
+    needs: build
     uses: ./.github/workflows/e2e.yml
     with:
-      image: ${{ needs.build-and-push.outputs.image }}
+      image: ${{ needs.build.outputs.image }}
     secrets:
       FONT_REPO_TOKEN: ${{ secrets.FONT_REPO_TOKEN }}
 
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     outputs:
       version: ${{ steps.version.outputs.version }}
-      # E2E が pull するイメージ（metadata-action の {{version}} / workflow_dispatch の tag と同じ値）
+      # E2E が pull するイメージ（metadata-action の {{version}} と同じ値）
       image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.version }}
       # create-k8s-pr が PR 本文（差分のリンク・コミット一覧）に使う。前回のタグが無ければ空
       prev_tag: ${{ steps.migration.outputs.prev_tag }}
@@ -81,17 +84,12 @@ jobs:
 
       # 入力は `${{ }}` で run: に直接埋めない（シェルの文字列として解釈され、
       # 値に `"` や `$(...)` があればそのまま実行される）。環境変数で渡す
+      # tag-release.yml から呼ばれたときは github.ref が main なので、ref からは版が取れない。入力を優先する
       - name: Extract version
         id: version
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          INPUT_TAG: ${{ github.event.inputs.tag }}
-        run: |
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            echo "version=$INPUT_TAG" >> "$GITHUB_OUTPUT"
-          else
-            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
-          fi
+          INPUT_VERSION: ${{ inputs.version }}
+        run: echo "version=${INPUT_VERSION:-${GITHUB_REF#refs/tags/v}}" >> "$GITHUB_OUTPUT"
 
       - name: Check for migration changes
         id: migration
@@ -116,13 +114,14 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # tag-release.yml から呼ばれたときは github.ref が main なので、版は value で渡す
+          flavor: latest=false
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{version}},value=v${{ steps.version.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ steps.version.outputs.version }}
+            type=raw,value=latest
 
-      # BuildKit の --mount=type=cache（.next/cache・npm）は type=gha では永続化されないため、
+      # BuildKit の --mount=type=cache（.next/cache・npm）はレジストリのキャッシュ（type=registry）では永続化されないため、
       # actions/cache 経由でラウンドトリップさせて Next.js のビルドを差分化する
       - name: Restore build cache mounts
         uses: reproducible-containers/buildkit-cache-dance@v3.4.0
@@ -153,7 +152,7 @@ jobs:
   # ノートは GitHub の自動生成（前回のタグからマージされた PR の一覧・英語。分類は .github/release.yml）。
   # 同じノートを create-k8s-pr がデプロイ PR の本文に使う（変更の一覧の出どころを1つにする）。
   release:
-    needs: [build-and-push, checks, golden, e2e]
+    needs: [build, checks, golden, e2e]
     runs-on: ubuntu-latest
     permissions:
       # generate-notes API も Release の作成も contents: write が要る
@@ -164,13 +163,12 @@ jobs:
     steps:
       # 前回のタグは明示する。省くと GitHub は前回の「Release」を起点にするが、
       # v1.5.3 以前は Release をマイナーごとにしか作っていない。
-      # workflow_dispatch（作り直し）でタグが無いときは target_commitish の時点で生成される。
       - name: Generate release notes
         id: notes
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.build-and-push.outputs.version }}
-          PREV_TAG: ${{ needs.build-and-push.outputs.prev_tag }}
+          VERSION: ${{ needs.build.outputs.version }}
+          PREV_TAG: ${{ needs.build.outputs.prev_tag }}
         run: |
           args=(-f tag_name="v$VERSION" -f target_commitish="$GITHUB_SHA")
           if [ -n "$PREV_TAG" ]; then args+=(-f previous_tag_name="$PREV_TAG"); fi
@@ -182,20 +180,20 @@ jobs:
             echo "NOTES_EOF"
           } >> "$GITHUB_OUTPUT"
 
-      # 作り直し（workflow_dispatch）では Release は作らない（タグが無い・既にある）
+      # タグ名は版から作る（tag-release.yml から呼ばれたときは GITHUB_REF_NAME が main のため）
       - name: Create release
-        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
-            --title "$GITHUB_REF_NAME" --notes-file "$RUNNER_TEMP/notes.md"
+          gh release create "v$VERSION" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "v$VERSION" --notes-file "$RUNNER_TEMP/notes.md"
 
   create-k8s-pr:
     # ビルド・CI・ゴールデン画像テスト・E2E が全て成功したときだけ k8s マニフェストへ PR する（release が
     # 同じ条件で待っているので、それを待てば足りる）。マニフェストのリポジトリは Flux 同期なので、この PR の
     # マージがそのまま本番へのデプロイになる。
-    needs: [build-and-push, release]
+    needs: [build, release]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -218,7 +216,7 @@ jobs:
       # PR を作らずに黙って成功する（＝デプロイされないのに緑）。書き換わったことを確かめて落とす
       - name: Update image tag
         env:
-          IMAGE: ${{ needs.build-and-push.outputs.image }}
+          IMAGE: ${{ needs.build.outputs.image }}
         working-directory: k8s-repo
         run: |
           repo="${IMAGE%:*}"
@@ -234,9 +232,9 @@ jobs:
       # 名前なので、ここには <...> の引数として書き、実際の値はマニフェストのリポジトリの手順書に置く。
       - name: Write PR body
         env:
-          IMAGE: ${{ needs.build-and-push.outputs.image }}
+          IMAGE: ${{ needs.build.outputs.image }}
           NOTES: ${{ needs.release.outputs.notes }}
-          HAS_MIGRATION: ${{ needs.build-and-push.outputs.has_migration }}
+          HAS_MIGRATION: ${{ needs.build.outputs.has_migration }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           {
@@ -267,15 +265,15 @@ jobs:
         with:
           path: k8s-repo
           token: ${{ secrets.K8SG1_PAT }}
-          branch: update-movapic-neo-${{ needs.build-and-push.outputs.version }}
+          branch: update-movapic-neo-${{ needs.build.outputs.version }}
           delete-branch: true
           # マニフェストのリポジトリには PR が大量に来るので、自分に assign して「Assigned to you」で見落とさないようにする
           assignees: ${{ github.repository_owner }}
-          commit-message: Update movapic-neo to ${{ needs.build-and-push.outputs.version }}
-          title: Update movapic-neo to ${{ needs.build-and-push.outputs.version }}
+          commit-message: Update movapic-neo to ${{ needs.build.outputs.version }}
+          title: Update movapic-neo to ${{ needs.build.outputs.version }}
           body-path: ${{ runner.temp }}/pr-body.md
           # app-update: マニフェストのリポジトリに大量に来る PR のうちアプリの版上げを見分ける（全アプリ共通）。
           # アプリ名はタイトルにあるのでアプリ別のラベルは付けない
           labels: |
             app-update
-            ${{ needs.build-and-push.outputs.has_migration == 'true' && 'requires-migration' || '' }}
+            ${{ needs.build.outputs.has_migration == 'true' && 'requires-migration' || '' }}
