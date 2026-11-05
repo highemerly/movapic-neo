@@ -1,7 +1,19 @@
 import type { NextConfig } from "next";
 
+// アプリの版はタグだけに持つ（package.json に持たない＝版上げの PR が要らない）。リリースのビルドは
+// docker-build.yml がタグの版を APP_VERSION で渡す。それ以外（ブランチの e2e・golden のビルド、手元の dev）は
+// ビルドした時刻（JST）で dev.YYYYMMDDHHMMSS にする（どのビルドか見分けられるように）。
+// env に入れた値はビルド時にバンドルへ埋め込まれるので、全 tier（同一イメージ）で同じ値になる。
+function devVersion(now = new Date()): string {
+  const jst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return `dev.${jst.toISOString().replace(/\D/g, "").slice(0, 14)}`;
+}
+
 const nextConfig: NextConfig = {
   output: "standalone",
+  env: {
+    APP_VERSION: process.env.APP_VERSION || devVersion(),
+  },
   // 開発時に許可するクロスオリジン（LAN内のスマホ等からアクセスする用）
   allowedDevOrigins: ["192.168.110.136", "192.168.110.146"],
   // ネイティブモジュールをサーバーサイドでのみ使用（バンドルから除外）

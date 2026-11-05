@@ -46,6 +46,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # サーバーポリシー系（ALLOWED_SERVERS 等）は全ページが動的レンダリングのためビルド時には不要
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 
+# アプリの版。リリースでは docker-build.yml がタグの版を渡す。渡さないビルド（ブランチの e2e・golden）は
+# next.config.ts が dev.YYYYMMDDHHMMSS にする。値が毎回変わるので、ビルドの直前に置いて上の層のキャッシュを保つ
+ARG APP_VERSION
+
 RUN --mount=type=cache,target=/app/.next/cache \
     npm run build
 

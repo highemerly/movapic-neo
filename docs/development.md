@@ -80,7 +80,7 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
 | `workers/**`（本番イメージに入らないが tsc・eslint の対象） | ✓ | – | – |
 | ワークフロー（checks.yml / golden.yml / e2e.yml） | そのワークフローのジョブだけ | 同左 | 同左 |
 | ドキュメント（`*.md`・`docs/**`）・`.claude/**`・`.githooks/**`・ruleset・Renovate 設定・リリースノートの分類（`.github/release.yml`）・docker-build.yml | – | – | – |
-| `release/*` ブランチ（バージョンの bump だけ） | – | – | – |
+| `release/*` ブランチ（リリースの準備＝アプリ内のリリースノートだけ） | – | – | – |
 
 - **一覧に無い種類のファイルは3つとも回す**（知らない変更を素通しさせない）。`src/**` は golden・e2e も必ず回す: 描画は src のどこから壊れるか分からず、E2E が壊れたまま進むと以後の依存更新を確かめられなくなるため。
 - 必須チェックは結果をまとめる `ci-result` だけ。成功・スキップは通し、失敗・キャンセルは落とす。
@@ -88,8 +88,8 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
 - **リリース（タグ push）では [docker-build.yml](../.github/workflows/docker-build.yml) が checks・golden・e2e を全部回す**。e2e は push したばかりの本番イメージ（＝デプロイするもの）で回す。全部緑で初めて k8s マニフェストへ PR が出る。ブランチで省いた検査で壊れていたら、ここで止まる（直す PR を出してタグを打ち直す）。
 
 ## リリース
-1. バージョンの Bump もブランチ（`release/vX.Y.Z`）→ PR でマージする。Claude Code に `/release [X.Y.Z]`（または「1.5.2 を出したい」）と頼めば PR 作成まで行い、タグを打つコマンドも案内する（ユーザー共通の release スキル。このリポジトリ固有の作業は下の「Bump で行うこと」）。
-2. マージ後の main を pull し、タグを push する（タグは ruleset の対象外）:
+1. 版はタグだけに持つので、パッチは PR なしでタグを打てる。マイナー・メジャーはアプリ内のリリースノートを足す PR（`release/vX.Y.Z`）を先にマージする（下の「リリースの準備で行うこと」）。Claude Code に `/release [X.Y.Z]`（または「1.5.2 を出したい」）と頼めば、差分から版を提案し、要るなら PR を作り、タグを打つコマンドも案内する（ユーザー共通の release スキル）。
+2. main を pull し、タグを push する（タグは ruleset の対象外）:
    ```bash
    git switch main && git pull && git tag vX.Y.Z && git push origin vX.Y.Z
    ```
@@ -98,9 +98,9 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
    - `requires-migration` ラベルが付いていたら、**マージ前に**本番 DB へマイグレーションを当てる（手順は PR 本文と [architecture.md](architecture.md#本番dbマイグレーション)）。
    - マニフェストのリポジトリは必須チェックを設定できない（Free プランの非公開リポジトリ）ので、そちらの CI（yamllint・kubeconform）が緑かは目で見る。
 
-### Bump で行うこと
-- 版は package.json（`npm version X.Y.Z --no-git-tag-version` で package-lock.json とそろえる）。
-- **アプリ内のリリースノート**（[releaseNotes.ts](../src/data/releaseNotes.ts)・利用者向け・日本語）は**マイナー単位**（"1.5"）で書く。パッチの bump では追記しない。マイナー・メジャーを上げるときは、前回のタグからのコミットで add / fix / change の下書きを作り、確認してから先頭に追記する（文体は既存の項目に合わせる。日付は JST の今日）。
+### リリースの準備で行うこと
+- **版はタグだけに持つ**（package.json に `version` を持たない＝版上げの PR が要らない）。docker-build.yml がタグの版をビルド引数 `APP_VERSION` で渡し、[next.config.ts](../next.config.ts) がバンドルへ埋め込む。読むのは [version.ts](../src/lib/version.ts) の `APP_VERSION` だけ（/docs の表記・User-Agent・`/api/health`・/admin）。タグ以外のビルド（ブランチの e2e・golden、手元の dev）は `dev.YYYYMMDDHHMMSS`（ビルドした JST の時刻）になる。
+- **アプリ内のリリースノート**（[releaseNotes.ts](../src/data/releaseNotes.ts)・利用者向け・日本語）は**マイナー単位**（"1.5"）で書く。パッチでは追記しない。マイナー・メジャーを上げるときは、前回のタグからのコミットで add / fix / change の下書きを作り、確認してから先頭に追記する（文体は既存の項目に合わせる。日付は JST の今日）。
 - マイグレーションは `prisma/migrations/`。前回のタグから差分があれば、本番のマイグレーションが要る（[architecture.md](architecture.md#本番dbマイグレーション)。当てるのはデプロイ PR のマージ前）。
 
 ### デプロイ PR
