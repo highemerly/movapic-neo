@@ -16,7 +16,7 @@ import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
 import { BackLink } from "@/components/BackLink";
 import { PageContainer } from "@/components/PageContainer";
-import { version } from "../../../../package.json";
+import { APP_VERSION_LABEL } from "@/lib/version";
 
 export const metadata: Metadata = {
   title: "技術仕様",
@@ -83,7 +83,7 @@ export default async function SpecPage() {
 
         <div className="flex items-baseline gap-2 mb-6">
           <h1 className="text-lg font-semibold">技術仕様</h1>
-          <span className="text-xs text-muted-foreground tabular-nums">v{version}</span>
+          <span className="text-xs text-muted-foreground tabular-nums">{APP_VERSION_LABEL}</span>
         </div>
 
         <TableOfContents />

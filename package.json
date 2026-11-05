@@ -1,6 +1,5 @@
 {
   "name": "movapic-neo",
-  "version": "1.5.4",
   "private": true,
   "scripts": {
     "build": "next build",

@@ -30,7 +30,7 @@ import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
 import { PageContainer } from "@/components/PageContainer";
 import { sortedReleaseNotes } from "@/data/releaseNotes";
-import { version } from "../../../package.json";
+import { APP_VERSION_LABEL } from "@/lib/version";
 
 function formatDate(date: string): string {
   const [y, m, d] = date.split("-");
@@ -119,7 +119,7 @@ export default async function DocsPage() {
 
         <div className="flex items-baseline gap-2 mb-6">
           <h1 className="text-lg font-semibold">ドキュメントセンター</h1>
-          <span className="text-xs text-muted-foreground tabular-nums">v{version}</span>
+          <span className="text-xs text-muted-foreground tabular-nums">{APP_VERSION_LABEL}</span>
         </div>
 
         <section className="mb-8">

@@ -140,6 +140,9 @@ jobs:
           context: .
           target: runner
           push: true
+          # 版は package.json に持たずタグだけに持つ。next.config.ts がバンドルへ埋め込む
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache

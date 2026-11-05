@@ -3,6 +3,7 @@
  *
  * ソフトウェアのバージョン・DB/ストレージ容量を表示する読み取り専用ページ用。
  * バージョンはすべて実際に動いている値を出す:
+ *  - 本体はビルド時に埋め込んだタグの版（version.ts の APP_VERSION。package.json には版を持たない）。
  *  - ライブラリは各パッケージの package.json（ビルド時にバンドルへインライン化＝実行時 I/O なし）。
  *    pitfall: 以前はルート package.json の宣言値（"^7.4.2" の範囲の下限）を出しており、実際に
  *    入っている版とずれていた（Prisma 7.4.2 表示で実体 7.10.0 など）。対象の各パッケージは
@@ -16,8 +17,8 @@
 import prisma from "@/lib/db";
 import { Prisma } from "@prisma/client";
 
+import { APP_VERSION } from "@/lib/version";
 // package.json はビルド時に JSON がバンドルへインライン化される（実行時 I/O なし）。
-import pkg from "../../../package.json";
 import nextPkg from "next/package.json";
 import reactPkg from "react/package.json";
 import prismaClientPkg from "@prisma/client/package.json";
@@ -61,7 +62,7 @@ export async function getSystemInfo(): Promise<SystemInfo> {
   const dbSizeBytes = Number(dbSizeRows[0]?.size ?? 0);
 
   const software: SoftwareItem[] = [
-    { name: "SHAMEZO（本体）", version: pkg.version },
+    { name: "SHAMEZO（本体）", version: APP_VERSION },
     { name: "Node.js", version: process.version.replace(/^v/, "") },
     { name: "Next.js", version: nextPkg.version },
     { name: "React", version: reactPkg.version },
