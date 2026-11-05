@@ -92,19 +92,26 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
    ```bash
    git switch main && git pull && git tag vX.Y.Z && git push origin vX.Y.Z
    ```
-3. タグ push で [docker-build.yml](../.github/workflows/docker-build.yml) がイメージをビルド・push し、checks・golden・e2e（そのイメージで）が全部通ったら GitHub Release を作り、k8s マニフェスト（k8sg1-repo の `manifests/movapic-neo/prd/` の web・worker・compute）へ PR を出す。
-4. k8sg1 の PR を確かめてマージする。k8sg1 は Flux 同期なので、**マージがそのまま本番へのデプロイ**（約1分で反映）。
+3. タグ push で [docker-build.yml](../.github/workflows/docker-build.yml) がイメージをビルド・push し、checks・golden・e2e（そのイメージで）が全部通ったら GitHub Release を作り、マニフェストのリポジトリ（非公開）へイメージの版を上げる PR（デプロイ PR。web・worker-front・compute の3つ）を出す。
+4. デプロイ PR を確かめてマージする。マニフェストのリポジトリは Flux 同期なので、**マージがそのまま本番へのデプロイ**（約1分で反映）。
    - `requires-migration` ラベルが付いていたら、**マージ前に**本番 DB へマイグレーションを当てる（手順は PR 本文と [architecture.md](architecture.md#本番dbマイグレーション)）。
-   - k8sg1 は必須チェックを設定できない（Free プランの非公開リポジトリ）ので、k8sg1 側の CI（yamllint・kubeconform）が緑かは目で見る。
+   - マニフェストのリポジトリは必須チェックを設定できない（Free プランの非公開リポジトリ）ので、そちらの CI（yamllint・kubeconform）が緑かは目で見る。
 
 ### Bump で行うこと
 - 版は package.json（`npm version X.Y.Z --no-git-tag-version` で package-lock.json とそろえる）。
 - **アプリ内のリリースノート**（[releaseNotes.ts](../src/data/releaseNotes.ts)・利用者向け・日本語）は**マイナー単位**（"1.5"）で書く。パッチの bump では追記しない。マイナー・メジャーを上げるときは、前回のタグからのコミットで add / fix / change の下書きを作り、確認してから先頭に追記する（文体は既存の項目に合わせる。日付は JST の今日）。
-- マイグレーションは `prisma/migrations/`。前回のタグから差分があれば、本番のマイグレーションが要る（[architecture.md](architecture.md#本番dbマイグレーション)。当てるのは k8sg1 の PR のマージ前）。
+- マイグレーションは `prisma/migrations/`。前回のタグから差分があれば、本番のマイグレーションが要る（[architecture.md](architecture.md#本番dbマイグレーション)。当てるのはデプロイ PR のマージ前）。
 
-### k8sg1 への PR
-- 書式は k8sg1 に PR を出す全アプリで共通（英語）: タイトル `Update movapic-neo to X.Y.Z`、ラベル `app-update`（アプリの版上げを Renovate などの PR と見分ける）と、マイグレーションがあるときの `requires-migration`。本文はイメージとビルドのリンク・GitHub Release と同じノート（下）、マイグレーションがあるときはその手順。
-- **PR が出なかったとき**は docker-build.yml の `create-k8s-pr` のログを見る。マニフェストの `image:` 行が書き換わらなかった（k8sg1 側で書式が変わった）ときはジョブが赤くなる。黙って PR が出ないこと（書き換わらず差分が無いと create-pull-request は何もせず成功する）を防ぐため。
+### デプロイ PR
+- 書式はマニフェストのリポジトリに PR を出す全アプリで共通（英語）: タイトル `Update movapic-neo to X.Y.Z`、ラベル `app-update`（アプリの版上げを Renovate などの PR と見分ける）と、マイグレーションがあるときの `requires-migration`。本文はイメージとビルドのリンク・GitHub Release と同じノート（下）、マイグレーションがあるときはその手順（namespace などクラスタ内の名前は `<...>` の引数にしてあり、値はマニフェストのリポジトリの手順書にある）。
+- ワークフローが使うシークレット。マニフェストのリポジトリ名とパスもシークレットに置く（このリポジトリは公開で、ワークフローのファイルも Actions のログも誰でも読める。シークレットの値はログで `***` に伏せられる）:
+
+  | シークレット | 中身 |
+  |---|---|
+  | `K8SG1_REPO` | マニフェストのリポジトリ（`owner/name`） |
+  | `K8SG1_MANIFEST_PATHS` | 書き換える prd のマニフェストのパス（web・worker-front・compute の3つ、スペース区切り） |
+  | `K8SG1_PAT` | マニフェストのリポジトリへ PR を出すトークン（Contents と Pull requests の Read and write）。`GITHUB_TOKEN` では他のリポジトリへ push できず、PAT で作った PR だからマニフェストのリポジトリの CI も走る |
+- **PR が出なかったとき**は docker-build.yml の `create-k8s-pr` のログを見る。マニフェストの `image:` 行が書き換わらなかった（マニフェストの側で書式が変わった）ときはジョブが赤くなる。黙って PR が出ないこと（書き換わらず差分が無いと create-pull-request は何もせず成功する）を防ぐため。
 - イメージは検査の結果を待たずに push され、`latest` タグも動く。本番のマニフェストは版を固定しており、**`latest` はデプロイに使わない**。
 
 ### GitHub Release
@@ -114,4 +121,4 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
 - 利用者向けのリリースノート（[releaseNotes.ts](../src/data/releaseNotes.ts)・日本語・マイナーごと）とは別物。
 
 ### 作り直し（workflow_dispatch）
-docker-build.yml は Actions の画面から手動でも動かせる（同じ版のイメージを作り直したいとき）。入力の tag はそのままイメージのタグとマニフェストの版になるので、**`v` を付けずに** `X.Y.Z` で入れる。検査が全部通れば同じ書式で k8sg1 に PR が出る（GitHub Release は作らない）。
+docker-build.yml は Actions の画面から手動でも動かせる（同じ版のイメージを作り直したいとき）。入力の tag はそのままイメージのタグとマニフェストの版になるので、**`v` を付けずに** `X.Y.Z` で入れる。検査が全部通れば同じ書式でデプロイ PR が出る（GitHub Release は作らない）。

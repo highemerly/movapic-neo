@@ -16,9 +16,6 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  K8S_REPO: highemerly/k8sg1-repo
-  # web / worker-front / compute は同一イメージ・同一タグ。3マニフェストを更新する（スペース区切り）。
-  K8S_MANIFEST_PATHS: "manifests/movapic-neo/prd/web.yaml manifests/movapic-neo/prd/worker.yaml manifests/movapic-neo/prd/compute.yaml"
 
 jobs:
   # CI（vitest / eslint / tsc）。build-and-push と並走し、両方緑になって初めて
@@ -151,7 +148,7 @@ jobs:
 
   # GitHub Release をタグごと（パッチも含む）に作る。全検査が通ったときだけ＝Release がある版はデプロイしてよい版。
   # ノートは GitHub の自動生成（前回のタグからマージされた PR の一覧・英語。分類は .github/release.yml）。
-  # 同じノートを create-k8s-pr が k8sg1 の PR 本文に使う（変更の一覧の出どころを1つにする）。
+  # 同じノートを create-k8s-pr がデプロイ PR の本文に使う（変更の一覧の出どころを1つにする）。
   release:
     needs: [build-and-push, checks, golden, e2e]
     runs-on: ubuntu-latest
@@ -193,12 +190,18 @@ jobs:
 
   create-k8s-pr:
     # ビルド・CI・ゴールデン画像テスト・E2E が全て成功したときだけ k8s マニフェストへ PR する（release が
-    # 同じ条件で待っているので、それを待てば足りる）。k8sg1 は Flux 同期なので、この PR のマージが
-    # そのまま本番へのデプロイになる。
+    # 同じ条件で待っているので、それを待てば足りる）。マニフェストのリポジトリは Flux 同期なので、この PR の
+    # マージがそのまま本番へのデプロイになる。
     needs: [build-and-push, release]
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      # マニフェストのリポジトリは非公開。このリポジトリの Actions のログは誰でも読めるので、リポジトリ名と
+      # マニフェストのパス（web / worker-front / compute は同一イメージ・同一タグ。prd の3つ、スペース区切り）も
+      # シークレットに置き、ログでは伏せる
+      K8S_REPO: ${{ secrets.K8SG1_REPO }}
+      K8S_MANIFEST_PATHS: ${{ secrets.K8SG1_MANIFEST_PATHS }}
 
     steps:
       - name: Checkout k8s repo
@@ -222,9 +225,10 @@ jobs:
           done
 
       # 本文は英語・全アプリ共通の書式（イメージ・ビルドのリンク・release ジョブが生成したノート）。
-      # ノートの PR は完全な URL で書かれるので、k8sg1 の #N へのリンクに化けない。
+      # ノートの PR は完全な URL で書かれるので、マニフェストのリポジトリの #N へのリンクに化けない。
       # マイグレーションの節だけはこのリポジトリ固有（共有 Postgres に port-forward して手元から当てる。
-      # 当てるのはマージ＝イメージ差し替えの前）。
+      # 当てるのはマージ＝イメージ差し替えの前）。接続先の namespace・Service・DB 名はクラスタ内の非公開の
+      # 名前なので、ここには <...> の引数として書き、実際の値はマニフェストのリポジトリの手順書に置く。
       - name: Write PR body
         env:
           IMAGE: ${{ needs.build-and-push.outputs.image }}
@@ -244,10 +248,12 @@ jobs:
           > [!WARNING]
           > This release includes DB migrations. Apply them before merging.
 
+          Run from a checkout of the release tag. The `<...>` values are in the movapic-neo service doc of this repository.
+
           ```bash
-          kubectl port-forward -n shared-postgres-prd svc/postgres-rw 15432:5432
-          DATABASE_URL="postgresql://<username>:<password>@localhost:15432/movapic?sslmode=disable&schema=public" npx prisma migrate status
-          DATABASE_URL="postgresql://<username>:<password>@localhost:15432/movapic?sslmode=disable&schema=public" npx prisma migrate deploy
+          kubectl port-forward -n <db-namespace> svc/<db-service> 15432:5432
+          DATABASE_URL="postgresql://<username>:<password>@localhost:15432/<database>?sslmode=disable&schema=public" npx prisma migrate status
+          DATABASE_URL="postgresql://<username>:<password>@localhost:15432/<database>?sslmode=disable&schema=public" npx prisma migrate deploy
           ```
           MIGRATION
             fi
@@ -263,7 +269,7 @@ jobs:
           commit-message: Update movapic-neo to ${{ needs.build-and-push.outputs.version }}
           title: Update movapic-neo to ${{ needs.build-and-push.outputs.version }}
           body-path: ${{ runner.temp }}/pr-body.md
-          # app-update: k8sg1 に大量に来る PR のうちアプリの版上げを見分ける（全アプリ共通）。
+          # app-update: マニフェストのリポジトリに大量に来る PR のうちアプリの版上げを見分ける（全アプリ共通）。
           # アプリ名はタイトルにあるのでアプリ別のラベルは付けない
           labels: |
             app-update
