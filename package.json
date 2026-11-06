@@ -60,7 +60,7 @@
     "eslint-config-next": "^16.4.3",
     "node-addon-api": "^8.9.2",
     "node-gyp": "^13.1.0",
-    "pixelmatch": "^7.2.0",
+    "pixelmatch": "^8.0.0",
     "pngjs": "^7.0.0",
     "shadcn": "^3.8.5",
     "tailwindcss": "^4.3.3",
