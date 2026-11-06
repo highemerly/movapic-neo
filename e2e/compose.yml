@@ -14,7 +14,7 @@
 #   docker compose -f e2e/compose.yml up -d --wait db
 #   DATABASE_URL=postgresql://postgres:postgres@localhost:55432/movapic npx prisma migrate deploy
 #   docker compose -f e2e/compose.yml up -d --wait
-#   npx playwright install chromium   # 初回のみ
+#   npx playwright install --only-shell chromium   # 初回のみ（CI と同じ。headless shell だけ）
 #   npx playwright test -c e2e/playwright.config.ts
 #   docker compose -f e2e/compose.yml down -v
 name: movapic-e2e
