@@ -74,7 +74,9 @@ jobs:
       # その apt のダウンロードがミラー次第で数分〜止まったままになった（2026-11 に繰り返し発生）。
       # スモークは見た目を比べない（スクリーンショットなし）のでフォントは要らない。
       # headless でしか動かさないので、本体ではなく headless shell だけを入れる（小さい）。
+      # 外から取ってくるステップは短めに切る（ふだんは数秒。以前は apt のミラー待ちで7分以上止まった）
       - name: Install Playwright browser
+        timeout-minutes: 5
         run: npx playwright install --only-shell chromium
 
       - name: Generate certificates for fake Fediverse servers

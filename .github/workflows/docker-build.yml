@@ -45,6 +45,8 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    # 既定の 360 分だと固まったときに6時間待つ。ふだんの所要時間（4〜5分）の数倍で切る
+    timeout-minutes: 20
     permissions:
       contents: read
       packages: write
@@ -154,6 +156,7 @@ jobs:
   release:
     needs: [build, checks, golden, e2e]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       # generate-notes API も Release の作成も contents: write が要る
       contents: write
@@ -195,6 +198,7 @@ jobs:
     # マージがそのまま本番へのデプロイになる。
     needs: [build, release]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
     env:
