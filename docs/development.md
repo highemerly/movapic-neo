@@ -83,6 +83,7 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
 | `release/*` ブランチ（リリースの準備＝アプリ内のリリースノートだけ） | – | – | – |
 
 - **一覧に無い種類のファイルは3つとも回す**（知らない変更を素通しさせない）。`src/**` は golden・e2e も必ず回す: 描画は src のどこから壊れるか分からず、E2E が壊れたまま進むと以後の依存更新を確かめられなくなるため。
+- 全ジョブに `timeout-minutes` を付けている（ふだんの所要時間の数倍。checks 10分・golden 15分・e2e 20分・ビルド 20分・数秒のジョブは5分）。既定の 360 分だと、固まったときに6時間待つことになるため。外から取ってくる Playwright のインストールにも短め（5分）に付けている。
 - 必須チェックは結果をまとめる `ci-result` だけ。成功・スキップは通し、失敗・キャンセルは落とす。
 - **main への push では回さない**。マージ前に同じ中身をブランチで通しており、リリースのタグで全部回すため（以前は main でも回していたが、マージが続くと concurrency で途中の実行が捨てられ、ほぼ二重実行だった）。
 - **リリース（タグ push・Tag a release）では [docker-build.yml](../.github/workflows/docker-build.yml) が checks・golden・e2e を全部回す**。e2e は push したばかりの本番イメージ（＝デプロイするもの）で回す。全部緑で初めてデプロイ PR が出る。ブランチで省いた検査で壊れていたら、ここで止まる（直す PR を出して次の版を出す）。

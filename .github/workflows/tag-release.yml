@@ -21,6 +21,8 @@ concurrency:
 jobs:
   tag:
     runs-on: ubuntu-latest
+    # 既定の 360 分だと固まったときに6時間待つ。ふだんの所要時間（数秒）の数倍で切る
+    timeout-minutes: 5
     permissions:
       contents: write
     outputs:
