@@ -2,8 +2,8 @@ name: Tag a release
 
 # リリースを Actions の画面から出す（手元でタグを打って push しても同じことが起きる）。
 # main の先頭に次の版のタグを打ち、docker-build.yml を呼ぶ。版の上げ方は実行するときに選ぶ
-# （ラベルでは決めない。付ける人がいない）。マイナー・メジャーは先にアプリ内のリリースノートの PR をマージしておく
-# （docs/development.md「リリース」）。
+# （ラベルでは決めない。付ける人がいない）。アプリ内のリリースノートは docker-build.yml が PR 本文から作るので、
+# 事前の PR は要らない（docs/development.md「リリース」）。
 on:
   workflow_dispatch:
     inputs:
@@ -55,7 +55,10 @@ jobs:
             minor) version="$major.$((minor + 1)).0" ;;
             patch) version="$major.$minor.$((patch + 1))" ;;
           esac
-          git tag "v$version"
+          # 注釈付きにする: 打った時刻がアプリ内のリリースノートの日時になる（軽量タグだとコミットの時刻）
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898133+github-actions[bot]@users.noreply.github.com'
+          git tag -a "v$version" -m "v$version"
           git push origin "v$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Tagged \`v$version\` on $GITHUB_SHA (previous: \`$prev\`, bump: $BUMP)" >> "$GITHUB_STEP_SUMMARY"
@@ -65,9 +68,10 @@ jobs:
     uses: ./.github/workflows/docker-build.yml
     with:
       version: ${{ needs.tag.outputs.version }}
-    # 呼ばれる側のジョブが使う権限の和（GitHub Release の作成・イメージの push）と、フォントの checkout と
-    # デプロイ PR に使うシークレット。足りないと呼ばれる側が起動時に落ちる
+    # 呼ばれる側のジョブが使う権限の和（GitHub Release の作成・イメージの push・リリースノート用の PR の読み取り）と、
+    # フォントの checkout とデプロイ PR に使うシークレット。足りないと呼ばれる側が起動時に落ちる
     permissions:
       contents: write
       packages: write
+      pull-requests: read
     secrets: inherit
