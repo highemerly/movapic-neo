@@ -14,8 +14,10 @@ const nextConfig: NextConfig = {
   env: {
     APP_VERSION: process.env.APP_VERSION || devVersion(),
   },
-  // 開発時に許可するクロスオリジン（LAN内のスマホ等からアクセスする用）
-  allowedDevOrigins: ["192.168.110.136", "192.168.110.146"],
+  // 開発時に許可するクロスオリジン（LAN内のスマホ等からアクセスする用）。
+  // DHCP で手元の IP が変わるたびに書き換えていたので /24 ごと許可する。CIDR 表記は使えず、
+  // `*` が `.` 区切りの1区切りに合う（next の csrf-protection の matchWildcardDomain）。
+  allowedDevOrigins: ["192.168.110.*"],
   // ネイティブモジュールをサーバーサイドでのみ使用（バンドルから除外）
   serverExternalPackages: ["skia-canvas", "sharp"],
   experimental: {

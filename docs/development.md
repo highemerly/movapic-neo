@@ -30,7 +30,7 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
 
 ## 依存更新（Renovate）
 依存は Renovate（GitHub App）が出す PR で上げる。設定は [.github/renovate.json5](../.github/renovate.json5)（各ルールの理由はコメント参照）。
-- **毎週月曜・木曜の 9時前（JST）** にまとめて PR が来る（lockfile の一括更新は月曜のみ）。自動マージはしない。
+- **毎週月曜・木曜の 9時前（JST）** にまとめて PR が来る（lockfile の一括更新は月曜のみ）。マイナー・パッチの多くは CI が緑なら自動でマージされる（下の「自動マージ」）。
 - **承認制のもの**は PR が自動では来ず、Issue「Dependency Dashboard」の Pending Approval に並ぶ:
   - メジャー更新全般（コード側の対応が要るため）
   - sharp の 0.35 以降（Alpine の libvips が 8.18.3 以上になるまでソースビルドできない）
@@ -38,20 +38,41 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
 - 対象外: [docker-compose.yml](../docker-compose.yml)（本番の共有 Postgres に合わせて手で上げる）・[workers/](../workers/)（CI が無く手動デプロイ）。
 - `node:22-alpine` は digest 固定。Alpine や Node のパッチ更新は digest 更新の PR として来る（apk の vips/libheif の版が変わり得るので golden を必ず見る）。
 
-### PR が来たら
-1. CI（`ci-result`）が緑か見る。赤なら ruleset でマージできない。依存の更新は checks・golden・e2e が全部走る。
-2. PR 本文の変更履歴（Renovate が載せる）を読む。
-3. 種類に応じて確認を足す。CI が見ているのは unit・lint・型・ゴールデン（描画）と、E2E スモーク（本番イメージで主要ページが開くか・プレビュー生成が通るか）まで。**ログイン・投稿・Fediverse 連携・ジョブは見ていない**:
+### 自動マージ
+Renovate が自分の PR に GitHub の auto-merge を付け、必須チェック `ci-result` が緑になった時点で squash マージされる。自動マージされた PR は assign されない（失敗したときだけ assign される）ので、**「Assigned to you」に残った PR だけを見ればよい**。マージされても main に入るだけで、本番へはリリース（Tag a release）とデプロイ PR のマージを経る。
 
-   | 種類 | 例 | マージ前の確認 |
-   |---|---|---|
-   | 型定義・開発ツール | `@types/*`・eslint・typescript・tailwind-merge | CI 緑ならマージ |
-   | 描画系 | skia-canvas・`node:22-alpine` の digest | golden 緑ならマージ |
-   | 実行時に効くもの | next・react・prisma・jose・ws・pg・mailparser・`@aws-sdk/*` | E2E 緑でページ表示・プレビュー生成までは確認済み。ログイン・投稿は手元で確認 |
-   | 0.x のもの | graphile-worker | 0.x はマイナーでも互換を崩すことが多いのに Renovate はメジャー扱いしない。変更履歴を読んでから手元で確認（Bot・メールのジョブ） |
-   | タグ時にしか動かない Actions | docker/login-action・docker/metadata-action・peter-evans/create-pull-request・buildkit-cache-dance | PR の CI では実行されない。マージ後、次のリリースの docker-build.yml で初めて動く |
+依存の更新では checks・golden・e2e が全部走る。CI が確かめているのは unit・lint・型・ゴールデン（sharp/skia の描画）と、E2E（本番イメージで主要ページが JS 例外・CSP 違反なく開く・プレビュー生成・本物の Postgres と S3（versitygw）・偽の Mastodon/Misskey へのログインと投稿）まで。**見た目・画面操作・定期ジョブ・Bot・リアクションの連合は見ていない**。それに合わせて分けている:
+
+| 種類 | 例 | マージ |
+|---|---|---|
+| 型定義・開発ツール | `@types/*`・typescript・eslint・vitest・@playwright/test・dotenv・node-gyp | 自動（マイナー・パッチ） |
+| 描画系 | skia-canvas・sharp のパッチ | 自動（golden が見ている） |
+| E2E か本物を通す unit で確かめているもの | `@aws-sdk/*`・pg・jose・nanoid・mailparser・emojibase・tailwind-merge | 自動 |
+| ブランチの CI で動く Actions | checks.yml・golden.yml・e2e.yml・ci.yml の中の Actions | 自動 |
+| 見た目・操作 | next・react・tailwindcss・radix-ui・lucide-react・sonner・next-themes・class-variance-authority・tw-animate-css・shadcn | 手動。手元で画面を見る |
+| ジョブ・Bot | graphile-worker・ws | 手動。変更履歴を読み、手元で Bot・メール投稿・定期ジョブを動かす |
+| DB | prisma のグループ | 手動。本番の共有 DB に効きクエリも多い（E2E は migrate deploy と投稿の書き込みまで） |
+| EXIF の読み取り | exifr | 手動。位置情報を含む写真で投稿して確かめる（本物の画像を通すテストが無い） |
+| 0.x のもの | graphile-worker・next-themes・class-variance-authority・jpeg-js・sharp のマイナー | 手動。0.x はマイナーでも互換を崩すことが多いのに Renovate はメジャー扱いしない |
+| タグ時にしか動かない Actions | docker-build.yml・tag-release.yml の中の Actions | 手動。PR の CI では何も走らず `ci-result` がスキップのまま緑になる。マージ後、次のリリースの docker-build.yml のログを見る |
+| メジャー・`node:22-alpine` の digest・lockfile の一括更新 | | 手動。digest は golden の `vips-dev` の版を見る |
+
+- 1つの PR に手動の依存が1つでも入っていれば、その PR は自動ではマージされない（next と eslint-config-next のようにまとまる PR は手動の側に倒れる）。
+- 0.x の依存を足したら、[renovate.json5](../.github/renovate.json5) の除外にも足す。CI が見ていない種類の依存を足したときも同じ。
+- 除外したものも、本物を通すテストを足せば自動の側へ移せる（mailparser は、日本語のメールで本物の mailparser を通す unit テストがあるので自動にしている）。
+
+### 脆弱性の PR
+Dependabot alerts を有効にしてあり（Dependabot security updates・version updates は無効。Renovate の PR と重なるため）、Renovate がアラートを読んで **schedule と公開から3日の待ちを無視して** すぐ PR を作る（題名の末尾に `[SECURITY]`）。メジャーの修正でも承認を待たない。
+- 自動マージの対象かどうかは上の表と同じ。手動の依存（next が多い）は assign されて残る。
+- **マージしても本番には入らない。マージしたらパッチ版をリリースする**（Tag a release）。
+- アラートの一覧は `gh api repos/highemerly/movapic-neo/dependabot/alerts`、有効かどうかは `gh api repos/highemerly/movapic-neo/vulnerability-alerts -i`（204 なら有効）。
+
+### 手動の PR が来たら
+1. CI（`ci-result`）が緑か見る。赤なら ruleset でマージできない。
+2. PR 本文の変更履歴（Renovate が載せる）を読み、lockfile の差分で実際に入る版を確かめる。
+3. 上の表の「マージ」の列の確認をする。
 4. squash マージする。
-5. 手元で入れ直す（`npm ci` が postinstall で sharp を system libvips にソースビルドし直す。`npm ci` は生成済みの Prisma クライアントごと node_modules を消すので generate も要る）:
+5. 手元で入れ直す（自動マージされたものも、作業を始める前に。`npm ci` が postinstall で sharp を system libvips にソースビルドし直す。`npm ci` は生成済みの Prisma クライアントごと node_modules を消すので generate も要る）:
    ```bash
    git switch main && git pull
    npm ci
@@ -66,7 +87,7 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
 
 ### その他
 - 今は要らない更新: PR を閉じる（その版は作り直されない。次の版が出れば再び PR になる）。恒久的に止めるなら renovate.json5 にルールを足す。
-- 急ぐ更新（セキュリティ修正など）: Dashboard の Awaiting Schedule でチェックを入れるとスケジュールを待たずに PR が作られる。
+- 急ぐ更新: 脆弱性の修正は上のとおり待たずに PR が来る。それ以外は Dashboard の Awaiting Schedule でチェックを入れるとスケジュールを待たずに PR が作られる。
 - 衝突した PR は Renovate が自動で rebase する。急ぐときは PR 本文の rebase チェックボックスを入れる。
 - 手元で `npm update` はしない（Renovate の PR とぶつかる）。依存の追加（`npm install <新しいパッケージ>`）はブランチを切って PR で。
 
