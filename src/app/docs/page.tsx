@@ -29,13 +29,8 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
 import { PageContainer } from "@/components/PageContainer";
-import { sortedReleaseNotes } from "@/data/releaseNotes";
+import { allReleaseNotes, formatReleasedAt } from "@/lib/releaseNotes";
 import { APP_VERSION_LABEL } from "@/lib/version";
-
-function formatDate(date: string): string {
-  const [y, m, d] = date.split("-");
-  return `${y}/${parseInt(m, 10)}/${parseInt(d, 10)}`;
-}
 
 export const metadata: Metadata = {
   title: "ドキュメントセンター",
@@ -110,7 +105,7 @@ function ExternalDocsLink({
 
 export default async function DocsPage() {
   const user = await getCurrentUser();
-  const latest = sortedReleaseNotes()[0];
+  const latest = allReleaseNotes()[0];
 
   return (
     <>
@@ -135,11 +130,7 @@ export default async function DocsPage() {
               <DocsLink
                 href={`/docs/release-note/${latest.version}`}
                 label={`最新リリース（v${latest.version}）`}
-                description={
-                  latest.title
-                    ? `${formatDate(latest.date)}・${latest.title}`
-                    : `${formatDate(latest.date)} 公開の更新内容`
-                }
+                description={`${formatReleasedAt(latest)} 公開の更新内容`}
                 Icon={Sparkles}
               />
             )}

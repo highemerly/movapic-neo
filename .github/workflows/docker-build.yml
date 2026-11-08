@@ -50,6 +50,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+      # アプリ内のリリースノートを作るのに PR の本文と変更したファイルを読む
+      pull-requests: read
     outputs:
       version: ${{ steps.version.outputs.version }}
       # E2E が pull するイメージ（metadata-action の {{version}} と同じ値）
@@ -110,6 +112,25 @@ jobs:
             echo "has_migration=false" >> "$GITHUB_OUTPUT"
             echo "No previous tag found"
           fi
+
+      # アプリ内のリリースノート（/docs/release-note）を PR 本文の release-note ブロックから作り、
+      # イメージに焼き込む（docs/development.md「アプリ内のリリースノート」）。実行時に GitHub から
+      # 読まないのは、Release がある版＝デプロイしてよい版で、デプロイ済みとは限らないため
+      - name: Set up Node.js (release notes)
+        uses: actions/setup-node@v7
+        with:
+          # 型の除去（scripts/release-notes.ts を素の node で動かす）に 22.18 以上が要る
+          node-version: 22
+
+      - name: Generate in-app release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # タグの push で起動したとき、checkout はそのタグを注釈の無い形で取ってくることがある
+          # （actions/checkout#290。打った時刻がコミットの時刻に変わる）ので取り直す
+          git fetch --force --tags
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/release-notes.ts "$VERSION" src/data/releaseNotes-generated.json
 
       - name: Extract metadata (tags, labels)
         id: meta
