@@ -72,5 +72,57 @@
       matchFileNames: ['workers/**'],
       enabled: false,
     },
+    {
+      // マイナー・パッチは CI（ci-result＝unit・lint・型・golden・E2E）が緑なら自動でマージする。
+      // E2E は本物の Postgres・S3（versitygw）と偽の Mastodon/Misskey へのログイン・投稿まで通す。
+      // メジャー（承認制）・digest・lockfile の一括更新は semver の上げ方ではなく影響が広いので手でマージする。
+      // マージしても main に入るだけで、本番へはリリース（Tag a release）とデプロイ PR のマージを経る。
+      matchUpdateTypes: ['minor', 'patch'],
+      automerge: true,
+    },
+    {
+      // CI が緑でも確かめていないもの。1つの PR に1つでも automerge: false の更新があれば自動ではマージされない。
+      // - 見た目・操作（E2E はページが開くことしか見ない）: next・react・tailwind・radix-ui・lucide-react・
+      //   sonner・next-themes・class-variance-authority・tw-animate-css・shadcn（globals.css が @import する）
+      // - テストの無いジョブと Bot: graphile-worker・ws
+      // - 本番の共有 DB に効き、クエリも多い: prisma（E2E は migrate deploy と投稿の書き込みまでしか通らない）
+      // - 位置情報などの EXIF の読み取り（本物の画像を通すテストが無い）: exifr
+      // - マイナーでも互換を崩しうる 0.x: graphile-worker・next-themes・class-variance-authority・jpeg-js
+      //   （0.x の依存を足したらここにも足す）
+      matchPackageNames: [
+        'next',
+        'react',
+        'react-dom',
+        'tailwindcss',
+        '@tailwindcss/**',
+        'radix-ui',
+        'lucide-react',
+        'sonner',
+        'next-themes',
+        'class-variance-authority',
+        'tw-animate-css',
+        'shadcn',
+        'graphile-worker',
+        'ws',
+        'prisma',
+        '@prisma/**',
+        'exifr',
+        'jpeg-js',
+      ],
+      automerge: false,
+    },
+    {
+      // sharp は 0.x で、マイナー（0.34 → 0.35）は上の承認制。承認して作らせた PR は手でマージする
+      // （system libvips の版に縛られるため、golden の vips-dev の版を見てから入れる）。パッチは自動。
+      matchPackageNames: ['sharp'],
+      matchUpdateTypes: ['minor'],
+      automerge: false,
+    },
+    {
+      // タグ時にしか動かないワークフローは、ブランチの CI（ci-targets.sh）で何も回さず
+      // ci-result がスキップのまま緑になる＝何も確かめずにマージされてしまう。
+      matchFileNames: ['.github/workflows/docker-build.yml', '.github/workflows/tag-release.yml'],
+      automerge: false,
+    },
   ],
 }
