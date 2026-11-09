@@ -12,8 +12,13 @@
   assignees: ['highemerly'],
   // npm 10.9.2 は vitest の peer 解決で lockfile 更新がクラッシュする（arborist の
   // `Cannot read properties of null (reading 'edgesOut')`）。lockfile は npm 11 で更新させる。
+  // npm 12 も使わない。既定が allow-remote=none になり、--package-lock-only のときだけ
+  // bundleDependencies を持つパッケージ（tailwind の @tailwindcss/oxide-wasm32-wasi）のレジストリの
+  // tarball を remote と誤判定して EALLOWREMOTE で落ちる（npm/cli#9800）。Renovate は lockfile を
+  // 更新できず package.json だけの PR を出し、CI の npm ci が全部落ちる（#81 で実例）。
+  // allow-remote=all で打ち消すより、バグの無い版で動かす。#9800 の修正が入った npm 12 が出たら上限を外す。
   constraints: {
-    npm: '>=11',
+    npm: '^11',
   },
   // 間接依存（lockfile だけにある版）も週1で更新する。
   lockFileMaintenance: {
