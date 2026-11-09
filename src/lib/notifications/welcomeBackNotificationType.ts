@@ -10,17 +10,17 @@
  * クライアントからも import されるため React・サーバー専用 API・env を import しないこと。
  */
 
-import { toJstDateString } from "@/lib/streak";
+import { daysBetween, type PostDate } from "@/lib/dayClock";
 import type { NotificationLines, NotificationVariant } from "./lines";
 
 export const WELCOME_BACK_NOTIFICATION_TYPE = "welcome-back";
 
-/** 前回の投稿からこの日数以上空いた投稿を「おかえり」とみなす（JST の暦日差）。 */
+/** 前回の投稿からこの日数以上空いた投稿を「おかえり」とみなす（記録日の差）。 */
 export const WELCOME_BACK_MIN_DAYS = 30;
 
 /** type="welcome-back" の Notification.data。 */
 export interface WelcomeBackNotificationData {
-  /** 前回の投稿から何日ぶりか（JST の暦日差） */
+  /** 前回の投稿から何日ぶりか（記録日の差） */
   days: number;
 }
 
@@ -32,22 +32,14 @@ export function welcomeBackNotificationId(imageId: string): string {
   return `welcome-back-${imageId}`;
 }
 
-/** 2つの時刻の JST の暦日差（later − earlier）。 */
-function jstDayDiff(earlier: Date, later: Date): number {
-  const toUtcDay = (d: Date) => {
-    const [y, m, day] = toJstDateString(d).split("-").map(Number);
-    return Date.UTC(y, m - 1, day);
-  };
-  return Math.round((toUtcDay(later) - toUtcDay(earlier)) / (24 * 60 * 60 * 1000));
-}
-
 /**
  * 「おかえり」に当たるなら何日ぶりかを返す。前回の投稿が無い（初投稿）か、空きが短ければ null。
- * 暦日で数えるのは、カレンダーや連続投稿と同じ「日」の感覚に揃えるため（深夜をまたいだ投稿で揺れない）。
+ * 記録日の差で数えるのは、カレンダーや連続投稿と同じ「日」の感覚に揃えるため（深夜をまたいだ投稿で
+ * 揺れない・日付の区切りも同じ）。
  */
-export function welcomeBackDays(previousPostAt: Date | null, postedAt: Date): number | null {
-  if (!previousPostAt) return null;
-  const days = jstDayDiff(previousPostAt, postedAt);
+export function welcomeBackDays(previousPostDate: PostDate | null, postDate: PostDate): number | null {
+  if (!previousPostDate) return null;
+  const days = daysBetween(previousPostDate, postDate);
   return days >= WELCOME_BACK_MIN_DAYS ? days : null;
 }
 

@@ -13,6 +13,7 @@ vi.mock("@/lib/db", () => ({
   default: {
     image: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), delete: vi.fn() },
     achievement: { findFirst: vi.fn() },
+    dayBoundarySetting: { findMany: vi.fn() },
   },
 }));
 vi.mock("@/lib/storage/storage", () => ({ deleteImage: vi.fn() }));
@@ -48,6 +49,7 @@ const mockStatusExists = vi.mocked(fediverseStatusExists);
 const mockResolveCap = vi.mocked(resolveMakeupCap);
 const mockLock = vi.mocked(withMonthMakeupLock);
 const mockHeal = vi.mocked(healAfterImageDelete);
+const mockBoundaries = vi.mocked(prisma.dayBoundarySetting.findMany);
 
 /** JST のその日時を「今」にする（Date だけ固定）。 */
 function setNow(iso: string) {
@@ -62,9 +64,12 @@ const OWNER = {
   instance: { domain: "handon.club", type: "mastodon" },
 } as unknown as SessionUser;
 
-/** JST でその日の正午になる Date（toJstDateString は UTC+9 で切るため）。 */
-function jst(day: number, month = 3, year = 2026): Date {
-  return new Date(Date.UTC(year, month - 1, day, 3, 0, 0));
+/**
+ * 記録日（postDate 列）の値。DB の DATE 列は UTC 0:00 の Date で読める。
+ * 日・月は記録日で決まるので、フィクスチャに投稿時刻は要らない。
+ */
+function pd(day: number, month = 3, year = 2026): Date {
+  return new Date(Date.UTC(year, month - 1, day));
 }
 
 const params = (id = "img1") => ({ params: Promise.resolve({ id }) });
@@ -86,7 +91,7 @@ function targetImage(over: Record<string, unknown> = {}) {
   return {
     id: "img1",
     userId: "u1",
-    createdAt: jst(10),
+    postDate: pd(10),
     calendarPickedAt: null,
     makeupTargetDay: null,
     makeupTargetMonthDelta: 0,
@@ -103,6 +108,7 @@ beforeEach(() => {
   mockAuth.mockResolvedValue(OWNER);
   mockAchievementFindFirst.mockResolvedValue(null as never);
   mockUpdate.mockResolvedValue({} as never);
+  mockBoundaries.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -114,7 +120,7 @@ describe("DELETE /api/v1/images/[id]", () => {
     ({
       id: "img1",
       userId: "u1",
-      createdAt: jst(10),
+      postDate: pd(10),
       storageKey: "2026/03/10/a.jpg",
       thumbnailKey: "2026/03/10/a-thumb.webp",
       postId: null,
@@ -190,12 +196,15 @@ describe("DELETE /api/v1/images/[id]", () => {
     ["ポイント制の月", "2026-10-25T03:00:00Z", 10],
   ])("%s でも、失効した donor 割当を外すだけ（月の割当は組み直さない＝自動穴埋めは撤去済み）", async (_label, nowIso, month) => {
     setNow(nowIso);
-    const createdAt = month === 3 ? jst(10) : jst(10, 10);
-    mockFindUnique.mockResolvedValue(image({ createdAt }));
+    const postDate = month === 3 ? pd(10) : pd(10, 10);
+    mockFindUnique.mockResolvedValue(image({ postDate }));
 
     await DELETE(deleteReq(), params());
 
-    expect(mockHeal).toHaveBeenCalledWith({ userId: "u1", deletedCreatedAt: createdAt });
+    expect(mockHeal).toHaveBeenCalledWith({
+      userId: "u1",
+      deletedPostDate: postDate.toISOString().slice(0, 10),
+    });
   });
 
   it("失効掃除が失敗しても画像削除は成功させる", async () => {
@@ -270,7 +279,7 @@ describe("PATCH /api/v1/images/[id]", () => {
   function monthImages(entries: Array<{ id: string; day: number; makeupTargetDay?: number | null }>) {
     return entries.map((e) => ({
       id: e.id,
-      createdAt: jst(e.day),
+      postDate: pd(e.day),
       makeupTargetDay: e.makeupTargetDay ?? null,
       makeupTargetMonthDelta: 0,
     })) as never;
@@ -417,7 +426,7 @@ describe("PATCH /api/v1/images/[id]", () => {
     });
 
     it("ダブル投稿の日の写真でなければ穴埋めに使えない", async () => {
-      mockFindUnique.mockResolvedValue(targetImage({ createdAt: jst(20) }));
+      mockFindUnique.mockResolvedValue(targetImage({ postDate: pd(20) }));
       mockFindMany.mockResolvedValue(
         monthImages([
           { id: "img1", day: 20 },
@@ -509,12 +518,12 @@ describe("PATCH /api/v1/images/[id]", () => {
 
     it("ポイント制の月で残りが無ければ、ポイント不足として409で拒否する", async () => {
       setNow("2026-10-25T03:00:00Z");
-      mockFindUnique.mockResolvedValue(targetImage({ createdAt: jst(10, 10) }));
+      mockFindUnique.mockResolvedValue(targetImage({ postDate: pd(10, 10) }));
       mockFindMany.mockResolvedValue(
         [
-          { id: "img1", createdAt: jst(10, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
-          { id: "img2", createdAt: jst(10, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
-          { id: "d1", createdAt: jst(20, 10), makeupTargetDay: 2, makeupTargetMonthDelta: 0 },
+          { id: "img1", postDate: pd(10, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img2", postDate: pd(10, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "d1", postDate: pd(20, 10), makeupTargetDay: 2, makeupTargetMonthDelta: 0 },
         ] as never
       );
       mockResolveCap.mockResolvedValue(1); // 1pt を 2日の穴で使用済み
@@ -530,11 +539,11 @@ describe("PATCH /api/v1/images/[id]", () => {
 
     it("ポイント0の月は1件目から拒否する", async () => {
       setNow("2026-10-25T03:00:00Z");
-      mockFindUnique.mockResolvedValue(targetImage({ createdAt: jst(10, 10) }));
+      mockFindUnique.mockResolvedValue(targetImage({ postDate: pd(10, 10) }));
       mockFindMany.mockResolvedValue(
         [
-          { id: "img1", createdAt: jst(10, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
-          { id: "img2", createdAt: jst(10, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img1", postDate: pd(10, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img2", postDate: pd(10, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
         ] as never
       );
       mockResolveCap.mockResolvedValue(0);
@@ -561,6 +570,16 @@ describe("PATCH /api/v1/images/[id]", () => {
       await expect(res.json()).resolves.toEqual({ error: "3月の穴埋めは4月10日で締め切りました" });
       expect(mockLock).not.toHaveBeenCalled();
       expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("2時区切りの人は 11日 1:59 まで先月分を穴埋めでき、2:00 で締め切る（締切は持ち主の記録日）", async () => {
+      mockBoundaries.mockResolvedValue([{ fromDate: pd(1), hour: 2 }] as never);
+
+      setNow("2026-04-11T01:59:00+09:00");
+      expect((await PATCH(patchReq({ makeupTargetDay: 5 }), params())).status).toBe(200);
+
+      setNow("2026-04-11T02:00:00+09:00");
+      expect((await PATCH(patchReq({ makeupTargetDay: 5 }), params())).status).toBe(409);
     });
 
     it("締切後は解除も409で拒否する（ポイントを戻して再利用させない）", async () => {
@@ -594,11 +613,11 @@ describe("PATCH /api/v1/images/[id]", () => {
       function novemberDonor(over: Record<string, unknown> = {}) {
         setNow("2026-11-05T03:00:00Z");
         mockResolveCap.mockResolvedValue(1);
-        mockFindUnique.mockResolvedValue(targetImage({ createdAt: jst(3, 11), ...over }));
+        mockFindUnique.mockResolvedValue(targetImage({ postDate: pd(3, 11), ...over }));
         mockFindMany.mockResolvedValue([
-          { id: "img1", createdAt: jst(3, 11), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
-          { id: "img2", createdAt: jst(3, 11), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
-          { id: "oct1", createdAt: jst(30, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img1", postDate: pd(3, 11), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img2", postDate: pd(3, 11), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "oct1", postDate: pd(30, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
         ] as never);
       }
 
@@ -675,11 +694,11 @@ describe("PATCH /api/v1/images/[id]", () => {
       it("1日1donor は月をまたいで共有する: 同じ11/3の別写真が10月を埋めていたら外す", async () => {
         setNow("2026-11-05T03:00:00Z");
         mockResolveCap.mockResolvedValue(2);
-        mockFindUnique.mockResolvedValue(targetImage({ createdAt: jst(3, 11) }));
+        mockFindUnique.mockResolvedValue(targetImage({ postDate: pd(3, 11) }));
         mockFindMany.mockResolvedValue([
-          { id: "img1", createdAt: jst(3, 11), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
-          { id: "img2", createdAt: jst(3, 11), makeupTargetDay: 31, makeupTargetMonthDelta: -1 },
-          { id: "nov1", createdAt: jst(2, 11), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img1", postDate: pd(3, 11), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img2", postDate: pd(3, 11), makeupTargetDay: 31, makeupTargetMonthDelta: -1 },
+          { id: "nov1", postDate: pd(2, 11), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
         ] as never);
 
         // 11/1 の穴を、同じ 11/3 の別の写真で埋めようとする
@@ -698,27 +717,27 @@ describe("PATCH /api/v1/images/[id]", () => {
       it("10月の👑を崩す付け替え（1日1donor による10月の割当外し）は409で拒否する", async () => {
         setNow("2026-11-05T03:00:00Z");
         mockResolveCap.mockResolvedValue(1);
-        mockFindUnique.mockResolvedValue(targetImage({ createdAt: jst(3, 11) }));
+        mockFindUnique.mockResolvedValue(targetImage({ postDate: pd(3, 11) }));
         // 10月は1〜30日に投稿があり、31日の穴を 11/3 の img2 が埋めている＝達成済み。
         // 11月は2〜30日に投稿があり、1日が穴。img1（同じ11/3）でその穴を埋めようとすると、
         // 1日1donor の月またぎ共有で img2 の10月の割当が外れ、10月が非達成に落ちる。
         const octoberPosts = Array.from({ length: 30 }, (_, i) => ({
           id: `oct${i + 1}`,
-          createdAt: jst(i + 1, 10),
+          postDate: pd(i + 1, 10),
           makeupTargetDay: null,
           makeupTargetMonthDelta: 0,
         }));
         const novemberPosts = Array.from({ length: 29 }, (_, i) => ({
           id: `nov${i + 2}`,
-          createdAt: jst(i + 2, 11),
+          postDate: pd(i + 2, 11),
           makeupTargetDay: null,
           makeupTargetMonthDelta: 0,
         }));
         mockFindMany.mockResolvedValue([
           ...octoberPosts,
           ...novemberPosts,
-          { id: "img1", createdAt: jst(3, 11), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
-          { id: "img2", createdAt: jst(3, 11), makeupTargetDay: 31, makeupTargetMonthDelta: -1 },
+          { id: "img1", postDate: pd(3, 11), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img2", postDate: pd(3, 11), makeupTargetDay: 31, makeupTargetMonthDelta: -1 },
         ] as never);
         mockAchievementFindFirst.mockResolvedValue({ id: "a1" } as never);
 
@@ -738,10 +757,10 @@ describe("PATCH /api/v1/images/[id]", () => {
       it("同じ日・未来日は月をまたいでも埋められない（10/31 の写真で 11/1 は不可）", async () => {
         setNow("2026-11-05T03:00:00Z");
         mockResolveCap.mockResolvedValue(1);
-        mockFindUnique.mockResolvedValue(targetImage({ createdAt: jst(31, 10) }));
+        mockFindUnique.mockResolvedValue(targetImage({ postDate: pd(31, 10) }));
         mockFindMany.mockResolvedValue([
-          { id: "img1", createdAt: jst(31, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
-          { id: "img2", createdAt: jst(31, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img1", postDate: pd(31, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
+          { id: "img2", postDate: pd(31, 10), makeupTargetDay: null, makeupTargetMonthDelta: 0 },
         ] as never);
 
         const res = await PATCH(

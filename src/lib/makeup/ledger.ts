@@ -14,7 +14,8 @@ import prisma from "@/lib/db";
 import { isUniqueViolation } from "@/lib/db/errors";
 import { perfectMonthGrace } from "@/lib/achievements/grace";
 import { perfectMonthKey } from "@/lib/achievements/perfectMonth";
-import { jstMonthRangeOfYm, shiftYm, toJstYm } from "@/lib/jst";
+import { shiftYm } from "@/lib/jst";
+import { jstCalendarDateOf, ymOf, type PostDate } from "@/lib/dayClock";
 import {
   MAKEUP_POINT_REASONS,
   hasGrant,
@@ -112,16 +113,17 @@ export async function resolveMakeupLimits(args: {
   userId: string;
   instanceDomain: string | null | undefined;
   ym: string;
-  now: Date;
+  /** 持ち主の今日（記録日）。当月かどうかはこれで決める。 */
+  today: PostDate;
 }): Promise<MakeupLimits> {
-  const { userId, instanceDomain, ym, now } = args;
+  const { userId, instanceDomain, ym, today } = args;
   if (!isPointEra(ym)) {
     const grace = perfectMonthGrace(instanceDomain);
     return { pointEra: false, cap: grace, potentialCap: grace, grants: [] };
   }
 
   const grants = await getMonthGrants(userId, ym);
-  const isCurrentMonth = ym === toJstYm(now);
+  const isCurrentMonth = ym === ymOf(today);
   let catchupEligible = false;
   if (isCurrentMonth && !hasGrant(grants, MAKEUP_POINT_REASONS.MONTHLY_CATCHUP)) {
     catchupEligible = await isCatchupCandidate(userId, ym);
@@ -134,9 +136,11 @@ export async function resolveMakeupLimits(args: {
   };
 }
 
-/** 先月中に既にアカウントがあり、先月の皆勤賞行が無いか（potentialCap の見込み用の推定）。 */
+/**
+ * 先月中に既にアカウントがあり、先月の皆勤賞行が無いか（potentialCap の見込み用の推定）。
+ * 登録日は JST の暦日で比べる（定期ジョブの catchup 付与と同じ条件。登録時はまだ区切りを設定できない）。
+ */
 async function isCatchupCandidate(userId: string, ym: string): Promise<boolean> {
-  const { start } = jstMonthRangeOfYm(ym);
   const [user, lastMonthPerfect] = await Promise.all([
     prisma.user.findUnique({ where: { id: userId }, select: { createdAt: true } }),
     prisma.achievement.findFirst({
@@ -144,7 +148,7 @@ async function isCatchupCandidate(userId: string, ym: string): Promise<boolean> 
       select: { id: true },
     }),
   ]);
-  return !!user && user.createdAt < start && !lastMonthPerfect;
+  return !!user && ymOf(jstCalendarDateOf(user.createdAt)) < ym && !lastMonthPerfect;
 }
 
 /**

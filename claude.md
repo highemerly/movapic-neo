@@ -40,7 +40,7 @@
 | [docs/posting.md](docs/posting.md) | メール投稿・Bot（メンション）投稿・投稿ソース(source)・公開範囲(visibility)・**出力形式（保存=AVIF / Mastodon送信時のみJPEG）** |
 | [docs/ui.md](docs/ui.md) | レスポンシブ(PC/モバイル)・ボタンカラー(primary/brand)・共通セレクター(SegmentControl)・画像リトライ表示 |
 | [docs/text-rendering.md](docs/text-rendering.md) | 文字配置・フォントサイズ・影・EXIF・代替テキスト(ALT)の配管 |
-| [docs/features.md](docs/features.md) | Fediverse認証・カレンダー・実績/通知・PWA |
+| [docs/features.md](docs/features.md) | Fediverse認証・カレンダー・**日付の区切り（記録日）**・実績/通知・PWA |
 | [docs/reply.md](docs/reply.md) | リプライ（スレッド）: `Image.replyToId`・Web「スレッドに投稿」/Bot・メール「連」・Fediverse上の接続と繋げられないケース・ミュート・通知 |
 | [docs/favorite.md](docs/favorite.md) | リアクション（Mastodon favourite / Misskey reaction連携）のマージ表示・絵文字・TTL・定期同期・取り消し反映など全仕様 |
 | [docs/periodic-jobs.md](docs/periodic-jobs.md) | 定期ジョブ（graphile-worker crontab内蔵の30分毎メンテ） |
@@ -126,4 +126,5 @@ App Router の `<Link>` はビューポート進入で RSC ペイロードを自
 - `User.blockCrawlers` フラグで検索（noindexメタ）とAI Bot（robots.txt Disallow）をユーザー単位制御・`revalidateTag`で即反映。
 
 ### 日時
-- サーバ側の「今日/今月」は必ずJST（`toJstDateString`）で判定。`new Date().getMonth()` は本番UTCで前月を返す。
+- **ユーザーの「日」「月」（カレンダー・皆勤賞・穴埋め・連続投稿・日/月で数える実績・/stats）は記録日で判定**。投稿の日は `Image.postDate`（保存時に確定・書き換えない）、今日は持ち主の区切り（0〜4時・ユーザーごと）で決まる [dayClock.ts](src/lib/dayClock.ts)（サーバーは [dayClock.server.ts](src/lib/dayClock.server.ts) の `loadToday`）。`createdAt` から JST の日付を計算し直さない（ESLint で import 禁止・生 SQL の `AT TIME ZONE` は admin 以外禁止のテストあり）。詳細: [docs/features.md](docs/features.md)「日付の区切り」。
+- 時計どおりに判定するもの（早起き・書き初め等の実績・管理画面の時系列・シーズン）は JST（`jstCalendarDateOf`／`toJstHour`）。全員共通の月次処理は `LATEST_CLOCK`（4時区切り＝全員がその日に入った後）で判定。`new Date().getMonth()` は本番UTCで前月を返すので使わない。

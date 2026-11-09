@@ -22,7 +22,8 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
-import { toJstDateString, toJstHour } from "@/lib/streak";
+import { calculateStreak, toJstHour } from "@/lib/streak";
+import { ymOf, type PostDate } from "@/lib/dayClock";
 import {
   CATALOG,
   evaluateMonthDays,
@@ -43,6 +44,7 @@ import { donorTargetYm } from "@/lib/makeup/donor";
 import { parseYm } from "@/lib/jst";
 import { perfectMonthGrace } from "@/lib/achievements/grace";
 import { isPointEra } from "@/lib/makeup/points";
+import { fromDbDate } from "@/lib/dayClock.server";
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -52,27 +54,11 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-// JST日付文字列の前日
-function prevDay(day: string): string {
-  const d = new Date(day + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
-
-// daySet を使って day で終わる連続日数を求める
-function streakEndingAt(daySet: Set<string>, day: string): number {
-  let n = 0;
-  let cur = day;
-  while (daySet.has(cur)) {
-    n++;
-    cur = prevDay(cur);
-  }
-  return n;
-}
 
 interface ReplayImage {
   id: string;
   createdAt: Date;
+  postDate: Date;
   overlayText: string;
   position: string;
   font: string;
@@ -111,16 +97,17 @@ function replayUser(userId: string, images: ReplayImage[], capOf: (ym: string) =
 
   // running 集計
   let totalPosts = 0;
-  const allDays = new Set<string>();
+  // 日はすべて記録日（Image.postDate）。live=collectStats と同じく createdAt から計算し直さない。
+  const allDays = new Set<PostDate>();
   const dayCounts = new Map<string, number>();
-  // JST日 -> その日に使った source の集合（ハットトリック判定）
+  // 記録日 -> その日に使った source の集合（ハットトリック判定）
   const daySources = new Map<string, Set<string>>();
-  // ym -> (JST日 -> その日の投稿数)。distinct日数 / 皆勤賞判定をここから出す。
+  // ym -> (記録日 -> その日の投稿数)。distinct日数 / 皆勤賞判定をここから出す。
   const monthDayCounts = new Map<string, Map<string, number>>();
   // ym -> その月で永続化された穴埋め割当（makeupTargetDay）が指す空き日。皆勤賞判定の単一ソース。
   // live=collectStats（DBから当月分を読む）と同形式。backfill は時系列リプレイで running に積む。
   const monthFilledHoles = new Map<string, number[]>();
-  // 通算で投稿した月（YYYY-MM）と時間帯（0-23時）。live=collectStats と同じ JST 基準。
+  // 通算で投稿した月（記録日の YYYY-MM）と時間帯（時計の 0-23時）。live=collectStats と同じ。
   const postMonths = new Set<string>();
   const postHours = new Set<number>();
   const featureCounts = { neon: 0, stamp: 0, xlarge: 0, vertical: 0 };
@@ -147,8 +134,8 @@ function replayUser(userId: string, images: ReplayImage[], capOf: (ym: string) =
   };
 
   for (const img of images) {
-    const day = toJstDateString(img.createdAt);
-    const ym = day.slice(0, 7);
+    const day = fromDbDate(img.postDate);
+    const ym = ymOf(day);
 
     totalPosts += 1;
     allDays.add(day);
@@ -194,7 +181,8 @@ function replayUser(userId: string, images: ReplayImage[], capOf: (ym: string) =
     }
     const stats: AchStats = {
       totalPosts,
-      currentStreak: streakEndingAt(allDays, day),
+      // live と同じ関数で、この投稿の記録日で終わる連続日数を数える。
+      currentStreak: calculateStreak(allDays, day),
       todayPosts: dayCounts.get(day) ?? 0,
       distinctDaysInPostMonth: monthSummary.distinctDays,
       postMonthDayCounts,
@@ -226,6 +214,7 @@ function replayUser(userId: string, images: ReplayImage[], capOf: (ym: string) =
       // 親が削除されると replyToId は SET NULL になり判定できない（live では投稿時点の値で付与済み）
       isReply: img.replyToId != null,
       createdAt: img.createdAt,
+      postDate: day,
     };
 
     // 固定実績（リアクション/プロフィール起点は投稿では確定しないので別経路で扱う）
@@ -407,6 +396,7 @@ async function main() {
       select: {
         id: true,
         createdAt: true,
+        postDate: true,
         overlayText: true,
         position: true,
         font: true,

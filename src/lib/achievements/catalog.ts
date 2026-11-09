@@ -8,8 +8,9 @@
  * 動的にキーが増える皆勤賞だけはカタログ配列に入れず evaluatePerfectMonth で扱う。
  */
 
-import { toJstDateString, toJstHour } from "@/lib/streak";
+import { toJstHour } from "@/lib/streak";
 import { seasonLabel } from "@/lib/seasons/catalog";
+import { jstCalendarDateOf, ymOf, type PostDate } from "@/lib/dayClock";
 import { countGraphemes } from "@/lib/text/grapheme";
 import {
   PERFECT_MONTH_CATEGORY,
@@ -119,7 +120,10 @@ export interface PostFacts {
   visibility: string; // "public" | "unlisted" | "local"
   /** スレッドへの投稿（Image.replyToId あり＝他の写真への続き）か。docs/reply.md */
   isReply: boolean;
+  /** 投稿の時刻。時計で判定する実績（書き初め・早起き・夜更かし等）だけが使う */
   createdAt: Date;
+  /** 記録日（Image.postDate）。日・月で数える判定はこちらを使う（docs/features.md「日付の区切り」） */
+  postDate: PostDate;
 }
 
 /**
@@ -620,7 +624,8 @@ const singletons: PostAchievementDef[] = [
     title: "書き初め",
     description: "元日（1月1日）に投稿しました",
     icon: "Brush",
-    evaluate: (_s, p) => toJstDateString(p.createdAt).slice(5) === "01-01",
+    // 時計どおり（JST の元日）。区切りの遅い人の 1/1 0:30 の投稿は記録日では大晦日だが、元日の投稿として数える。
+    evaluate: (_s, p) => jstCalendarDateOf(p.createdAt).slice(5) === "01-01",
   },
   {
     key: "first-email",
@@ -858,7 +863,7 @@ export const ACHIEVEMENT_LAYOUT: { title: string; blocks: AchievementBlock[] }[]
  * 「後日のダブル投稿」で穴埋めできる（日付順マッチング）。grace は呼び出し側が渡す。
  */
 export function evaluatePerfectMonth(s: AchStats, post: PostFacts, grace: number): string | null {
-  const ym = toJstDateString(post.createdAt).slice(0, 7); // "2026-06"
+  const ym = ymOf(post.postDate); // "2026-06"
   const year = Number(ym.slice(0, 4));
   const month = Number(ym.slice(5, 7));
   const daysInMonth = daysInMonthOf(year, month);
@@ -877,7 +882,7 @@ export function evaluatePerfectMonth(s: AchStats, post: PostFacts, grace: number
  * 穴埋めは数えず実際に投稿した日数だけで決まる（理由は monthDays.ts）ので、投稿起点だけで評価が閉じる。
  */
 export function evaluateMonthDays(s: AchStats, post: PostFacts): string[] {
-  return reachedMonthDaysKeys(toJstDateString(post.createdAt).slice(0, 7), s.distinctDaysInPostMonth);
+  return reachedMonthDaysKeys(ymOf(post.postDate), s.distinctDaysInPostMonth);
 }
 
 /**

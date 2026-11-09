@@ -6,6 +6,7 @@
  */
 
 import prisma from "@/lib/db";
+import { fromDbDate } from "@/lib/dayClock.server";
 import {
   WELCOME_BACK_NOTIFICATION_TYPE,
   welcomeBackDays,
@@ -24,15 +25,18 @@ export async function createWelcomeBackNotification(params: {
 }): Promise<void> {
   const image = await prisma.image.findUnique({
     where: { id: params.imageId },
-    select: { createdAt: true },
+    select: { createdAt: true, postDate: true },
   });
   if (!image) return;
   const previous = await prisma.image.findFirst({
     where: { userId: params.userId, id: { not: params.imageId }, createdAt: { lt: image.createdAt } },
     orderBy: { createdAt: "desc" },
-    select: { createdAt: true },
+    select: { postDate: true },
   });
-  const days = welcomeBackDays(previous?.createdAt ?? null, image.createdAt);
+  const days = welcomeBackDays(
+    previous ? fromDbDate(previous.postDate) : null,
+    fromDbDate(image.postDate)
+  );
   if (days === null) return;
 
   const id = welcomeBackNotificationId(params.imageId);

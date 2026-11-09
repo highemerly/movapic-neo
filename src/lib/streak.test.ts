@@ -1,9 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
+import { asPostDate } from "@/lib/dayClock";
 import { toJstDateString, calculateStreak } from "./streak";
-
-// JST正午あたりの瞬間を作るヘルパ（UTC 03:00 = JST 12:00）。
-// これで「JST日付 = 引数の日」になり、UTC/JSTのズレに埋もれないテストデータを作れる。
-const jstNoon = (isoDay: string) => new Date(`${isoDay}T03:00:00Z`);
 
 describe("toJstDateString", () => {
   it("UTC+9してYYYY-MM-DDを返す", () => {
@@ -30,72 +27,47 @@ describe("toJstDateString", () => {
 });
 
 describe("calculateStreak", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  // 「今日」を JST 2024-01-15 に固定（UTC 03:00 = JST 12:00）
-  const freezeAt = (iso: string) => vi.setSystemTime(new Date(iso));
+  const d = asPostDate;
+  const days = (...xs: string[]) => xs.map(d);
 
   it("投稿が無ければ0", () => {
-    freezeAt("2024-01-15T03:00:00Z");
-    expect(calculateStreak([])).toBe(0);
+    expect(calculateStreak([], d("2024-01-15"))).toBe(0);
   });
 
   it("今日だけ投稿があれば1", () => {
-    freezeAt("2024-01-15T03:00:00Z");
-    expect(calculateStreak([jstNoon("2024-01-15")])).toBe(1);
+    expect(calculateStreak(days("2024-01-15"), d("2024-01-15"))).toBe(1);
   });
 
   it("今日から連続していれば日数を数える", () => {
-    freezeAt("2024-01-15T03:00:00Z");
-    const dates = [jstNoon("2024-01-15"), jstNoon("2024-01-14"), jstNoon("2024-01-13")];
-    expect(calculateStreak(dates)).toBe(3);
+    expect(calculateStreak(days("2024-01-15", "2024-01-14", "2024-01-13"), d("2024-01-15"))).toBe(3);
   });
 
   it("今日は未投稿でも昨日があればそこから数える", () => {
-    freezeAt("2024-01-15T03:00:00Z");
-    const dates = [jstNoon("2024-01-14"), jstNoon("2024-01-13")];
-    expect(calculateStreak(dates)).toBe(2);
+    expect(calculateStreak(days("2024-01-14", "2024-01-13"), d("2024-01-15"))).toBe(2);
   });
 
   it("今日も昨日も無ければ0（連続が途切れている）", () => {
-    freezeAt("2024-01-15T03:00:00Z");
-    expect(calculateStreak([jstNoon("2024-01-13")])).toBe(0);
+    expect(calculateStreak(days("2024-01-13"), d("2024-01-15"))).toBe(0);
   });
 
   it("途中に欠けがあればそこで打ち切る", () => {
-    freezeAt("2024-01-15T03:00:00Z");
     // 15,14 は連続、13 が欠け、12 があっても数えない
-    const dates = [jstNoon("2024-01-15"), jstNoon("2024-01-14"), jstNoon("2024-01-12")];
-    expect(calculateStreak(dates)).toBe(2);
+    expect(calculateStreak(days("2024-01-15", "2024-01-14", "2024-01-12"), d("2024-01-15"))).toBe(2);
   });
 
   it("同一日の重複はまとめて1日として数える", () => {
-    freezeAt("2024-01-15T03:00:00Z");
-    const dates = [jstNoon("2024-01-15"), jstNoon("2024-01-15"), jstNoon("2024-01-14")];
-    expect(calculateStreak(dates)).toBe(2);
+    expect(calculateStreak(days("2024-01-15", "2024-01-15", "2024-01-14"), d("2024-01-15"))).toBe(2);
   });
 
-  it("未来日の投稿は現在の連続数を水増ししない", () => {
-    freezeAt("2024-01-15T03:00:00Z");
-    const dates = [jstNoon("2024-01-16"), jstNoon("2024-01-15"), jstNoon("2024-01-14")];
-    expect(calculateStreak(dates)).toBe(2);
+  it("anchor より後の投稿は連続数を水増ししない", () => {
+    expect(calculateStreak(days("2024-01-16", "2024-01-15", "2024-01-14"), d("2024-01-15"))).toBe(2);
   });
 
   it("入力順に依存しない", () => {
-    freezeAt("2024-01-15T03:00:00Z");
-    const dates = [jstNoon("2024-01-13"), jstNoon("2024-01-15"), jstNoon("2024-01-14")];
-    expect(calculateStreak(dates)).toBe(3);
+    expect(calculateStreak(days("2024-01-13", "2024-01-15", "2024-01-14"), d("2024-01-15"))).toBe(3);
   });
 
-  it("「今日」はJSTで判定する（UTC深夜=JST翌日のズレを吸収）", () => {
-    // 2024-01-15 15:30 UTC = 2024-01-16 00:30 JST → 今日は JST 1/16
-    freezeAt("2024-01-15T15:30:00Z");
-    // JST 1/16 の投稿を「今日」として拾えれば1。UTC判定だと0になり落ちる。
-    expect(calculateStreak([jstNoon("2024-01-16")])).toBe(1);
+  it("月またぎ・年またぎも続けて数える", () => {
+    expect(calculateStreak(days("2023-12-31", "2024-01-01"), d("2024-01-01"))).toBe(2);
   });
 });

@@ -16,15 +16,15 @@ import prisma from "@/lib/db";
 import { parseUserHandle } from "@/lib/userHandle";
 import { getHomeServer } from "@/lib/auth/serverPolicy";
 import { getCurrentUser } from "@/lib/auth/session";
-import { toJstDateString } from "@/lib/streak";
 import { CACHE_PUBLIC_MEDIUM } from "@/lib/http";
-import { formatYm, isValidYearMonth } from "@/lib/jst";
+import { formatYm, isValidYearMonth, shiftYm } from "@/lib/jst";
+import { dayOfMonth, firstDayOfYm, hourOn, lastDayOfYm, todayOf, ymOf } from "@/lib/dayClock";
+import { loadSchedule, postDateBetween } from "@/lib/dayClock.server";
 import { resolveMakeupLimits } from "@/lib/makeup/ledger";
 import { allowsPrevMonthDonor, donorTargetYm } from "@/lib/makeup/donor";
-import { isMakeupEditable, makeupDeadline } from "@/lib/makeup/points";
+import { isMakeupEditable, makeupDeadlineAt } from "@/lib/makeup/points";
 import type { MonthDaysGoal } from "@/lib/achievements/monthDays";
 import {
-  calendarMonthRange,
   fetchCalendarImages,
   resolveCalendarMonth,
   type DayData,
@@ -46,10 +46,15 @@ interface MakeupInfo {
   remaining: number;
   /** まだ埋まっていない未投稿日の数（当月は昨日まで）。 */
   unfilled: number;
-  /** 穴埋めの締切（この時刻より前なら編集可）。ISO 8601。 */
+  /**
+   * 穴埋めの締切の時刻（表示用・この時刻より前なら編集可）。ISO 8601。持ち主の区切りで決まる
+   * （2時区切りなら翌月11日 2:00 JST）。編集できるかは editable を見る。
+   */
   deadline: string;
   /** 今この月の穴埋めを指定・解除できるか（締切前かつ未来月でない）。 */
   editable: boolean;
+  /** 持ち主の今日の日付の区切り（時）。説明文の「1日の区切り」に出す。 */
+  dayBoundaryHour: number;
   /** 付与履歴（古い順）。従来ルールの月は空。 */
   grants: Array<{ reason: string; amount: number; grantedAt: string }>;
   /** この月の皆勤賞にまだ手が届くか（達成済みも true）。false なら案内を月間投稿日数の目標に切り替える。 */
@@ -152,11 +157,13 @@ export async function GET(
 
     // 指定月の画像を取得（新しい順）→ 代表サムネ・穴埋め・皆勤賞を単一ソースで解決。
     // 穴埋めの上限は持ち主の所属インスタンス（従来ルールの月）か台帳（ポイント制の月）で決まる。
-    const now = new Date();
+    // 日・今日は持ち主の記録日（日付の区切り）で決める。閲覧者の区切りは使わない。
     const ym = formatYm(year, month);
+    const schedule = await loadSchedule(user.id);
+    const today = todayOf(schedule, new Date());
     const [images, limits] = await Promise.all([
       fetchCalendarImages(user.id, year, month),
-      resolveMakeupLimits({ userId: user.id, instanceDomain: parsed.domain, ym, now }),
+      resolveMakeupLimits({ userId: user.id, instanceDomain: parsed.domain, ym, today }),
     ]);
     const resolved = resolveCalendarMonth({
       images,
@@ -164,7 +171,7 @@ export async function GET(
       month,
       makeupCap: limits.cap,
       potentialCap: limits.potentialCap,
-      now,
+      today,
     });
 
     // owner編集用: 各日の全画像（chronological asc）。images は desc なので unshift で整列。
@@ -174,15 +181,15 @@ export async function GET(
     if (isOwner) {
       const dayImages: OwnerEditData["dayImages"] = {};
       const nextMonthDayImages: OwnerEditData["dayImages"] = {};
-      // resolveCalendarMonth と同じ JST 日付でグルーピングする。
+      // resolveCalendarMonth と同じ記録日でグルーピングする。
       // desc（新しい順）を維持したまま各日で unshift＝chronological asc。
       const desc = [...images].sort(
         (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
       );
       for (const image of desc) {
-        const jst = toJstDateString(image.createdAt);
-        const day = Number(jst.slice(8, 10));
-        const bucket = jst.startsWith(ym) ? dayImages : nextMonthDayImages;
+        const day = dayOfMonth(image.postDate);
+        const imageYm = ymOf(image.postDate);
+        const bucket = imageYm === ym ? dayImages : nextMonthDayImages;
         if (!bucket[day]) bucket[day] = [];
         bucket[day].unshift({
           id: image.id,
@@ -193,7 +200,7 @@ export async function GET(
           makeupTargetMonth:
             image.makeupTargetDay == null
               ? null
-              : donorTargetYm(jst.slice(0, 7), image.makeupTargetMonthDelta),
+              : donorTargetYm(imageYm, image.makeupTargetMonthDelta),
         });
       }
       ownerEdit = {
@@ -202,18 +209,14 @@ export async function GET(
       };
     }
 
-    // 前月に投稿があるか（前月の範囲＝当月 startDate の直前月）。
-    const { startDate } = calendarMonthRange(year, month);
-    const { startDate: prevMonthStart } = calendarMonthRange(
-      month === 1 ? year - 1 : year,
-      month === 1 ? 12 : month - 1
-    );
+    // 前月に投稿があるか（記録日が前月の投稿）。
+    const prevYm = shiftYm(ym, -1);
     const hasPrevMonth = await prisma.image.findFirst({
       where: {
         userId: user.id,
         isPublic: true,
         isDisabled: false,
-        createdAt: { gte: prevMonthStart, lt: startDate },
+        postDate: postDateBetween(firstDayOfYm(prevYm), lastDayOfYm(prevYm)),
       },
       select: { id: true },
     });
@@ -221,16 +224,13 @@ export async function GET(
     // 過去月のみ翌月投稿の有無をチェック（当月・未来月は不要）。
     let hasNextMonth = false;
     if (!resolved.isCurrentMonth && !resolved.isFutureMonth) {
-      const { startDate: nextMonthStart, endDate: nextMonthEnd } = calendarMonthRange(
-        month === 12 ? year + 1 : year,
-        month === 12 ? 1 : month + 1
-      );
+      const nextYm = shiftYm(ym, 1);
       const nextMonthImage = await prisma.image.findFirst({
         where: {
           userId: user.id,
           isPublic: true,
           isDisabled: false,
-          createdAt: { gte: nextMonthStart, lt: nextMonthEnd },
+          postDate: postDateBetween(firstDayOfYm(nextYm), lastDayOfYm(nextYm)),
         },
         select: { id: true },
       });
@@ -253,8 +253,9 @@ export async function GET(
                   usedDays: [...new Set(resolved.filledHoleDays)].sort((a, b) => a - b),
                   remaining: resolved.makeupRemaining,
                   unfilled: resolved.unfilledDays,
-                  deadline: makeupDeadline(ym).toISOString(),
-                  editable: isMakeupEditable(ym, now),
+                  deadline: makeupDeadlineAt(schedule, ym).toISOString(),
+                  editable: isMakeupEditable(ym, today),
+                  dayBoundaryHour: hourOn(schedule, today),
                   grants: limits.grants.map((g) => ({
                     reason: g.reason,
                     amount: g.amount,

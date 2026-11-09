@@ -5,6 +5,11 @@
  * - monthly-catchup: 当月1日より前に登録済みで、先月が皆勤でなかったユーザーへ当月分+1pt（11日以降）
  * - event:<key>:     期間中のイベント（events.ts）の対象者へ、イベントの月の分を付与
  *
+ * 月の判定は全員共通の時計で行う（ユーザーごとの区切りの履歴は読まない）。月は人によって始まる時刻が
+ * 違う（日付の区切り 0〜4 時）ので、付与は全員が同じ月にいる間（1日 4:00〜月末 24:00 JST）だけ行う。
+ * 1日 0:00〜4:00 は区切りの遅い人がまだ前月にいて、前月分を配ると終わった月の上限が増え、確定した👑が
+ * 揺れる（月末で凍結の不変条件）。catchup も全員の締切（10日）が過ぎた 11日 4:00 以降に配る。
+ *
  * 「毎月1日／11日ちょうど」ではなく「その日以降で、当月の行がまだ無ければ」付与する。
  * ジョブが止まっていて日付を跨いでも次の実行で拾え、リリースが月初に間に合わなくても自動で追いつく。
  * 二重付与は台帳の @@unique([userId, month, reason]) が弾くので、何度走っても冪等。
@@ -16,10 +21,11 @@ import prisma from "@/lib/db";
 import { evaluateAndGrantPerfectMonth } from "@/lib/achievements/engine";
 import { perfectMonthKey } from "@/lib/achievements/perfectMonth";
 import { getFavorServers } from "@/lib/auth/serverPolicy";
-import { jstMonthRangeOfYm, shiftYm, toJstYm } from "@/lib/jst";
+import { shiftYm } from "@/lib/jst";
+import { dayStart, firstDayOfYm, JST_CLOCK } from "@/lib/dayClock";
 import { grantMakeupPoints } from "./ledger";
 import { notifyMakeupReadyAfterGrant } from "./notify";
-import { MAKEUP_POINT_REASONS, isCatchupOpen, isPointEra, type MakeupPointReason } from "./points";
+import { MAKEUP_POINT_REASONS, isPointEra, monthlyGrantWindow, type MakeupPointReason } from "./points";
 import { activeMakeupEvents, makeupEventCreatedAtFilter, makeupEventReason } from "./events";
 
 /**
@@ -80,11 +86,10 @@ async function grantFavorMonthly(ym: string, now: Date): Promise<number> {
  */
 async function grantMonthlyCatchup(ym: string, now: Date): Promise<{ granted: number; perfect: number }> {
   const lastYm = shiftYm(ym, -1);
-  const { start } = jstMonthRangeOfYm(ym);
   const users = await prisma.user.findMany({
     where: {
-      // 先月中に既にアカウントがある＝当月1日(JST)より前に登録
-      createdAt: { lt: start },
+      // 先月中に既にアカウントがある＝当月1日(JST の暦)より前に登録（ledger.isCatchupCandidate と同じ条件）
+      createdAt: { lt: dayStart(JST_CLOCK, firstDayOfYm(ym)) },
       makeupPointGrants: { none: { month: ym, reason: MAKEUP_POINT_REASONS.MONTHLY_CATCHUP } },
       // 先月の皆勤賞が確定済みの人は対象外（データ判定で皆勤だった人もここで行が付くので次回から外れる）
       achievements: { none: { key: perfectMonthKey(lastYm) } },
@@ -119,6 +124,7 @@ async function grantMonthlyCatchup(ym: string, now: Date): Promise<{ granted: nu
  * 対象者の条件は DB 側で絞り、台帳に行がある人は候補から外れるので、BATCH ずつ次の実行で消化される。
  */
 async function grantEvents(now: Date): Promise<number> {
+  // 全員が付与先の月にいるかは activeMakeupEvents が判定する。
   let count = 0;
   for (const event of activeMakeupEvents(now)) {
     const reason = makeupEventReason(event.key);
@@ -147,11 +153,15 @@ async function grantEvents(now: Date): Promise<number> {
  * @returns ログ用サマリ（付与が1件も無ければ undefined＝ログを出さない）
  */
 export async function runMonthlyMakeupGrants(now: Date = new Date()): Promise<string | undefined> {
-  const ym = toJstYm(now);
-  if (!isPointEra(ym)) return undefined;
+  // 配ってよい時間帯・月・catchup の可否は純粋関数で決める（points.monthlyGrantWindow でテスト済み）。
+  const window = monthlyGrantWindow(now);
+  if (!window || !isPointEra(window.ym)) return undefined;
+  const { ym } = window;
 
   const favor = await grantFavorMonthly(ym, now);
-  const catchup = isCatchupOpen(now) ? await grantMonthlyCatchup(ym, now) : { granted: 0, perfect: 0 };
+  const catchup = window.catchupOpen
+    ? await grantMonthlyCatchup(ym, now)
+    : { granted: 0, perfect: 0 };
   const event = await grantEvents(now);
 
   if (favor === 0 && catchup.granted === 0 && catchup.perfect === 0 && event === 0) return undefined;

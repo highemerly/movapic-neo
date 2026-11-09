@@ -1,9 +1,11 @@
 /**
  * JST（日本標準時）の年月・日・月境界を扱う純粋ユーティリティ。
  *
- * サーバの「今日/今月」は必ず JST で判定する（`new Date().getMonth()` は本番UTCで前月を返す）。
- * その土台である「UTC+9時間ずらす」計算は streak.ts の `toJstDateString` 1箇所だけが持ち、
- * ここはその上に「年月(YYYY-MM)」「日(1-31)」「月境界(UTC Date)」を積む。
+ * **カレンダー・皆勤賞・連続投稿など、ユーザーの「日」「月」を扱う判定には使わない**。それらは日付の
+ * 区切り（ユーザーごとに 0〜4 時）で決まる記録日で判定する＝ @/lib/dayClock（ESLint で import を禁止）。
+ * ここの時刻→日付の関数（toJstYm / jstDayOf / jstMonthRange*）は、時計どおりの暦で数える管理画面や
+ * 検証用スクリプトのためのもの。年月の文字列操作（parseYm / formatYm / shiftYm）はどこで使ってもよい。
+ * `new Date().getMonth()` は本番UTCで前月を返すので使わない。
  *
  * 集約した理由（pitfall）: 同じ月境界の式 `Date.UTC(y, m-1, 1, -9, 0, 0)` が resolveMonth.ts /
  * makeupAssign.ts / reevaluate/route.ts の3箇所に、`jstDay` が2箇所に重複定義されていた。
@@ -76,10 +78,4 @@ export function jstMonthRange(year: number, month: number): { start: Date; end: 
 export function jstMonthRangeOfYm(ym: string): { start: Date; end: Date } {
   const { year, month } = parseYm(ym);
   return jstMonthRange(year, month);
-}
-
-/** JST のその日の 00:00 を UTC Date で返す（通知の「1日1通」判定などの下限に使う）。 */
-export function jstDayStart(d: Date): Date {
-  const [year, month, day] = toJstDateString(d).split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day, -9, 0, 0));
 }

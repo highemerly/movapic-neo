@@ -1,3 +1,5 @@
+import { addDays, type PostDate } from "@/lib/dayClock";
+
 // JSTの日付文字列 (YYYY-MM-DD) を返す
 export function toJstDateString(d: Date): string {
   return new Date(d.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -8,23 +10,18 @@ export function toJstHour(d: Date): number {
   return new Date(d.getTime() + 9 * 60 * 60 * 1000).getUTCHours();
 }
 
-// 投稿日のリストから現在の連続投稿日数を計算（JST基準）
-// 今日または昨日に投稿があれば、そこから過去に向かって連続している日数を返す
-export function calculateStreak(dates: Date[]): number {
-  if (dates.length === 0) return 0;
-  const dateSet = new Set(dates.map(toJstDateString));
-  const todayStr = toJstDateString(new Date());
-  let cursor: Date;
-  if (dateSet.has(todayStr)) {
-    cursor = new Date();
-  } else {
-    cursor = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    if (!dateSet.has(toJstDateString(cursor))) return 0;
-  }
+/**
+ * 記録日のリストから、anchor の日（今日、または投稿時の評価ならその投稿の記録日）で終わる連続投稿日数。
+ * anchor に投稿が無ければ前日から数える（今日まだ投稿していなくても、昨日までの連続は途切れていない）。
+ * 日は記録日（Image.postDate）で数える＝日付の区切りが遅い人の深夜の投稿も、その人の「前の日」になる。
+ */
+export function calculateStreak(postDates: Iterable<PostDate>, anchor: PostDate): number {
+  const dateSet = new Set(postDates);
+  let cursor = dateSet.has(anchor) ? anchor : addDays(anchor, -1);
   let streak = 0;
-  while (dateSet.has(toJstDateString(cursor))) {
+  while (dateSet.has(cursor)) {
     streak++;
-    cursor = new Date(cursor.getTime() - 24 * 60 * 60 * 1000);
+    cursor = addDays(cursor, -1);
   }
   return streak;
 }

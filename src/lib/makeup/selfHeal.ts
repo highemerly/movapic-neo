@@ -19,37 +19,35 @@
  */
 
 import prisma from "@/lib/db";
-import { jstDayOf, jstMonthRange, parseYm, toJstYm } from "@/lib/jst";
+import type { PostDate } from "@/lib/dayClock";
+import { toDbDate } from "@/lib/dayClock.server";
 
 /**
- * 削除後に残った同月の画像から、失効した割当（その日の投稿が2枚未満になった donor）の id を返す（純粋）。
- * deletedDay は削除した画像の JST 日。
+ * 削除した画像と同じ記録日に残った画像から、失効した割当（その日の投稿が2枚未満になった donor）の
+ * id を返す（純粋）。
  */
 export function staleDonorIdsAfterDelete(
-  remaining: ReadonlyArray<{ id: string; createdAt: Date; makeupTargetDay: number | null }>,
-  deletedDay: number
+  sameDayRemaining: ReadonlyArray<{ id: string; makeupTargetDay: number | null }>
 ): string[] {
-  const sameDay = remaining.filter((r) => jstDayOf(r.createdAt) === deletedDay);
-  if (sameDay.length >= 2) return [];
-  return sameDay.filter((r) => r.makeupTargetDay != null).map((r) => r.id);
+  if (sameDayRemaining.length >= 2) return [];
+  return sameDayRemaining.filter((r) => r.makeupTargetDay != null).map((r) => r.id);
 }
 
 /**
  * 画像を削除した後に呼ぶ。失効した割当を外して、外した件数を返す。
+ * deletedPostDate は削除した画像の記録日（日は記録日で数える＝カレンダー・皆勤賞と同じ）。
  * 画像削除自体は常に成功させる（プライバシー優先）ので、呼び出し側で .catch すること。
  */
 export async function healAfterImageDelete(args: {
   userId: string;
-  deletedCreatedAt: Date;
+  deletedPostDate: PostDate;
 }): Promise<number> {
-  const { userId, deletedCreatedAt } = args;
-  const { year, month } = parseYm(toJstYm(deletedCreatedAt));
-  const { start, end } = jstMonthRange(year, month);
+  const { userId, deletedPostDate } = args;
   const remaining = await prisma.image.findMany({
-    where: { userId, createdAt: { gte: start, lt: end } },
-    select: { id: true, createdAt: true, makeupTargetDay: true },
+    where: { userId, postDate: toDbDate(deletedPostDate) },
+    select: { id: true, makeupTargetDay: true },
   });
-  const ids = staleDonorIdsAfterDelete(remaining, jstDayOf(deletedCreatedAt));
+  const ids = staleDonorIdsAfterDelete(remaining);
   if (ids.length === 0) return 0;
   const { count } = await prisma.image.updateMany({
     where: { id: { in: ids } },

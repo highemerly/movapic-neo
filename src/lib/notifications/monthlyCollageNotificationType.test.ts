@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  monthlyCollageCycle,
   monthlyCollageNotificationHref,
   monthlyCollageNotificationId,
   monthlyCollageNotificationLines,
@@ -64,5 +65,27 @@ describe("monthlyCollageNotificationHref", () => {
     expect(monthlyCollageNotificationHref("alice@example.com", null)).toBe(
       "/u/alice@example.com/calendar"
     );
+  });
+});
+
+describe("monthlyCollageCycle - 送る対象月（全員共通の時計）", () => {
+  const at = (s: string) => new Date(`${s}:00+09:00`);
+
+  it("1日 4:00 JST から先月分の周期に入る", () => {
+    expect(monthlyCollageCycle(at("2026-11-01T04:00"))).toEqual({
+      ym: "2026-10",
+      cycleStart: at("2026-11-01T04:00"),
+    });
+  });
+
+  it("1日 0:00〜3:59 はまだ前の周期（先々月分＝送り済み）", () => {
+    expect(monthlyCollageCycle(at("2026-11-01T03:59"))).toEqual({
+      ym: "2026-09",
+      cycleStart: at("2026-10-01T04:00"),
+    });
+  });
+
+  it("年またぎ", () => {
+    expect(monthlyCollageCycle(at("2027-01-01T04:00")).ym).toBe("2026-12");
   });
 });

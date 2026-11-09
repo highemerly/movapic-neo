@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { User, Palette, ShieldCheck, SlidersHorizontal, Lock, type LucideIcon } from "lucide-react";
+import {
+  User,
+  Palette,
+  ShieldCheck,
+  SlidersHorizontal,
+  Settings2,
+  Lock,
+  type LucideIcon,
+} from "lucide-react";
 
 type NavItem = { href: string; id: string; label: string; Icon: LucideIcon };
 
@@ -13,6 +21,7 @@ const ITEMS: NavItem[] = [
   { href: "#profile", id: "profile", label: "プロフィール", Icon: User },
   { href: "#appearance", id: "appearance", label: "外観", Icon: Palette },
   { href: "#defaults", id: "defaults", label: "投稿設定", Icon: SlidersHorizontal },
+  { href: "#advanced", id: "advanced", label: "高度な設定", Icon: Settings2 },
   { href: "#privacy", id: "privacy", label: "プライバシー", Icon: ShieldCheck },
   { href: "#account", id: "account", label: "アカウント・セキュリティ", Icon: Lock },
 ];

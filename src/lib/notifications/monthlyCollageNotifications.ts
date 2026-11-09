@@ -2,6 +2,10 @@
  * 「先月の月次画像を作れます」通知の作成（サーバー専用・30分ごとの periodic から呼ぶ）。
  * type・遷移先・文言は monthlyCollageNotificationType.ts。
  *
+ * 月の判定は全員共通の時計（LATEST_CLOCK＝4時区切り）で行う。月は人によって始まる時刻が違う
+ * （日付の区切り 0〜4 時）ので、1日 4:00 JST を過ぎてから送る＝全員の先月が終わってから
+ * （区切りの遅い人の 1日 1:00 の投稿はまだ先月の記録日で、先に送ると対象から漏れうる）。
+ *
  * 「毎月1日ちょうど」ではなく「当月に入っていて、先月分をまだ送っていなければ」送る
  * （makeup-points と同じ方式）。ジョブが止まって日付を跨いでも次の実行で拾う。対象（先月に投稿した人）は
  * 月が終わった時点で確定するので、遅れて送っても対象がずれない。
@@ -10,9 +14,11 @@
  */
 
 import prisma from "@/lib/db";
-import { jstMonthRangeOfYm, shiftYm, toJstYm } from "@/lib/jst";
+import { firstDayOfYm, lastDayOfYm } from "@/lib/dayClock";
+import { postDateBetween } from "@/lib/dayClock.server";
 import {
   MONTHLY_COLLAGE_NOTIFICATION_TYPE,
+  monthlyCollageCycle,
   monthlyCollageNotificationId,
   type MonthlyCollageNotificationData,
 } from "./monthlyCollageNotificationType";
@@ -26,26 +32,25 @@ const BATCH = 200;
 /**
  * 先月に投稿したユーザーへ、先月の月次画像の通知を作る。サマリ（作成件数）を返す。
  * 「投稿した」はカレンダーに出る写真（公開・非表示でない）で数える＝通知から開いたカレンダーが空にならない。
+ * 月は記録日（カレンダーと同じ）で決める。
  */
 export async function runMonthlyCollageNotifications(now: Date = new Date()): Promise<string | void> {
-  const thisYm = toJstYm(now);
-  const ym = shiftYm(thisYm, -1);
-  const target = jstMonthRangeOfYm(ym);
-  const thisMonthStart = jstMonthRangeOfYm(thisYm).start;
+  // 対象月とこの周期の始まり（当月1日 4:00 JST）は純粋関数で決める（テスト済み）。
+  const { ym, cycleStart: thisCycleStart } = monthlyCollageCycle(now);
 
   const users = await prisma.user.findMany({
     where: {
       images: {
         some: {
-          createdAt: { gte: target.start, lt: target.end },
+          postDate: postDateBetween(firstDayOfYm(ym), lastDayOfYm(ym)),
           isPublic: true,
           isDisabled: false,
         },
       },
-      // 当月に作った monthly-collage は必ず先月分（作るのは先月分だけ）。候補を絞る最適化で、
+      // この周期に作った monthly-collage は必ず先月分（作るのは先月分だけ）。候補を絞る最適化で、
       // 二重作成そのものは決定的な id（skipDuplicates）が弾く。
       notifications: {
-        none: { type: MONTHLY_COLLAGE_NOTIFICATION_TYPE, createdAt: { gte: thisMonthStart } },
+        none: { type: MONTHLY_COLLAGE_NOTIFICATION_TYPE, createdAt: { gte: thisCycleStart } },
       },
     },
     orderBy: { createdAt: "asc" },

@@ -16,7 +16,7 @@
  * 頻繁にゲリラ開催したくなったら、この一覧を DB（管理画面）に移す。台帳側はそのままでよい。
  */
 
-import { toJstYm } from "@/lib/jst";
+import { monthlyGrantWindow } from "./points";
 
 /** 対象者の決め方。 */
 export type MakeupEventTarget =
@@ -28,7 +28,7 @@ export interface MakeupPointEventDef {
   key: string;
   /** 表示名（付与履歴・付与通知に出る）。 */
   name: string;
-  /** 付与先の月（JST の "YYYY-MM"）。付与もこの月の間だけ行う。 */
+  /** 付与先の月（"YYYY-MM"）。付与は全員がこの月にいる間だけ行う（activeMakeupEvents）。 */
   month: string;
   amount: number;
   /** 付与開始日時（JST のオフセット付き ISO）。この瞬間以降に配る。 */
@@ -64,13 +64,17 @@ export function findMakeupEventByReason(
   return events.find((e) => e.key === key) ?? null;
 }
 
-/** 今付与を行うべきイベント（開始済みで、今がその付与先の月の中）。 */
+/**
+ * 今付与を行うべきイベント（開始済みで、全員がその付与先の月の中にいる）。
+ * 配ってよい時間帯は月次付与と同じ（points.monthlyGrantWindow＝1日 4:00〜月末 24:00 JST）。
+ */
 export function activeMakeupEvents(
   now: Date,
   events: readonly MakeupPointEventDef[] = MAKEUP_POINT_EVENTS
 ): MakeupPointEventDef[] {
-  const ym = toJstYm(now);
-  return events.filter((e) => e.month === ym && new Date(e.start).getTime() <= now.getTime());
+  const window = monthlyGrantWindow(now);
+  if (!window) return [];
+  return events.filter((e) => e.month === window.ym && new Date(e.start).getTime() <= now.getTime());
 }
 
 /** 対象者の条件を、ユーザー検索の createdAt 条件として返す（DB 側で絞るため）。 */

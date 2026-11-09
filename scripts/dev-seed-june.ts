@@ -9,6 +9,8 @@ import { randomUUID } from "crypto";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
+import { postDateOfYmDay } from "@/lib/dayClock";
+import { toDbDate } from "@/lib/dayClock.server";
 
 const USERNAME = "highemerly";
 const DAYS = [6, 7, 8, 10, 12]; // 2026年6月（JST）
@@ -55,6 +57,8 @@ async function main() {
         source: "web",
         isPublic: true,
         createdAt,
+        // 記録日は明示する（省略すると DB の既定値＝実行した日になる）
+        postDate: toDbDate(postDateOfYmDay("2026-06", day)),
       },
     });
     console.log(`  + 6/${day} (createdAt=${createdAt.toISOString()})`);

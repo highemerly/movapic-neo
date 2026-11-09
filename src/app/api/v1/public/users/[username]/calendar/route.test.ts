@@ -16,6 +16,7 @@ vi.mock("@/lib/db", () => ({
   default: {
     user: { findFirst: vi.fn() },
     image: { findFirst: vi.fn() },
+    dayBoundarySetting: { findMany: vi.fn() },
   },
 }));
 vi.mock("@/lib/auth/session", () => ({ getCurrentUser: vi.fn() }));
@@ -33,6 +34,7 @@ import { fetchCalendarImages } from "@/lib/calendar/resolveMonth";
 
 const mockUserFindFirst = vi.mocked(prisma.user.findFirst);
 const mockImageFindFirst = vi.mocked(prisma.image.findFirst);
+const mockBoundaries = vi.mocked(prisma.dayBoundarySetting.findMany);
 const mockViewer = vi.mocked(getCurrentUser);
 const mockLimits = vi.mocked(resolveMakeupLimits);
 const mockImages = vi.mocked(fetchCalendarImages);
@@ -45,6 +47,7 @@ const image = (id: string, day: number, makeupTargetDay: number | null = null) =
   storageKey: `k/${id}`,
   position: "bottom",
   createdAt: jst(day),
+  postDate: `2026-10-${String(day).padStart(2, "0")}`,
   calendarPickedAt: null,
   makeupTargetDay,
   makeupTargetMonthDelta: 0,
@@ -61,6 +64,7 @@ beforeEach(() => {
   vi.setSystemTime(jst(20));
   mockUserFindFirst.mockResolvedValue({ id: "owner" } as never);
   mockImageFindFirst.mockResolvedValue(null as never);
+  mockBoundaries.mockResolvedValue([]);
   // 1日・3日・3日（3日の2枚目で2日を埋めた）
   mockImages.mockResolvedValue([image("a", 1), image("b", 3), image("c", 3, 2)] as never);
   mockLimits.mockResolvedValue({
@@ -98,7 +102,7 @@ describe("GET calendar - 穴埋め枠", () => {
       userId: "owner",
       instanceDomain: "handon.club",
       ym: "2026-10",
-      now: jst(20),
+      today: "2026-10-20",
     });
   });
 
@@ -119,6 +123,7 @@ describe("GET calendar - 穴埋め枠", () => {
       unfilled: 16,
       deadline: "2026-11-10T15:00:00.000Z",
       editable: true,
+      dayBoundaryHour: 0,
       grants: [
         { reason: "favor-monthly", amount: 1, grantedAt: "2026-10-01T00:10:00.000Z" },
         { reason: "monthly-catchup", amount: 1, grantedAt: "2026-10-11T00:10:00.000Z" },
@@ -151,5 +156,19 @@ describe("GET calendar - 穴埋め枠", () => {
     const body = await res.json();
 
     expect(body.perfectMonth.makeup.editable).toBe(false);
+  });
+
+  it("2時区切りの持ち主は 11日 1:59 まで編集でき、締切の時刻も 11日 2:00 で返す", async () => {
+    mockBoundaries.mockResolvedValue([{ fromDate: new Date("2026-10-01T00:00:00Z"), hour: 2 }] as never);
+    mockViewer.mockResolvedValue({ id: "owner" } as never);
+
+    vi.setSystemTime(new Date("2026-11-11T01:59:00+09:00"));
+    const before = await (await GET(req(), params)).json();
+    expect(before.perfectMonth.makeup.editable).toBe(true);
+    expect(before.perfectMonth.makeup.deadline).toBe("2026-11-10T17:00:00.000Z");
+
+    vi.setSystemTime(new Date("2026-11-11T02:00:00+09:00"));
+    const after = await (await GET(req(), params)).json();
+    expect(after.perfectMonth.makeup.editable).toBe(false);
   });
 });

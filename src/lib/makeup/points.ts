@@ -17,7 +17,19 @@
  * DB を見る側は `@/lib/makeup/ledger`（サーバー専用）。
  */
 
-import { jstDayOf, parseYm, shiftYm, toJstYm } from "@/lib/jst";
+import { shiftYm } from "@/lib/jst";
+import {
+  addDays,
+  dayOfMonth,
+  dayStart,
+  jstCalendarDateOf,
+  LATEST_CLOCK,
+  postDateOfYmDay,
+  todayOf,
+  ymOf,
+  type BoundarySchedule,
+  type PostDate,
+} from "@/lib/dayClock";
 
 /**
  * ポイント制を適用する最初の月（JST）。これ未満の月は従来の grace（3/4日）で判定する。
@@ -57,12 +69,31 @@ export const MAKEUP_DEADLINE_DAY = 10;
 export const MONTHLY_CATCHUP_DAY = MAKEUP_DEADLINE_DAY + 1;
 
 /**
- * 今日(JST)が monthly-catchup の付与を始めてよい日か（11日以降）。
+ * monthly-catchup の付与を始めてよい日か（11日以降）。today は全員共通の時計（LATEST_CLOCK）の今日を
+ * 渡す: 全員の締切（10日）が過ぎてから配らないと、区切りの遅い人は +1pt を受け取ってから先月を埋めて
+ * 👑も取れてしまう（例: 2時区切りの人は 11日 1:59 まで先月を編集できる）。
  * 「11日ちょうど」ではなく「以降」: 定期ジョブが止まっていて11日を跨いでも、次の実行で拾うため
  * （二重付与は台帳の @@unique が弾く）。
  */
-export function isCatchupOpen(now: Date): boolean {
-  return jstDayOf(now) >= MONTHLY_CATCHUP_DAY;
+export function isCatchupOpen(today: PostDate): boolean {
+  return dayOfMonth(today) >= MONTHLY_CATCHUP_DAY;
+}
+
+/**
+ * 定期ジョブ（月次付与・イベント付与）が今ポイントを配ってよいか、配るならどの月の分か。
+ * null は「配らない」。ユーザーごとの区切りの履歴は読まず、全員共通の時計で決める。
+ *
+ * 月は人によって始まる時刻が違う（日付の区切り 0〜4 時）ので、いちばん早い時計（JST の暦）と
+ * いちばん遅い時計（LATEST_CLOCK）が同じ月のとき＝全員がその月にいる間（1日 4:00〜月末 24:00 JST）
+ * だけ配る。1日 0:00〜4:00 に前月分を配ると、区切りの遅い人にとってはまだ前月でも、区切りの早い人の
+ * 前月はもう終わっていて、終わった月の上限が増え確定した👑が揺れる（月末で凍結の不変条件）。
+ * catchup はさらに、全員の締切が過ぎた 11日 4:00 以降（isCatchupOpen にいちばん遅い時計の今日を渡す）。
+ */
+export function monthlyGrantWindow(now: Date): { ym: string; catchupOpen: boolean } | null {
+  const latestToday = todayOf(LATEST_CLOCK, now);
+  const ym = ymOf(latestToday);
+  if (ym !== ymOf(jstCalendarDateOf(now))) return null;
+  return { ym, catchupOpen: isCatchupOpen(latestToday) };
 }
 
 /** 新規登録時に付与するポイントの上限（登録が10日以降なら一律この値）。 */
@@ -96,32 +127,38 @@ export function isPointEra(ym: string): boolean {
 }
 
 /**
- * 新規登録時の付与ポイント。登録日(JST)の「前日までの日数」＝その月に既に過ぎた日数ぶんを配る。
+ * 新規登録時の付与ポイント。登録日の「前日までの日数」＝その月に既に過ぎた日数ぶんを配る。
  * 2日登録=+1（1日を埋められる）／9日登録=+8（1〜8日を埋められる）で初月の皆勤賞に手が届き、
  * 10日以降の登録は上限8ptに対し穴が9日以上あるため初月の皆勤賞は構造的に取れない。
  * 1日登録は0pt（まだ過ぎた日が無く、そのまま毎日投稿すれば皆勤できる）。
  */
-export function signupPointAmount(jstDay: number): number {
-  return Math.min(Math.max(jstDay - 1, 0), SIGNUP_POINT_MAX);
+export function signupPointAmount(day: number): number {
+  return Math.min(Math.max(day - 1, 0), SIGNUP_POINT_MAX);
+}
+
+/** その月の穴埋めの締切の日（翌月10日。持ち主の記録日でこの日まで編集できる）。 */
+export function makeupLastDay(ym: string): PostDate {
+  return postDateOfYmDay(shiftYm(ym, 1), MAKEUP_DEADLINE_DAY);
 }
 
 /**
- * その月の穴埋め締切（この時刻より前なら編集可）。翌月11日 JST 00:00 を UTC Date で返す
- * ＝「翌月10日 23:59:59.999 JST まで」を排他上限で表したもの（ミリ秒の取りこぼしが無い）。
+ * 締切の時刻（表示用・この時刻より前なら編集可）。持ち主の区切りで締切の翌日が始まる時刻
+ * （0時区切りなら翌月11日 0:00、2時区切りなら 11日 2:00）。
+ * **編集できるかの判定には使わない**（isMakeupEditable を使う）。後から予約された区切りの変更で
+ * この時刻は動きうるが、記録日で比べれば判定はぶれない。
  */
-export function makeupDeadline(ym: string): Date {
-  const { year, month } = parseYm(shiftYm(ym, 1));
-  return new Date(Date.UTC(year, month - 1, MAKEUP_DEADLINE_DAY + 1, -9, 0, 0));
+export function makeupDeadlineAt(schedule: BoundarySchedule, ym: string): Date {
+  return dayStart(schedule, addDays(makeupLastDay(ym), 1));
 }
 
 /**
- * その月の穴埋め（割当の指定・解除）がまだ可能か。新旧era 共通で適用する。
+ * その月の穴埋め（割当の指定・解除）がまだ可能か。today は持ち主の今日（記録日）。新旧era 共通で適用する。
  * 未来月も false（まだ穴の概念が無い）。
  */
-export function isMakeupEditable(ym: string, now: Date): boolean {
-  if (now.getTime() >= makeupDeadline(ym).getTime()) return false;
+export function isMakeupEditable(ym: string, today: PostDate): boolean {
+  if (today > makeupLastDay(ym)) return false;
   // 未来月は編集させない（対象月がまだ始まっていない）。
-  return ym <= toJstYm(now);
+  return ym <= ymOf(today);
 }
 
 /** 台帳行の合計＝その月の cap（穴埋めできる上限日数）。 */

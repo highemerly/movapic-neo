@@ -10,7 +10,7 @@
 
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   DEFAULT_POSITION,
   DEFAULT_FONT,
@@ -29,6 +29,7 @@ const {
   resolveFediverseReplyTarget,
   createReplyNotification,
   createWelcomeBackNotification,
+  loadSchedule,
 } = vi.hoisted(() => ({
   postToMastodon: vi.fn(),
   postToMisskey: vi.fn(),
@@ -38,6 +39,7 @@ const {
   resolveFediverseReplyTarget: vi.fn(),
   createReplyNotification: vi.fn(),
   createWelcomeBackNotification: vi.fn(),
+  loadSchedule: vi.fn(),
 }));
 
 vi.mock("@/lib/fediverse/post", () => ({
@@ -55,6 +57,12 @@ vi.mock("@/lib/db", () => ({
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({ image: { create: imageCreate } }),
   },
+}));
+
+// 区切りの履歴の読み込み（DB）だけをモックし、DATE 列への変換は本物を使う。
+vi.mock("@/lib/dayClock.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/dayClock.server")>()),
+  loadSchedule,
 }));
 
 vi.mock("@/lib/storage/storage", () => ({
@@ -128,6 +136,7 @@ beforeEach(() => {
     postUrl: "https://misskey.example/notes/n1",
   });
   imageCreate.mockResolvedValue({});
+  loadSchedule.mockResolvedValue([]);
   imageUpdate.mockResolvedValue({});
   transcodeToJpeg.mockResolvedValue(Buffer.from("jpeg"));
   resolveFediverseReplyTarget.mockResolvedValue({ kind: "linked", postId: "parent-status" });
@@ -437,5 +446,30 @@ describe("recordWithImage（Bot の処理済み確定）", () => {
       "db down"
     );
     expect(postToMastodon).not.toHaveBeenCalled();
+  });
+});
+
+describe("記録日（postDate）", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("保存のトランザクションで区切りの履歴を読み、時刻と記録日を書いて実績評価にも同じ値を渡す", async () => {
+    // Date だけを固定する（タイマーまで止めると非同期の処理が進まない）。
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-09T01:30:00+09:00"));
+    loadSchedule.mockResolvedValue([{ fromDate: "2026-11-01", hour: 2 }]);
+
+    await publishImage(baseInput({}));
+
+    expect(loadSchedule).toHaveBeenCalledWith("user-1", { image: { create: imageCreate } });
+    const data = imageCreate.mock.calls[0][0].data;
+    expect(data.createdAt.toISOString()).toBe("2026-11-08T16:30:00.000Z");
+    // 2 時区切りなので 1:30 は前の日
+    expect(data.postDate.toISOString()).toBe("2026-11-08T00:00:00.000Z");
+    expect(vi.mocked(evaluateAndGrant).mock.calls[0][0].post).toMatchObject({
+      createdAt: data.createdAt,
+      postDate: "2026-11-08",
+    });
   });
 });

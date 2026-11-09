@@ -9,7 +9,8 @@
  */
 
 import { isFavorServer } from "@/lib/auth/serverPolicy";
-import { jstDayOf, toJstYm } from "@/lib/jst";
+import { dayOfMonth, jstCalendarDateOf, ymOf } from "@/lib/dayClock";
+import { loadToday } from "@/lib/dayClock.server";
 import { grantMakeupPoints } from "./ledger";
 import { notifyMakeupReadyAfterGrant } from "./notify";
 import { MAKEUP_POINT_REASONS, isPointEra, signupPointAmount } from "./points";
@@ -26,14 +27,16 @@ export async function grantSignupMakeupPoints(args: {
   now: Date;
 }): Promise<void> {
   const { userId, instanceDomain, now } = args;
-  const ym = toJstYm(now);
+  // 登録したばかりの人は区切りの履歴が無い（0 時区切り）ので、今日は JST の暦日そのもの。
+  const today = jstCalendarDateOf(now);
+  const ym = ymOf(today);
   if (!isPointEra(ym)) return;
 
   await grantMakeupPoints({
     userId,
     ym,
     reason: MAKEUP_POINT_REASONS.SIGNUP,
-    amount: signupPointAmount(jstDayOf(now)),
+    amount: signupPointAmount(dayOfMonth(today)),
   });
   if (isFavorServer(instanceDomain)) {
     await grantMakeupPoints({ userId, ym, reason: MAKEUP_POINT_REASONS.FAVOR_MONTHLY, amount: 1 });
@@ -53,7 +56,9 @@ export async function maybeGrantAchievementPoint(args: {
   now: Date;
 }): Promise<void> {
   const { userId, now } = args;
-  const ym = toJstYm(now);
+  // 付与先はその人の今月（記録日）。区切りの遅い人の月初 0〜4 時に達成した実績は前月分になる
+  // （その人にとってはまだ前月＝前月の穴埋めに使える）。
+  const ym = ymOf(await loadToday(userId, now));
   if (!isPointEra(ym)) return;
   const granted = await grantMakeupPoints({
     userId,

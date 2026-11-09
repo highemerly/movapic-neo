@@ -17,14 +17,11 @@ import {
   donorTargetYm,
   filledHoleOf,
 } from "./donor";
+import { postDateOfYmDay } from "@/lib/dayClock";
 
-/** JST で YYYY-MM-DD の正午。 */
-const jst = (ym: string, day: number) => {
-  const [y, m] = ym.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, day, 3, 0, 0));
-};
+/** 記録日が YYYY-MM-DD の行（日・月は記録日で決まり、投稿時刻は見ない）。 */
 const row = (ym: string, day: number, target?: number, delta = 0) => ({
-  createdAt: jst(ym, day),
+  postDate: postDateOfYmDay(ym, day),
   makeupTargetDay: target ?? null,
   makeupTargetMonthDelta: delta,
 });
@@ -38,10 +35,8 @@ describe("donorTargetYm - 割当が指す穴の月", () => {
 });
 
 describe("donorRange - donor になれる期間", () => {
-  it("対象月の1日から締切（翌月11日 0:00 JST）まで＝翌月1〜10日の投稿まで含む", () => {
-    const { start, end } = donorRange("2026-10");
-    expect(start).toEqual(new Date("2026-09-30T15:00:00Z")); // 10/1 0:00 JST
-    expect(end).toEqual(new Date("2026-11-10T15:00:00Z")); // 11/11 0:00 JST
+  it("対象月の1日から締切（翌月10日）までの記録日＝翌月1〜10日の投稿まで含む", () => {
+    expect(donorRange("2026-10")).toEqual({ from: "2026-10-01", to: "2026-11-10" });
   });
 });
 

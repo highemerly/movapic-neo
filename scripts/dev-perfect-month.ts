@@ -49,6 +49,8 @@ import {
 } from "@/lib/achievements/perfectMonth";
 import { perfectMonthGrace } from "@/lib/achievements/grace";
 import { isPointEra } from "@/lib/makeup/points";
+import { postDateOfYmDay } from "@/lib/dayClock";
+import { toDbDate } from "@/lib/dayClock.server";
 
 const USERNAME = process.env.SEED_USER ?? "highemerly";
 // 同名ユーザーが複数インスタンスに存在するため、必ず domain で一意に絞る（ログイン中アカウントと一致させる）。
@@ -210,6 +212,8 @@ async function main() {
         source: "web",
         isPublic: true,
         createdAt: at(day, seq),
+        // 記録日は明示する（省略すると DB の既定値＝実行した日になる）。at() は JST 正午なのでその日。
+        postDate: toDbDate(postDateOfYmDay(`${YEAR}-${mm}`, day)),
         makeupTargetDay,
       },
     });

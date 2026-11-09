@@ -1,14 +1,18 @@
 /**
  * 実績評価のための集計値を投稿後に1ショットで集める（live 用）。
  * backfill はこれを使わず、メモリ上のリプレイで同じ AchStats を作る。
+ *
+ * 日・月は記録日（Image.postDate）で数える。投稿時の評価の「日」の集計は postStats.ts（純粋）で組む。
  */
 
 import prisma from "@/lib/db";
-import { calculateStreak, toJstDateString, toJstHour } from "@/lib/streak";
+import { calculateStreak } from "@/lib/streak";
+import { dayOfMonth, ymOf, type PostDate } from "@/lib/dayClock";
+import { withPostDate } from "@/lib/dayClock.server";
 import { filledHoleOf } from "@/lib/makeup/donor";
 import type { AchStats, PostFacts, ReactionStats } from "./catalog";
+import { summarizePostDays } from "./postStats";
 import {
-  summarizeDayCounts,
   daysInMonthOf,
   isPerfectMonth,
   currentMonthMakeupStatus,
@@ -16,9 +20,6 @@ import {
 } from "./perfectMonth";
 
 export async function collectStats(userId: string, post: PostFacts): Promise<AchStats> {
-  const postYm = toJstDateString(post.createdAt).slice(0, 7);
-  const postDay = toJstDateString(post.createdAt);
-
   const [dateRows, featureCounts, fontGroups, colorGroups, distinctGroups] = await Promise.all([
     // 全投稿日（streak / today / monthly-distinct-days / 当日のsource種類 用）
     // makeupTargetDay も相乗せ（投稿月の永続穴埋め割当＝皆勤賞判定の filledHoleDays に使う）。
@@ -26,6 +27,7 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
       where: { userId },
       select: {
         createdAt: true,
+        postDate: true,
         source: true,
         makeupTargetDay: true,
         makeupTargetMonthDelta: true,
@@ -58,49 +60,13 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
     ]),
   ]);
 
-  const jstDays = dateRows.map((r) => toJstDateString(r.createdAt));
   const [neon, stamp, xlarge, vertical] = featureCounts;
   const [cameraGroups, prefGroups, sourceGroups] = distinctGroups;
   const sources = new Set(sourceGroups.map((g) => g.source));
 
-  // 投稿月の日別投稿数 → distinct日数 / 日付順マッチング（皆勤賞の穴埋め判定に使用）
-  const monthDayCounts = new Map<string, number>();
-  for (const d of jstDays) {
-    if (d.startsWith(postYm)) monthDayCounts.set(d, (monthDayCounts.get(d) ?? 0) + 1);
-  }
-  const monthSummary = summarizeDayCounts(monthDayCounts.values());
-  // 日(1-31)→投稿数（穴埋めの日付順マッチング用。キーは JST 日付文字列の DD 部分）
-  const postMonthDayCounts: Record<number, number> = {};
-  for (const [dayStr, c] of monthDayCounts) {
-    postMonthDayCounts[Number(dayStr.slice(8, 10))] = c;
-  }
-
-  // 投稿月の穴を埋めている永続割当が指す空き日。皆勤賞判定の単一ソース。
-  // donor は翌月1〜10日の投稿でもよい（filledHoleOf が月を解決する）ので、投稿月の行だけ見てはいけない。
-  const filledHoleDays: number[] = [];
-  for (const r of dateRows) {
-    const hole = filledHoleOf(r, postYm);
-    if (hole != null) filledHoleDays.push(hole);
-  }
-
-  // 投稿日（JST）に使った source の種類数（ハットトリック判定）
-  const sourcesToday = new Set(
-    dateRows.filter((r) => toJstDateString(r.createdAt) === postDay).map((r) => r.source)
-  );
-
-  // 通算で投稿した月（YYYY-MM）と時間帯（0-23時）の種類数。どちらも JST 基準。
-  const postMonths = new Set(jstDays.map((d) => d.slice(0, 7)));
-  const postHours = new Set(dateRows.map((r) => toJstHour(r.createdAt)));
-
   return {
-    totalPosts: dateRows.length,
-    currentStreak: calculateStreak(dateRows.map((r) => r.createdAt)),
-    todayPosts: jstDays.filter((d) => d === postDay).length,
-    distinctDaysInPostMonth: monthSummary.distinctDays,
-    postMonthDayCounts,
-    filledHoleDays,
-    distinctPostMonths: postMonths.size,
-    distinctPostHours: postHours.size,
+    // 日にまつわる集計は純粋関数（postStats.ts）で組む。
+    ...summarizePostDays(withPostDate(dateRows), post.postDate),
     featureCounts: { neon, stamp, xlarge, vertical },
     distinctFonts: fontGroups.length,
     distinctColors: colorGroups.length,
@@ -108,7 +74,6 @@ export async function collectStats(userId: string, post: PostFacts): Promise<Ach
     distinctPrefectures: prefGroups.length,
     hasEmailPost: sources.has("email"),
     hasMentionPost: sources.has("mention"),
-    distinctSourcesToday: sourcesToday.size,
   };
 }
 
@@ -147,13 +112,14 @@ export async function collectReactionStats(userId: string): Promise<ReactionStat
 /**
  * 実績タブのラダー表示用に、各 ladderKey の「今時点の数」を集める（表示専用）。
  * 累計系（投稿数・機能利用・カメラ・都道府県）はそのままの現在値、
- * streak は現在の連続日数、daily は今日（JST）の投稿数。
+ * streak は現在の連続日数、daily は今日の投稿数。today は持ち主の今日（記録日）。
  */
-export async function collectLadderValues(userId: string): Promise<Record<string, number>> {
-  const todayStr = toJstDateString(new Date());
-
+export async function collectLadderValues(
+  userId: string,
+  today: PostDate
+): Promise<Record<string, number>> {
   const [dateRows, featureCounts, distinctGroups, reactionStats] = await Promise.all([
-    prisma.image.findMany({ where: { userId }, select: { createdAt: true } }),
+    prisma.image.findMany({ where: { userId }, select: { postDate: true } }),
     prisma.$transaction([
       prisma.image.count({ where: { userId, season: null, arrangement: "neon" } }),
       prisma.image.count({ where: { userId, season: null, arrangement: "stamp" } }),
@@ -176,15 +142,15 @@ export async function collectLadderValues(userId: string): Promise<Record<string
     collectReactionStats(userId),
   ]);
 
-  const jstDays = dateRows.map((r) => toJstDateString(r.createdAt));
+  const postDates = withPostDate(dateRows).map((r) => r.postDate);
   const [neon, stamp, xlarge, vertical] = featureCounts;
   const [cameraGroups, prefGroups, colorGroups] = distinctGroups;
 
   return {
-    "post-count": dateRows.length,
-    streak: calculateStreak(dateRows.map((r) => r.createdAt)),
-    months: new Set(jstDays.map((d) => d.slice(0, 7))).size,
-    daily: jstDays.filter((d) => d === todayStr).length,
+    "post-count": postDates.length,
+    streak: calculateStreak(postDates, today),
+    months: new Set(postDates.map(ymOf)).size,
+    daily: postDates.filter((d) => d === today).length,
     "feature:neon": neon,
     "feature:stamp": stamp,
     "feature:xlarge": xlarge,
@@ -201,7 +167,7 @@ export async function collectLadderValues(userId: string): Promise<Record<string
 /** 「あと少しナビ」の当月皆勤カード用（本人分・永続割当ベース）。 */
 export interface CurrentMonthPerfect {
   daysInMonth: number;
-  /** JST の今日の日(1-31)。 */
+  /** 持ち主の今日（記録日）の日(1-31)。 */
   todayDayNum: number;
   /** 当月に1枚以上投稿した distinct 日数。 */
   distinctDays: number;
@@ -224,28 +190,30 @@ export interface CurrentMonthPerfect {
  */
 export async function collectCurrentMonthPerfect(
   userId: string,
+  /** 持ち主の今日（記録日）。limits を解決したときと同じ値を渡す。 */
+  today: PostDate,
   limits: { pointEra: boolean; cap: number; potentialCap: number }
 ): Promise<CurrentMonthPerfect> {
-  const todayStr = toJstDateString(new Date());
-  const ym = todayStr.slice(0, 7);
+  const ym = ymOf(today);
   const year = Number(ym.slice(0, 4));
   const month = Number(ym.slice(5, 7));
   const daysInMonth = daysInMonthOf(year, month);
-  const todayDayNum = Number(todayStr.slice(8, 10));
+  const todayDayNum = dayOfMonth(today);
 
-  const rows = await prisma.image.findMany({
-    where: { userId },
-    select: { createdAt: true, makeupTargetDay: true, makeupTargetMonthDelta: true },
-  });
+  const rows = withPostDate(
+    await prisma.image.findMany({
+      where: { userId },
+      select: { postDate: true, makeupTargetDay: true, makeupTargetMonthDelta: true },
+    })
+  );
 
   // 当月の日(1-31)→投稿数 と、当月の穴を埋めている永続割当が指す空き日。
   const dayCounts: Record<number, number> = {};
   const filledHoleDays: number[] = [];
   let todayHasDonor = false;
   for (const r of rows) {
-    const d = toJstDateString(r.createdAt);
-    if (d.startsWith(ym)) {
-      const day = Number(d.slice(8, 10));
+    if (ymOf(r.postDate) === ym) {
+      const day = dayOfMonth(r.postDate);
       dayCounts[day] = (dayCounts[day] ?? 0) + 1;
       // 1日1donor は月をまたいで共有する＝前月の穴を埋めた写真でも「今日は使用済み」。
       if (r.makeupTargetDay != null && day === todayDayNum) todayHasDonor = true;

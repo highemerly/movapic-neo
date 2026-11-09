@@ -78,17 +78,18 @@ model User {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   lastLoginAt DateTime? @map("last_login_at")
 
-  instance          Instance           @relation(fields: [instanceId], references: [id])
-  images            Image[]
-  loginSessions     LoginSession[]
-  achievements      Achievement[]
-  notifications     Notification[]
-  reports           Report[]
-  mutesCreated      Mute[]             @relation("Muter")
-  mutedBy           Mute[]             @relation("Muted")
-  reactions         Reaction[]
-  customEmojis      CustomEmoji[]
-  makeupPointGrants MakeupPointGrant[]
+  instance            Instance             @relation(fields: [instanceId], references: [id])
+  images              Image[]
+  loginSessions       LoginSession[]
+  achievements        Achievement[]
+  notifications       Notification[]
+  reports             Report[]
+  mutesCreated        Mute[]               @relation("Muter")
+  mutedBy             Mute[]               @relation("Muted")
+  reactions           Reaction[]
+  customEmojis        CustomEmoji[]
+  makeupPointGrants   MakeupPointGrant[]
+  dayBoundarySettings DayBoundarySetting[]
 
   @@unique([instanceId, remoteId])
   @@unique([instanceId, username])
@@ -143,7 +144,7 @@ model Achievement {
 model MakeupPointGrant {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
-  // このポイントが使える対象月（JST の "YYYY-MM"）。翌月へは持ち越さない。
+  // このポイントが使える対象月（持ち主の記録日の "YYYY-MM"。Image.postDate 参照）。翌月へは持ち越さない。
   month     String   @db.VarChar(7)
   // 付与理由。"favor-monthly" | "monthly-catchup" | "signup" | "achievement" | "event:<key>"
   reason    String   @db.VarChar(64)
@@ -261,7 +262,7 @@ model Image {
   // pinnedAt と同じ timestamp idiom（同日に複数指定されたら最新のpickを優先してtie-break）。
   calendarPickedAt    DateTime? @map("calendar_picked_at")
   // 皆勤賞の穴埋め割当（永続化）。この投稿(donor)が埋める空き日(1-31)。null=穴埋めに使っていない。
-  // 対象の月は makeupTargetMonthDelta と組で決まる（この投稿のJST月 + delta）。
+  // 対象の月は makeupTargetMonthDelta と組で決まる（この投稿の記録日 postDate の月 + delta）。
   // カレンダー表示・皆勤賞判定の両方がこの永続値を読む（表示と👑のズレを防ぐ単一ソース）。
   // 書き込み: カレンダー編集モードの手動指定／2026-09以前の月のみ投稿時の自動割当(autoMakeup=true)／既存分はbackfill。
   // 2026-10以降は穴埋めポイント（MakeupPointGrant）の残高を「占有」する。残高はここから導出する。
@@ -285,6 +286,13 @@ model Image {
   // （仕様: 削除されたリプライ先は何も表示しない）。仕様の全体は docs/reply.md。
   replyToId           String?   @map("reply_to_id")
   createdAt           DateTime  @default(now()) @map("created_at")
+  // 記録日（この投稿が数えられる日。持ち主の日付の区切りで決まる）。カレンダー・皆勤賞・連続投稿など
+  // 「日」「月」の判定はすべてこれを読み、createdAt から計算し直さない。保存時に確定し書き換えない
+  // （区切りの変更やロジックのバグで過去の記録日・👑・穴埋めの割当が動かないようにするため）。
+  // 計算は src/lib/dayClock.ts。仕様は docs/features.md「日付の区切り」。
+  // 既定値はマイグレーションからイメージ差し替えまでの間に旧コードが保存する行を埋めるためだけのもの
+  // （全員 0 時区切りの時期なので JST の今日で正しい）。差し替え後の別マイグレーションで外す。
+  postDate            DateTime  @default(dbgenerated("(timezone('Asia/Tokyo'::text, now()))::date")) @map("post_date") @db.Date
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   replyTo       Image?         @relation("ImageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
@@ -295,9 +303,29 @@ model Image {
   reactions     Reaction[]
 
   @@index([userId, createdAt])
+  @@index([userId, postDate])
   @@index([isPublic, createdAt])
   @@index([replyToId])
   @@map("images")
+}
+
+// 日付の区切り（1日の始まりの時刻）の履歴。fromDate の記録日から hour 時区切りになる
+// （2 なら 2:00〜翌1:59 が1日）。行が無い日は 0 時区切り。
+// 変更は「今（＋余白）より後の境界」だけを動かすので、ふつうは翌日から効く（planBoundaryChange）。
+// 過去の行を消したり書き換えたりしない（過去の日の長さが変わると postDate との整合が取れなくなる）。
+// hour は DB の CHECK で 0〜4 に制限している（記録日が「JST の日付かその前日」になる前提を守るため。
+// Prisma は CHECK を表現できないのでマイグレーションの SQL にだけある）。仕様は docs/features.md「日付の区切り」。
+model DayBoundarySetting {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  fromDate  DateTime @map("from_date") @db.Date
+  hour      Int
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, fromDate])
+  @@map("day_boundary_settings")
 }
 
 // SHAMEZO上で実施されたリアクション（このテーブルが正データ）。

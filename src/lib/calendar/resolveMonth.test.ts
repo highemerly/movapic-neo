@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest";
 import {
   buildCollageAltText,
   buildCollageCaption,
-  calendarMonthRange,
   resolveCalendarMonth,
   type CalendarImageRow,
 } from "./resolveMonth";
+import { asPostDate, jstCalendarDateOf, todayOf, uniformSchedule } from "@/lib/dayClock";
 
 // テスト対象は 2024年6月（30日）。JST正午 = UTC 03:00 に投稿を置く。
 const Y = 2024;
@@ -16,14 +16,17 @@ const jstNoon = (day: number, utcHour = 3) =>
   new Date(`2024-06-${String(day).padStart(2, "0")}T${String(utcHour).padStart(2, "0")}:00:00Z`);
 
 let seq = 0;
+/** 既定の記録日は投稿時刻の JST 日付（0 時区切りの人）。区切りの影響を見るときは postDate を渡す。 */
 function row(day: number, o: Partial<CalendarImageRow> = {}): CalendarImageRow {
   seq++;
+  const createdAt = o.createdAt ?? jstNoon(day);
   return {
     id: o.id ?? `i${day}-${seq}`,
     thumbnailKey: o.thumbnailKey ?? null,
     storageKey: o.storageKey ?? `s${day}`,
     position: o.position ?? "bottom",
-    createdAt: o.createdAt ?? jstNoon(day),
+    createdAt,
+    postDate: o.postDate ?? jstCalendarDateOf(createdAt),
     calendarPickedAt: o.calendarPickedAt ?? null,
     makeupTargetDay: o.makeupTargetDay ?? null,
     makeupTargetMonthDelta: o.makeupTargetMonthDelta ?? 0,
@@ -35,7 +38,14 @@ function row(day: number, o: Partial<CalendarImageRow> = {}): CalendarImageRow {
  * ここでは数値で直接与える。potentialCap を省略したら cap と同じ（過去月・従来ルールと同じ扱い）。
  */
 const resolve = (images: CalendarImageRow[], now: Date, makeupCap = 3, potentialCap = makeupCap) =>
-  resolveCalendarMonth({ images, year: Y, month: M, makeupCap, potentialCap, now });
+  resolveCalendarMonth({
+    images,
+    year: Y,
+    month: M,
+    makeupCap,
+    potentialCap,
+    today: jstCalendarDateOf(now),
+  });
 
 const PAST_NOW = new Date("2024-07-01T03:00:00Z"); // JST 2024-07-01（対象月は過去）
 
@@ -70,19 +80,29 @@ describe("buildCollageAltText", () => {
   });
 });
 
-describe("calendarMonthRange（JST基準のUTC範囲）", () => {
-  it("月初JST00:00〜翌月初JST00:00をUTCで返す", () => {
-    const { startDate, endDate } = calendarMonthRange(2024, 6);
-    // JST 2024-06-01 00:00 = UTC 2024-05-31 15:00
-    expect(startDate.toISOString()).toBe("2024-05-31T15:00:00.000Z");
-    // JST 2024-07-01 00:00 = UTC 2024-06-30 15:00
-    expect(endDate.toISOString()).toBe("2024-06-30T15:00:00.000Z");
+describe("resolveCalendarMonth: 記録日（日付の区切り）", () => {
+  it("日は投稿時刻ではなく記録日で決まる（2時区切りの人の 7/1 1:30 の投稿は 6/30）", () => {
+    const late = row(30, {
+      id: "late",
+      createdAt: new Date("2024-06-30T16:30:00Z"), // JST 7/1 1:30
+      postDate: asPostDate("2024-06-30"),
+    });
+    const r = resolve([row(29), late], PAST_NOW);
+    expect(r.dayCounts).toEqual({ 29: 1, 30: 1 });
+    expect(r.days[30].latest.id).toBe("late");
   });
 
-  it("年跨ぎ（12月）", () => {
-    const { startDate, endDate } = calendarMonthRange(2024, 12);
-    expect(startDate.toISOString()).toBe("2024-11-30T15:00:00.000Z");
-    expect(endDate.toISOString()).toBe("2024-12-31T15:00:00.000Z"); // JST 2025-01-01 00:00
+  it("今月かどうかは持ち主の今日で決まる（2時区切りの人の 7/1 1:30 はまだ6月）", () => {
+    const today = todayOf(uniformSchedule(2), new Date("2024-06-30T16:30:00Z"));
+    const r = resolveCalendarMonth({
+      images: [row(1)],
+      year: Y,
+      month: M,
+      makeupCap: 3,
+      potentialCap: 3,
+      today,
+    });
+    expect(r.isCurrentMonth).toBe(true);
   });
 });
 
@@ -163,14 +183,13 @@ describe("resolveCalendarMonth: 穴埋め（makeup）", () => {
     const images = [
       row(1),
       // 7/3 のダブル投稿で 6/30（月末）を埋めた＝月内に後日が無くても埋められる
-      {
-        ...row(3, { id: "next1" }),
+      row(3, { id: "next1", createdAt: new Date("2024-07-03T03:00:00Z") }),
+      row(3, {
+        id: "next2",
+        makeupTargetDay: 30,
+        makeupTargetMonthDelta: -1,
         createdAt: new Date("2024-07-03T03:00:00Z"),
-      },
-      {
-        ...row(3, { id: "next2", makeupTargetDay: 30, makeupTargetMonthDelta: -1 }),
-        createdAt: new Date("2024-07-03T03:00:00Z"),
-      },
+      }),
     ];
     const r = resolve(images, PAST_NOW);
     expect(r.filledHoleDays).toEqual([30]);
@@ -183,10 +202,7 @@ describe("resolveCalendarMonth: 穴埋め（makeup）", () => {
   it("翌月の donor が前月を埋めていても、その月自身の穴埋めとしては数えない", () => {
     const images = [
       row(1),
-      {
-        ...row(3, { id: "x", makeupTargetDay: 30, makeupTargetMonthDelta: -1 }),
-        createdAt: new Date("2024-06-03T03:00:00Z"),
-      },
+      row(3, { id: "x", makeupTargetDay: 30, makeupTargetMonthDelta: -1 }),
     ];
     // 6/3 の写真が5月の30日を埋めている → 6月の filledHoleDays には入らない
     expect(resolve(images, PAST_NOW).filledHoleDays).toEqual([]);

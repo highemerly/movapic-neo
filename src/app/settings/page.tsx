@@ -1,6 +1,14 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { User, Palette, ShieldCheck, SlidersHorizontal, Lock, type LucideIcon } from "lucide-react";
+import {
+  User,
+  Palette,
+  ShieldCheck,
+  SlidersHorizontal,
+  Settings2,
+  Lock,
+  type LucideIcon,
+} from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getAvatarUrl } from "@/lib/avatar";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -20,6 +28,9 @@ import { LocationMapToggle } from "./LocationMapToggle";
 import { BlockCrawlersToggle } from "./BlockCrawlersToggle";
 import { DefaultsEditor } from "./DefaultsEditor";
 import { SettingsNav } from "./SettingsNav";
+import { DayBoundarySelector } from "./DayBoundarySelector";
+import { hourOn, todayOf, upcomingChanges } from "@/lib/dayClock";
+import { loadSchedule } from "@/lib/dayClock.server";
 import {
   Position,
   FontFamily,
@@ -83,6 +94,12 @@ export default async function SettingsPage() {
       blockCrawlers: true,
     },
   });
+
+  // 日付の区切り（今日の区切りと予約）。
+  const boundarySchedule = await loadSchedule(user.id);
+  const now = new Date();
+  const todayHour = hourOn(boundarySchedule, todayOf(boundarySchedule, now));
+  const upcomingBoundaries = upcomingChanges(boundarySchedule, now);
 
   // 自分の /u/ パスセグメント（LocationMapToggle の「自分の地図」リンク用）
   const selfSeg = userPathSegment(user.username, user.instance.domain, getHomeServer());
@@ -158,6 +175,11 @@ export default async function SettingsPage() {
           {emailDomain && (
             <EmailPrefixRegenerate emailPrefix={user.emailPrefix} emailDomain={emailDomain} />
           )}
+        </SettingsSection>
+
+        {/* 高度な設定（日付の区切り＝皆勤賞・カレンダー・連続投稿の「1日」。仕様は docs/features.md「日付の区切り」） */}
+        <SettingsSection id="advanced" icon={Settings2} title="高度な設定">
+          <DayBoundarySelector initialTodayHour={todayHour} initialUpcoming={upcomingBoundaries} />
         </SettingsSection>
 
         {/* プライバシー（公開範囲のオプトイン設定） */}

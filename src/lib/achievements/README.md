@@ -12,6 +12,7 @@
 | `grace.ts` | 2026-09 以前の月の固定上限（`perfectMonthGrace(domain)` ＝ 特典サーバー4・その他3）。env を読むので perfectMonth.ts から分離。**月を問わず上限が欲しいときは `@/lib/makeup/ledger` の `resolveMakeupCap` を使う** |
 | `../makeup/*` | **穴埋めポイント制（2026-10〜）**。`points.ts`（純粋: era・付与量・締切・potentialCap）/ `donor.ts`（純粋: donor になれる範囲＝月またぎ・割当がどの月の穴を指すかの解決・月の割当状況の組み立て）/ `ledger.ts`（上限の解決・付与・直列化ロック）/ `awards.ts`（登録時・実績時の付与）/ `events.ts`（イベント一覧）/ `monthlyGrants.ts`（定期ジョブの月次・イベント付与）/ `notify.ts`（穴埋めを促す通知）/ `notificationTypes.ts`（通知の type・文言・遷移先）/ `selfHeal.ts`（画像削除後の失効掃除） |
 | `stats.ts` | live 用。投稿後に DB から集計（`collectStats`）して `AchStats` を作る。リアクション起点の集計（`collectReactionStats`＝`ReactionStats`）もここ |
+| `postStats.ts` | 純粋。`collectStats` のうち「日」にまつわる集計（連続日数・今日の枚数・月の日別枚数・穴埋め・ハットトリック等）。投稿の記録日を基準に数える（`summarizePostDays`） |
 | `engine.ts` | live 用。`evaluateAndGrant`（投稿起点）/ `evaluateAndGrantReaction`（リアクション起点）/ `evaluateAndGrantProfile`（プロフィール起点）/ `evaluateAndGrantPerfectMonth`（皆勤賞の再判定・定期ジョブ）が新規付与＋通知作成。**付与はすべて `grantAll` を通す**（実績ptの付与フックがここにだけあるため）。`selectNewlyGranted*` は純粋関数で live/backfill 共有 |
 | `reactionTriggers.ts` | リアクション起点のフック（`onReactionGiven` / `onReactionsReceived`）。例外を握り潰してリアクション操作・同期を止めない |
 | `profileTriggers.ts` | プロフィール起点のフック（`onProfileUpdated`）。例外を握り潰してプロフィール保存を止めない |
@@ -33,7 +34,7 @@
 
 - **`key` は永続。一度使った key の意味を変えない／リネームしない／使い回さない。** DB（`achievements.key`・`notifications.achievement_key`）に保存され、表示は key→CATALOG で解決される。文言だけ変えたいなら title/description を変えれば良い（key はそのまま）。
 - `evaluate` は**純粋関数**（DB/IO 禁止）。集計は `AchStats`、投稿そのものは `PostFacts` から読む。
-- 日付は必ず `@/lib/streak` の `toJstDateString` を使う（JST 一貫）。
+- **「日」「月」は記録日で数える**。投稿の日は `Image.postDate`（保存時に確定・書き換えない）、今日は持ち主の区切りで決まる `@/lib/dayClock`（`todayOf` / サーバーは `dayClock.server` の `loadToday`）。`createdAt` から JST の日付を計算し直さない（区切りを 0 時以外にした人の深夜の投稿が別の日に数えられる。ESLint で `toJstDateString` / `toJstYm` 等の import を禁止）。投稿時の評価は「今日」ではなく `post.postDate` を基準にする。時計どおりに判定する実績（早起き・夜更かし・書き初め・全時間帯）だけが `createdAt` を使う。仕様は [docs/features.md「日付の区切り」](../../../docs/features.md#日付の区切り)。
 - 通知は実績付与時に live でのみ作る。バックフィルの通知は「実績の獲得日（過去日）」付きで補填され、赤ドットは光らない（Cookie `not` 初回 now 初期化）。
 
 ## 手順A: 単発実績を追加する
@@ -75,7 +76,7 @@
 1. `catalog.ts` の `AchStats` にフィールド追加。
 2. `stats.ts` `collectStats`（live・DBクエリ）で算出。クエリは `userId` スコープで数本に収める。`groupBy` は当 Prisma で `orderBy` 必須。
 3. `scripts/backfill-achievements.ts` `replayUser`（backfill・メモリ集計）でも同じ値を running 集計として算出。
-   - 「現在の連続日数」のような**その投稿時点**の値が要るものは、`new Date()` 基準の関数（`calculateStreak`）をそのまま使わず、投稿日基準で計算する（既存の `streakEndingAt` を参照）。
+   - 「現在の連続日数」のような**その投稿時点**の値は、live と同じ関数をその投稿の記録日を基準に呼ぶ（`calculateStreak(postDates, post.postDate)`）。
 4. `PostFacts`（投稿そのものの属性）で足りるなら集計は不要。必要なら `PostFacts` に足し、`publishImage.ts` の `toPostFacts` と backfill の `ReplayImage`/select も合わせる。
 
 ## 手順C-2: リアクション起点の実績を追加する
@@ -149,17 +150,18 @@ npm run build             # 本番ビルド（新ルート・静的解析）
   | reason | タイミング | 条件 | 量 | 実装 |
   |---|---|---|---|---|
   | `favor-monthly` | 定期ジョブ＋登録時 | FAVOR_SERVERS 所属（登録月も付与） | 1 | `monthlyGrants.ts` / `awards.grantSignupMakeupPoints` |
-  | `monthly-catchup` | 定期ジョブ（11日以降） | 当月1日より前に登録・先月が皆勤でない（**データから再計算**） | 1 | `monthlyGrants.ts` |
+  | `monthly-catchup` | 定期ジョブ（11日 4:00 JST 以降） | 当月1日より前に登録・先月が皆勤でない（**データから再計算**） | 1 | `monthlyGrants.ts` |
   | `signup` | 登録時 | 常に（0pt なら行を作らない） | `min(登録日-1, 8)` | `awards.grantSignupMakeupPoints` |
   | `achievement` | 実績を付与した瞬間 | その月に1回（**月間投稿日数の実績だけでは発火しない**） | 1 | `grantAll` → `awards.maybeGrantAchievementPoint` |
   | `event:<key>` | 定期ジョブ（イベントの期間中） | イベントごと（例: 開始時点で登録済み） | イベントごと | `events.ts` の一覧 → `monthlyGrants.ts` |
 
+  - 定期ジョブの付与（favor-monthly・catchup・イベント）は**全員が同じ月にいる間（1日 4:00〜月末 24:00 JST）だけ**行う。月は人によって始まる時刻が違う（日付の区切り 0〜4 時）ので、1日 0:00〜4:00 に前月分を配ると区切りの遅い人の終わった月の上限が増え（月末で凍結の不変条件が崩れる）、catchup を全員の締切より前に配ると二重取りが成立する。判定は全員共通の時計 `LATEST_CLOCK`（4時区切り）で行い、ユーザーごとの履歴は読まない。実績ptの付与先は、その人の今日の月。
   - イベントは `src/lib/makeup/events.ts` に1件足すだけで配られる（キー・名前・付与先の月・量・開始日時・対象）。付与は開始日時以降かつ付与先の月の間だけ。表示名（付与履歴・通知）は一覧から引くので、**終わったイベントも一覧から消さない**。キーは台帳の reason になるのでリネーム・使い回し禁止。
   - 2026-10 の「穴埋めポイント開始記念」: 10月1日 0:00 JST 時点の登録者全員に1pt。
 
   - catchup の「先月が皆勤でない」を Achievement 行で見てはいけない。行の付与は編集モード終了時のビーコン頼みで、「数値上は皆勤なのに行が無い」状態が11日に存在しうる。行を信じると +1pt を受け取った後に👑も取れる（締切で塞いだ二重取りが残る）。ジョブはデータから判定し、皆勤なら👑をその場で確定付与する。
   - 実績ptは backfill から付与しない（過去日付の実績でポイントを遡及させない）。
-- **締切: 対象月の翌月10日 23:59 JST（`isMakeupEditable`）**。新旧どちらの月にも適用。PATCH の割当の指定・解除をゲートする（代表サムネの指定はゲートしない）。締切が無いと「11日の catchup を受け取ってから先月を埋めて👑も取る」が成立する。`reevaluate` はゲートしない（付与のみ・締切後は割当が変わらないので結果が決定的）。
+- **締切: 対象月の翌月10日（持ち主の記録日で。`isMakeupEditable(ym, today)`）**。0時区切りなら 10日 23:59、2時区切りなら 11日 1:59 まで。判定は記録日の比較で行い、表示用の締切時刻（`makeupDeadlineAt`）と `now` を比べない（後から予約された区切りの変更で時刻は動きうる）。新旧どちらの月にも適用。PATCH の割当の指定・解除をゲートする（代表サムネの指定はゲートしない）。締切が無いと「11日の catchup を受け取ってから先月を埋めて👑も取る」が成立する。`reevaluate` はゲートしない（付与のみ・締切後は割当が変わらないので結果が決定的）。
 - **割当の書き込みはユーザー×月で直列化する**（`withMonthMakeupLock`＝advisory lock）。PATCH は「読む→上限を検証→書く」なので、残り1pt が常態のポイント制ではダブルタップで上限を超えうる。
 
 ### 月またぎ donor（翌月1〜10日の投稿で前月を埋める）
@@ -194,7 +196,7 @@ donor を同月に限ると**月末日を忘れた人だけが構造的に救済
 | type | 発火 | 重複排除 |
 |---|---|---|
 | `makeup-point` | 付与時（台帳と同一トランザクション） | 台帳の一意制約 |
-| `makeup-need-second` | 投稿時: 今日1枚目・残りptあり・穴あり・達成可能 | 1日1通（JST の今日0時以降に同 type があれば送らない） |
+| `makeup-need-second` | 投稿時: 今日1枚目・残りptあり・穴あり・達成可能 | 1日1通（その人の今日が始まって以降＝`dayStart(区切り, 今日)` に同 type があれば送らない） |
 | `makeup-ready` | 投稿時: 今日2枚目以上・今日の donor 無し（同条件）／付与直後: `hasAssignableMakeup` | 1日1通 |
 | `makeup-reminder` | **作成は撤去済み**（2026-09 以前の月の旧通知）。既存行の表示だけ残す（`LEGACY_REMINDER`・2026-12-29 以降に削除可） | 月1通 |
 
