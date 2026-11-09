@@ -290,9 +290,9 @@ model Image {
   // 「日」「月」の判定はすべてこれを読み、createdAt から計算し直さない。保存時に確定し書き換えない
   // （区切りの変更やロジックのバグで過去の記録日・👑・穴埋めの割当が動かないようにするため）。
   // 計算は src/lib/dayClock.ts。仕様は docs/features.md「日付の区切り」。
-  // 既定値はマイグレーションからイメージ差し替えまでの間に旧コードが保存する行を埋めるためだけのもの
-  // （全員 0 時区切りの時期なので JST の今日で正しい）。差し替え後の別マイグレーションで外す。
-  postDate            DateTime  @default(dbgenerated("(timezone('Asia/Tokyo'::text, now()))::date")) @map("post_date") @db.Date
+  // 既定値は持たない（保存経路で書き忘れると型エラーになるように）。DB の今日（JST）を既定にすると、
+  // 区切りを変えた人の記録日を黙って間違えるため。導入時の移行期間だけ既定値を置いていた。
+  postDate            DateTime  @map("post_date") @db.Date
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   replyTo       Image?         @relation("ImageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
