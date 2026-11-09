@@ -36,6 +36,7 @@ vi.mock("@/lib/achievements/grace", () => ({
   perfectMonthGrace: vi.fn((domain: string | null) => (domain === "handon.club" ? 4 : 3)),
 }));
 
+import { asPostDate } from "@/lib/dayClock";
 import { grantMakeupPoints, resolveMakeupCap, resolveMakeupLimits } from "./ledger";
 
 /** JST のその日の正午。 */
@@ -78,7 +79,7 @@ describe("resolveMakeupLimits - cap と『まだ来うる分』込みの上限",
       userId: "u1",
       instanceDomain: "handon.club",
       ym: "2026-09",
-      now: jstNoon("2026-09-20"),
+      today: asPostDate("2026-09-20"),
     });
 
     expect(r).toEqual({ pointEra: false, cap: 4, potentialCap: 4, grants: [] });
@@ -89,7 +90,7 @@ describe("resolveMakeupLimits - cap と『まだ来うる分』込みの上限",
       userId: "u1",
       instanceDomain: null,
       ym: "2026-10",
-      now: jstNoon("2026-10-05"),
+      today: asPostDate("2026-10-05"),
     });
 
     expect(r.pointEra).toBe(true);
@@ -104,7 +105,7 @@ describe("resolveMakeupLimits - cap と『まだ来うる分』込みの上限",
       userId: "u1",
       instanceDomain: null,
       ym: "2026-10",
-      now: jstNoon("2026-10-05"),
+      today: asPostDate("2026-10-05"),
     });
 
     expect(r.potentialCap).toBe(1);
@@ -121,7 +122,7 @@ describe("resolveMakeupLimits - cap と『まだ来うる分』込みの上限",
       userId: "u1",
       instanceDomain: null,
       ym: "2026-10",
-      now: jstNoon("2026-10-05"),
+      today: asPostDate("2026-10-05"),
     });
 
     expect(r.potentialCap).toBe(1);
@@ -134,7 +135,7 @@ describe("resolveMakeupLimits - cap と『まだ来うる分』込みの上限",
       userId: "u1",
       instanceDomain: null,
       ym: "2026-10",
-      now: jstNoon("2026-11-05"),
+      today: asPostDate("2026-11-05"),
     });
 
     expect(r.cap).toBe(1);

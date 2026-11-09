@@ -45,6 +45,8 @@ import { isFavorServer } from "@/lib/auth/serverPolicy";
 import { formatYm, jstDayOf, jstMonthRangeOfYm, parseYm, shiftYm, toJstYm } from "@/lib/jst";
 import { MAKEUP_NOTIFICATION_TYPES } from "@/lib/makeup/notificationTypes";
 import { isPointEra, makeupPointStartYm } from "@/lib/makeup/points";
+import { postDateOfYmDay } from "@/lib/dayClock";
+import { toDbDate } from "@/lib/dayClock.server";
 
 const SCENARIOS = [
   "no-points",
@@ -318,6 +320,8 @@ async function main() {
         isPublic: true,
         // JST 12:0seq（同じ日の中で1枚目・2枚目の順序をつける）
         createdAt: new Date(Date.UTC(year, month - 1, day, 3, seq, 0)),
+        // 記録日は明示する（省略すると DB の既定値＝実行した日になる）
+        postDate: toDbDate(postDateOfYmDay(ym, day)),
         makeupTargetDay,
       },
     });

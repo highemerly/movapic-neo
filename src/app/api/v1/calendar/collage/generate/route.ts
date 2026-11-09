@@ -19,6 +19,7 @@ import {
 } from "@/lib/calendar/resolveMonth";
 import { formatYm, isValidYearMonth } from "@/lib/jst";
 import { resolveMakeupCap } from "@/lib/makeup/ledger";
+import { loadToday } from "@/lib/dayClock.server";
 import { getImage } from "@/lib/storage/storage";
 import { renderCalendarCollage } from "@/lib/compute/client";
 import { isJapaneseHoliday } from "@/lib/holidays";
@@ -94,9 +95,11 @@ async function generateCollage(
     state.stage = "db";
     // 穴埋めの上限は画面のカレンダーと同じ解決（ledger）を通す＝共有画像と表示の👑・穴埋めが一致する。
     // コラージュはコールアウトを使わないので potentialCap は cap と同じでよい。
-    const [images, makeupCap] = await Promise.all([
+    const [images, makeupCap, today] = await Promise.all([
       fetchCalendarImages(user.id, year, month),
       resolveMakeupCap({ userId: user.id, instanceDomain: user.instance.domain, ym: formatYm(year, month) }),
+      // 未来月かどうかは本人の今日（記録日）で決める（カレンダー表示と同じ）。
+      loadToday(user.id, new Date()),
     ]);
     const resolved = resolveCalendarMonth({
       images,
@@ -104,7 +107,7 @@ async function generateCollage(
       month,
       makeupCap,
       potentialCap: makeupCap,
-      now: new Date(),
+      today,
     });
 
     if (resolved.isFutureMonth) {

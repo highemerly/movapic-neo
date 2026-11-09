@@ -10,7 +10,8 @@
  * クライアントからも import されるため React・サーバー専用 API・env を import しないこと。
  */
 
-import { parseYm } from "@/lib/jst";
+import { parseYm, shiftYm } from "@/lib/jst";
+import { dayStart, firstDayOfYm, LATEST_CLOCK, todayOf, ymOf } from "@/lib/dayClock";
 import type { NotificationLines, NotificationVariant } from "./lines";
 
 export const MONTHLY_COLLAGE_NOTIFICATION_TYPE = "monthly-collage";
@@ -70,3 +71,16 @@ export function monthlyCollageNotificationHref(
 
 /** 通知のアイコン名（AchievementIcon に登録済みの lucide アイコン名）。 */
 export const MONTHLY_COLLAGE_NOTIFICATION_ICON = "Images";
+
+/**
+ * 定期ジョブが今送る通知の対象月（先月）と、この周期の通知が作られ始める時刻（当月1日 4:00 JST）。
+ *
+ * 月は人によって始まる時刻が違う（日付の区切り 0〜4 時）ので、全員共通の「いちばん遅い時計」
+ * （LATEST_CLOCK＝4時区切り）で決める。1日 0:00〜4:00 は区切りの遅い人がまだ前月にいて、その人の
+ * 1日 1:00 の投稿は前月の記録日になる＝先に送ると対象から漏れうる。その間は対象月が「先々月」のまま
+ * なので、先々月分は前の周期で送り済み＝新しく送る相手がいない（ジョブは何もしない）。
+ */
+export function monthlyCollageCycle(now: Date): { ym: string; cycleStart: Date } {
+  const thisYm = ymOf(todayOf(LATEST_CLOCK, now));
+  return { ym: shiftYm(thisYm, -1), cycleStart: dayStart(LATEST_CLOCK, firstDayOfYm(thisYm)) };
+}

@@ -8,28 +8,29 @@
  */
 
 import prisma from "@/lib/db";
+import { shiftYm } from "@/lib/jst";
+import { ymOf, type PostDate } from "@/lib/dayClock";
+import { loadToday } from "@/lib/dayClock.server";
 import { perfectMonthKey } from "./perfectMonth";
-import { toJstDateString } from "@/lib/streak";
 
-/** JST基準の今月の YYYY-MM。 */
-export function thisMonthYm(now: Date = new Date()): string {
-  return toJstDateString(now).slice(0, 7);
+/** 今月の YYYY-MM。today は持ち主の今日（記録日）。 */
+export function thisMonthYm(today: PostDate): string {
+  return ymOf(today);
 }
 
-/** JST基準の先月の YYYY-MM。 */
-export function lastMonthYm(now: Date = new Date()): string {
-  const [y, m] = toJstDateString(now).split("-").map(Number);
-  const year = m === 1 ? y - 1 : y;
-  const month = m === 1 ? 12 : m - 1;
-  return `${year}-${String(month).padStart(2, "0")}`;
+/** 先月の YYYY-MM。today は持ち主の今日（記録日）。 */
+export function lastMonthYm(today: PostDate): string {
+  return shiftYm(ymOf(today), -1);
 }
 
 /**
  * 指定ユーザーが直近（先月または今月）の皆勤賞を獲得しているか。
  * 月末最終日に当月分が確定するケースを取りこぼさないよう両月を見る。
+ * 今月・先月は持ち主の今日で決める（閲覧者の区切りではない）。
  */
 export async function hasRecentPerfectAttendance(userId: string): Promise<boolean> {
-  const keys = [perfectMonthKey(lastMonthYm()), perfectMonthKey(thisMonthYm())];
+  const today = await loadToday(userId, new Date());
+  const keys = [perfectMonthKey(lastMonthYm(today)), perfectMonthKey(thisMonthYm(today))];
   const row = await prisma.achievement.findFirst({
     where: { userId, key: { in: keys } },
     select: { id: true },

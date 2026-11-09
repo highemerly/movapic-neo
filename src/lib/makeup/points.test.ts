@@ -5,8 +5,8 @@
  * 実績時）、割当の可否（PATCH）、カレンダー表示、通知ゲートのすべてがここを通るため、
  * ここが正しければ「付与した量」「埋められる量」「締切」が経路ごとに食い違わない。
  *
- * 締切は「翌月10日 23:59:59.999 JST まで」。UTC で書くと日付がずれるので、境界は必ず
- * JST 00:00 = UTC 前日15:00 の形で検証する。
+ * 締切は「翌月10日まで」を持ち主の記録日（日付の区切りで決まる今日）で判定する。表示用の時刻は
+ * 区切りで変わる（0時区切りなら 11日 0:00 JST・2時区切りなら 11日 2:00 JST）。
  */
 
 import { describe, it, expect, afterEach, vi } from "vitest";
@@ -20,14 +20,20 @@ import {
   isCatchupOpen,
   isMakeupEditable,
   isPointEra,
-  makeupDeadline,
+  makeupDeadlineAt,
+  makeupLastDay,
+  monthlyGrantWindow,
   potentialCapOf,
   remainingPoints,
   signupPointAmount,
   sumGrants,
 } from "./points";
 
+import { asPostDate, LATEST_CLOCK, todayOf, uniformSchedule, ymOf } from "@/lib/dayClock";
+import { shiftYm } from "@/lib/jst";
+
 const { FAVOR_MONTHLY, MONTHLY_CATCHUP, SIGNUP, ACHIEVEMENT } = MAKEUP_POINT_REASONS;
+const d = asPostDate;
 
 describe("isPointEra - 2026-10 からポイント制", () => {
   it("2026-09 以前は従来ルール", () => {
@@ -96,62 +102,125 @@ describe("signupPointAmount - 登録日で配る量が決まる", () => {
   });
 });
 
-describe("makeupDeadline - 翌月10日 23:59 JST まで", () => {
-  it("10月分の締切は 11/11 JST 00:00（排他上限）", () => {
+describe("makeupLastDay / makeupDeadlineAt - 締切は翌月10日（持ち主の記録日）", () => {
+  it("10月分の締切の日は 11/10", () => {
+    expect(makeupLastDay("2026-10")).toBe("2026-11-10");
+  });
+
+  it("12月分は翌年1月10日", () => {
+    expect(makeupLastDay("2026-12")).toBe("2027-01-10");
+  });
+
+  it("表示用の締切時刻は、0時区切りなら 11/11 0:00 JST（排他上限）", () => {
     // 11/11 00:00 JST = 11/10 15:00 UTC
-    expect(makeupDeadline("2026-10").toISOString()).toBe("2026-11-10T15:00:00.000Z");
+    expect(makeupDeadlineAt([], "2026-10").toISOString()).toBe("2026-11-10T15:00:00.000Z");
   });
 
-  it("12月分は翌年1月11日", () => {
-    expect(makeupDeadline("2026-12").toISOString()).toBe("2027-01-10T15:00:00.000Z");
-  });
-
-  it("従来ルールの月（2026-09）にも同じ締切を適用する", () => {
-    expect(makeupDeadline("2026-09").toISOString()).toBe("2026-10-10T15:00:00.000Z");
+  it("2時区切りなら 11/11 2:00 JST（11日 1:59 までは 10日）", () => {
+    expect(makeupDeadlineAt(uniformSchedule(2), "2026-10").toISOString()).toBe(
+      "2026-11-10T17:00:00.000Z"
+    );
   });
 });
 
-describe("isMakeupEditable - 締切と未来月", () => {
+describe("isMakeupEditable - 締切と未来月（持ち主の今日で判定）", () => {
   it("当月は編集できる", () => {
-    expect(isMakeupEditable("2026-10", new Date("2026-10-05T03:00:00Z"))).toBe(true);
+    expect(isMakeupEditable("2026-10", d("2026-10-05"))).toBe(true);
   });
 
-  it("翌月10日 23:59:59.999 JST まではまだ先月を編集できる", () => {
-    // 11/10 23:59:59.999 JST = 11/10 14:59:59.999 UTC
-    expect(isMakeupEditable("2026-10", new Date("2026-11-10T14:59:59.999Z"))).toBe(true);
+  it("翌月10日まではまだ先月を編集できる", () => {
+    expect(isMakeupEditable("2026-10", d("2026-11-10"))).toBe(true);
   });
 
-  it("翌月11日 00:00 JST ちょうどで締め切る", () => {
-    expect(isMakeupEditable("2026-10", new Date("2026-11-10T15:00:00.000Z"))).toBe(false);
+  it("翌月11日で締め切る", () => {
+    expect(isMakeupEditable("2026-10", d("2026-11-11"))).toBe(false);
+  });
+
+  it("2時区切りの人は 11日 1:59 まで先月を編集できる（その人の今日はまだ10日）", () => {
+    const s = uniformSchedule(2);
+    expect(isMakeupEditable("2026-10", todayOf(s, new Date("2026-11-11T01:59:00+09:00")))).toBe(true);
+    expect(isMakeupEditable("2026-10", todayOf(s, new Date("2026-11-11T02:00:00+09:00")))).toBe(false);
+  });
+
+  it("従来ルールの月（2026-09）にも同じ締切を適用する", () => {
+    expect(isMakeupEditable("2026-09", d("2026-10-10"))).toBe(true);
+    expect(isMakeupEditable("2026-09", d("2026-10-11"))).toBe(false);
   });
 
   it("2ヶ月前の月は編集できない", () => {
-    expect(isMakeupEditable("2026-09", new Date("2026-11-05T03:00:00Z"))).toBe(false);
+    expect(isMakeupEditable("2026-09", d("2026-11-05"))).toBe(false);
   });
 
   it("未来月は編集できない", () => {
-    expect(isMakeupEditable("2026-11", new Date("2026-10-31T03:00:00Z"))).toBe(false);
+    expect(isMakeupEditable("2026-11", d("2026-10-31"))).toBe(false);
   });
 
-  it("月の変わり目は JST で判定する（UTC ではまだ前月でも JST で翌月なら当月扱い）", () => {
-    // 2026-10-31T15:00Z = 11/1 00:00 JST → 11月は当月
-    expect(isMakeupEditable("2026-11", new Date("2026-10-31T15:00:00Z"))).toBe(true);
+  it("月が変わったら当月扱い", () => {
+    expect(isMakeupEditable("2026-11", d("2026-11-01"))).toBe(true);
   });
 });
 
 describe("isCatchupOpen - monthly-catchup は締切の翌日（11日）以降", () => {
-  it("10日 23:59 JST はまだ付与しない（先月をまだ埋められる）", () => {
-    // 10/10 23:59 JST = 10/10 14:59 UTC
-    expect(isCatchupOpen(new Date("2026-10-10T14:59:59Z"))).toBe(false);
+  it("10日はまだ付与しない（先月をまだ埋められる）", () => {
+    expect(isCatchupOpen(d("2026-10-10"))).toBe(false);
     expect(MONTHLY_CATCHUP_DAY).toBe(11);
   });
 
-  it("11日 00:00 JST から付与する", () => {
-    expect(isCatchupOpen(new Date("2026-10-10T15:00:00Z"))).toBe(true);
+  it("11日から付与する", () => {
+    expect(isCatchupOpen(d("2026-10-11"))).toBe(true);
+  });
+
+  it("全員共通の時計（4時区切り）で渡すと、11日 4:00 JST まで開かない（全員の締切の後）", () => {
+    expect(isCatchupOpen(todayOf(LATEST_CLOCK, new Date("2026-10-11T03:59:00+09:00")))).toBe(false);
+    expect(isCatchupOpen(todayOf(LATEST_CLOCK, new Date("2026-10-11T04:00:00+09:00")))).toBe(true);
   });
 
   it("11日を過ぎても付与対象のまま（ジョブ停止で11日を跨いでも次の実行で拾う）", () => {
-    expect(isCatchupOpen(new Date("2026-10-20T03:00:00Z"))).toBe(true);
+    expect(isCatchupOpen(d("2026-10-20"))).toBe(true);
+  });
+});
+
+describe("monthlyGrantWindow - 定期ジョブが配ってよい時間帯（全員共通の時計）", () => {
+  const at = (s: string) => new Date(`${s}:00+09:00`);
+
+  it("1日 0:00〜3:59 JST は配らない（区切りの遅い人はまだ前月にいる）", () => {
+    expect(monthlyGrantWindow(at("2026-11-01T00:00"))).toBeNull();
+    expect(monthlyGrantWindow(at("2026-11-01T03:59"))).toBeNull();
+  });
+
+  it("1日 4:00 JST から当月分を配る（catchup はまだ）", () => {
+    expect(monthlyGrantWindow(at("2026-11-01T04:00"))).toEqual({ ym: "2026-11", catchupOpen: false });
+  });
+
+  it("月末 23:59 JST まではその月の分（翌月にはみ出さない）", () => {
+    expect(monthlyGrantWindow(at("2026-11-30T23:59"))).toEqual({ ym: "2026-11", catchupOpen: true });
+  });
+
+  it("年またぎも同じ（1/1 0:00〜3:59 は配らない）", () => {
+    expect(monthlyGrantWindow(at("2027-01-01T02:00"))).toBeNull();
+    expect(monthlyGrantWindow(at("2027-01-01T04:00"))).toEqual({ ym: "2027-01", catchupOpen: false });
+  });
+
+  it("catchup は 11日 4:00 から（全員の締切＝4時区切りの人の 11日 3:59 の後）", () => {
+    expect(monthlyGrantWindow(at("2026-11-11T03:59"))).toEqual({ ym: "2026-11", catchupOpen: false });
+    expect(monthlyGrantWindow(at("2026-11-11T04:00"))).toEqual({ ym: "2026-11", catchupOpen: true });
+  });
+
+  it("どの区切りの人も、配ってよい時間帯には全員その月にいて、catchup の時点で締切を過ぎている", () => {
+    // 1時間ごとに1か月ぶん回し、0〜4時区切りすべてで確かめる。
+    for (let t = at("2026-10-31T00:00").getTime(); t < at("2026-12-02T00:00").getTime(); t += 3600_000) {
+      const now = new Date(t);
+      const window = monthlyGrantWindow(now);
+      if (!window) continue;
+      for (let h = 0; h <= 4; h++) {
+        const today = todayOf(uniformSchedule(h), now);
+        expect(ymOf(today)).toBe(window.ym);
+        if (window.catchupOpen) {
+          // 先月の穴埋めはもう締め切られている
+          expect(isMakeupEditable(shiftYm(window.ym, -1), today)).toBe(false);
+        }
+      }
+    }
   });
 });
 

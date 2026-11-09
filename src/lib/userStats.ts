@@ -1,5 +1,6 @@
 import prisma from "@/lib/db";
 import { calculateStreak } from "@/lib/streak";
+import { fromDbDate, loadToday } from "@/lib/dayClock.server";
 import { countRanks } from "@/lib/achievements/catalog";
 
 /**
@@ -21,11 +22,11 @@ export interface UserProfileStats {
 }
 
 export async function getUserProfileStats(userId: string): Promise<UserProfileStats> {
-  const [imageCount, postDates, prefectures, achievements] = await Promise.all([
+  const [imageCount, postDates, prefectures, achievements, today] = await Promise.all([
     prisma.image.count({ where: { userId, isPublic: true, isDisabled: false } }),
     prisma.image.findMany({
       where: { userId, isPublic: true, isDisabled: false },
-      select: { createdAt: true },
+      select: { postDate: true },
     }),
     prisma.image.findMany({
       where: { userId, isPublic: true, isDisabled: false, locationPrefecture: { not: null } },
@@ -36,13 +37,18 @@ export async function getUserProfileStats(userId: string): Promise<UserProfileSt
       where: { userId },
       select: { key: true, category: true },
     }),
+    // 連続投稿は持ち主の記録日で数える（閲覧者の区切りではない）。
+    loadToday(userId, new Date()),
   ]);
 
   const { gold, silver } = countRanks(achievements);
 
   return {
     imageCount,
-    streak: calculateStreak(postDates.map((p) => p.createdAt)),
+    streak: calculateStreak(
+      postDates.map((p) => fromDbDate(p.postDate)),
+      today
+    ),
     prefectureCount: prefectures.length,
     goldCount: gold,
     silverCount: silver,

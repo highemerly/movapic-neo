@@ -8,7 +8,8 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Footer } from "@/components/Footer";
 import { UserProfileHeader } from "@/components/user/UserProfileHeader";
 import { TabTransition } from "@/components/user/TabTransition";
-import { toJstDateString } from "@/lib/streak";
+import { hourOn, todayOf } from "@/lib/dayClock";
+import { loadSchedule } from "@/lib/dayClock.server";
 import { hasRecentPerfectAttendance } from "@/lib/achievements/lastMonthPerfect";
 import { parseUserHandle, userPathSegment } from "@/lib/userHandle";
 import { getFavorServers, getHomeServer, isFavorServer } from "@/lib/auth/serverPolicy";
@@ -62,10 +63,14 @@ export default async function CalendarPage({
 
   const publicUrl = (process.env.S3_PUBLIC_URL || "").replace(/\/+$/, "");
 
-  // クエリパラメータまたは現在の年月を使用
-  // 初期表示月は必ず JST 基準。サーバーローカルTZ（本番=UTC）だと JST 00:00〜09:00 に
-  // 先月が初期表示になり、APIの「今月」判定とも食い違うため toJstDateString に揃える。
-  const jstToday = toJstDateString(new Date()); // "YYYY-MM-DD"（JST）
+  // クエリパラメータまたは現在の年月を使用。
+  // 今日は持ち主の記録日（日付の区切り）で決め、API の「今月」判定と揃える。ブラウザやサーバーの
+  // ローカル時刻は使わない（本番は UTC・閲覧者のブラウザは任意の TZ・閲覧者の区切りとも無関係）。
+  const schedule = await loadSchedule(user.id);
+  const today = todayOf(schedule, new Date()); // "YYYY-MM-DD"
+  // カレンダーの下に出す「今の」区切り（予約中の変更ではなく今日の値）。閲覧者全員に見せる
+  // （深夜の投稿が前の日に入っている理由が、見る人にも分かるように）。
+  const dayBoundaryHour = hourOn(schedule, today);
   const queryYear = query.year ? parseInt(query.year, 10) : null;
   const queryMonth = query.month ? parseInt(query.month, 10) : null;
 
@@ -73,8 +78,8 @@ export default async function CalendarPage({
   const isValidYear = queryYear && queryYear >= 2000 && queryYear <= 2100;
   const isValidMonth = queryMonth && queryMonth >= 1 && queryMonth <= 12;
 
-  const initialYear = isValidYear ? queryYear : Number(jstToday.slice(0, 4));
-  const initialMonth = isValidMonth ? queryMonth : Number(jstToday.slice(5, 7));
+  const initialYear = isValidYear ? queryYear : Number(today.slice(0, 4));
+  const initialMonth = isValidMonth ? queryMonth : Number(today.slice(5, 7));
 
   // ヘッダーのアバター王冠用（皆勤賞判定）
   const perfectAttendance = await hasRecentPerfectAttendance(user.id);
@@ -122,6 +127,8 @@ export default async function CalendarPage({
             publicUrl={publicUrl}
             initialYear={initialYear}
             initialMonth={initialMonth}
+            today={today}
+            dayBoundaryHour={dayBoundaryHour}
             isOwner={isOwner}
             serverName={user.instance.domain}
             favorServers={getFavorServers()}

@@ -17,36 +17,27 @@ vi.mock("@/lib/db", () => ({
   default: { image: { findMany, updateMany } },
 }));
 
+import { asPostDate } from "@/lib/dayClock";
 import { healAfterImageDelete, staleDonorIdsAfterDelete } from "./selfHeal";
 
-/** JST で 2026-10-DD の正午。 */
-const jst = (day: number) => new Date(Date.UTC(2026, 9, day, 3, 0, 0));
-const row = (id: string, day: number, makeupTargetDay: number | null = null) => ({
-  id,
-  createdAt: jst(day),
-  makeupTargetDay,
-});
+const row = (id: string, makeupTargetDay: number | null = null) => ({ id, makeupTargetDay });
 
 describe("staleDonorIdsAfterDelete - 失効した割当を選ぶ", () => {
   it("削除でその日が1枚になったら、残った donor の割当は失効", () => {
     // 10日に2枚（b が3日を埋めていた）→ a を削除して b だけが残った
-    expect(staleDonorIdsAfterDelete([row("b", 10, 3)], 10)).toEqual(["b"]);
+    expect(staleDonorIdsAfterDelete([row("b", 3)])).toEqual(["b"]);
   });
 
   it("その日にまだ2枚以上残っていれば何も外さない", () => {
-    expect(staleDonorIdsAfterDelete([row("b", 10, 3), row("c", 10)], 10)).toEqual([]);
+    expect(staleDonorIdsAfterDelete([row("b", 3), row("c")])).toEqual([]);
   });
 
   it("残った写真が donor でなければ外すものは無い", () => {
-    expect(staleDonorIdsAfterDelete([row("b", 10)], 10)).toEqual([]);
-  });
-
-  it("別の日の donor には触らない（削除した日だけを見る）", () => {
-    expect(staleDonorIdsAfterDelete([row("b", 10), row("x", 20, 5)], 10)).toEqual([]);
+    expect(staleDonorIdsAfterDelete([row("b")])).toEqual([]);
   });
 
   it("削除でその日が0枚になれば外すものは無い（donor ごと消えている）", () => {
-    expect(staleDonorIdsAfterDelete([row("x", 20, 5), row("y", 20)], 10)).toEqual([]);
+    expect(staleDonorIdsAfterDelete([])).toEqual([]);
   });
 });
 
@@ -56,18 +47,17 @@ describe("healAfterImageDelete - DB への反映", () => {
     updateMany.mockResolvedValue({ count: 1 });
   });
 
-  it("削除した画像の月の残りを読み、失効した割当だけを null に戻す", async () => {
-    findMany.mockResolvedValue([row("b", 10, 3), row("x", 20, 5), row("y", 20)]);
+  it("削除した画像と同じ記録日の残りを読み、失効した割当だけを null に戻す", async () => {
+    findMany.mockResolvedValue([row("b", 3)]);
 
-    await expect(healAfterImageDelete({ userId: "u1", deletedCreatedAt: jst(10) })).resolves.toBe(1);
+    await expect(
+      healAfterImageDelete({ userId: "u1", deletedPostDate: asPostDate("2026-10-10") })
+    ).resolves.toBe(1);
 
     expect(findMany).toHaveBeenCalledWith({
-      where: {
-        userId: "u1",
-        // 10月の JST 月境界
-        createdAt: { gte: new Date("2026-09-30T15:00:00Z"), lt: new Date("2026-10-31T15:00:00Z") },
-      },
-      select: { id: true, createdAt: true, makeupTargetDay: true },
+      // 記録日で絞る（区切りの遅い人の 0〜2 時の投稿も、カレンダーと同じ日として数える）
+      where: { userId: "u1", postDate: new Date("2026-10-10T00:00:00Z") },
+      select: { id: true, makeupTargetDay: true },
     });
     expect(updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["b"] } },
@@ -77,9 +67,11 @@ describe("healAfterImageDelete - DB への反映", () => {
   });
 
   it("外すものが無ければ書き込まない", async () => {
-    findMany.mockResolvedValue([row("b", 10, 3), row("c", 10)]);
+    findMany.mockResolvedValue([row("b", 3), row("c")]);
 
-    await expect(healAfterImageDelete({ userId: "u1", deletedCreatedAt: jst(10) })).resolves.toBe(0);
+    await expect(
+      healAfterImageDelete({ userId: "u1", deletedPostDate: asPostDate("2026-10-10") })
+    ).resolves.toBe(0);
     expect(updateMany).not.toHaveBeenCalled();
   });
 });

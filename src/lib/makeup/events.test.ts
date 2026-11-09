@@ -37,8 +37,10 @@ describe("MAKEUP_POINT_EVENTS - 一覧そのもの", () => {
     for (const e of MAKEUP_POINT_EVENTS) {
       expect(makeupEventReason(e.key).length).toBeLessThanOrEqual(64);
       expect(Number.isNaN(new Date(e.start).getTime())).toBe(false);
-      // 開始が別の月だと一度も配られない
-      expect(activeMakeupEvents(new Date(e.start), [e])).toEqual([e]);
+      // 開始が別の月だと一度も配られない（月末の時点で開始済みなら、その月のどこかで配られる）
+      const monthEnd = new Date(`${e.month}-01T00:00:00+09:00`);
+      monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1);
+      expect(activeMakeupEvents(new Date(monthEnd.getTime() - 1), [e])).toEqual([e]);
     }
   });
 
@@ -52,8 +54,19 @@ describe("activeMakeupEvents - 配る期間", () => {
     expect(activeMakeupEvents(new Date("2026-09-30T14:59:59Z"), [LAUNCH])).toEqual([]);
   });
 
-  it("開始の瞬間から配る（10/1 00:00 JST）", () => {
-    expect(activeMakeupEvents(new Date("2026-09-30T15:00:00Z"), [LAUNCH])).toEqual([LAUNCH]);
+  it("1日は 4:00 まで配らない（区切りの遅い人はまだ前月にいる）", () => {
+    expect(activeMakeupEvents(new Date("2026-09-30T15:00:00Z"), [LAUNCH])).toEqual([]);
+    expect(activeMakeupEvents(new Date("2026-09-30T18:59:59Z"), [LAUNCH])).toEqual([]);
+  });
+
+  it("全員が付与先の月に入った 1日 4:00 から配る", () => {
+    expect(activeMakeupEvents(new Date("2026-09-30T19:00:00Z"), [LAUNCH])).toEqual([LAUNCH]);
+  });
+
+  it("開始が月の途中なら開始の瞬間から配る", () => {
+    const mid = { ...LAUNCH, start: "2026-10-15T00:00:00+09:00" };
+    expect(activeMakeupEvents(new Date("2026-10-14T14:59:59Z"), [mid])).toEqual([]);
+    expect(activeMakeupEvents(new Date("2026-10-14T15:00:00Z"), [mid])).toEqual([mid]);
   });
 
   it("月の途中でも配る（ジョブが止まっていても追いつく）", () => {
@@ -61,6 +74,7 @@ describe("activeMakeupEvents - 配る期間", () => {
   });
 
   it("翌月になったら配らない（翌月分のポイントにしない・持ち越せないので意味が無い）", () => {
+    expect(activeMakeupEvents(new Date("2026-10-31T14:59:59Z"), [LAUNCH])).toEqual([LAUNCH]);
     expect(activeMakeupEvents(new Date("2026-10-31T15:00:00Z"), [LAUNCH])).toEqual([]);
   });
 });

@@ -9,8 +9,8 @@
 - `tmp-cleanup`: オブジェクトストレージ `tmp/` の一時ファイルを30分経過で削除。メール投稿の元画像は producer が `tmp/email/{uuid}` に保存し worker が成功時のみ削除するため、投稿失敗（リトライ上限超過等）で残留する分を回収する。実装は `listExpiredObjects`（[storage.ts](../src/lib/storage/storage.ts)・LastModified判定）＋ `deleteImage`。出力画像/サムネは `{year}/{month}/{day}/` プレフィックスなので混在しない。
 - `favorite-sync`: リアクションのフォールバック同期。画像詳細ページが一度も開かれない投稿は閲覧時（GET）の同期に乗らないため、ここで拾う。オーナー側で取り消されたリアクションの反映（`reconcileRemovals`）も兼ねる。発火条件・バックオフ・停止条件は入り組んでいるので [リアクション仕様](./favorite.md) を正とする。
 - `mute-cleanup`: 期限切れミュート行の削除（`expiresAt=null` の無期は残す）。表示・除外は期限切れ行が残っていても正しく動くので、肥大防止のための掃除。
-- `makeup-points`: 皆勤賞の穴埋めポイントの月次付与（2026-10 分から）。`favor-monthly`（FAVOR_SERVERS 所属へ当月+1pt）と、11日以降の `monthly-catchup`（先月からいて先月が皆勤でなかった人へ当月+1pt）と、期間中のイベント（[events.ts](../src/lib/makeup/events.ts)）の付与。crontab は UTC 基準なので「JST の1日／11日」は cron 式で書かず、ジョブ内で JST の日付を見る。「その日以降で当月の台帳行が無ければ付与」なので、ジョブ停止で日付を跨いでも次の実行で拾い、二重付与は台帳の一意制約が弾く。catchup の「先月が皆勤でない」は Achievement 行ではなくデータから再計算し、皆勤ならここで👑を確定付与する。1回あたり理由ごとに200人まで。実装は [monthlyGrants.ts](../src/lib/makeup/monthlyGrants.ts)。
-- `monthly-collage`: 月初に、先月カレンダーに写真がある（公開・非表示でない投稿がある）ユーザーへ「先月の月次画像を作れます」通知（`monthly-collage`）を作る。通知からは先月のカレンダーを月次画像のダイアログを開いた状態で表示する（`?collage=1`）。`makeup-points` と同じく cron 式で JST の1日を書かず「当月に入っていて先月分が未送信なら送る」。二重作成は決定的な通知 id（`monthly-collage-<userId>-<YYYY-MM>`）で弾く。1回あたり200人まで。実装は [monthlyCollageNotifications.ts](../src/lib/notifications/monthlyCollageNotifications.ts)。
+- `makeup-points`: 皆勤賞の穴埋めポイントの月次付与（2026-10 分から）。`favor-monthly`（FAVOR_SERVERS 所属へ当月+1pt）と、11日 4:00 JST 以降の `monthly-catchup`（先月からいて先月が皆勤でなかった人へ当月+1pt）と、期間中のイベント（[events.ts](../src/lib/makeup/events.ts)）の付与。crontab は UTC 基準なので「1日／11日」は cron 式で書かず、ジョブ内で日付を見る。日付は**全員共通の時計（4時区切り `LATEST_CLOCK`）**で見て、付与は全員が同じ月にいる間（1日 4:00〜月末 24:00 JST）だけ行う。月は人によって始まる時刻が違う（[日付の区切り](./features.md#日付の区切り) 0〜4 時）ため、1日 0:00〜4:00 に前月分を配ると区切りの遅い人の終わった月が動き、catchup を全員の締切より前に配ると二重取りが成立する。「その日以降で当月の台帳行が無ければ付与」なので、ジョブ停止で日付を跨いでも次の実行で拾い、二重付与は台帳の一意制約が弾く。catchup の「先月が皆勤でない」は Achievement 行ではなくデータから再計算し、皆勤ならここで👑を確定付与する。1回あたり理由ごとに200人まで。実装は [monthlyGrants.ts](../src/lib/makeup/monthlyGrants.ts)。
+- `monthly-collage`: 月初に、先月カレンダーに写真がある（公開・非表示でない投稿がある）ユーザーへ「先月の月次画像を作れます」通知（`monthly-collage`）を作る。通知からは先月のカレンダーを月次画像のダイアログを開いた状態で表示する（`?collage=1`）。`makeup-points` と同じく cron 式で1日を書かず、全員共通の時計で「当月に入っていて（1日 4:00 JST 以降）先月分が未送信なら送る」。先月に写真があるかは記録日（`post_date`）で見る。二重作成は決定的な通知 id（`monthly-collage-<userId>-<YYYY-MM>`）で弾く。1回あたり200人まで。実装は [monthlyCollageNotifications.ts](../src/lib/notifications/monthlyCollageNotifications.ts)。
 - `queue-cleanup`: 参照するジョブが無くなった名前付きキュー（`graphile_worker` の job_queues 行）の削除（`cleanup({ tasks: ["GC_JOB_QUEUES"] })`）。Bot・メール投稿は「連」（[リプライ仕様](./reply.md)）の 1→2→3 の順を保つため送信者ごとの `queueName` で直列化しており、キュー行が送信者の数だけ残るため。
 
 ## graphile-worker のスキーマ更新
@@ -28,4 +28,4 @@ worker-front の Deployment は既定の RollingUpdate だと `replicas: 1` で�
 ただしこれは**スキーマ自体が変わらなかった場合の結論**。次のメジャー更新では移行SQLの中身（`node_modules/graphile-worker/sql/` の新規ファイル）を必ず読み、実体のある DDL が入るなら worker-front を 0 に落としてからデプロイする。
 
 ## 新しいサブジョブの足し方
-`periodicJobs` 配列に1要素足すだけ。日付で動くジョブ（毎月1日など）は、cron 式ではなくジョブ内で JST の日付を判定し、「その日以降で未処理なら実行」＋DBの一意制約で冪等にする（`makeup-points` が前例）。
+`periodicJobs` 配列に1要素足すだけ。日付で動くジョブ（毎月1日など）は、cron 式ではなくジョブ内で日付を判定し、「その日以降で未処理なら実行」＋DBの一意制約で冪等にする（`makeup-points` が前例）。ユーザーの「月」に関わる処理は、全員共通の時計 `LATEST_CLOCK`（[dayClock.ts](../src/lib/dayClock.ts)）で判定する（全員がその日に入ってから動かすため）。

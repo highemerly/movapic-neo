@@ -49,7 +49,7 @@ export default async function AdminAccountsPage({
       {rows.length === 0 ? (
         <EmptyBox>ユーザーがいません。</EmptyBox>
       ) : (
-        <TableWrap minWidth="46rem">
+        <TableWrap minWidth="52rem">
           <thead>
             <tr className={theadRowCls}>
               <th className="py-1.5 pr-3 text-left font-semibold" colSpan={2}>
@@ -92,7 +92,8 @@ export default async function AdminAccountsPage({
                 descValue="size_desc"
                 className="py-1.5 pr-3 text-right font-semibold"
               />
-              <th className="py-1.5 text-right font-semibold">実績（金/銀）</th>
+              <th className="py-1.5 pr-3 text-right font-semibold">実績（金/銀）</th>
+              <th className="py-1.5 text-right font-semibold whitespace-nowrap">日付の区切り</th>
             </tr>
           </thead>
           <tbody className="tabular-nums">
@@ -140,13 +141,25 @@ export default async function AdminAccountsPage({
                   <td className="py-1.5 pr-3 text-right whitespace-nowrap text-muted-foreground">
                     {u.storageBytes > 0 ? fmtBytes(u.storageBytes) : "—"}
                   </td>
-                  <td className="py-1.5 text-right whitespace-nowrap">
+                  <td className="py-1.5 pr-3 text-right whitespace-nowrap">
                     <span className="text-amber-500" title="金">
                       🥇{u.gold}
                     </span>{" "}
                     <span className="text-muted-foreground" title="銀">
                       🥈{u.silver}
                     </span>
+                  </td>
+                  {/* 今日の区切り。履歴（いつから何時区切りか）はホバーで出す（問い合わせ対応用）。 */}
+                  <td
+                    className="py-1.5 text-right whitespace-nowrap text-muted-foreground"
+                    title={
+                      u.dayBoundaryHistory.length > 0
+                        ? u.dayBoundaryHistory.map((b) => `${b.fromDate}〜 ${b.hour}:00`).join("\n")
+                        : undefined
+                    }
+                  >
+                    {u.dayBoundaryHour}:00
+                    {u.dayBoundaryHistory.length > 0 && <span className="ml-0.5 text-xs">*</span>}
                   </td>
                 </tr>
               );

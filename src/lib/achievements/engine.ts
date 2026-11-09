@@ -11,10 +11,11 @@
 
 import prisma from "@/lib/db";
 import { isUniqueViolation } from "@/lib/db/errors";
-import { toJstDateString } from "@/lib/streak";
-import { parseYm, toJstYm } from "@/lib/jst";
+import { parseYm } from "@/lib/jst";
+import { ymOf } from "@/lib/dayClock";
+import { postDateBetween, withPostDate } from "@/lib/dayClock.server";
 import { maybeGrantAchievementPoint } from "@/lib/makeup/awards";
-import { donorRange, filledHoleOf } from "@/lib/makeup/donor";
+import { buildMonthMakeupState, donorRange } from "@/lib/makeup/donor";
 import { resolveMakeupCap } from "@/lib/makeup/ledger";
 import { notifyMakeupProgressOnPost } from "@/lib/makeup/notify";
 import {
@@ -236,7 +237,7 @@ export async function evaluateAndGrant(opts: {
   instanceDomain: string;
 }): Promise<GrantedAchievement[]> {
   const { userId, post, imageId, instanceDomain } = opts;
-  const grace = await resolveMakeupCap({ userId, instanceDomain, ym: toJstYm(post.createdAt) });
+  const grace = await resolveMakeupCap({ userId, instanceDomain, ym: ymOf(post.postDate) });
 
   const [owned, stats] = await Promise.all([ownedKeysOf(userId), collectStats(userId, post)]);
   const candidates = selectNewlyGranted(stats, post, owned, grace);
@@ -245,7 +246,7 @@ export async function evaluateAndGrant(opts: {
   // 実績付与（grantAll）の後に呼ぶ: 実績ptの付与で残高が増えた状態を見て判定するため。
   // 投稿フローを止めないため、ここは独立して握りつぶす。
   const notifyProgress = () =>
-    notifyMakeupProgressOnPost({ userId, imageId, now: post.createdAt }).catch((e) =>
+    notifyMakeupProgressOnPost({ userId, imageId, postDate: post.postDate }).catch((e) =>
       console.error("Makeup progress notification failed:", e)
     );
 
@@ -288,28 +289,23 @@ export async function evaluateAndGrantPerfectMonth(opts: {
   const key = perfectMonthKey(ym);
   const { year, month } = parseYm(ym);
   // 範囲は月末ではなく穴埋めの締切まで（donorRange）。翌月1〜10日の投稿も前月の donor になれる。
-  const { start, end } = donorRange(ym);
+  const { from, to } = donorRange(ym);
 
-  const [rows, grace] = await Promise.all([
+  const [dbRows, grace] = await Promise.all([
     prisma.image.findMany({
-      where: { userId, createdAt: { gte: start, lt: end } },
+      where: { userId, postDate: postDateBetween(from, to) },
       orderBy: { createdAt: "desc" },
-      select: { id: true, createdAt: true, makeupTargetDay: true, makeupTargetMonthDelta: true },
+      select: { id: true, postDate: true, makeupTargetDay: true, makeupTargetMonthDelta: true },
     }),
     resolveMakeupCap({ userId, instanceDomain, ym }),
   ]);
-  // 判定・実績のきっかけ写真は対象月の投稿だけ（翌月の donor は穴埋めにしか効かせない）。
-  const monthImages = rows.filter((r) => toJstDateString(r.createdAt).startsWith(ym));
+  const rows = withPostDate(dbRows);
+  // 実績のきっかけ写真は対象月の投稿だけ（翌月の donor は穴埋めにしか効かせない）。
+  const monthImages = rows.filter((r) => ymOf(r.postDate) === ym);
   if (monthImages.length === 0) return { perfect: false, granted: false, key };
 
-  const dayCounts: Record<number, number> = {};
-  for (const m of monthImages) {
-    const d = Number(toJstDateString(m.createdAt).slice(8, 10));
-    dayCounts[d] = (dayCounts[d] ?? 0) + 1;
-  }
-  const filledHoleDays = rows
-    .map((r) => filledHoleOf(r, ym))
-    .filter((v): v is number => v != null);
+  // 日別の枚数と有効な穴は、カレンダー・通知と同じ組み立て（donor.buildMonthMakeupState・テスト済み）。
+  const { dayCounts, filledHoleDays } = buildMonthMakeupState(rows, ym);
 
   const perfect = isPerfectMonth({
     daysInMonth: daysInMonthOf(year, month),

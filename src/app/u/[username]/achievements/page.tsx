@@ -11,7 +11,8 @@ import { AchievementsView } from "@/components/achievements/AchievementsView";
 import { perfectMonthKey } from "@/lib/achievements/perfectMonth";
 import { lastMonthYm, thisMonthYm } from "@/lib/achievements/lastMonthPerfect";
 import { collectLadderValues, collectCurrentMonthPerfect } from "@/lib/achievements/stats";
-import { toJstYm } from "@/lib/jst";
+import { ymOf } from "@/lib/dayClock";
+import { loadToday } from "@/lib/dayClock.server";
 import { resolveMakeupLimits } from "@/lib/makeup/ledger";
 import { parseUserHandle } from "@/lib/userHandle";
 import { getHomeServer } from "@/lib/auth/serverPolicy";
@@ -60,12 +61,14 @@ export default async function AchievementsPage({
   const isOwner = currentUser?.id === user.id;
 
   // 「次のステップ」はこのページの主（プロフィールの持ち主）の進捗として全員に表示する。
-  const now = new Date();
+  // 今日は持ち主の記録日で1回だけ求め、上限・進捗・王冠で同じ値を使う（別々に求めると日付の
+  // 境目で月が食い違う）。
+  const today = await loadToday(user.id, new Date());
   const makeupLimits = await resolveMakeupLimits({
     userId: user.id,
     instanceDomain: user.instance.domain,
-    ym: toJstYm(now),
-    now,
+    ym: ymOf(today),
+    today,
   });
   const [achievements, ladderValues, currentMonthPerfect] = await Promise.all([
     prisma.achievement.findMany({
@@ -73,8 +76,8 @@ export default async function AchievementsPage({
       select: { key: true, category: true, grantedAt: true },
       orderBy: { grantedAt: "desc" },
     }),
-    collectLadderValues(user.id),
-    collectCurrentMonthPerfect(user.id, makeupLimits),
+    collectLadderValues(user.id, today),
+    collectCurrentMonthPerfect(user.id, today, makeupLimits),
   ]);
 
   const granted = achievements.map((a) => ({
@@ -85,8 +88,8 @@ export default async function AchievementsPage({
 
   // 直近（先月/今月）の皆勤賞を取っていればアバターに王冠を表示（取得済みデータから判定）
   const recentPerfectKeys = new Set([
-    perfectMonthKey(lastMonthYm()),
-    perfectMonthKey(thisMonthYm()),
+    perfectMonthKey(lastMonthYm(today)),
+    perfectMonthKey(thisMonthYm(today)),
   ]);
   const perfectAttendance = achievements.some((a) =>
     recentPerfectKeys.has(a.key),

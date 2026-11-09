@@ -18,7 +18,6 @@ import {
   shiftYm,
   jstMonthRange,
   jstMonthRangeOfYm,
-  jstDayStart,
 } from "./jst";
 
 describe("toJstYm / jstDayOf - UTCとJSTで日がずれる境界", () => {
@@ -119,18 +118,5 @@ describe("jstMonthRange - JST月境界をUTC Dateで返す", () => {
     const b = jstMonthRangeOfYm("2026-10");
     expect(b.start.getTime()).toBe(a.start.getTime());
     expect(b.end.getTime()).toBe(a.end.getTime());
-  });
-});
-
-describe("jstDayStart - その日のJST 00:00", () => {
-  it("JST 正午の日の 00:00 は UTC で前日15:00", () => {
-    expect(jstDayStart(new Date("2026-10-05T03:00:00Z")).toISOString()).toBe(
-      "2026-10-04T15:00:00.000Z"
-    );
-  });
-
-  it("JST 00:00 ちょうどは自分自身を返す（境界が自分より後ろにずれない）", () => {
-    const jstMidnight = new Date("2026-10-04T15:00:00Z");
-    expect(jstDayStart(jstMidnight).getTime()).toBe(jstMidnight.getTime());
   });
 });

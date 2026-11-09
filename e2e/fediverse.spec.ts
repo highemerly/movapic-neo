@@ -82,17 +82,38 @@ async function fetchInPage(page: Page, url: string, init: { method: string; json
   }, { url, init });
 }
 
+/** 偽サーバーのアカウントでログインする（認可画面は通さない）。 */
+async function login(page: Page, p: (typeof PLATFORMS)[number]) {
+  await page.goto("/");
+  const reg = await fetchInPage(page, "/api/auth/fediverse/register", { method: "POST", json: { server: p.host } });
+  expect(reg.status, JSON.stringify(reg.body)).toBe(200);
+  expect(reg.body.platform).toBe(p.name.toLowerCase());
+  await page.goto(p.callbackUrl(new URL(reg.body.url)));
+  // 失敗時は /?error=... へ戻される
+  expect(new URL(page.url()).searchParams.get("error")).toBeNull();
+}
+
+/** ページを開き、200 で表示され、未捕捉の JS 例外と CSP 違反が出ないことを確かめる（smoke.spec.ts と同じ基準）。 */
+async function expectPageOk(page: Page, pagePath: string) {
+  const problems: string[] = [];
+  const onError = (err: Error) => problems.push(`pageerror: ${err.message}`);
+  const onConsole = (msg: { type(): string; text(): string }) => {
+    if (msg.type() === "error" && msg.text().includes("Content Security Policy")) {
+      problems.push(`csp: ${msg.text()}`);
+    }
+  };
+  page.on("pageerror", onError);
+  page.on("console", onConsole);
+  const res = await page.goto(pagePath, { waitUntil: "load" });
+  page.off("pageerror", onError);
+  page.off("console", onConsole);
+  expect(res?.status(), pagePath).toBe(200);
+  expect(problems, pagePath).toEqual([]);
+}
+
 for (const p of PLATFORMS) {
   test(`${p.name}: ログインして投稿すると、変換済みの画像と本文が届く`, async ({ page, request }) => {
-    await page.goto("/");
-
-    // ログイン
-    const reg = await fetchInPage(page, "/api/auth/fediverse/register", { method: "POST", json: { server: p.host } });
-    expect(reg.status, JSON.stringify(reg.body)).toBe(200);
-    expect(reg.body.platform).toBe(p.name.toLowerCase());
-    await page.goto(p.callbackUrl(new URL(reg.body.url)));
-    // 失敗時は /?error=... へ戻される
-    expect(new URL(page.url()).searchParams.get("error")).toBeNull();
+    await login(page, p);
 
     const receivedNow = async (): Promise<Received[]> =>
       (await request.get(`${FAKEVERSE_ADMIN}/__e2e/received?host=${p.host}`)).json();
@@ -137,3 +158,19 @@ for (const p of PLATFORMS) {
     expect(detail?.status()).toBe(200);
   });
 }
+
+// 日付の区切り（docs/features.md「日付の区切り」）。ログインが要るページと API を、投稿と同じ本番イメージで通す。
+// 区切りの規則そのものは unit（dayClock.test.ts）で見ているので、ここは配線（マイグレーション済みの DB・
+// 本人だけのページ）が本番イメージで動くかだけを見る。
+test("日付の区切りを変えられ、設定とカレンダーのページが表示できる", async ({ page }) => {
+  const p = PLATFORMS[0];
+  await login(page, p);
+
+  const res = await fetchInPage(page, "/api/v1/me/day-boundary", { method: "PUT", json: { hour: 2 } });
+  expect(res.status, JSON.stringify(res.body)).toBe(200);
+  // 変更は翌日から効く＝今日の区切りは変わらず、予約として返る（手元で繰り返し回しても最後の予約は 2 時）。
+  expect(res.body.upcoming.at(-1)).toMatchObject({ hour: 2 });
+
+  await expectPageOk(page, "/settings");
+  await expectPageOk(page, `/u/e2e@${p.host}/calendar`);
+});

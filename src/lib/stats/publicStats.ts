@@ -305,8 +305,6 @@ function column(rows: Record<string, unknown>[], key: string): number[] {
 }
 
 const PUBLIC_SQL = Prisma.sql`is_public = true AND is_disabled = false`;
-// JST 日付（UTC とみなして Asia/Tokyo へ変換 → date）。timeseries.ts と同一 idiom。
-const JST_DATE = Prisma.sql`(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Tokyo')::date`;
 
 /** ヒストグラムの取得元（生SQL 1本＝1ソース）。 */
 type DistributionSource = "main" | "daily" | "streak" | "reaction";
@@ -368,18 +366,19 @@ function distributionSql(userId?: string): Record<DistributionSource, Prisma.Sql
       WHERE ${PUBLIC_SQL} ${imageUser}
       GROUP BY user_id
     `,
-    // 1日の最多投稿数（JST 日単位でのユーザーごとの最大件数）
+    // 1日の最多投稿数（記録日単位でのユーザーごとの最大件数）。日は実績・カレンダーと同じ記録日
+    // （post_date・日付の区切り）で数える。created_at から日付を計算し直さない。
     daily: Prisma.sql`
       SELECT MAX(c)::int AS daily FROM (
-        SELECT user_id, ${JST_DATE} AS d, COUNT(*) AS c
+        SELECT user_id, post_date AS d, COUNT(*) AS c
         FROM images WHERE ${PUBLIC_SQL} ${imageUser}
         GROUP BY user_id, d
       ) t GROUP BY user_id
     `,
-    // 最長連続投稿日数（gaps-and-islands・JST）
+    // 最長連続投稿日数（gaps-and-islands・記録日）
     streak: Prisma.sql`
       WITH days AS (
-        SELECT DISTINCT user_id, ${JST_DATE} AS d
+        SELECT DISTINCT user_id, post_date AS d
         FROM images WHERE ${PUBLIC_SQL} ${imageUser}
       ),
       grp AS (

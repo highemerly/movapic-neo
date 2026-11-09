@@ -7,11 +7,14 @@
  * 両方がここを呼ぶことで、「画面のカレンダー」と「共有画像」が必ず一致する。
  *
  * DB取得は fetchCalendarImages に閉じ込め、集計は resolveCalendarMonth（純粋）に分ける。
+ * 日・月・今日は持ち主の記録日（Image.postDate・日付の区切り）で決める。閲覧者の区切りは使わない
+ * （同じカレンダーが閲覧者によって変わらないように＝公開カレンダーのキャッシュも持ち主だけで決まる）。
  */
 
 import prisma from "@/lib/db";
-import { toJstDateString } from "@/lib/streak";
-import { formatYm, jstMonthRange } from "@/lib/jst";
+import { formatYm } from "@/lib/jst";
+import { dayOfMonth, ymOf, type PostDate } from "@/lib/dayClock";
+import { postDateBetween, withPostDate } from "@/lib/dayClock.server";
 import { donorRange, donorTargetYm } from "@/lib/makeup/donor";
 import { isMakeupEditable } from "@/lib/makeup/points";
 import {
@@ -63,7 +66,9 @@ export interface CalendarImageRow {
   thumbnailKey: string | null;
   storageKey: string;
   position: string;
+  /** 同じ日の中の並び（最古＝代表サムネ）にだけ使う。日は postDate で決める。 */
   createdAt: Date;
+  postDate: PostDate;
   calendarPickedAt: Date | null;
   makeupTargetDay: number | null;
   makeupTargetMonthDelta: number;
@@ -149,36 +154,24 @@ export function buildCollageAltText(args: {
 }
 
 /**
- * 指定月の開始・終了（JST基準・UTC Date）。createdAt は UTC 保存なので JST 00:00 を UTC-9h で表す。
- * 境界の式は @/lib/jst の jstMonthRange が単一ソース（ここは呼び出し側の命名に合わせた薄い別名）。
- */
-export function calendarMonthRange(
-  year: number,
-  month: number
-): { startDate: Date; endDate: Date } {
-  const { start, end } = jstMonthRange(year, month);
-  return { startDate: start, endDate: end };
-}
-
-/**
  * 指定月の公開画像を createdAt 降順で取得する（カレンダー系で共通利用）。
  *
  * 範囲は月末ではなく穴埋めの締切（翌月10日）まで＝ donorRange。翌月1〜10日の投稿も前月の donor に
  * なれるため、月の範囲だけ読むと穴埋め済みの日を見落とす。対象月の外の行は donor としてだけ効き、
  * 日別の投稿数・代表サムネには数えない（resolveCalendarMonth が月で振り分ける）。
  */
-export function fetchCalendarImages(
+export async function fetchCalendarImages(
   userId: string,
   year: number,
   month: number
 ): Promise<CalendarImageRow[]> {
-  const { start, end } = donorRange(formatYm(year, month));
-  return prisma.image.findMany({
+  const { from, to } = donorRange(formatYm(year, month));
+  const rows = await prisma.image.findMany({
     where: {
       userId,
       isPublic: true,
       isDisabled: false,
-      createdAt: { gte: start, lt: end },
+      postDate: postDateBetween(from, to),
     },
     select: {
       id: true,
@@ -186,12 +179,14 @@ export function fetchCalendarImages(
       storageKey: true,
       position: true,
       createdAt: true,
+      postDate: true,
       calendarPickedAt: true,
       makeupTargetDay: true,
       makeupTargetMonthDelta: true,
     },
     orderBy: { createdAt: "desc" },
   });
+  return withPostDate(rows);
 }
 
 /**
@@ -211,10 +206,10 @@ export function resolveCalendarMonth(args: {
   makeupCap: number;
   /** 月内にまだ付与されうる分も含めた上限（達成可能かの判定にだけ使う）。過去月は makeupCap と同じ。 */
   potentialCap: number;
-  /** 「今日」判定の基準時刻。 */
-  now: Date;
+  /** カレンダー持ち主の今日（記録日）。今月・未来月・締切の判定に使う。 */
+  today: PostDate;
 }): ResolvedCalendarMonth {
-  const { year, month, makeupCap, potentialCap, now } = args;
+  const { year, month, makeupCap, potentialCap, today } = args;
   // 降順（新しい→古い）に整える。後に来るものほど古く、oldest を毎回上書きで最古が残る。
   const images = [...args.images].sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
@@ -238,9 +233,8 @@ export function resolveCalendarMonth(args: {
 
   const ym = formatYm(year, month);
   for (const image of images) {
-    const jst = toJstDateString(image.createdAt);
-    const day = Number(jst.slice(8, 10));
-    const imageYm = jst.slice(0, 7);
+    const day = dayOfMonth(image.postDate);
+    const imageYm = ymOf(image.postDate);
     const ref: DayImageRef = {
       id: image.id,
       thumbnailKey: image.thumbnailKey,
@@ -254,7 +248,7 @@ export function resolveCalendarMonth(args: {
         donorRows.push({
           holeDay: image.makeupTargetDay,
           filledBy: day,
-          filledByMonth: Number(jst.slice(5, 7)),
+          filledByMonth: Number(imageYm.slice(5, 7)),
           image: { id: image.id, thumbnailKey: image.thumbnailKey, storageKey: image.storageKey },
         });
       }
@@ -295,13 +289,9 @@ export function resolveCalendarMonth(args: {
     days[day] = { count: dayCounts[day], latest: r.picked ?? r.oldest };
   }
 
-  // 「今月/未来月」は必ず JST 基準で判定する（UTC で getMonth すると前月へ誤判定）。
-  const jstToday = toJstDateString(now);
-  const currentYear = Number(jstToday.slice(0, 4));
-  const currentMonth = Number(jstToday.slice(5, 7));
-  const isCurrentMonth = year === currentYear && month === currentMonth;
-  const isFutureMonth =
-    year > currentYear || (year === currentYear && month > currentMonth);
+  // 「今月/未来月」は持ち主の今日で判定する（"YYYY-MM" は辞書順＝時系列順）。
+  const isCurrentMonth = ym === ymOf(today);
+  const isFutureMonth = ym > ymOf(today);
 
   const daysInMonth = daysInMonthOf(year, month);
   let isPerfectAttendance = false;
@@ -330,14 +320,14 @@ export function resolveCalendarMonth(args: {
       }));
     makeupRemaining = Math.max(0, makeupCap - new Set(filledHoleDays).size);
     // 当月は今日を含めない（まだ投稿できる）。過去月は月末まで。
-    const lastCountedDay = isCurrentMonth ? Number(jstToday.slice(8, 10)) - 1 : daysInMonth;
+    const lastCountedDay = isCurrentMonth ? dayOfMonth(today) - 1 : daysInMonth;
     const filledSet = new Set(filledHoleDays);
     for (let d = 1; d <= lastCountedDay; d++) {
       if (!days[d] && !filledSet.has(d)) unfilledDays++;
     }
 
     if (isCurrentMonth) {
-      const todayDayNum = Number(jstToday.slice(8, 10));
+      const todayDayNum = dayOfMonth(today);
       const status = currentMonthMakeupStatus({
         daysInMonth,
         todayDayNum,
@@ -363,7 +353,7 @@ export function resolveCalendarMonth(args: {
       // 過去月は上限が凍結しているので、締切前かつ未投稿日が上限以内なら穴埋めで届く。
       perfectAchievable =
         isPerfectAttendance ||
-        (isMakeupEditable(ym, now) && daysInMonth - postedDays <= makeupCap);
+        (isMakeupEditable(ym, today) && daysInMonth - postedDays <= makeupCap);
       goal = monthDaysGoal({ postedDays, daysLeft: 0 });
     }
   }

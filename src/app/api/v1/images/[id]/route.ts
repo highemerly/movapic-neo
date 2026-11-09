@@ -9,9 +9,10 @@ import { deleteImage } from "@/lib/storage/storage";
 import { decryptToken } from "@/lib/auth/tokens";
 import { fediverseStatusExists } from "@/lib/fediverse/delete";
 import prisma from "@/lib/db";
-import { toJstDateString } from "@/lib/streak";
 import { daysInMonthOf, isPerfectMonth, perfectMonthKey } from "@/lib/achievements/perfectMonth";
-import { jstMonthRangeOfYm, parseYm, shiftYm, toJstYm } from "@/lib/jst";
+import { parseYm, shiftYm } from "@/lib/jst";
+import { dayOfMonth, firstDayOfYm, postDateOfYmDay, ymOf } from "@/lib/dayClock";
+import { fromDbDate, loadToday, postDateBetween, withPostDate } from "@/lib/dayClock.server";
 import { resolveMakeupCap, withMonthMakeupLock } from "@/lib/makeup/ledger";
 import {
   DONOR_SAME_MONTH,
@@ -23,15 +24,10 @@ import {
 import {
   MAKEUP_DEADLINE_DAY,
   isMakeupEditable,
-  makeupDeadline,
+  makeupLastDay,
 } from "@/lib/makeup/points";
 import { healAfterImageDelete } from "@/lib/makeup/selfHeal";
 import { expireFeaturedImages } from "@/lib/featuredImages";
-
-/** その画像の JST 日(1-31)。 */
-function jstDay(createdAt: Date): number {
-  return Number(toJstDateString(createdAt).slice(8, 10));
-}
 
 /** 穴埋め割当の変更内容（day=null は解除）。月またぎがあるので対象月のオフセットも持つ。 */
 interface MakeupUpdate {
@@ -53,8 +49,8 @@ function makeupClosedMessage(ym: string): string {
 function dayCountsOf(rows: ReadonlyArray<MakeupRow>, ym: string): Record<number, number> {
   const counts: Record<number, number> = {};
   for (const r of rows) {
-    if (!toJstDateString(r.createdAt).startsWith(ym)) continue;
-    const d = jstDay(r.createdAt);
+    if (ymOf(r.postDate) !== ym) continue;
+    const d = dayOfMonth(r.postDate);
     counts[d] = (counts[d] ?? 0) + 1;
   }
   return counts;
@@ -74,7 +70,7 @@ function filledHolesAfter(
   for (const r of rows) {
     const upd = updates.get(r.id);
     const hole = upd
-      ? upd.day != null && donorTargetYm(toJstYm(r.createdAt), upd.delta) === ym
+      ? upd.day != null && donorTargetYm(ymOf(r.postDate), upd.delta) === ym
         ? upd.day
         : null
       : filledHoleOf(r, ym);
@@ -93,6 +89,7 @@ function filledHolesAfter(
  *（＝表示と👑が食い違わない no-divergence 不変条件）。別donorへの付替（穴を保つ）は許可。
  *
  * ② は締切（対象月の翌月10日まで）を過ぎると指定・解除とも拒否する。① は締切と無関係。
+ * 日・月・締切はすべて持ち主の記録日（Image.postDate と、日付の区切りで決まる今日）で判定する。
  * ② の上限は ledger.resolveMakeupCap（2026-09 以前は所属インスタンスの固定日数・以降は穴埋めポイント）。
  * 検証〜適用はユーザー×月で直列化する（並行リクエストで上限を超えないため。withMonthMakeupLock 参照）。
  */
@@ -118,7 +115,7 @@ export async function PATCH(
       select: {
         id: true,
         userId: true,
-        createdAt: true,
+        postDate: true,
         calendarPickedAt: true,
         makeupTargetDay: true,
         makeupTargetMonthDelta: true,
@@ -131,8 +128,8 @@ export async function PATCH(
       return NextResponse.json({ error: "権限がありません" }, { status: 403 });
     }
 
-    const imageJstDate = toJstDateString(image.createdAt);
-    const imageYm = imageJstDate.slice(0, 7);
+    const imagePostDate = fromDbDate(image.postDate);
+    const imageYm = ymOf(imagePostDate);
 
     const wantsPick = typeof body.calendarPicked === "boolean";
     const wantsMakeup = body.makeupTargetDay !== undefined;
@@ -166,8 +163,9 @@ export async function PATCH(
     const { year: targetYear, month: targetMonth } = parseYm(targetYm);
     const daysInMonth = daysInMonthOf(targetYear, targetMonth);
 
-    const now = new Date();
-    if (wantsMakeup && !isMakeupEditable(targetYm, now)) {
+    // 締切は持ち主（＝本人）の今日で判定する。締切の時刻と now を比べない（points.isMakeupEditable）。
+    const today = await loadToday(user.id, new Date());
+    if (wantsMakeup && !isMakeupEditable(targetYm, today)) {
       return NextResponse.json({ error: makeupClosedMessage(targetYm) }, { status: 409 });
     }
 
@@ -181,16 +179,19 @@ export async function PATCH(
       // 検証に要る画像（実績と同じ集合＝isPublic/isDisabledで絞らない）。
       // 範囲は「前月の1日 〜 この写真の月の締切」。月またぎ donor があるので、対象月の投稿だけでなく
       // 前月の投稿と、この写真と同じ日の投稿がすべて1本の範囲に入るようにする。
-      const rangeStart = jstMonthRangeOfYm(shiftYm(imageYm, -1)).start;
-      const rangeEnd = makeupDeadline(imageYm);
-      const rows: MakeupRow[] = await tx.image.findMany({
-        where: { userId: user.id, createdAt: { gte: rangeStart, lt: rangeEnd } },
-        select: { id: true, createdAt: true, makeupTargetDay: true, makeupTargetMonthDelta: true },
-      });
+      const rows: MakeupRow[] = withPostDate(
+        await tx.image.findMany({
+          where: {
+            userId: user.id,
+            postDate: postDateBetween(firstDayOfYm(shiftYm(imageYm, -1)), makeupLastDay(imageYm)),
+          },
+          select: { id: true, postDate: true, makeupTargetDay: true, makeupTargetMonthDelta: true },
+        })
+      );
       const dayCounts = dayCountsOf(rows, targetYm);
       // この写真と同じ日の投稿（ダブル投稿判定・1日1代表・1日1donor）。
-      // 月をまたぐので日番号ではなく JST 日付そのもので比べる（10/3 と 11/3 を取り違えない）。
-      const sameDate = rows.filter((m) => toJstDateString(m.createdAt) === imageJstDate);
+      // 月をまたぐので日番号ではなく記録日そのもので比べる（10/3 と 11/3 を取り違えない）。
+      const sameDate = rows.filter((m) => m.postDate === imagePostDate);
 
       // 実行する DB 更新（imageId -> 変更内容）をまとめてから1トランザクションで適用する。
       const pickUpdates = new Map<string, Date | null>();
@@ -208,7 +209,7 @@ export async function PATCH(
             );
           }
           pickUpdates.set(id, new Date());
-          // 1日1代表: 同JST日の他画像の pick を外す
+          // 1日1代表: 同じ記録日の他画像の pick を外す
           for (const m of sameDate) {
             if (m.id !== id) pickUpdates.set(m.id, null);
           }
@@ -227,9 +228,8 @@ export async function PATCH(
             return NextResponse.json({ error: "穴埋め先の日付が不正です" }, { status: 400 });
           }
           // 合法性: donorは穴より後・穴は空き日・donor日はダブル投稿・代表ではない
-          // 「穴より後」は月をまたぐので JST 日付で比べる（11/3 は 10/31 より後）。
-          const holeDate = `${targetYm}-${String(target).padStart(2, "0")}`;
-          if (imageJstDate <= holeDate) {
+          // 「穴より後」は月をまたぐので記録日で比べる（11/3 は 10/31 より後）。
+          if (imagePostDate <= postDateOfYmDay(targetYm, target)) {
             return NextResponse.json(
               { error: "穴埋めは、その日より後のダブル投稿でしか埋められません" },
               { status: 409 }
@@ -251,7 +251,7 @@ export async function PATCH(
             );
           }
           makeupUpdates.set(id, { day: target, delta: donorDelta });
-          // 1日1donor（月またぎ共有）: 同JST日の他の donor を外す。どの月の穴を埋めていても外す
+          // 1日1donor（月またぎ共有）: 同じ記録日の他の donor を外す。どの月の穴を埋めていても外す
           //（共有しないと1回のダブル投稿で2日ぶん埋まり、1pt で2日得をする）。
           for (const m of sameDate) {
             if (m.id !== id && m.makeupTargetDay != null) makeupUpdates.set(m.id, unassign);
@@ -274,14 +274,14 @@ export async function PATCH(
         for (const [rowId, upd] of makeupUpdates) {
           const row = rowById.get(rowId);
           if (!row) continue;
-          const rowYm = toJstYm(row.createdAt);
+          const rowYm = ymOf(row.postDate);
           if (row.makeupTargetDay != null) affected.add(donorTargetYm(rowYm, row.makeupTargetMonthDelta));
           if (upd.day != null) affected.add(donorTargetYm(rowYm, upd.delta));
         }
 
         for (const ym of affected) {
           // 締切: どの月であれ、締め切った月の割当は動かさない（月を凍結するのが締切の目的）。
-          if (!isMakeupEditable(ym, now)) {
+          if (!isMakeupEditable(ym, today)) {
             return NextResponse.json({ error: makeupClosedMessage(ym) }, { status: 409 });
           }
           const { year: y, month: m } = parseYm(ym);
@@ -398,8 +398,8 @@ export async function DELETE(
     // 手動の割当は付け替えず、2枚未満になった日の donor 割当だけを外す（selfHeal.ts 参照）。
     // 👑（Achievement 行）は剥奪しない。（以前は 2026-09 以前の月・自動穴埋めONだけ月の割当を
     // 再計算して別 donor で埋め直していた。自動穴埋めの撤去で廃止）
-    await healAfterImageDelete({ userId: user.id, deletedCreatedAt: image.createdAt }).catch((e) =>
-      console.error("Makeup stale donor cleanup failed:", e)
+    await healAfterImageDelete({ userId: user.id, deletedPostDate: fromDbDate(image.postDate) }).catch(
+      (e) => console.error("Makeup stale donor cleanup failed:", e)
     );
 
     // 連携先（Mastodon/Misskey）に投稿が残っている場合は、その情報をクライアントに返す。

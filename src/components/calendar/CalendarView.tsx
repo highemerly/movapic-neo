@@ -12,6 +12,7 @@ import { parseApiError, formatErrorMessage } from "@/lib/errors";
 import { isJapaneseHoliday } from "@/lib/holidays";
 import { MONTH_DAYS_TIERS } from "@/lib/achievements/monthDays";
 import { formatYm } from "@/lib/jst";
+import { dayRangeLabel } from "@/lib/dayClock";
 import { isPointEra } from "@/lib/makeup/points";
 import { COLLAGE_OPEN_QUERY } from "@/lib/notifications/monthlyCollageNotificationType";
 import Link from "@/components/Link";
@@ -76,6 +77,13 @@ interface CalendarViewProps {
   publicUrl: string;
   initialYear: number;
   initialMonth: number;
+  /**
+   * カレンダー持ち主の今日（記録日 "YYYY-MM-DD"・日付の区切りで決まる）。今月・未来月・今日のセルの判定に使う。
+   * ブラウザの時計は使わない（閲覧者の TZ や区切りでカレンダーが変わらないように）。
+   */
+  today: string;
+  /** カレンダー持ち主の今日の日付の区切り（時）。カレンダーの下に出す。 */
+  dayBoundaryHour: number;
   /** 閲覧者がこのカレンダーの持ち主本人か（穴埋め促しコールアウトの表示制御）。 */
   isOwner: boolean;
   /** 投稿先サーバー名（カレンダー画像投稿ボタンの文言に使う）。 */
@@ -127,6 +135,8 @@ export function CalendarView({
   publicUrl,
   initialYear,
   initialMonth,
+  today: todayStr,
+  dayBoundaryHour,
   isOwner,
   serverName,
   favorServers,
@@ -393,9 +403,12 @@ export function CalendarView({
   };
 
   const grid = generateCalendarGrid();
-  const today = new Date();
-  const isCurrentMonth =
-    year === today.getFullYear() && month === today.getMonth() + 1;
+  const today = {
+    year: Number(todayStr.slice(0, 4)),
+    month: Number(todayStr.slice(5, 7)),
+    day: Number(todayStr.slice(8, 10)),
+  };
+  const isCurrentMonth = year === today.year && month === today.month;
 
   // 後日のダブル投稿で「埋まった空き日」。日→穴埋め情報のマップ（穴埋め済みセルの緑表示・遷移に使う）。
   const filledByDay = new Map<number, FilledDay>(
@@ -403,9 +416,7 @@ export function CalendarView({
   );
 
   // 未来の月かどうか
-  const isFutureMonth =
-    year > today.getFullYear() ||
-    (year === today.getFullYear() && month > today.getMonth() + 1);
+  const isFutureMonth = year > today.year || (year === today.year && month > today.month);
 
   // この月に投稿（または穴埋め）があるか（カレンダー画像投稿ボタンの表示判定）。
   const hasPosts =
@@ -521,8 +532,8 @@ export function CalendarView({
             const filled = day != null ? filledByDay.get(day) : undefined;
             // 明日以降（未来日）は編集不可。過去月は未来日なし・当月は今日より後が未来。
             const isFutureDay =
-              isCurrentMonth && day != null && day > today.getDate();
-            const isTodayCell = isCurrentMonth && day === today.getDate();
+              isCurrentMonth && day != null && day > today.day;
+            const isTodayCell = isCurrentMonth && day === today.day;
             // 本人の当月「今日」がまだ未投稿なら、そのセルに「＋」投稿導線を出す
             // （編集モード中は穴埋めピッカーを優先するため出さない）。
             const showAddPost =
@@ -590,6 +601,17 @@ export function CalendarView({
             );
           })}
         </div>
+
+        {/* 今の1日の区切り（閲覧者全員）。区切りを変えた人の深夜の投稿が前の日に入っている理由を示す。
+            本人には設定への導線も出す。 */}
+        <p className="mt-2 text-right text-[11px] text-muted-foreground">
+          1日の区切り: {dayBoundaryHour}時（{dayRangeLabel(dayBoundaryHour)}）
+          {isOwner && (
+            <Link href="/settings#advanced" className="ml-1.5 underline underline-offset-2 hover:text-foreground">
+              変更
+            </Link>
+          )}
+        </p>
 
         {/* 皆勤賞達成バナー（達成月のみ・閲覧者全員に表示・カレンダーの下） */}
         {data?.perfectMonth?.achieved && <PerfectMonthBanner />}
@@ -691,12 +713,12 @@ function MonthYearPicker({
   selectedMonth: number;
   pickerYear: number;
   setPickerYear: (y: number) => void;
-  today: Date;
+  today: { year: number; month: number };
   onClose: () => void;
   onPick: (year: number, month: number) => void;
 }) {
-  const todayYear = today.getFullYear();
-  const todayMonth = today.getMonth() + 1;
+  const todayYear = today.year;
+  const todayMonth = today.month;
   // 未来年へは進めない（当年まで）。
   const canGoNextYear = pickerYear < todayYear;
 

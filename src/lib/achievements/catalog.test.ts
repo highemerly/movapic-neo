@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { asPostDate } from "@/lib/dayClock";
 import {
   CATALOG,
   CATALOG_BY_KEY,
@@ -21,7 +22,12 @@ const bareStats = (dayCounts: Record<number, number>): AchStats =>
   ({ postMonthDayCounts: dayCounts, filledHoleDays: [] } as unknown as AchStats);
 
 const barePost = (o: Partial<PostFacts> = {}): PostFacts =>
-  ({ season: null, createdAt: new Date("2026-06-15T03:00:00Z"), ...o } as PostFacts);
+  ({
+    season: null,
+    createdAt: new Date("2026-06-15T03:00:00Z"),
+    postDate: asPostDate("2026-06-15"),
+    ...o,
+  } as PostFacts);
 
 describe("resolveAchievement", () => {
   it("固定実績はカタログ定義に解決する", () => {
@@ -117,9 +123,14 @@ describe("evaluateMonthDays", () => {
     ]);
   });
 
-  it("月は JST で決める（UTC では前月末でも JST の翌月1日なら翌月のキー）", () => {
-    const post = barePost({ createdAt: new Date("2026-06-30T15:30:00Z") }); // JST 7/1 00:30
-    expect(evaluateMonthDays(withDays(10), post)).toEqual(["month-days:2026-07:10"]);
+  it("月は記録日で決める（JST 7/1 0:30 の投稿でも、2時区切りの人の記録日 6/30 なら6月のキー）", () => {
+    const createdAt = new Date("2026-06-30T15:30:00Z"); // JST 7/1 00:30
+    expect(
+      evaluateMonthDays(withDays(10), barePost({ createdAt, postDate: asPostDate("2026-07-01") }))
+    ).toEqual(["month-days:2026-07:10"]);
+    expect(
+      evaluateMonthDays(withDays(10), barePost({ createdAt, postDate: asPostDate("2026-06-30") }))
+    ).toEqual(["month-days:2026-06:10"]);
   });
 });
 

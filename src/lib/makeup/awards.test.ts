@@ -10,13 +10,16 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-const { grantMakeupPoints, notifyMakeupReadyAfterGrant } = vi.hoisted(() => ({
+const { grantMakeupPoints, notifyMakeupReadyAfterGrant, boundaryFindMany } = vi.hoisted(() => ({
   grantMakeupPoints: vi.fn(),
   notifyMakeupReadyAfterGrant: vi.fn(),
+  boundaryFindMany: vi.fn(),
 }));
 
 vi.mock("./ledger", () => ({ grantMakeupPoints }));
 vi.mock("./notify", () => ({ notifyMakeupReadyAfterGrant }));
+// 区切りの履歴は DB の境界でモックし、今日の計算は本物を使う。
+vi.mock("@/lib/db", () => ({ default: { dayBoundarySetting: { findMany: boundaryFindMany } } }));
 
 import { grantSignupMakeupPoints, maybeGrantAchievementPoint } from "./awards";
 
@@ -28,6 +31,7 @@ beforeEach(() => {
   vi.stubEnv("FAVOR_SERVERS", "handon.club");
   grantMakeupPoints.mockResolvedValue(true);
   notifyMakeupReadyAfterGrant.mockResolvedValue(undefined);
+  boundaryFindMany.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -106,5 +110,12 @@ describe("maybeGrantAchievementPoint - 実績を達成したとき", () => {
     await maybeGrantAchievementPoint({ userId: "u1", now: jst(9, 30) });
 
     expect(grantMakeupPoints).not.toHaveBeenCalled();
+  });
+  it("付与先はその人の今月（2時区切りの人の 11/1 1:00 は10月分）", async () => {
+    boundaryFindMany.mockResolvedValue([{ fromDate: new Date("2026-10-01T00:00:00Z"), hour: 2 }]);
+
+    await maybeGrantAchievementPoint({ userId: "u1", now: new Date("2026-11-01T01:00:00+09:00") });
+
+    expect(grantMakeupPoints).toHaveBeenCalledWith(expect.objectContaining({ ym: "2026-10" }));
   });
 });

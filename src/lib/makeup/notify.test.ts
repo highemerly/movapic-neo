@@ -11,29 +11,36 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { imageFindMany, notificationFindFirst, notificationCreate, resolveMakeupLimits } = vi.hoisted(() => ({
-  imageFindMany: vi.fn(),
-  notificationFindFirst: vi.fn(),
-  notificationCreate: vi.fn(),
-  resolveMakeupLimits: vi.fn(),
-}));
+const { imageFindMany, notificationFindFirst, notificationCreate, resolveMakeupLimits, boundaryFindMany } =
+  vi.hoisted(() => ({
+    imageFindMany: vi.fn(),
+    notificationFindFirst: vi.fn(),
+    notificationCreate: vi.fn(),
+    resolveMakeupLimits: vi.fn(),
+    boundaryFindMany: vi.fn(),
+  }));
 
 vi.mock("@/lib/db", () => ({
   default: {
     image: { findMany: imageFindMany },
     notification: { findFirst: notificationFindFirst, create: notificationCreate },
+    dayBoundarySetting: { findMany: boundaryFindMany },
   },
 }));
 vi.mock("./ledger", () => ({ resolveMakeupLimits }));
 
+import { asPostDate } from "@/lib/dayClock";
 import { notifyMakeupProgressOnPost, notifyMakeupReadyAfterGrant } from "./notify";
 
 /** JST で 2026-10-DD の正午。 */
 const jst = (day: number, month = 10) => new Date(Date.UTC(2026, month - 1, day, 3, 0, 0));
-/** 月の画像行。targets は makeupTargetDay。 */
+/** 2026-10-DD の記録日。 */
+const pd = (day: number, month = 10) =>
+  asPostDate(`2026-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`);
+/** 月の画像行（DB から読んだ形＝ postDate は UTC 0:00 の Date）。targets は makeupTargetDay。 */
 const rows = (entries: Array<[day: number, target?: number]>) =>
   entries.map(([day, target]) => ({
-    createdAt: jst(day),
+    postDate: new Date(`${pd(day)}T00:00:00Z`),
     makeupTargetDay: target ?? null,
     makeupTargetMonthDelta: 0,
   }));
@@ -56,15 +63,17 @@ beforeEach(() => {
   notificationFindFirst.mockResolvedValue(null);
   notificationCreate.mockResolvedValue({});
   resolveMakeupLimits.mockResolvedValue(limits(1));
+  boundaryFindMany.mockResolvedValue([]);
 });
 
 describe("notifyMakeupProgressOnPost - 投稿した瞬間の促し", () => {
-  const post = (now: Date) => notifyMakeupProgressOnPost({ userId: "u1", imageId: "img", now });
+  const post = (postDate: string) =>
+    notifyMakeupProgressOnPost({ userId: "u1", imageId: "img", postDate: asPostDate(postDate) });
 
   it("makeup-need-second: 今日1枚目・穴あり・残高あり → 今日2枚目を投稿しよう", async () => {
     imageFindMany.mockResolvedValue(withToday(1));
 
-    await post(jst(5));
+    await post(pd(5));
 
     expect(notificationCreate).toHaveBeenCalledWith({
       data: {
@@ -79,7 +88,7 @@ describe("notifyMakeupProgressOnPost - 投稿した瞬間の促し", () => {
   it("makeup-ready: 今日2枚目・まだ割り当てていない → 今すぐ穴埋めしよう", async () => {
     imageFindMany.mockResolvedValue(withToday(2));
 
-    await post(jst(5));
+    await post(pd(5));
 
     expect(notificationCreate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ type: "makeup-ready" }) })
@@ -92,7 +101,7 @@ describe("notifyMakeupProgressOnPost - 投稿した瞬間の促し", () => {
     resolveMakeupLimits.mockResolvedValue(limits(2));
     imageFindMany.mockResolvedValue(rows([[1], [4], [5], [5, 2]]));
 
-    await post(jst(5));
+    await post(pd(5));
 
     expect(notificationCreate).not.toHaveBeenCalled();
   });
@@ -101,7 +110,7 @@ describe("notifyMakeupProgressOnPost - 投稿した瞬間の促し", () => {
     resolveMakeupLimits.mockResolvedValue(limits(0, 2));
     imageFindMany.mockResolvedValue(withToday(1));
 
-    await post(jst(5));
+    await post(pd(5));
 
     expect(notificationCreate).not.toHaveBeenCalled();
   });
@@ -109,7 +118,7 @@ describe("notifyMakeupProgressOnPost - 投稿した瞬間の促し", () => {
   it("穴が無ければ出さない", async () => {
     imageFindMany.mockResolvedValue(rows([[1], [2], [3], [4], [5]]));
 
-    await post(jst(5));
+    await post(pd(5));
 
     expect(notificationCreate).not.toHaveBeenCalled();
   });
@@ -119,16 +128,16 @@ describe("notifyMakeupProgressOnPost - 投稿した瞬間の促し", () => {
     // 2〜4日が穴（3日）で上限1
     imageFindMany.mockResolvedValue(rows([[1], [5]]));
 
-    await post(jst(5));
+    await post(pd(5));
 
     expect(notificationCreate).not.toHaveBeenCalled();
   });
 
-  it("同じ種類の通知が今日すでにあれば出さない（1日1通・JST の今日0時以降で判定）", async () => {
+  it("同じ種類の通知が今日すでにあれば出さない（1日1通・その人の今日が始まって以降で判定）", async () => {
     imageFindMany.mockResolvedValue(withToday(1));
     notificationFindFirst.mockResolvedValue({ id: "n1" });
 
-    await post(jst(5));
+    await post(pd(5));
 
     expect(notificationFindFirst).toHaveBeenCalledWith({
       where: {
@@ -141,8 +150,22 @@ describe("notifyMakeupProgressOnPost - 投稿した瞬間の促し", () => {
     expect(notificationCreate).not.toHaveBeenCalled();
   });
 
+  it("2時区切りの人の「今日」は 2:00 から（1日1通の下限）", async () => {
+    boundaryFindMany.mockResolvedValue([{ fromDate: new Date("2026-10-01T00:00:00Z"), hour: 2 }]);
+    imageFindMany.mockResolvedValue(withToday(1));
+    notificationFindFirst.mockResolvedValue({ id: "n1" });
+
+    await post(pd(5));
+
+    expect(notificationFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ createdAt: { gte: new Date("2026-10-04T17:00:00Z") } }),
+      })
+    );
+  });
+
   it("2026-09 以前の月は何もしない（従来の makeup-reminder の担当）", async () => {
-    await post(jst(20, 9));
+    await post(pd(20, 9));
 
     expect(resolveMakeupLimits).not.toHaveBeenCalled();
     expect(notificationCreate).not.toHaveBeenCalled();
@@ -169,6 +192,21 @@ describe("notifyMakeupReadyAfterGrant - 付与した直後の促し", () => {
     await notifyMakeupReadyAfterGrant({ userId: "u1", ym: "2026-10", now: jst(11) });
 
     expect(notificationCreate).not.toHaveBeenCalled();
+  });
+
+  it("その人の今月で判定する（2時区切りの人の 11/1 1:00 はまだ10月）", async () => {
+    boundaryFindMany.mockResolvedValue([{ fromDate: new Date("2026-10-01T00:00:00Z"), hour: 2 }]);
+    // 3日だけが穴で、8日にダブル投稿済み（31日まで毎日投稿）
+    const days = Array.from({ length: 31 }, (_, i): [number] => [i + 1]).filter(([d]) => d !== 3);
+    imageFindMany.mockResolvedValue(rows([...days, [8]]));
+
+    await notifyMakeupReadyAfterGrant({
+      userId: "u1",
+      ym: "2026-10",
+      now: new Date("2026-11-01T01:00:00+09:00"),
+    });
+
+    expect(notificationCreate).toHaveBeenCalledTimes(1);
   });
 
   it("当月以外への付与では出さない", async () => {

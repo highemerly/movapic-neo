@@ -7,6 +7,7 @@ import Link from "@/components/Link";
 import { LegalInfoDialog } from "@/components/legal/LegalInfoDialog";
 import { makeupPointReasonLabel } from "@/lib/makeup/notificationTypes";
 import { MONTH_DAYS_TIERS, type MonthDaysGoal } from "@/lib/achievements/monthDays";
+import { dayRangeLabel } from "@/lib/dayClock";
 
 /** カレンダーAPI（perfectMonth.makeup）の形。owner のときだけ返る。 */
 export interface MakeupInfo {
@@ -19,9 +20,11 @@ export interface MakeupInfo {
   remaining: number;
   /** まだ埋まっていない未投稿日の数（当月は昨日まで）。 */
   unfilled: number;
-  /** 締切（この時刻より前なら編集可・排他上限）。ISO 8601。 */
+  /** 締切（この時刻より前なら編集可・排他上限）。ISO 8601。持ち主の日付の区切りで決まる。 */
   deadline: string;
   editable: boolean;
+  /** 持ち主の今日の日付の区切り（時）。 */
+  dayBoundaryHour: number;
   grants: Array<{ reason: string; amount: number; grantedAt: string }>;
   /** この月の皆勤賞にまだ手が届くか（達成済みも true）。 */
   perfectAchievable: boolean;
@@ -36,8 +39,8 @@ const JST = "Asia/Tokyo";
 const MONTH_DAYS_TIERS_LABEL = `${MONTH_DAYS_TIERS.join("日・")}日`;
 
 /**
- * 締切の表示。API の deadline は「翌月11日 00:00 JST」の排他上限なので、
- * 人に見せるときは1分戻して「翌月10日 23:59まで」にする。
+ * 締切の表示。API の deadline は「締切の翌日が始まる時刻」の排他上限（0時区切りなら翌月11日 0:00 JST・
+ * 2時区切りなら 11日 2:00）なので、人に見せるときは1分戻して「10日 23:59まで」「11日 1:59まで」にする。
  */
 export function formatMakeupDeadline(deadlineIso: string): string {
   const d = new Date(new Date(deadlineIso).getTime() - 60 * 1000);
@@ -200,7 +203,13 @@ function PerfectMonthRules({ month, makeup }: { month: number; makeup: MakeupInf
         <p className="mb-1.5 font-semibold text-foreground">皆勤賞</p>
         <ul className="list-disc space-y-1 pl-5">
           <li>その月に毎日1枚以上投稿すると獲得できます</li>
-          <li>1日の区切りは日本時間の 0:00〜23:59 です</li>
+          <li>
+            1日の区切りは日本時間の {dayRangeLabel(makeup.dayBoundaryHour)} です（
+            <Link href="/settings#advanced" className="underline underline-offset-2 hover:text-foreground">
+              設定
+            </Link>
+            で変えられます）
+          </li>
           <li>月ごとに判定するので、毎月獲得できます</li>
           <li>獲得した皆勤賞は、カレンダーと実績タブで公開されます</li>
         </ul>
@@ -216,7 +225,7 @@ function PerfectMonthRules({ month, makeup }: { month: number; makeup: MakeupInf
           <li>埋められるのは、穴埋めに使う投稿の日より前の日だけです（未来の日は埋められません）</li>
           <li>締め切りまでに投稿していれば、翌月の投稿も前月の穴埋めに使えます（月末の日もこれで埋められます）</li>
           <li>
-            その月の穴埋めは翌月10日 23:59 までできます
+            その月の穴埋めは翌月10日の終わり（1日の区切りまで）できます
             <span className="font-semibold text-foreground">
               （{month}月分は{formatMakeupDeadline(makeup.deadline)}
               {makeup.editable ? "まで" : "で締め切りました"}）

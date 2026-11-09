@@ -8,6 +8,8 @@
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/db";
 import { countRanks } from "@/lib/achievements/catalog";
+import { hourOn, todayOf, type BoundaryEntry } from "@/lib/dayClock";
+import { fromDbDate } from "@/lib/dayClock.server";
 import { PAGE_SIZE } from "@/app/admin/_components/query";
 
 export type AccountSort =
@@ -62,6 +64,10 @@ export interface AccountRow {
   /** 獲得実績（金/銀ランク別） */
   gold: number;
   silver: number;
+  /** 今日の日付の区切り（時） */
+  dayBoundaryHour: number;
+  /** 区切りの履歴（日付順・問い合わせ対応用。行が無ければ空＝ずっと 0 時区切り） */
+  dayBoundaryHistory: BoundaryEntry[];
 }
 
 export interface AccountsResult {
@@ -114,12 +120,20 @@ export async function getAccounts(
 
   const ids = users.map((u) => u.id);
   // 実績（金/銀集計）はページ分のユーザーをまとめて1クエリで取る（N+1回避）。
-  const achRows = ids.length
-    ? await prisma.achievement.findMany({
-        where: { userId: { in: ids } },
-        select: { userId: true, key: true, category: true },
-      })
-    : [];
+  const [achRows, boundaryRows] = ids.length
+    ? await Promise.all([
+        prisma.achievement.findMany({
+          where: { userId: { in: ids } },
+          select: { userId: true, key: true, category: true },
+        }),
+        // 日付の区切りの履歴もページ分をまとめて取る。
+        prisma.dayBoundarySetting.findMany({
+          where: { userId: { in: ids } },
+          orderBy: { fromDate: "asc" },
+          select: { userId: true, fromDate: true, hour: true },
+        }),
+      ])
+    : [[], []];
 
   const achByUser = new Map<string, { key: string; category: string }[]>();
   for (const a of achRows) {
@@ -128,9 +142,18 @@ export async function getAccounts(
     achByUser.set(a.userId, arr);
   }
 
+  const boundariesByUser = new Map<string, BoundaryEntry[]>();
+  for (const b of boundaryRows) {
+    const arr = boundariesByUser.get(b.userId) ?? [];
+    arr.push({ fromDate: fromDbDate(b.fromDate), hour: b.hour });
+    boundariesByUser.set(b.userId, arr);
+  }
+  const now = new Date();
+
   return {
     rows: users.map((u) => {
       const { gold, silver } = countRanks(achByUser.get(u.id) ?? []);
+      const boundaries = boundariesByUser.get(u.id) ?? [];
       return {
         id: u.id,
         username: u.username,
@@ -144,6 +167,8 @@ export async function getAccounts(
         storageBytes: Number(u.storage_bytes),
         gold,
         silver,
+        dayBoundaryHour: hourOn(boundaries, todayOf(boundaries, now)),
+        dayBoundaryHistory: boundaries,
       };
     }),
     totalCount,

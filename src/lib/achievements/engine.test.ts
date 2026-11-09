@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { asPostDate } from "@/lib/dayClock";
 import {
   selectNewlyGranted,
   selectNewlyGrantedProfile,
@@ -59,6 +60,7 @@ function post(overrides: Partial<PostFacts> = {}): PostFacts {
     visibility: "public",
     isReply: false,
     createdAt: new Date("2026-06-15T03:00:00Z"),
+    postDate: asPostDate("2026-06-15"),
     ...overrides,
   };
 }

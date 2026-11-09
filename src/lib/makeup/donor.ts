@@ -8,6 +8,7 @@
  *
  * 表現は `Image.makeupTargetDay`（穴の日 1-31）＋ `Image.makeupTargetMonthDelta`（0=同月 / -1=前月）。
  * 既存行は delta=0 で意味が変わらないため、過去月の割当・👑は一切揺れない。
+ * 日・月はすべて記録日（`Image.postDate`。持ち主の日付の区切りで決まる）で判定し、createdAt は見ない。
  *
  * **不変条件**
  * - donor は穴より後の日（月をまたいでも日付順は保たれる）。
@@ -21,26 +22,27 @@
  * React・サーバー専用 API を import しないこと（型・純粋関数のみ）。
  */
 
-import { jstDayOf, jstMonthRangeOfYm, shiftYm, toJstYm } from "@/lib/jst";
-import { isPointEra, makeupDeadline } from "./points";
+import { shiftYm } from "@/lib/jst";
+import { dayOfMonth, firstDayOfYm, ymOf, type PostDate } from "@/lib/dayClock";
+import { isPointEra, makeupLastDay } from "./points";
 
 /** donor と同じ月の穴を埋める（既定）。 */
 export const DONOR_SAME_MONTH = 0;
 /** 前月の穴を埋める（対象月の翌月1〜10日に投稿した写真）。 */
 export const DONOR_PREV_MONTH = -1;
 
-/** 割当が指す穴の月。donor 画像の JST 月と delta から決まる。 */
+/** 割当が指す穴の月。donor 画像の記録日の月と delta から決まる。 */
 export function donorTargetYm(donorYm: string, delta: number): string {
   return shiftYm(donorYm, delta);
 }
 
 /**
- * 対象月 ym の donor になれる画像の期間（UTC Date・start 以上 end 未満）。
- * end は締切（翌月11日 0:00 JST）そのもの＝「対象月の1日から締切まで」が1本の連続した範囲になる。
- * DB クエリの `createdAt: { gte, lt }` にそのまま渡せる。
+ * 対象月 ym の donor になれる画像の記録日の範囲（両端を含む）。
+ * to は締切の日（翌月10日）＝「対象月の1日から締切まで」が1本の連続した範囲になる。
+ * DB クエリには dayClock.server の postDateBetween で渡す。
  */
-export function donorRange(ym: string): { start: Date; end: Date } {
-  return { start: jstMonthRangeOfYm(ym).start, end: makeupDeadline(ym) };
+export function donorRange(ym: string): { from: PostDate; to: PostDate } {
+  return { from: firstDayOfYm(ym), to: makeupLastDay(ym) };
 }
 
 /** 対象月 ym が月またぎ donor（前月の穴埋め）を許すか。 */
@@ -49,7 +51,7 @@ export function allowsPrevMonthDonor(ym: string): boolean {
 }
 
 /**
- * donor 画像の JST 月から見た、対象月 ym への delta。donor になれない月なら null。
+ * donor 画像の記録日の月から見た、対象月 ym への delta。donor になれない月なら null。
  * 許すのは「同月」と「対象月の翌月（ポイント制の月のみ）」だけ。
  */
 export function donorDeltaFor(donorYm: string, targetYm: string): number | null {
@@ -60,7 +62,7 @@ export function donorDeltaFor(donorYm: string, targetYm: string): number | null 
 
 /** 穴埋め割当の解決に必要な画像行の最小形。 */
 export interface DonorRow {
-  createdAt: Date;
+  postDate: PostDate;
   makeupTargetDay: number | null;
   makeupTargetMonthDelta: number;
 }
@@ -68,7 +70,7 @@ export interface DonorRow {
 /** その行が対象月 ym の穴を埋めているならその穴の日(1-31)、埋めていなければ null。 */
 export function filledHoleOf(row: DonorRow, ym: string): number | null {
   if (row.makeupTargetDay == null) return null;
-  return donorTargetYm(toJstYm(row.createdAt), row.makeupTargetMonthDelta) === ym
+  return donorTargetYm(ymOf(row.postDate), row.makeupTargetMonthDelta) === ym
     ? row.makeupTargetDay
     : null;
 }
@@ -96,15 +98,15 @@ export function buildMonthMakeupState(
 ): MonthMakeupState {
   const dayCounts: Record<number, number> = {};
   for (const r of rows) {
-    if (toJstYm(r.createdAt) !== ym) continue;
-    const d = jstDayOf(r.createdAt);
+    if (ymOf(r.postDate) !== ym) continue;
+    const d = dayOfMonth(r.postDate);
     dayCounts[d] = (dayCounts[d] ?? 0) + 1;
   }
   const filled = new Set<number>();
   const donors = new Set<number>();
   for (const r of rows) {
     if (r.makeupTargetDay == null) continue;
-    if (toJstYm(r.createdAt) === ym) donors.add(jstDayOf(r.createdAt));
+    if (ymOf(r.postDate) === ym) donors.add(dayOfMonth(r.postDate));
     const hole = filledHoleOf(r, ym);
     // 投稿のある日を指す割当は穴埋めとして数えない（countValidFilledHoles と同じ規則）。
     if (hole != null && (dayCounts[hole] ?? 0) === 0) filled.add(hole);

@@ -45,6 +45,8 @@ import { evaluateAndGrant, GrantedAchievement } from "@/lib/achievements/engine"
 import { userPathSegment } from "@/lib/userHandle";
 import { getHomeServer } from "@/lib/auth/serverPolicy";
 import type { PostFacts } from "@/lib/achievements/catalog";
+import { postDateOf, type PostDate } from "@/lib/dayClock";
+import { loadSchedule, toDbDate } from "@/lib/dayClock.server";
 import type { ExifDetails } from "@/lib/exif/details";
 import {
   resolveFediverseReplyTarget,
@@ -151,7 +153,11 @@ export interface PublishImageResult {
  * 保存された投稿から実績評価用の PostFacts を作る。
  * replyToId は実際に保存した値を受ける＝DB と一致させる。
  */
-function toPostFacts(input: PublishImageInput, replyToId: string | null): PostFacts {
+function toPostFacts(
+  input: PublishImageInput,
+  replyToId: string | null,
+  saved: SavedImage
+): PostFacts {
   return {
     overlayText: input.text,
     position: input.options.position,
@@ -165,7 +171,8 @@ function toPostFacts(input: PublishImageInput, replyToId: string | null): PostFa
     locationPrefecture: input.extras?.locationPrefecture ?? null,
     visibility: input.visibility,
     isReply: replyToId != null,
-    createdAt: new Date(),
+    createdAt: saved.createdAt,
+    postDate: saved.postDate,
   };
 }
 
@@ -208,9 +215,10 @@ async function notifyWelcomeBackSafely(input: PublishImageInput, imageId: string
 async function afterSaved(
   input: PublishImageInput,
   imageId: string,
-  replyToId: string | null
+  replyToId: string | null,
+  saved: SavedImage
 ): Promise<GrantedAchievement[]> {
-  const newAchievements = await evaluateAchievementsSafely(input, imageId, replyToId);
+  const newAchievements = await evaluateAchievementsSafely(input, imageId, replyToId, saved);
   await notifyReplySafely(input, imageId, replyToId);
   await notifyWelcomeBackSafely(input, imageId);
   return newAchievements;
@@ -233,14 +241,15 @@ function isThreadBroken(link: ReplyLink | null, post: PostResult | null): boolea
 async function evaluateAchievementsSafely(
   input: PublishImageInput,
   imageId: string,
-  replyToId: string | null
+  replyToId: string | null,
+  saved: SavedImage
 ): Promise<GrantedAchievement[]> {
   try {
     // 穴埋めは全ユーザー手動（ポイント制）。投稿時に自動では割り当てない
     // （2026-09 以前の自動穴埋めは撤去済み）。
     return await evaluateAndGrant({
       userId: input.user.id,
-      post: toPostFacts(input, replyToId),
+      post: toPostFacts(input, replyToId, saved),
       imageId,
       instanceDomain: input.user.instance.domain,
     });
@@ -384,6 +393,12 @@ function buildImagePageUrl(username: string, domain: string, imageId: string): s
   return `${appUrl}/u/${userPathSegment(username, domain, getHomeServer())}/status/${imageId}`;
 }
 
+/** 保存した投稿の時刻と記録日（実績評価はこの値で行い、評価時点の「今」を使わない）。 */
+interface SavedImage {
+  createdAt: Date;
+  postDate: PostDate;
+}
+
 /**
  * 画像をS3へ保存し、サムネイルを生成し、DBにImageレコードを作成する。
  * Fediverse投稿は行わない（postUrl/postId は投稿後に更新する）。
@@ -392,7 +407,7 @@ async function storeAndRecord(
   input: PublishImageInput,
   imageId: string,
   replyToId: string | null
-): Promise<{ imagePageUrl: string; storageKey: string }> {
+): Promise<{ imagePageUrl: string; storageKey: string; saved: SavedImage }> {
   const extension = getExtensionFromMimeType(input.contentType);
   const storageKey = generateStorageKey(imageId, extension);
   const filename = `movapic-${imageId}.${extension}`;
@@ -406,7 +421,13 @@ async function storeAndRecord(
     await input.getThumbnailAndDimensions();
   await uploadImage(thumbnail, thumbnailKey, "image/webp");
 
-  await prisma.$transaction(async (tx) => {
+  const saved = await prisma.$transaction(async (tx) => {
+    // 時刻と記録日は create の直前に取る。投稿処理の先頭で取ると、S3・compute の数秒ぶん createdAt が
+    // コミットより前になり、タイムラインの since ポーリング（createdAt 順）がこの投稿を取りこぼす。
+    // 区切りの履歴を読んでから書くまでに境界をまたいでも、変更は今から余白（10分）より後の境界しか
+    // 動かさないので、記録日が「今日」から外れることはない（dayClock.ts の BOUNDARY_CHANGE_MARGIN_MS）。
+    const createdAt = new Date();
+    const postDate = postDateOf(await loadSchedule(input.user.id, tx), createdAt);
     await tx.image.create({
       data: {
         id: imageId,
@@ -442,14 +463,18 @@ async function storeAndRecord(
         locationPrefecture: input.extras?.locationPrefecture ?? null,
         locationCity: input.extras?.locationCity ?? null,
         replyToId,
+        createdAt,
+        postDate: toDbDate(postDate),
       },
     });
     await input.recordWithImage?.(tx);
+    return { createdAt, postDate };
   });
 
   return {
     imagePageUrl: buildImagePageUrl(input.user.username, input.user.instance.domain, imageId),
     storageKey,
+    saved,
   };
 }
 
@@ -505,7 +530,7 @@ export async function publishImage(
   // 先に保存（投稿失敗でも画像を残す。local は投稿しない）。
   // リプライ先の解決（最大 REPLY_RESOLVE_TIMEOUT_MS）は保存と並行させ、同期 /api/v1/post の
   // 応答時間（Ingress の504）に上乗せしない。解決は throw しないので保存の例外伝播は変わらない。
-  const [{ storageKey }, replyLink] = await Promise.all([
+  const [{ storageKey, saved }, replyLink] = await Promise.all([
     storeAndRecord(input, imageId, replyToImageId),
     resolveReply(),
   ]);
@@ -524,7 +549,7 @@ export async function publishImage(
   logReply(replyLink, postResult);
 
   // 画像は保存済み（投稿失敗でも残る）なので実績評価する
-  const newAchievements = await afterSaved(input, imageId, replyToImageId);
+  const newAchievements = await afterSaved(input, imageId, replyToImageId, saved);
 
   return {
     imageId,
