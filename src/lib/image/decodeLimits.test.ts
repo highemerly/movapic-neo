@@ -7,6 +7,7 @@ import {
   isSupportedInputFormat,
   MAX_OUTPUT_EDGE,
   exceedsOutputEdge,
+  estimateDecodeMB,
 } from "./decodeLimits";
 
 describe("isSupportedInputFormat", () => {
@@ -75,5 +76,39 @@ describe("exceedsOutputEdge", () => {
   it("長辺が出力上限を超えたら弾く（文字入れ処理では作られない画像）", () => {
     expect(exceedsOutputEdge({ width: MAX_OUTPUT_EDGE + 1, height: 100 })).toBe(true);
     expect(exceedsOutputEdge({ width: 100, height: 16_000 })).toBe(true);
+  });
+});
+
+describe("estimateDecodeMB", () => {
+  it("画素数と形式で見積もる（同じ寸法なら HEIF > WebP > JPEG > PNG）", () => {
+    const size = { width: 8000, height: 6000 };
+    const heif = estimateDecodeMB({ format: "heif", ...size });
+    const webp = estimateDecodeMB({ format: "webp", ...size });
+    const jpeg = estimateDecodeMB({ format: "jpeg", ...size });
+    const png = estimateDecodeMB({ format: "png", ...size });
+    expect(heif).toBeGreaterThan(webp);
+    expect(webp).toBeGreaterThan(jpeg);
+    expect(jpeg).toBeGreaterThan(png);
+  });
+
+  it("実測（2026-11-10）の増分を下回らない", () => {
+    // 1枚と同時複数枚のピークの差から求めた増分（decodeLimits のコメント参照）
+    expect(estimateDecodeMB({ format: "heif", width: 8900, height: 8900 })).toBeGreaterThanOrEqual(907);
+    expect(estimateDecodeMB({ format: "heif", width: 8064, height: 6048 })).toBeGreaterThanOrEqual(566);
+    expect(estimateDecodeMB({ format: "heif", width: 4032, height: 3024 })).toBeGreaterThanOrEqual(172);
+    expect(estimateDecodeMB({ format: "jpeg", width: 4032, height: 3024 })).toBeGreaterThanOrEqual(172);
+    expect(estimateDecodeMB({ format: "webp", width: 8900, height: 8900 })).toBeGreaterThanOrEqual(544);
+    expect(estimateDecodeMB({ format: "jpeg", width: 14000, height: 13500 })).toBeGreaterThanOrEqual(500);
+    expect(estimateDecodeMB({ format: "png", width: 14000, height: 13500 })).toBeGreaterThanOrEqual(128);
+  });
+
+  it("rotate がヘッダで弾く入力（対応外の形式・画素数超過）は展開しないので 0", () => {
+    expect(estimateDecodeMB({ format: "gif", width: 14000, height: 14000 })).toBe(0);
+    expect(estimateDecodeMB({ format: "heif", width: 14000, height: 14000 })).toBe(0);
+  });
+
+  it("ヘッダが読めない・寸法が無いときは jpeg-js の上限ぶんで見積もる", () => {
+    expect(estimateDecodeMB(undefined)).toBeGreaterThanOrEqual(512);
+    expect(estimateDecodeMB({ format: "jpeg" })).toBeGreaterThanOrEqual(512);
   });
 });

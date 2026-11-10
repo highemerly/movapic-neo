@@ -10,8 +10,10 @@
  * pitfall: 以前は全形式 200MP 一律（「RGB で ~600MB」想定）で、196MP・2KB の AVIF 1枚で
  * compute が OOM Kill された（/api/v1/generate は未認証で叩ける）。
  *
- * 80MP は、compute の常駐分と同時に来た通常写真（12MP≈180MB）を差し引いても上限に収まる値。
- * iPhone の 48MP HEIC は通る。
+ * 80MP は 1枚なら上限に収まる値（iPhone の 48MP HEIC は通る）。同時に来た分は decodeBudget が
+ * メモリ予算で待たせる（上限は1枚ごとの天井、予算は同時処理の合計を守る）。
+ * pitfall: 以前は「重い画像は同時に1枚」前提で上限だけを決めていたため、未認証の generate に
+ * 79MP・2KB の AVIF を2枚同時に送るだけで compute が OOM Kill された（2026-11-10 再現）。
  */
 
 /**
@@ -45,6 +47,47 @@ export function exceedsDecodePixelLimit(meta: {
   height?: number;
 }): boolean {
   return (meta.width ?? 0) * (meta.height ?? 0) > maxDecodePixels(meta.format);
+}
+
+/**
+ * 1リクエストの文字入れ全体（rotate → 2048px 縮小 → 文字描画 → 出力変換）で増えるメモリの
+ * 見積もり（MB）。decodeBudget が同時に処理する分の合計をこれで数える。
+ * 本番同等（Alpine libvips・メモリ上限 1536Mi）で、常駐（初回処理後 約220MB）を除いた1件あたりの
+ * 増分を実測した（2026-11-10。上の 2026-10-15 の値は常駐込みのピークなので係数には使えない）:
+ *  - AVIF 12MP=+172MB / 48MP=+566MB / 79MP=+907MB（傾き 約11MB/MP）
+ *  - JPEG 12MP（実写相当のノイズ・8.6MB）=+172MB / 190MP（ベタ塗り）=+500MB
+ *  - WebP 79MP=+544MB / PNG 190MP=+128MB
+ * 固定分は入力バッファの複製・文字描画・出力変換など画素数によらない分。どの実測も下回らない
+ * ように取ってある（見積もり不足は OOM、過大は待ちが少し増えるだけのため。テストで実測値と突き合わせる）。
+ */
+const REQUEST_BASE_MB = 150;
+const MB_PER_MEGAPIXEL: Readonly<Record<string, number>> = {
+  heif: 11,
+  webp: 7,
+  jpeg: 2.5,
+  png: 0.5,
+};
+/**
+ * 形式や寸法が読めないときの見積もり。この場合 rotate は壊れた JPEG として jpeg-js へ回すため、
+ * その既定の上限 maxMemoryUsageInMB:512 を使う（それ以外の形式は rotate が即座に弾く）。
+ */
+const UNKNOWN_INPUT_MB = 512;
+
+/**
+ * @param meta ヘッダ（sharp の metadata()）。読めなかったときは undefined。
+ * @returns 見積もり（MB）。rotate がヘッダの時点で弾く入力（対応外の形式・画素数超過）は展開しないので 0。
+ *   0 を予算に数えると、弾くだけの入力で他のリクエストを待たせてしまう。
+ */
+export function estimateDecodeMB(
+  meta: { format?: string; width?: number; height?: number } | undefined
+): number {
+  if (meta === undefined) return REQUEST_BASE_MB + UNKNOWN_INPUT_MB;
+  if (!isSupportedInputFormat(meta.format) || exceedsDecodePixelLimit(meta)) return 0;
+  const perMegapixel = MB_PER_MEGAPIXEL[meta.format as string];
+  if (perMegapixel === undefined || !meta.width || !meta.height) {
+    return REQUEST_BASE_MB + UNKNOWN_INPUT_MB;
+  }
+  return Math.ceil(REQUEST_BASE_MB + ((meta.width * meta.height) / 1_000_000) * perMegapixel);
 }
 
 /**

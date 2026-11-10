@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
       arrangement,
       season,
       requestId,
+      signal: request.signal,
     });
 
     return new NextResponse(new Uint8Array(result.buffer), {
@@ -121,6 +122,11 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    // worker-front が諦めた（タイムアウト・切断）＝メモリ予算の待ちから抜けた。応答は誰も読まない。
+    if (request.signal.aborted) {
+      console.warn(`[internal/render] rid=${requestId ?? "unknown"} aborted by caller`);
+      return new NextResponse(null, { status: 503 });
+    }
     // 画像処理の段階エラー（読み込み不可・画素数超過など）は stage と文言を返し、worker-front 側で
     // ImageProcessError に戻す。汎用500にすると generate が利用者向けの文言を出せない
     // （3層分割で一度失われ、常に「処理中にエラーが発生しました」になっていた）。

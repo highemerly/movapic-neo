@@ -10,7 +10,12 @@ import {
   STROKE_COLORS,
 } from "@/types";
 import { ImageProcessError } from "@/lib/errors";
-import { MAX_OUTPUT_EDGE } from "@/lib/image/decodeLimits";
+import {
+  MAX_DECODE_PIXELS,
+  MAX_OUTPUT_EDGE,
+  estimateDecodeMB,
+} from "@/lib/image/decodeLimits";
+import { getComputeDecodeBudget, type ReleaseBudget } from "@/lib/image/decodeBudget";
 import {
   rotateImage,
   applyOutputFormat,
@@ -32,16 +37,65 @@ interface ProcessImageParams {
   /** シーズン（期間限定）キー。セット時は position/color/size/font/arrangement を無視しプリセットで描画 */
   season?: string | null;
   requestId?: string;
+  /** 呼び出し元が諦めたら、メモリ予算の待ちから抜ける（render route の request.signal） */
+  signal?: AbortSignal;
 }
 
 export type { ProcessImageResult };
+
+/**
+ * ヘッダだけ読んで見積もり、予算を取る（展開はしない）。待たされたときだけログに残す。
+ * ヘッダの読み込みは rotate と同じ設定（unlimited: HEIC の libheif 制限を外す）で行う。
+ */
+async function acquireDecodeBudget(
+  imageBuffer: Buffer,
+  rid: string,
+  signal: AbortSignal | undefined
+): Promise<ReleaseBudget> {
+  const header = await sharp(imageBuffer, { unlimited: true, limitInputPixels: MAX_DECODE_PIXELS })
+    .metadata()
+    .catch(() => undefined);
+  const costMB = estimateDecodeMB(header);
+  if (costMB === 0) return () => {};
+
+  const budget = await getComputeDecodeBudget();
+  const waitStart = Date.now();
+  const inUseBefore = budget.inUseMB();
+  const pending = budget.acquire(costMB, signal);
+  // 入れるなら acquire の中で同期的に列から外れる＝列が残っていれば自分も待っている（到着順なので最後尾）
+  const queuedBehind = budget.waiting();
+  const release = await pending;
+  if (queuedBehind > 0) {
+    console.log(
+      `[imageProcessor] rid=${rid} DECODE_BUDGET_WAIT: ${Date.now() - waitStart}ms, cost=${costMB}MB, inUseBefore=${inUseBefore}MB, queued=${queuedBehind}, format=${header?.format}, size=${header?.width}x${header?.height}`
+    );
+  }
+  return release;
+}
 
 // 処理用の最大サイズ（事前リサイズ）
 // 最終出力の長辺上限に合わせて事前に縮小することで後続処理を高速化
 // （finalize が同じ値で投稿画像を確かめるため decodeLimits と共有する）
 const MAX_PROCESSING_SIZE = MAX_OUTPUT_EDGE;
 
-export async function processImage({
+/**
+ * 1リクエストぶんの処理全体をメモリ予算の中で行う（decodeBudget 参照）。見積もりは
+ * 文字描画・出力変換まで含めた1件あたりの実測増分なので、予算も処理の最後まで持つ。
+ */
+export async function processImage(params: ProcessImageParams): Promise<ProcessImageResult> {
+  const release = await acquireDecodeBudget(
+    params.imageBuffer,
+    params.requestId || "unknown",
+    params.signal
+  );
+  try {
+    return await renderWithinBudget(params);
+  } finally {
+    release();
+  }
+}
+
+async function renderWithinBudget({
   imageBuffer,
   text,
   position,
