@@ -16,6 +16,7 @@
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/db";
 import { USER_AGENT } from "@/lib/userAgent";
+import { remoteFetch } from "@/lib/security/ssrf";
 import { parseCustomEmojiKey } from "@/lib/reactions/emojiKey";
 
 /** カタログ1件分（/api/emojis の要素から必要なフィールドだけ残したもの） */
@@ -47,7 +48,7 @@ interface RawEmoji {
  * Misskey の /api/emojis は未認証GETで読める（レスポンスは { emojis: [...] }）。
  */
 export async function fetchMisskeyEmojis(domain: string): Promise<CustomEmoji[]> {
-  const response = await fetch(`https://${domain}/api/emojis`, {
+  const response = await remoteFetch(`https://${domain}/api/emojis`, {
     headers: { "User-Agent": USER_AGENT },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });

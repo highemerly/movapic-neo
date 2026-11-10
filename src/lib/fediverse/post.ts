@@ -3,6 +3,7 @@
  */
 
 import { USER_AGENT } from "@/lib/userAgent";
+import { remoteFetch } from "@/lib/security/ssrf";
 import { truncateGraphemes } from "@/lib/text/grapheme";
 
 const REQUEST_TIMEOUT = 30000; // 30秒
@@ -131,7 +132,7 @@ async function uploadMastodonMedia(
   // 代替テキスト（ALT）。未設定なら送らない。Mastodon の description 上限は約1500字。
   if (altText) formData.append("description", altText);
 
-  const response = await fetch(`https://${server}/api/v2/media`, {
+  const response = await remoteFetch(`https://${server}/api/v2/media`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -181,7 +182,7 @@ async function waitForMastodonMediaReady(
     await sleep(MEDIA_POLL_INTERVAL);
     attempt += 1;
 
-    const res = await fetch(`https://${server}/api/v1/media/${mediaId}`, {
+    const res = await remoteFetch(`https://${server}/api/v1/media/${mediaId}`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -252,7 +253,7 @@ export async function postToMastodon(
     );
 
     const createStatus = (inReplyToId: string | null | undefined) =>
-      fetch(`https://${server}/api/v1/statuses`, {
+      remoteFetch(`https://${server}/api/v1/statuses`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -348,7 +349,7 @@ async function uploadMisskeyFile(
   // 書記素境界で切る（結合絵文字・サロゲートペアを途中で割らない）。
   if (altText) formData.append("comment", truncateGraphemes(altText, 512));
 
-  const response = await fetch(`https://${server}/api/drive/files/create`, {
+  const response = await remoteFetch(`https://${server}/api/drive/files/create`, {
     method: "POST",
     headers: {
       "User-Agent": USER_AGENT,
@@ -421,7 +422,7 @@ export async function postToMisskey(
     );
 
     const createNote = (replyId: string | null | undefined) =>
-      fetch(`https://${server}/api/notes/create`, {
+      remoteFetch(`https://${server}/api/notes/create`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

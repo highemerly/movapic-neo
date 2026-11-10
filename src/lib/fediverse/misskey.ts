@@ -7,6 +7,7 @@
  */
 
 import { USER_AGENT } from "@/lib/userAgent";
+import { remoteFetch } from "@/lib/security/ssrf";
 
 const MISSKEY_HEADERS = {
   "Content-Type": "application/json",
@@ -37,7 +38,7 @@ export async function apShowNoteId(
 ): Promise<string | null> {
   let response: Response;
   try {
-    response = await fetch(`https://${viewerDomain}/api/ap/show`, {
+    response = await remoteFetch(`https://${viewerDomain}/api/ap/show`, {
       method: "POST",
       headers: MISSKEY_HEADERS,
       body: JSON.stringify({ i: viewerToken, uri }),

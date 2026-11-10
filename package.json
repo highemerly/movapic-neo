@@ -39,6 +39,7 @@
     "skia-canvas": "^3.0.8",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.7.0",
+    "undici": "^6.29.1",
     "ws": "^8.22.1"
   },
   "devDependencies": {

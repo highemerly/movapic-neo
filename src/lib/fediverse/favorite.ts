@@ -17,6 +17,7 @@
  */
 
 import { USER_AGENT } from "@/lib/userAgent";
+import { remoteFetch } from "@/lib/security/ssrf";
 import { apShowNoteId, ApShowError } from "@/lib/fediverse/misskey";
 import { searchResolveStatusId, SearchResolveError } from "@/lib/fediverse/mastodon";
 import {
@@ -174,11 +175,11 @@ export async function fetchMastodonFavoriteData(
   const headers = { "User-Agent": USER_AGENT };
 
   const [statusRes, favBoyRes] = await Promise.all([
-    fetch(`https://${ownerDomain}/api/v1/statuses/${postId}`, {
+    remoteFetch(`https://${ownerDomain}/api/v1/statuses/${postId}`, {
       headers,
       signal: AbortSignal.timeout(SHORT_TIMEOUT),
     }),
-    fetch(`https://${ownerDomain}/api/v1/statuses/${postId}/favourited_by?limit=40`, {
+    remoteFetch(`https://${ownerDomain}/api/v1/statuses/${postId}/favourited_by?limit=40`, {
       headers,
       signal: AbortSignal.timeout(SHORT_TIMEOUT),
     }),
@@ -313,13 +314,13 @@ export async function fetchMisskeyFavoriteData(
   postId: string
 ): Promise<FavoriteData> {
   const [noteRes, reactionsRes] = await Promise.all([
-    fetch(`https://${ownerDomain}/api/notes/show`, {
+    remoteFetch(`https://${ownerDomain}/api/notes/show`, {
       method: "POST",
       headers: MISSKEY_HEADERS,
       body: JSON.stringify({ noteId: postId }),
       signal: AbortSignal.timeout(SHORT_TIMEOUT),
     }),
-    fetch(`https://${ownerDomain}/api/notes/reactions`, {
+    remoteFetch(`https://${ownerDomain}/api/notes/reactions`, {
       method: "POST",
       headers: MISSKEY_HEADERS,
       body: JSON.stringify({ noteId: postId, limit: 40 }),
@@ -431,7 +432,7 @@ async function toggleFavorite(
 ): Promise<ReactionActionResult> {
   const localStatusId = await resolveViewerStatusId(params);
 
-  const response = await fetch(
+  const response = await remoteFetch(
     `https://${params.viewerDomain}/api/v1/statuses/${localStatusId}/${action}`,
     {
       method: "POST",
@@ -499,7 +500,7 @@ async function misskeyReactionRequest(
   action: "create" | "delete",
   reaction?: string
 ): Promise<{ alreadyReacted: boolean }> {
-  const response = await fetch(
+  const response = await remoteFetch(
     `https://${params.viewerDomain}/api/notes/reactions/${action}`,
     {
       method: "POST",
@@ -539,7 +540,7 @@ async function readMisskeyReactionState(
   optimisticReacted: boolean
 ): Promise<ReactionActionResult> {
   try {
-    const response = await fetch(`https://${params.viewerDomain}/api/notes/show`, {
+    const response = await remoteFetch(`https://${params.viewerDomain}/api/notes/show`, {
       method: "POST",
       headers: MISSKEY_HEADERS,
       body: JSON.stringify({ i: params.viewerToken, noteId }),
