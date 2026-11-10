@@ -111,8 +111,7 @@ model Mute {
   muter     User @relation("Muter", fields: [muterId], references: [id], onDelete: Cascade)
   mutedUser User @relation("Muted", fields: [mutedUserId], references: [id], onDelete: Cascade)
 
-  @@unique([muterId, mutedUserId]) // 同一相手への重複ミュートを防ぐ（再ミュートは期間更新=upsert）
-  @@index([muterId])
+  @@unique([muterId, mutedUserId]) // 同一相手への重複ミュートを防ぐ（再ミュートは期間更新=upsert）。muterId だけの検索もこれで引ける
   @@map("mutes")
 }
 
@@ -133,6 +132,7 @@ model Achievement {
 
   @@unique([userId, key]) // レース時の二重付与をDBで防ぐ
   @@index([userId, grantedAt])
+  @@index([imageId]) // 画像詳細の「この投稿で獲得した実績」と、画像削除時の SET NULL
   @@map("achievements")
 }
 
@@ -153,8 +153,7 @@ model MakeupPointGrant {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, month, reason]) // 月×理由で1回だけ＝30分ごとの定期ジョブでも二重付与をDBで防ぐ
-  @@index([userId, month])
+  @@unique([userId, month, reason]) // 月×理由で1回だけ＝30分ごとの定期ジョブでも二重付与をDBで防ぐ。userId・month の検索もこれで引ける
   @@map("makeup_point_grants")
 }
 
@@ -182,6 +181,7 @@ model Notification {
   image Image? @relation(fields: [imageId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
+  @@index([imageId]) // 画像削除時の SET NULL（無いと削除のたびに全件を走査する）
   @@map("notifications")
 }
 
