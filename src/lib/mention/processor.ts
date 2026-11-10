@@ -14,6 +14,7 @@ import { parseMentionContent, formatOptionsSummary, ParsedMentionOptions } from 
 import {
   OutputFormat,
   MAX_TEXT_LENGTH,
+  MAX_FILE_SIZE,
   DEFAULT_ARRANGEMENT,
   type Position,
 } from "@/types";
@@ -114,10 +115,15 @@ async function sendBotReply(
 async function fetchImage(url: string): Promise<Buffer> {
   const safeUrl = await assertSafeRemoteUrl(url);
 
-  const response = await remoteFetch(safeUrl, {
-    headers: { "User-Agent": USER_AGENT },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT),
-  });
+  // 上限は Web の投稿・generate と同じ（それより大きい画像は受け付けない）
+  const response = await remoteFetch(
+    safeUrl,
+    {
+      headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+    },
+    { maxResponseBytes: MAX_FILE_SIZE }
+  );
 
   if (!response.ok) {
     throw new Error(`画像の取得に失敗しました: ${response.status}`);
