@@ -1,10 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 const MAX_RETRIES = 2;
 
-type Status = "loading" | "loaded" | "failed";
+type Status = "loading" | "retrying" | "loaded" | "failed";
+
+const subscribeNothing = () => () => {};
+
+/**
+ * サーバー描画（SSR とそのハイドレーション）中は false、クライアントで新しくマウントしたときは true。
+ */
+function useIsClientMount(): boolean {
+  const isClient = useSyncExternalStore(subscribeNothing, () => true, () => false);
+  // ハイドレーション後の再レンダーで true に変わっても、最初の値のまま扱う
+  const [initial] = useState(isClient);
+  return initial;
+}
 
 /**
  * フルサイズ画像（縮小せず原本を表示する箇所）向けの共通 <img> ラッパー。
@@ -19,6 +31,11 @@ type Status = "loading" | "loaded" | "failed";
  * iOS 側の一過性の資源不足なので、同一URLで張り直せば十分再取得でき、かつ CDN/プロキシ
  * のキャッシュを活かせる（バスターは毎回キャッシュミス＝オリジン往復で逆に遅く、
  * クエリ検証つきプロキシでは 403/404 を招く）。
+ *
+ * SSR で出た <img> は最初から見せる（読み込み後のフェードインはクライアントで追加された分だけ）。
+ * pitfall: 以前は SSR の <img> も opacity-0 で出し、onLoad で表示していた。React はハイドレーション前に
+ * 起きた load/error を捨てるため、画像が先に届いてもハイドレーションまで見えず LCP がその分遅れ
+ * （計測で約0.6秒）、ハイドレーション前に失敗した画像はリトライされず灰色のまま止まっていた。
  *
  * 縮小表示で十分な箇所（サムネイル等）はそもそもデコードが軽く問題が出ないので、
  * このコンポーネントは原本をそのまま見せる箇所（タイムライン写真・画像詳細の本画像）専用。
@@ -58,6 +75,7 @@ export function RetryImage({
   const [status, setStatus] = useState<Status>("loading");
   const ref = useRef<HTMLImageElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fadeIn = useIsClientMount();
 
   // src（原本URL）が変わったら状態をリセット（リスト再利用での取り違え防止）。
   // レンダー中に前回 src と比較して同期する（effect 内 setState を避ける React 推奨パターン）。
@@ -68,15 +86,37 @@ export function RetryImage({
     setStatus("loading");
   }
 
-  // キャッシュ済み等で onLoad が来ないケースを拾う＋アンマウント時のタイマー掃除
+  const handleError = () => {
+    if (attempt < MAX_RETRIES) {
+      setStatus("retrying");
+      if (timer.current) clearTimeout(timer.current);
+      const next = attempt + 1;
+      timer.current = setTimeout(() => {
+        setAttempt(next);
+        setStatus("loading");
+      }, 300 * next);
+    } else {
+      setStatus("failed");
+    }
+  };
+
+  // ハイドレーション前（とキャッシュ済み）で onLoad/onError が来なかった分を拾う＋アンマウント時のタイマー掃除
   useEffect(() => {
-    if (ref.current?.complete && ref.current.naturalWidth > 0) setStatus("loaded");
+    const img = ref.current;
+    if (img?.complete) {
+      if (img.naturalWidth > 0) setStatus("loaded");
+      else handleError();
+    }
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
+    // マウント時に一度だけ見る（以降は onLoad/onError が届く）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loaded = status === "loaded";
+  // リトライ中・失敗後は iOS の壊れた画像「？」を見せない。SSR 分の初回読み込みは届きしだい見せる。
+  const visible = loaded || (!fadeIn && attempt === 0 && status === "loading");
 
   return (
     <div
@@ -118,17 +158,9 @@ export function RetryImage({
         loading={loading}
         decoding="async"
         onLoad={() => setStatus("loaded")}
-        onError={() => {
-          if (attempt < MAX_RETRIES) {
-            if (timer.current) clearTimeout(timer.current);
-            const next = attempt + 1;
-            timer.current = setTimeout(() => setAttempt(next), 300 * next);
-          } else {
-            setStatus("failed");
-          }
-        }}
-        className={`transition-opacity duration-300 ${
-          loaded ? "opacity-100" : "opacity-0"
+        onError={handleError}
+        className={`${fadeIn ? "transition-opacity duration-300" : ""} ${
+          visible ? "opacity-100" : "opacity-0"
         } ${imgClassName}`}
       />
     </div>
