@@ -126,6 +126,15 @@ describe("toDisplayEmoji", () => {
 });
 
 describe("isSelectableUnicodeEmoji", () => {
+  it("結合文字を重ねた巨大な1書記素は選べない（絵文字1個として保存させない）", () => {
+    expect(isSelectableUnicodeEmoji("😀" + "\u0301".repeat(100_000))).toBe(false);
+  });
+
+  it("長い部類の正規の絵文字は選べる", () => {
+    expect(isSelectableUnicodeEmoji("👩🏽‍❤️‍💋‍👨🏿")).toBe(true);
+    expect(isSelectableUnicodeEmoji("🏴󠁧󠁢󠁥󠁮󠁧󠁿")).toBe(true);
+  });
+
   it("絵文字1個なら true（結合絵文字・肌色修飾も1個として扱う）", () => {
     expect(isSelectableUnicodeEmoji("👍")).toBe(true);
     expect(isSelectableUnicodeEmoji("❤️")).toBe(true);

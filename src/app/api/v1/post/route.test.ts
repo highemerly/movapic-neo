@@ -126,6 +126,14 @@ describe("POST /api/v1/post: バリデーション", () => {
     expect((await body(res)).error).toContain(`${MAX_TEXT_LENGTH}文字以下`);
   });
 
+  it("結合文字で書記素の数を抑えた長大なテキスト・ALTは 400", async () => {
+    const res = await POST(makeReq({ text: "あ" + "\u0301".repeat(100_000) }));
+    expect(res.status).toBe(400);
+    const alt = await POST(makeReq({ altText: "あ" + "\u0301".repeat(100_000) }));
+    expect(alt.status).toBe(400);
+    expect((await body(alt)).error).toContain("1500文字以下");
+  });
+
   it("ALTが1500字超は 400", async () => {
     const res = await POST(makeReq({ altText: "あ".repeat(1501) }));
     expect(res.status).toBe(400);

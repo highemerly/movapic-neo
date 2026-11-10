@@ -17,7 +17,7 @@
  *   別チップに割れてしまう。テキスト表示になってしまう絵文字には toDisplayEmoji で補い直す。
  */
 
-import { countGraphemes, isEmojiGrapheme } from "@/lib/text/grapheme";
+import { countGraphemes, exceedsGraphemeLimit, isEmojiGrapheme } from "@/lib/text/grapheme";
 
 /**
  * 絵文字の種別を持たない Fediverse の favourite を表す内部キー。
@@ -133,7 +133,8 @@ export function toDisplayEmoji(key: string): string {
  */
 export function isSelectableUnicodeEmoji(value: string): boolean {
   if (CUSTOM_EMOJI_PATTERN.test(value)) return false;
-  if (countGraphemes(value) !== 1) return false;
+  // 書記素の数だけでなく長さも見る（結合文字を重ねた巨大な1書記素を絵文字1個として保存しない）
+  if (exceedsGraphemeLimit(value, 1) || countGraphemes(value) !== 1) return false;
   return isEmojiGrapheme(value);
 }
 

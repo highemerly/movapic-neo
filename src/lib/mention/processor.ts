@@ -17,7 +17,7 @@ import {
   DEFAULT_ARRANGEMENT,
   type Position,
 } from "@/types";
-import { countGraphemes } from "@/lib/text/grapheme";
+import { exceedsGraphemeLimit } from "@/lib/text/grapheme";
 import { getSeasonByKey } from "@/lib/seasons/catalog";
 import { ErrorCodes } from "@/lib/errors";
 import { isAuthFailureStatus } from "@/lib/fediverse/failureAdvice";
@@ -358,7 +358,7 @@ export async function processOneMention(
       "テキストを入力してください。"
     );
   }
-  if (countGraphemes(text) > MAX_TEXT_LENGTH) {
+  if (exceedsGraphemeLimit(text, MAX_TEXT_LENGTH)) {
     return handleError(
       ErrorCodes.VALIDATION_TOO_LONG,
       `テキストは${MAX_TEXT_LENGTH}文字以内で入力してください。`
