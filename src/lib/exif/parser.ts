@@ -8,7 +8,6 @@
  * 出力画像のEXIFは既存どおりサーバー側で常に除去される。
  */
 
-import exifr from "exifr";
 import { formatExifDetails, type ExifDetails } from "./details";
 
 export interface ExtractedExif {
@@ -53,6 +52,9 @@ export async function extractExif(
     // pickに latitude/longitude を入れてもexifrがGPS IFDを自動で有効化しない事例が
     // あるため、必要なIFDを明示的に有効化する。
     // detail 時のみ exif IFD の露出設定・レンズ名も読む（不要時は従来どおり読まない）。
+    // exifr は呼ぶときに読み込む。pitfall: 以前は先頭で import しており、写真を選ぶ前から
+    // /create の初回読み込みに exifr（gzip 24KB）が載っていた（2026-11-10 計測）。
+    const { default: exifr } = await import("exifr");
     const parsed = await exifr.parse(input, {
       ifd0: { pick: ["Make", "Model"] },
       gps: true,
