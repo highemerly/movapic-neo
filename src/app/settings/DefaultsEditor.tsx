@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toastSaved, toastSettingsError } from "./settingsToast";
-import { parseApiError, formatErrorMessage } from "@/lib/errors";
+import { parseApiError, formatErrorMessage } from "@/lib/errors/client";
 import { Label } from "@/components/ui/label";
 import { SettingToggleRow } from "@/components/SettingRow";
 import { SegmentControl } from "@/components/SegmentControl";

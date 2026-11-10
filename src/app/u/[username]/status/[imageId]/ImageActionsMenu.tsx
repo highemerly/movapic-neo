@@ -31,7 +31,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { parseApiError, formatErrorMessage } from "@/lib/errors";
+import { parseApiError, formatErrorMessage } from "@/lib/errors/client";
 import {
   Dialog,
   DialogContent,

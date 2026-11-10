@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
-import { parseApiError, formatErrorMessage } from "@/lib/errors";
+import { parseApiError, formatErrorMessage } from "@/lib/errors/client";
 
 type ModerateAction = "disable" | "restore" | "delete" | "dismiss";
 

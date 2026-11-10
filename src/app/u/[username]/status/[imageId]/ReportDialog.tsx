@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Flag } from "lucide-react";
 import { toast } from "sonner";
-import { parseApiError, formatErrorMessage } from "@/lib/errors";
+import { parseApiError, formatErrorMessage } from "@/lib/errors/client";
 
 import {
   Dialog,

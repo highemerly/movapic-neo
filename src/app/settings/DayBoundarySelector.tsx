@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { SegmentControl } from "@/components/SegmentControl";
 import { SettingField } from "@/components/SettingRow";
 import { DAY_BOUNDARY_HOURS, describeBoundarySchedule } from "@/lib/dayClock";
-import { parseApiError, formatErrorMessage } from "@/lib/errors";
+import { parseApiError, formatErrorMessage } from "@/lib/errors/client";
 import { SETTINGS_TOAST_DURATION, toastSettingsError } from "./settingsToast";
 
 interface Upcoming {

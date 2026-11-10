@@ -12,7 +12,7 @@ import {
   Moon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { parseApiError, formatErrorMessage } from "@/lib/errors";
+import { parseApiError, formatErrorMessage } from "@/lib/errors/client";
 import { MastodonIcon } from "@/components/icons/MastodonIcon";
 import { MisskeyIcon } from "@/components/icons/MisskeyIcon";
 import { Button } from "@/components/ui/button";

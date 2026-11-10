@@ -10,7 +10,7 @@ import { RetryImg } from "@/components/RetryImg";
 import { Button } from "@/components/ui/button";
 import { userPathSegment } from "@/lib/userHandle";
 import { useHomeServer } from "@/components/HomeServerProvider";
-import { parseApiError, formatErrorMessage } from "@/lib/errors";
+import { parseApiError, formatErrorMessage } from "@/lib/errors/client";
 
 export type MuteEntryDto = {
   id: string;

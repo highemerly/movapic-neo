@@ -8,7 +8,7 @@ import { StackedSquaresIcon } from "./StackedSquaresIcon";
 import { CollageShareDialog } from "./CollageShareDialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { parseApiError, formatErrorMessage } from "@/lib/errors";
+import { parseApiError, formatErrorMessage } from "@/lib/errors/client";
 import { isJapaneseHoliday } from "@/lib/holidays";
 import { MONTH_DAYS_TIERS } from "@/lib/achievements/monthDays";
 import { formatYm } from "@/lib/jst";

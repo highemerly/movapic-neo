@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toastSaved, toastSettingsError } from "./settingsToast";
 import { SettingToggleRow } from "@/components/SettingRow";
-import { parseApiError, formatErrorMessage } from "@/lib/errors";
+import { parseApiError, formatErrorMessage } from "@/lib/errors/client";
 
 interface BlockCrawlersToggleProps {
   initialEnabled: boolean;
