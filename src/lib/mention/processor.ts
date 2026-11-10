@@ -23,7 +23,7 @@ import { ErrorCodes } from "@/lib/errors";
 import { isAuthFailureStatus } from "@/lib/fediverse/failureAdvice";
 import { federationFailedMessage } from "./replyMessages";
 import { USER_AGENT } from "@/lib/userAgent";
-import { assertSafeRemoteUrl } from "@/lib/security/ssrf";
+import { assertSafeRemoteUrl, remoteFetch } from "@/lib/security/ssrf";
 import { resolveAchievement } from "@/lib/achievements/catalog";
 import { userPathSegment } from "@/lib/userHandle";
 import { getHomeServer } from "@/lib/auth/serverPolicy";
@@ -109,13 +109,12 @@ async function sendBotReply(
  * 画像をfetch
  *
  * media_attachments[].url は外部インスタンス由来の任意URLになりうるため、
- * fetch前に解決先IPを検証して内部アドレスへのSSRFを防ぐ。
+ * 入力時（https・解決先IP）と接続時（リダイレクト先・再バインド）の両方で内部アドレスを止める。
  */
 async function fetchImage(url: string): Promise<Buffer> {
-  // 解決先IPが内部・予約済みアドレスでないことを検証（SSRF対策）
   const safeUrl = await assertSafeRemoteUrl(url);
 
-  const response = await fetch(safeUrl, {
+  const response = await remoteFetch(safeUrl, {
     headers: { "User-Agent": USER_AGENT },
     signal: AbortSignal.timeout(REQUEST_TIMEOUT),
   });

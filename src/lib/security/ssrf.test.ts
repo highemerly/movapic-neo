@@ -1,10 +1,20 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import { readFileSync } from "node:fs";
 
 // dns/promises.lookup をモックして DNS 解決経路を制御する。
 vi.mock("dns/promises", () => ({ lookup: vi.fn() }));
 
 import { lookup } from "dns/promises";
-import { isBlockedIP, assertSafeRemoteHost, assertSafeRemoteUrl, safeFetch, SsrfError } from "./ssrf";
+import {
+  isBlockedIP,
+  assertSafeRemoteHost,
+  assertSafeRemoteUrl,
+  remoteFetch,
+  safeFetch,
+  SsrfError,
+} from "./ssrf";
 
 const mockLookup = lookup as unknown as Mock;
 
@@ -28,6 +38,8 @@ describe("isBlockedIP", () => {
       ["239.255.255.255", "マルチキャスト 224/4 上端"],
       ["240.0.0.1", "予約 240/4"],
       ["255.255.255.255", "ブロードキャスト"],
+      ["198.18.0.1", "ベンチマーク 198.18/15 下端"],
+      ["198.19.255.255", "ベンチマーク 198.18/15 上端"],
     ])("%s をブロック（%s）", (ip) => {
       expect(isBlockedIP(ip)).toBe(true);
     });
@@ -46,6 +58,9 @@ describe("isBlockedIP", () => {
       ["100.63.255.255"], // CGNAT の直前
       ["100.128.0.1"], // CGNAT の直後
       ["223.255.255.255"], // 224/4 の直前
+      ["198.17.255.255"], // 198.18/15 の直前
+      ["198.20.0.1"], // 198.18/15 の直後
+      ["198.51.100.10"], // TEST-NET-2。E2E の偽 Fediverse がここで動く
     ])("%s を許可", (ip) => {
       expect(isBlockedIP(ip)).toBe(false);
     });
@@ -60,6 +75,20 @@ describe("isBlockedIP", () => {
       ["fd12:3456::1", "ユニークローカル fd"],
       ["::ffff:127.0.0.1", "IPv4射影→ループバック"],
       ["::ffff:10.0.0.1", "IPv4射影→プライベート"],
+      ["::ffff:7f00:1", "IPv4射影の16進表記→ループバック（URL はこの表記に正規化する）"],
+      ["::7f00:1", "IPv4互換（廃止）"],
+      ["fe90::1", "リンクローカル fe80::/10 の途中"],
+      ["febf:ffff::1", "リンクローカル fe80::/10 の上端"],
+      ["fec0::1", "サイトローカル（廃止）"],
+      ["ff02::1", "マルチキャスト"],
+      ["64:ff9b::7f00:1", "NAT64 に埋め込んだ 127.0.0.1"],
+      ["64:ff9b::a9fe:a9fe", "NAT64 に埋め込んだメタデータIP"],
+      ["64:ff9b:1::1", "NAT64 のローカル用"],
+      ["2002:7f00:1::1", "6to4 に埋め込んだ 127.0.0.1"],
+      ["2002:a00:1::1", "6to4 に埋め込んだ 10.0.0.1"],
+      ["2001::1", "Teredo"],
+      ["100::1", "破棄専用"],
+      ["fe80::1%eth0", "ゾーンID付き"],
     ])("%s をブロック（%s）", (ip) => {
       expect(isBlockedIP(ip)).toBe(true);
     });
@@ -67,6 +96,9 @@ describe("isBlockedIP", () => {
     it.each([
       ["2001:4860:4860::8888", "公開IPv6（Google DNS）"],
       ["::ffff:8.8.8.8", "IPv4射影→公開"],
+      ["64:ff9b::808:808", "NAT64 に埋め込んだ公開IP（DNS64 の網から IPv4 のインスタンスへ届く）"],
+      ["2002:808:808::1", "6to4 に埋め込んだ公開IP"],
+      ["2001:db8::1", "ドキュメント用（内部ではない）"],
     ])("%s を許可（%s）", (ip) => {
       expect(isBlockedIP(ip)).toBe(false);
     });
@@ -269,5 +301,58 @@ describe("safeFetch", () => {
     mockFetch.mockImplementation(async () => redirect(302, "https://a.example/loop"));
     await expect(safeFetch("https://a.example/loop")).rejects.toBeInstanceOf(SsrfError);
     expect(mockFetch).toHaveBeenCalledTimes(6);
+  });
+});
+
+describe("remoteFetch: 接続の直前に接続先IPを検査する", () => {
+  // 本物のソケットで確かめる（dispatcher の配線が切れていても fetch のモックでは気づけないため）。
+  // 127.0.0.1 で待ち受け、届いたら記録する。
+  let server: Server;
+  let port: number;
+  let hits = 0;
+
+  beforeEach(async () => {
+    vi.unstubAllGlobals();
+    hits = 0;
+    server = createServer((_req, res) => {
+      hits++;
+      res.end("ok");
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    port = (server.address() as AddressInfo).port;
+    return () => new Promise<void>((resolve) => server.close(() => resolve()));
+  });
+
+  const causeOf = async (p: Promise<unknown>) => {
+    const error = await p.then(
+      () => null,
+      (e: unknown) => e
+    );
+    return (error as { cause?: unknown } | null)?.cause;
+  };
+
+  it("IP 直指定の内部アドレスには接続しない（リダイレクト先の http://127.0.0.1 と同じ経路）", async () => {
+    const cause = await causeOf(remoteFetch(`http://127.0.0.1:${port}/`));
+    expect(cause).toBeInstanceOf(SsrfError);
+    expect(hits).toBe(0);
+  });
+
+  it("内部アドレスに解決される名前には接続しない（DNS の再バインドと同じ経路）", async () => {
+    const cause = await causeOf(remoteFetch(`http://localhost:${port}/`));
+    expect(cause).toBeInstanceOf(SsrfError);
+    expect(hits).toBe(0);
+  });
+
+  it("ガードを通さない素の fetch なら届く（上の2つがサーバー側の都合で落ちたのではないことの確認）", async () => {
+    const res = await fetch(`http://127.0.0.1:${port}/`);
+    expect(await res.text()).toBe("ok");
+    expect(hits).toBe(1);
+  });
+
+  it("undici のメジャーが Node 組み込みの fetch と同じ（違うと remoteFetch が全部失敗する）", () => {
+    const { version } = JSON.parse(
+      readFileSync(new URL("../../../node_modules/undici/package.json", import.meta.url), "utf8")
+    ) as { version: string };
+    expect(version.split(".")[0]).toBe(process.versions.undici?.split(".")[0]);
   });
 });

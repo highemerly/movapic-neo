@@ -7,6 +7,7 @@
  */
 
 import { USER_AGENT } from "@/lib/userAgent";
+import { remoteFetch } from "@/lib/security/ssrf";
 
 /** search が HTTPエラー（!ok）で終わったときに投げる。 */
 export class SearchResolveError extends Error {
@@ -31,7 +32,7 @@ export async function searchResolveStatusId(
   url: string,
   timeoutMs = 10000
 ): Promise<string | null> {
-  const response = await fetch(
+  const response = await remoteFetch(
     `https://${viewerDomain}/api/v2/search?q=${encodeURIComponent(url)}&resolve=true&type=statuses&limit=1`,
     {
       headers: {

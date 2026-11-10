@@ -53,7 +53,9 @@
     {
       // Node のメジャーは Dockerfile（node:22-alpine）・CI（setup-node）・.tool-versions・@types/node を
       // 揃えて上げる必要があるため1つの PR にまとめる。
-      matchDepNames: ['node', '@types/node'],
+      // undici も同じ。SSRF ガード（src/lib/security/ssrf.ts）は Node 組み込みの fetch に undici の Agent を
+      // 渡しており、メジャーが Node 組み込みの undici（Node 22 は 6）と違うと全部の通信が失敗する。
+      matchDepNames: ['node', '@types/node', 'undici'],
       matchUpdateTypes: ['major'],
       groupName: 'Node.js major',
     },

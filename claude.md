@@ -92,6 +92,7 @@
 ### API（詳細: [docs/api.md](docs/api.md)）
 - レート制限: プレビュー生成(`/api/v1/generate`)はIP単位のスライディングウィンドウ（[rateLimit.ts](src/lib/rateLimit.ts)）、投稿(`/api/v1/post`)はユーザー単位でDB履歴ベース（[postRateLimit.ts](src/lib/postRateLimit.ts)・15分/24時間の2窓、24時間は直近1週間の投稿数で上限が上がる）。閾値定数は将来env切り出し予定。処理タイムアウト30秒（超過で504）・レスポンスにContent-Lengthを含む。
 - エラー形式は `{ success:false, error:{ code, message, suggestion?, requestId? } }`。
+- 利用者が決められるホスト（ログインした Fediverse インスタンス・リモートの添付画像など）への通信は素の `fetch` でなく [`remoteFetch`/`safeFetch`](src/lib/security/ssrf.ts) を使う（接続の直前に接続先IPを検査＝リダイレクト先・DNS の再バインドで内部へ届かせない）。
 
 ### テスト / CI
 - **Vitest**（`environment: node`・`globals: true`・alias `@`＝[vitest.config.ts](vitest.config.ts)）。テストは対象と**同じ階層に併置**（`src/**/foo.ts` → `src/**/foo.test.ts`）。書式は `describe`/`it`/`expect`、`it` の説明は日本語。

@@ -10,6 +10,7 @@
  */
 
 import { USER_AGENT } from "@/lib/userAgent";
+import { remoteFetch } from "@/lib/security/ssrf";
 
 const REQUEST_TIMEOUT = 15000; // 15秒
 
@@ -30,7 +31,7 @@ async function mastodonStatusExists(
   statusId: string
 ): Promise<boolean> {
   try {
-    const response = await fetch(
+    const response = await remoteFetch(
       `https://${domain}/api/v1/statuses/${statusId}`,
       {
         method: "GET",
@@ -59,7 +60,7 @@ async function deleteMastodonStatus(
   statusId: string
 ): Promise<boolean> {
   try {
-    const response = await fetch(
+    const response = await remoteFetch(
       `https://${domain}/api/v1/statuses/${statusId}`,
       {
         method: "DELETE",
@@ -93,7 +94,7 @@ async function misskeyNoteExists(
   noteId: string
 ): Promise<boolean> {
   try {
-    const response = await fetch(`https://${domain}/api/notes/show`, {
+    const response = await remoteFetch(`https://${domain}/api/notes/show`, {
       method: "POST",
       headers: MISSKEY_HEADERS,
       body: JSON.stringify({ i: accessToken, noteId }),
@@ -117,7 +118,7 @@ async function deleteMisskeyNote(
   noteId: string
 ): Promise<boolean> {
   try {
-    const response = await fetch(`https://${domain}/api/notes/delete`, {
+    const response = await remoteFetch(`https://${domain}/api/notes/delete`, {
       method: "POST",
       headers: MISSKEY_HEADERS,
       body: JSON.stringify({ i: accessToken, noteId }),
