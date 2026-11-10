@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { RetryImg } from "@/components/RetryImg";
 import { useConfirm } from "@/components/providers/ConfirmProvider";
 import { NativeSelect } from "@/app/admin/_components/NativeSelect";
-import { parseApiError, formatErrorMessage } from "@/lib/errors";
+import { parseApiError, formatErrorMessage } from "@/lib/errors/client";
 
 export type AdminEmoji = {
   id: string;

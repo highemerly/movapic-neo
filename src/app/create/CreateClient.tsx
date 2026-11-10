@@ -61,7 +61,7 @@ import {
   parseApiError,
   formatErrorMessage,
   type ParsedApiError,
-} from "@/lib/errors";
+} from "@/lib/errors/client";
 import { extractExif, type ExtractedExif } from "@/lib/exif/parser";
 import { exifDetailValues } from "@/lib/exif/details";
 import { userPathSegment } from "@/lib/userHandle";
