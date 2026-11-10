@@ -7,9 +7,12 @@
  * 成立する）か、リモートが改行入りのユーザー名を返すと、robots.txt に任意の行を差し込めた。
  * また "spam.example:443" "spam.example." "spam.example/x" は同じホストへ通信するのに
  * DENIED_SERVERS の完全一致をすり抜けた。
+ * 同じく、全角（ｓpam.example）・全角の句点（spam。example）・ソフトハイフンやゼロ幅スペース入り・
+ * punycode（xn--…）と Unicode の両表記も、入力どおりに返していたためすり抜け、表記ごとに別の
+ * Instance / User になった（ユーザー単位の投稿レート制限も表記を変えれば回避できた。2026-11-10 確認）。
  */
 
-import { domainToASCII } from "node:url";
+import { domainToASCII, domainToUnicode } from "node:url";
 
 /**
  * サーバー名を正規化
@@ -27,8 +30,11 @@ export function normalizeServer(server: string): string {
 }
 
 /**
- * ログイン画面の入力を正規化し、ホスト名だけで構成されていればそれを返す。そうでなければ null。
- * 日本語ドメインは入力どおり（Unicode のまま）返す＝既存の Instance.domain と同じ形を保つ。
+ * ログイン画面の入力（と DENIED_SERVERS などの設定値）を正規化し、ホスト名だけで構成されていれば
+ * その正規形を返す。そうでなければ null。
+ * 正規形は、URL が解釈したホスト名（UTS46: 全角→半角・"。"→"."・不可視文字の除去・小文字化をした ASCII）を
+ * Unicode に戻したもの。通信先が同じなら表記によらず1つの値になる。日本語ドメインは Unicode の形
+ * （既存の Instance.domain と同じ形）になる。
  */
 export function parseServerHostname(server: string): string | null {
   // 末尾のドットは同じホストの別表記なので落とす（拒否リストのすり抜け防止）
@@ -48,7 +54,8 @@ export function parseServerHostname(server: string): string | null {
   // ":443" は既定ポートとして URL から落ちるため上の判定を通る。入力そのものがホスト名として
   // 解釈できること（ASCII 化した結果が URL のホスト名と一致すること）で確かめる。
   if (domainToASCII(normalized) !== url.hostname) return null;
-  return normalized;
+  // 不正な punycode（xn--zz 等）は Unicode に戻せず空になる
+  return domainToUnicode(url.hostname) || null;
 }
 
 /**

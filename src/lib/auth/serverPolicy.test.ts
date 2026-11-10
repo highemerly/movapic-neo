@@ -55,6 +55,16 @@ describe("getDeniedServers", () => {
     vi.stubEnv("DENIED_SERVERS", "Bad.example,evil.example");
     expect(getDeniedServers()).toEqual(["bad.example", "evil.example"]);
   });
+
+  it("ログイン入力と同じ正規形にする（punycode・全角で書いても Instance.domain と一致する）", () => {
+    vi.stubEnv("DENIED_SERVERS", "xn--wgv71a119e.jp,ｓpam.example,https://Evil.example/");
+    expect(getDeniedServers()).toEqual(["日本語.jp", "spam.example", "evil.example"]);
+  });
+
+  it("ドメインとして解釈できない値があれば落とす（黙って無視すると拒否リストに穴が開く）", () => {
+    vi.stubEnv("DENIED_SERVERS", "bad.example,evil.example:8443");
+    expect(() => getDeniedServers()).toThrow(/DENIED_SERVERS/);
+  });
 });
 
 describe("getHomeServer", () => {
