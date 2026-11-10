@@ -12,8 +12,12 @@ function stubFetch(impl: (url: string, init?: RequestInit) => Promise<Response>)
   return mock;
 }
 
+// 本物の Response を返す（remoteFetch が本文の大きさを数えるために body・headers を読むため）
 function json(data: unknown, status = 200): Response {
-  return { ok: status >= 200 && status < 300, status, json: async () => data } as Response;
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
 }
 
 afterEach(() => {

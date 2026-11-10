@@ -35,6 +35,8 @@ export interface EmojiCatalog {
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 // 数MBのレスポンスを受け切る必要があるため、他のFediverse呼び出し（4秒）より長く取る
 const FETCH_TIMEOUT_MS = 20000;
+// 応答の上限。misskey.io で 3.6MB（14,218件・2026-11-10 実測）。既定の上限（4MB）では余裕が無い
+const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 
 interface RawEmoji {
   name?: string;
@@ -48,10 +50,14 @@ interface RawEmoji {
  * Misskey の /api/emojis は未認証GETで読める（レスポンスは { emojis: [...] }）。
  */
 export async function fetchMisskeyEmojis(domain: string): Promise<CustomEmoji[]> {
-  const response = await remoteFetch(`https://${domain}/api/emojis`, {
-    headers: { "User-Agent": USER_AGENT },
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  });
+  const response = await remoteFetch(
+    `https://${domain}/api/emojis`,
+    {
+      headers: { "User-Agent": USER_AGENT },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    },
+    { maxResponseBytes: MAX_RESPONSE_BYTES }
+  );
   if (!response.ok) {
     throw new Error(`failed to fetch emojis from ${domain}: ${response.status}`);
   }

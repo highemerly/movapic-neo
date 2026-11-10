@@ -14,6 +14,8 @@ import {
   remoteFetch,
   safeFetch,
   SsrfError,
+  limitResponseBody,
+  ResponseTooLargeError,
 } from "./ssrf";
 
 const mockLookup = lookup as unknown as Mock;
@@ -354,5 +356,49 @@ describe("remoteFetch: 接続の直前に接続先IPを検査する", () => {
       readFileSync(new URL("../../../node_modules/undici/package.json", import.meta.url), "utf8")
     ) as { version: string };
     expect(version.split(".")[0]).toBe(process.versions.undici?.split(".")[0]);
+  });
+});
+
+describe("limitResponseBody: 応答の本文の上限", () => {
+  // Content-Length を付けずに少しずつ流す（相手が大きさを申告しない場合）
+  const streamed = (chunks: number[]) =>
+    new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          for (const n of chunks) controller.enqueue(new Uint8Array(n));
+          controller.close();
+        },
+      }),
+      { status: 200 }
+    );
+
+  it("上限以内ならそのまま読める（状態とヘッダも保つ）", async () => {
+    const res = limitResponseBody(
+      new Response('{"a":1}', { status: 201, headers: { "x-test": "1" } }),
+      100
+    );
+    expect(res.status).toBe(201);
+    expect(res.headers.get("x-test")).toBe("1");
+    expect(await res.json()).toEqual({ a: 1 });
+  });
+
+  it("ちょうど上限までは読める", async () => {
+    const res = limitResponseBody(streamed([40, 60]), 100);
+    expect((await res.arrayBuffer()).byteLength).toBe(100);
+  });
+
+  it("申告なしで上限を超えて流れてきたら、読んでいる途中で止める", async () => {
+    const res = limitResponseBody(streamed([60, 60]), 100);
+    await expect(res.arrayBuffer()).rejects.toBeInstanceOf(ResponseTooLargeError);
+  });
+
+  it("Content-Length が上限を超えていれば読む前に断る", () => {
+    const res = new Response("x".repeat(200), { headers: { "content-length": "200" } });
+    expect(() => limitResponseBody(res, 100)).toThrow(ResponseTooLargeError);
+  });
+
+  it("本文の無い応答（204 など）はそのまま返す", () => {
+    const res = new Response(null, { status: 204 });
+    expect(limitResponseBody(res, 100)).toBe(res);
   });
 });

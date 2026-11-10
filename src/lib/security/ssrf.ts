@@ -154,9 +154,65 @@ function getGuardedAgent(): Agent {
 }
 
 /**
+ * 応答の本文の既定の上限。Fediverse の API の応答は大きくても 100KB ほど（2026-11-10 実測:
+ * Misskey の notes/reactions 100件で 91KB・Mastodon の favourited_by 40件で 59KB・/api/v1/instance で 23KB）。
+ * 古い Misskey（v12）は /api/meta に絵文字一覧を丸ごと載せていたため、ログイン時の判定が落ちないよう余裕を取る。
+ */
+export const DEFAULT_MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+
+export class ResponseTooLargeError extends Error {
+  constructor(maxBytes: number) {
+    super(`応答が大きすぎます（上限 ${maxBytes} バイト）`);
+    this.name = "ResponseTooLargeError";
+  }
+}
+
+/**
+ * 本文を読みながら数え、maxBytes を超えたら読むのを止める（.json()/.text()/.arrayBuffer() が
+ * ResponseTooLargeError で失敗する）。Content-Length が上限を超えていれば読む前に断る。
+ * 数えるのは展開後の本文＝実際にメモリに載る量（Content-Length は圧縮後の大きさ）。
+ */
+export function limitResponseBody(res: Response, maxBytes: number): Response {
+  const declared = Number(res.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    void res.body?.cancel();
+    throw new ResponseTooLargeError(maxBytes);
+  }
+  if (!res.body) return res;
+
+  let total = 0;
+  const limited = res.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        total += chunk.byteLength;
+        if (total > maxBytes) {
+          controller.error(new ResponseTooLargeError(maxBytes));
+          return;
+        }
+        controller.enqueue(chunk);
+      },
+    })
+  );
+  // url・redirected は引き継がれないが、呼び出し側では使っていない
+  return new Response(limited, {
+    status: res.status,
+    statusText: res.statusText,
+    headers: res.headers,
+  });
+}
+
+export interface RemoteFetchOptions {
+  /** 応答の本文の上限（バイト）。既定は DEFAULT_MAX_RESPONSE_BYTES */
+  maxResponseBytes?: number;
+}
+
+/**
  * 利用者が決められるホスト（ログインした Fediverse インスタンス・リモートの添付画像など）への fetch。
  * リダイレクトは既定どおりたどるが、各ホップの接続先 IP を検査する。
  * 内部アドレスに当たると TypeError("fetch failed")（cause が SsrfError）で失敗する。
+ *
+ * 応答の本文にも上限を設ける（limitResponseBody）。pitfall: 以前は上限が無く、相手のサーバーが
+ * 巨大な本文を返すと、1 Pod の worker-front がまるごとメモリに読み込んでいた（2026-11-10 確認）。
  *
  * dispatcher は Node 組み込みの fetch と同じメジャーの undici でないと動かない
  * （undici 8 の Agent を Node 22 の fetch に渡すと invalid onRequestStart method で全部失敗する）。
@@ -164,8 +220,13 @@ function getGuardedAgent(): Agent {
  * なる（メディアのアップロードが壊れる）ため、組み込みの fetch に undici の Agent を渡す形にしている。
  * Node のメジャーを上げるときは undici のメジャーも揃える（ssrf.test.ts で確かめている）。
  */
-export function remoteFetch(input: string | URL, init: RequestInit = {}): Promise<Response> {
-  return fetch(input, { ...init, dispatcher: getGuardedAgent() } as RequestInit);
+export async function remoteFetch(
+  input: string | URL,
+  init: RequestInit = {},
+  { maxResponseBytes = DEFAULT_MAX_RESPONSE_BYTES }: RemoteFetchOptions = {}
+): Promise<Response> {
+  const res = await fetch(input, { ...init, dispatcher: getGuardedAgent() } as RequestInit);
+  return limitResponseBody(res, maxResponseBytes);
 }
 
 /**
