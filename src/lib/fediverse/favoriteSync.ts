@@ -12,7 +12,7 @@
  */
 
 import { Prisma } from "@prisma/client";
-import prisma from "@/lib/db";
+import prisma, { type InstanceOmit } from "@/lib/db";
 import {
   fetchFavoriteData,
   toFavoriteReason,
@@ -45,7 +45,7 @@ const OWNER_FAVOURITER_LIMIT = 40;
 const UNFAVORITE_GRACE_MS = 60 * 60 * 1000;
 
 export type ImageForFavorite = Prisma.ImageGetPayload<{
-  include: { user: { include: { instance: true } } };
+  include: { user: { include: { instance: { omit: InstanceOmit } } } };
 }>;
 
 export function readCache(image: ImageForFavorite): CachedFavoriter[] {

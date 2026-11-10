@@ -5,14 +5,14 @@
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { randomUUID } from "crypto";
-import prisma from "@/lib/db";
+import prisma, { type InstanceOmit } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import { SESSION_COOKIE_NAME, SESSION_DURATION_SECONDS } from "./sessionConstants";
 
 const LOGIN_SESSION_RETENTION_DAYS = 90;
 
 // Prismaから生成されたInstance型を取得
-type Instance = Prisma.InstanceGetPayload<object>;
+type Instance = Prisma.InstanceGetPayload<{ omit: InstanceOmit }>;
 
 // JWT署名用の秘密鍵
 function getJWTSecret(): Uint8Array {

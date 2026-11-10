@@ -31,6 +31,7 @@ model Instance {
   // ローカル絵文字URL解決（notes/show の reactionEmojis はリモート絵文字しか載せないため、
   // :name@.: のURLはオーナーインスタンスのこの一覧からしか引けない）。
   // 大規模インスタンスでは数MBになるため、読み出しはプロセス内メモ化を挟むこと。
+  // クライアント全体の omit で既定では読まない（src/lib/db/index.ts）。読むときは select で明示する。
   // Mastodonインスタンスでは常にnull。
   emojisCache    Json?     @map("emojis_cache")
   emojisSyncedAt DateTime? @map("emojis_synced_at")
