@@ -49,6 +49,57 @@ export interface UploadFailureReport {
   fileReadError?: string;
 }
 
+/** サーバーが受け付ける本文の上限。正規の報告は最大でも 400 バイトほど（全項目を埋めても 366 バイト）。 */
+export const MAX_UPLOAD_FAILURE_REPORT_BYTES = 2048;
+
+const ENDPOINTS: ReadonlySet<string> = new Set(["generate", "post"]);
+const PHASES: ReadonlySet<string> = new Set(["upload-stall", "process-timeout", "network", "aborted"]);
+
+const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+const bool = (v: unknown) => (typeof v === "boolean" ? v : undefined);
+const str = (v: unknown, max: number) =>
+  typeof v === "string" ? v.slice(0, max) : undefined;
+
+/**
+ * 受け取った報告から既知の項目だけを、型と長さを確かめて取り出す（サーバー側でログに書く前に通す）。
+ * endpoint・phase が既知の値でなければ報告ではないとみなして null。
+ * pitfall: 以前は受け取った JSON を丸ごとログに展開しており、認証なしで任意の中身（最大 20MB）を
+ * ログへ書き込めた（2026-11-10 確認）。
+ */
+export function sanitizeUploadFailureReport(body: unknown): Record<string, unknown> | null {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const b = body as Record<string, unknown>;
+  if (typeof b.endpoint !== "string" || !ENDPOINTS.has(b.endpoint)) return null;
+  if (typeof b.phase !== "string" || !PHASES.has(b.phase)) return null;
+
+  const c =
+    b.connection && typeof b.connection === "object" && !Array.isArray(b.connection)
+      ? (b.connection as Record<string, unknown>)
+      : {};
+  return {
+    endpoint: b.endpoint,
+    phase: b.phase,
+    uploadCompleted: bool(b.uploadCompleted),
+    uploadPct: num(b.uploadPct),
+    fileSize: num(b.fileSize),
+    output: str(b.output, 16),
+    elapsedMs: num(b.elapsedMs),
+    retryCount: num(b.retryCount),
+    fileType: str(b.fileType, 64),
+    fileExt: str(b.fileExt, 8),
+    fileReadable: bool(b.fileReadable),
+    fileReadMs: num(b.fileReadMs),
+    fileReadError: str(b.fileReadError, 64),
+    connection: {
+      effectiveType: str(c.effectiveType, 16),
+      downlink: num(c.downlink),
+      rtt: num(c.rtt),
+      saveData: bool(c.saveData),
+      type: str(c.type, 16),
+    },
+  };
+}
+
 /**
  * 失敗時に画像ファイルが実際に読めるかを実測する。
  * network フェーズ（送信前に即失敗）の正体が「ファイル本体を読めない（Android のクラウド画像等）」か
