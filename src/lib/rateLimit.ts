@@ -4,6 +4,8 @@
  * Web Pod は1インスタンス前提のため、分散共有せずインメモリで判定する。
  */
 
+import { isIPv6 } from "node:net";
+
 // キー（IP）ごとの、直近ウィンドウ内アクセス時刻（昇順）。
 const accessLog = new Map<string, number[]>();
 
@@ -33,14 +35,40 @@ function cleanupOldEntries(now: number): void {
 }
 
 /**
+ * 数える単位。IPv6 は /64 にまとめる（1契約・1端末に /64 が丸ごと割り当てられるのが普通で、
+ * アドレス単位だと下位64ビットを変えるだけで実質無制限になるため）。IPv4 はそのまま。
+ */
+export function rateLimitKey(ip: string): string {
+  const addr = ip.replace(/%.*$/, ""); // ゾーンID（fe80::1%eth0）は落とす
+  if (!isIPv6(addr)) return ip;
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(addr);
+  if (mapped) return mapped[1];
+
+  // "::" を展開して8グループにする。末尾の埋め込み IPv4（a.b.c.d）は2グループぶんで、/64 には影響しない
+  const [headPart, tailPart] = addr.split("::");
+  const groups = (part: string | undefined) =>
+    part ? part.split(":").flatMap((g) => (g.includes(".") ? ["0", "0"] : [g])) : [];
+  const head = groups(headPart);
+  const tail = tailPart === undefined ? [] : groups(tailPart);
+  const full =
+    tailPart === undefined ? head : [...head, ...Array(8 - head.length - tail.length).fill("0"), ...tail];
+  const prefix = full
+    .slice(0, 4)
+    .map((g) => parseInt(g, 16).toString(16))
+    .join(":");
+  return `${prefix}::/64`;
+}
+
+/**
  * レート制限をチェック
- * @param ip クライアントのIPアドレス
+ * @param clientIp クライアントのIPアドレス（IPv6 は /64 単位で数える）
  * @returns { allowed: boolean, retryAfter?: number }
  */
-export function checkRateLimit(ip: string): {
+export function checkRateLimit(clientIp: string): {
   allowed: boolean;
   retryAfter?: number;
 } {
+  const ip = rateLimitKey(clientIp);
   const now = Date.now();
   cleanupOldEntries(now);
 

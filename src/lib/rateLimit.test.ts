@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { checkRateLimit, getClientIp } from "./rateLimit";
+import { checkRateLimit, getClientIp, rateLimitKey } from "./rateLimit";
 
 describe("checkRateLimit", () => {
   beforeEach(() => {
@@ -84,5 +84,48 @@ describe("getClientIp", () => {
 
   it("いずれも無ければ unknown", () => {
     expect(getClientIp(reqWith({}))).toBe("unknown");
+  });
+});
+
+describe("rateLimitKey", () => {
+  it("IPv4 はアドレスそのまま", () => {
+    expect(rateLimitKey("203.0.113.5")).toBe("203.0.113.5");
+  });
+
+  it("IPv6 は /64 にまとめる（下位64ビットを変えても同じキー）", () => {
+    const a = rateLimitKey("2001:db8:1:2:aaaa:bbbb:cccc:dddd");
+    const b = rateLimitKey("2001:db8:1:2::1");
+    expect(a).toBe("2001:db8:1:2::/64");
+    expect(b).toBe(a);
+  });
+
+  it("別の /64 は別のキー", () => {
+    expect(rateLimitKey("2001:db8:1:3::1")).not.toBe(rateLimitKey("2001:db8:1:2::1"));
+  });
+
+  it("省略形・先頭ゼロ・大文字の違いは同じキー", () => {
+    expect(rateLimitKey("2001:DB8:0:0::1")).toBe("2001:db8:0:0::/64");
+    expect(rateLimitKey("2001:0db8::1")).toBe("2001:db8:0:0::/64");
+    expect(rateLimitKey("::1")).toBe("0:0:0:0::/64");
+  });
+
+  it("IPv4 射影アドレスは IPv4 として数える", () => {
+    expect(rateLimitKey("::ffff:203.0.113.5")).toBe("203.0.113.5");
+  });
+
+  it("ゾーンIDは落とす", () => {
+    expect(rateLimitKey("fe80::1%eth0")).toBe("fe80:0:0:0::/64");
+  });
+
+  it("IP でない値（unknown）はそのまま", () => {
+    expect(rateLimitKey("unknown")).toBe("unknown");
+  });
+});
+
+describe("checkRateLimit（IPv6）", () => {
+  it("同じ /64 の別アドレスは同じ枠を使う", () => {
+    expect(checkRateLimit("2001:db8:99:1::a").allowed).toBe(true);
+    expect(checkRateLimit("2001:db8:99:1::b").allowed).toBe(true);
+    expect(checkRateLimit("2001:db8:99:1::c").allowed).toBe(false);
   });
 });
