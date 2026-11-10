@@ -35,7 +35,7 @@ import {
   isValidOutput,
   isValidArrangement,
 } from "@/types";
-import { countGraphemes } from "@/lib/text/grapheme";
+import { exceedsGraphemeLimit } from "@/lib/text/grapheme";
 import { sanitizeExifDetails, type ExifDetails } from "@/lib/exif/details";
 
 export async function POST(request: NextRequest) {
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
 
     // 値の妥当性検証（/api/v1/generate と同一の制約。直叩きでの制限回避を防ぐ）。
     // 存在チェックだけでは不正な enum や長大テキストがそのまま DB・Fediverse へ流れる。
-    if (countGraphemes(text) > MAX_TEXT_LENGTH) {
+    if (exceedsGraphemeLimit(text, MAX_TEXT_LENGTH)) {
       return NextResponse.json(
         { error: `テキストは${MAX_TEXT_LENGTH}文字以下にしてください` },
         { status: 400 }
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
 
     // 代替テキスト（ALT）は Mastodon の description 上限に合わせて1500字まで。
     // （Misskey へ送るときは post.ts が512字に切り詰める）
-    if (altText && countGraphemes(altText) > 1500) {
+    if (altText && exceedsGraphemeLimit(altText, 1500)) {
       return NextResponse.json(
         { error: "代替テキストは1500文字以下にしてください" },
         { status: 400 }

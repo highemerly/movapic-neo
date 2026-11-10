@@ -267,6 +267,15 @@ describe("POST /api/v1/ingest/email — 宛先とバリデーション", () => {
     expect((await errorOf(res)).code).toBe("VALIDATION_TOO_LONG");
   });
 
+  it("結合文字で書記素の数を抑えた長大なテキストは400", async () => {
+    mockParseEmail.mockResolvedValue(parsed({ text: "あ" + "\u0301".repeat(100_000) }));
+
+    const res = await POST(req());
+
+    expect(res.status).toBe(400);
+    expect((await errorOf(res)).code).toBe("VALIDATION_TOO_LONG");
+  });
+
   it(`ちょうど${MAX_TEXT_LENGTH}文字は受け付ける`, async () => {
     mockParseEmail.mockResolvedValue(parsed({ text: "あ".repeat(MAX_TEXT_LENGTH) }));
 

@@ -3,6 +3,7 @@ import {
   splitGraphemes,
   countGraphemes,
   truncateGraphemes,
+  exceedsGraphemeLimit,
   isEmojiGrapheme,
   hasEmoji,
   hasNonEmojiText,
@@ -105,5 +106,29 @@ describe("hasNonEmojiText", () => {
     expect(hasNonEmojiText("👍 😀")).toBe(false); // 絵文字＋空白
     expect(hasNonEmojiText("   ")).toBe(false); // 空白のみ
     expect(hasNonEmojiText("")).toBe(false);
+  });
+});
+
+describe("exceedsGraphemeLimit", () => {
+  it("書記素で上限ちょうどは通り、1文字でも超えたら超過", () => {
+    expect(exceedsGraphemeLimit("あ".repeat(140), 140)).toBe(false);
+    expect(exceedsGraphemeLimit("あ".repeat(141), 140)).toBe(true);
+  });
+
+  it("絵文字は1文字（長い絵文字だけで上限まで埋めても通る）", () => {
+    // 旗のサブディビジョン（14）・肌色付き ZWJ の組み合わせ（15）が正規の絵文字で長い部類
+    expect(exceedsGraphemeLimit("🏴󠁧󠁢󠁥󠁮󠁧󠁿".repeat(140), 140)).toBe(false);
+    expect(exceedsGraphemeLimit("👩🏽‍❤️‍💋‍👨🏿".repeat(140), 140)).toBe(false);
+  });
+
+  it("結合文字を重ねて書記素の数を抑えた巨大な入力は超過（2026-11-10 に compute の CPU を占有した入力）", () => {
+    const oneGrapheme = "a" + "\u0301".repeat(100_000);
+    expect(countGraphemes(oneGrapheme)).toBe(1);
+    expect(exceedsGraphemeLimit(oneGrapheme, 140)).toBe(true);
+    expect(exceedsGraphemeLimit(("あ" + "\u0301".repeat(1000)).repeat(140), 140)).toBe(true);
+  });
+
+  it("日本語の濁点の結合文字（か+゛）程度は普通に通る", () => {
+    expect(exceedsGraphemeLimit("か\u3099".repeat(140), 140)).toBe(false);
   });
 });

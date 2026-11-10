@@ -90,6 +90,7 @@ describe("POST /api/v1/generate: バリデーション（統一エラー形 {suc
     { name: "非対応の拡張子/型", overrides: { image: new File(["x"], "a.txt", { type: "text/plain" }) }, status: 400, code: ErrorCodes.VALIDATION_FILE_TYPE },
     { name: "テキストなし", overrides: { text: "   " }, status: 400, code: ErrorCodes.VALIDATION_REQUIRED },
     { name: "テキスト長すぎ", overrides: { text: "あ".repeat(MAX_TEXT_LENGTH + 1) }, status: 400, code: ErrorCodes.VALIDATION_TOO_LONG },
+    { name: "結合文字で書記素の数を抑えた長大なテキスト", overrides: { text: "あ" + "\u0301".repeat(100_000) }, status: 400, code: ErrorCodes.VALIDATION_TOO_LONG },
     { name: "出力形式が不正", overrides: { output: "twitter" }, status: 400, code: ErrorCodes.VALIDATION_INVALID },
     { name: "位置が不正", overrides: { position: "center" }, status: 400, code: ErrorCodes.VALIDATION_INVALID },
     { name: "フォントが不正", overrides: { font: "arial" }, status: 400, code: ErrorCodes.VALIDATION_INVALID },

@@ -46,6 +46,22 @@ export function countGraphemes(text: string): number {
 }
 
 /**
+ * 1書記素あたりの UTF-16 の長さの上限（平均）。正規の絵文字で長い部類（旗のサブディビジョン 🏴󠁧󠁢󠁥󠁮󠁧󠁿=14・
+ * 肌色付き ZWJ の組み合わせ 👩🏽‍❤️‍💋‍👨🏿=15）が全部その絵文字でも収まる値。
+ */
+const MAX_CODE_UNITS_PER_GRAPHEME = 16;
+
+/**
+ * 文字数の上限（書記素で max 文字）を超えるか。入力の長さ制限は必ずこれで判定する。
+ * 書記素の数だけで判定すると、結合文字を1文字に何万個も重ねた入力が「1文字」として通る。
+ * pitfall: 実際に、2MB の本文が1文字として未認証の generate を通り、compute の CPU を数分以上
+ * 占有した（2026-11-10 再現）。UTF-16 の長さを先に見るので、巨大な入力は書記素に分割する前に弾ける。
+ */
+export function exceedsGraphemeLimit(text: string, max: number): boolean {
+  return text.length > max * MAX_CODE_UNITS_PER_GRAPHEME || countGraphemes(text) > max;
+}
+
+/**
  * 書記素境界を尊重して先頭から max 文字に切り詰める。
  * （サロゲートペアや結合絵文字を途中で割らない）
  */

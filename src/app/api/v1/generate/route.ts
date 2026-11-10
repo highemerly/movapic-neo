@@ -22,7 +22,7 @@ import {
   isValidOutput,
   isValidArrangement,
 } from "@/types";
-import { countGraphemes } from "@/lib/text/grapheme";
+import { exceedsGraphemeLimit } from "@/lib/text/grapheme";
 import { isSeasonActiveNow } from "@/lib/seasons/catalog";
 import {
   ErrorCodes,
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (countGraphemes(text) > MAX_TEXT_LENGTH) {
+    if (exceedsGraphemeLimit(text, MAX_TEXT_LENGTH)) {
       return errorResponse(
         ErrorCodes.VALIDATION_TOO_LONG,
         `テキストは${MAX_TEXT_LENGTH}文字以下にしてください`,
