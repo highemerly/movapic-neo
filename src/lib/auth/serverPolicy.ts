@@ -8,8 +8,13 @@
  * - FAVOR_SERVERS  : 特典対象サーバー（カンマ区切り）。特典は皆勤賞の穴埋め枠（2026-09 以前は grace +1日、
  *                    2026-10 以降は穴埋めポイント 毎月+1pt）。
  *
- * ドメインは全て normalizeServer 相当（小文字）で比較する前提で、ここで小文字化して返す。
+ * ドメインはログイン入力と同じ parseServerHostname の正規形にして返す（Instance.domain と同じ形）。
+ * pitfall: 以前は trim と小文字化だけで、設定に punycode（xn--…）や全角で書くと Unicode で保存された
+ * Instance.domain と一致しなかった。ドメインとして解釈できない値は、黙って無視すると拒否リストに
+ * 穴が開くため即座に落とす。
  */
+
+import { parseServerHostname } from "./serverIdentity";
 
 export type LoginPlatform = "mastodon" | "misskey";
 
@@ -22,6 +27,17 @@ function parseServerList(value: string | undefined): string[] {
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter((s) => s !== "");
+}
+
+/** カンマ区切りのドメインの env を正規形の配列にする。ドメインとして解釈できない値があれば落とす。 */
+function parseDomainList(name: string, value: string | undefined): string[] {
+  return parseServerList(value).map((item) => {
+    const domain = parseServerHostname(item);
+    if (!domain) {
+      throw new Error(`${name} にドメインとして解釈できない値があります: "${item}"`);
+    }
+    return domain;
+  });
 }
 
 /** ログインを許可するプラットフォーム。未設定・空なら両方許可。 */
@@ -46,7 +62,7 @@ export function getAllowedServers(): string[] | undefined {
   if (!allowed || allowed.trim() === "") {
     return undefined;
   }
-  return parseServerList(allowed);
+  return parseDomainList("ALLOWED_SERVERS", allowed);
 }
 
 /**
@@ -55,7 +71,7 @@ export function getAllowedServers(): string[] | undefined {
  * 拒否リストの取得は必ずこの関数を経由すること（差し替えの単一チョークポイント）。
  */
 export function getDeniedServers(): string[] {
-  return parseServerList(process.env.DENIED_SERVERS);
+  return parseDomainList("DENIED_SERVERS", process.env.DENIED_SERVERS);
 }
 
 /**
@@ -69,12 +85,16 @@ export function getHomeServer(): string | undefined {
     // 複数指定は URL の一意性が壊れる（同名ユーザーの衝突）ため設定ミスとして即座に落とす
     throw new Error("HOME_SERVER には単一のドメインのみ指定できます");
   }
-  return raw.trim().toLowerCase();
+  const domain = parseServerHostname(raw);
+  if (!domain) {
+    throw new Error(`HOME_SERVER がドメインとして解釈できません: "${raw}"`);
+  }
+  return domain;
 }
 
 /** 特典対象サーバー。未設定なら特典なし。 */
 export function getFavorServers(): string[] {
-  return parseServerList(process.env.FAVOR_SERVERS);
+  return parseDomainList("FAVOR_SERVERS", process.env.FAVOR_SERVERS);
 }
 
 /**

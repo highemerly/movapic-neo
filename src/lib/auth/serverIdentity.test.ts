@@ -12,9 +12,25 @@ describe("parseServerHostname", () => {
     expect(parseServerHostname("spam.example.")).toBe("spam.example");
   });
 
-  it("日本語ドメインは入力どおり（Unicode のまま）返す", () => {
+  it("日本語ドメインは Unicode の形で返す（punycode で入力しても同じ値になる）", () => {
     expect(parseServerHostname("日本語.jp")).toBe("日本語.jp");
-    expect(parseServerHostname("xn--wgv71a119e.jp")).toBe("xn--wgv71a119e.jp");
+    expect(parseServerHostname("xn--wgv71a119e.jp")).toBe("日本語.jp");
+    expect(parseServerHostname("日本語。jp")).toBe("日本語.jp");
+  });
+
+  it.each([
+    ["ｓpam.example", "全角の英字"],
+    ["ｓｐａｍ．ｅｘａｍｐｌｅ", "全部全角"],
+    ["spam。example", "全角の句点"],
+    ["spam．example", "全角のピリオド"],
+    ["spa\u00ADm.example", "ソフトハイフン入り"],
+    ["spa\u200Bm.example", "ゼロ幅スペース入り"],
+  ])("通信先が同じ別表記は同じ値にする: %s（%s）", (input) => {
+    expect(parseServerHostname(input)).toBe("spam.example");
+  });
+
+  it("Unicode に戻せない不正な punycode は弾く", () => {
+    expect(parseServerHostname("xn--zz.example")).toBeNull();
   });
 
   it("ポート付きは弾く（既定ポートの :443 も。同じホストへ通信するのに別ドメイン扱いになるため）", () => {
