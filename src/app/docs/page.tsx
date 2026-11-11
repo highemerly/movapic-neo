@@ -13,7 +13,6 @@ import {
   Type,
   ChartColumn,
   Smile,
-  Sparkles,
   Code,
   Megaphone,
   ScrollText,
@@ -29,7 +28,6 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Footer } from "@/components/Footer";
 import { PageContainer } from "@/components/PageContainer";
-import { allReleaseNotes, formatReleasedAt } from "@/lib/releaseNotes";
 import { APP_VERSION_LABEL } from "@/lib/version";
 
 export const metadata: Metadata = {
@@ -105,7 +103,6 @@ function ExternalDocsLink({
 
 export default async function DocsPage() {
   const user = await getCurrentUser();
-  const latest = allReleaseNotes()[0];
 
   return (
     <>
@@ -126,14 +123,6 @@ export default async function DocsPage() {
               description="システム構成・画像処理・入力制限・テキスト合成・各機能の仕組みなど"
               Icon={Code}
             />
-            {latest && (
-              <DocsLink
-                href={`/docs/release-note/${latest.version}`}
-                label={`最新リリース（v${latest.version}）`}
-                description={`${formatReleasedAt(latest)} 公開の更新内容`}
-                Icon={Sparkles}
-              />
-            )}
             <DocsLink
               href="/docs/release-note"
               label="リリースノート"
