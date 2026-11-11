@@ -104,6 +104,12 @@ export async function createTextOverlay(
       ctx.shadowBlur = Math.max(2, fontSize * 0.28);
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = Math.max(1, fontSize * 0.05);
+    } else if (seasonDef.decoration === "momiji") {
+      // 紅葉狩り: 写真の上で文字を浮かせる、暗い紅の短い影。
+      ctx.shadowColor = "rgba(60, 12, 8, 0.6)";
+      ctx.shadowBlur = Math.max(2, fontSize * 0.2);
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = Math.max(1, fontSize * 0.05);
     }
     // 残暑見舞い(hagaki): 影の上書きなし＝通常どおり白文字＋黒縁取りで写真の上に直接描く。
     if (seasonPos === "top" || seasonPos === "bottom") {

@@ -17,7 +17,13 @@
 import type { Position, Color, Size, FontFamily } from "@/types";
 
 /** compute のレンダラ分岐キー（装飾の種類） */
-export type SeasonDecoration = "tanzaku" | "obake" | "hagaki" | "tsukimi" | "lantern";
+export type SeasonDecoration =
+  | "tanzaku"
+  | "obake"
+  | "hagaki"
+  | "tsukimi"
+  | "lantern"
+  | "momiji";
 
 export interface SeasonDef {
   /** 永続キー。例: "tanabata-2026"（実績キーになるためリネーム禁止） */
@@ -136,6 +142,23 @@ export const SEASONS: SeasonDef[] = [
     },
     decoration: "lantern", // 下辺の夕暮れ＋かぼちゃランタンの行列＋こうもり
     description: "横書き・かぼちゃランタンが並ぶハロウィン限定デコレーション",
+  },
+  {
+    key: "momiji-2026",
+    label: "紅葉狩り",
+    // 関東の平地の紅葉の見頃。勤労感謝の日の3連休（11/21〜23）を含める。
+    start: "2026-11-20T00:00:00+09:00",
+    end: "2026-11-30T23:59:59+09:00",
+    preset: {
+      position: "bottom", // 横書き（下）。上辺の紅葉の天蓋と離して、写真を上下から挟む
+      color: "red", // DB列用（描画は紅葉の紅＝下の textColorHex で上書き）
+      size: "medium",
+      font: "hui-font", // ふい字（手書きの風情）
+      textColorHex: "#e8352a", // 紅葉の紅。上辺の天蓋と色を揃える
+      strokeColorHex: "rgba(255, 244, 224, 0.95)", // 生成り。暗い写真でも紅の文字を縁で浮かせる
+    },
+    decoration: "momiji", // 上辺の天蓋の陰＋枝から垂れる紅葉＋中ほどの左右に散り葉
+    description: "横書き・紅葉の枝が垂れる紅葉狩り限定デコレーション",
   },
 ];
 

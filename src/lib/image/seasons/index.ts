@@ -21,6 +21,7 @@ import { drawObake } from "./obake";
 import { drawHagaki } from "./hagaki";
 import { drawTsukimi } from "./tsukimi";
 import { drawHalloween } from "./halloween";
+import { drawMomiji } from "./momiji";
 
 /** 装飾種別ごとに背景を描く。テキストより先に呼ぶこと。topInset=上部（穴）の余白。 */
 export function drawSeasonBackground(
@@ -48,6 +49,9 @@ export function drawSeasonBackground(
       return;
     case "lantern":
       drawHalloween(ctx, text, width, height, fontSize, margin);
+      return;
+    case "momiji":
+      drawMomiji(ctx, text, width, height, fontSize, margin);
       return;
   }
 }
