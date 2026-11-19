@@ -31,6 +31,10 @@ describe("parseServerHostname", () => {
 
   it("Unicode に戻せない不正な punycode は弾く", () => {
     expect(parseServerHostname("xn--zz.example")).toBeNull();
+    expect(parseServerHostname("xn--a.example")).toBeNull();
+    expect(parseServerHostname("xn--.example")).toBeNull();
+    // 正しい punycode のラベルと混ざっていても弾く
+    expect(parseServerHostname("xn--zz.xn--wgv71a119e.jp")).toBeNull();
   });
 
   it("ポート付きは弾く（既定ポートの :443 も。同じホストへ通信するのに別ドメイン扱いになるため）", () => {

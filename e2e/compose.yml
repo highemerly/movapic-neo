@@ -61,7 +61,7 @@ services:
       retries: 30
 
   fakeverse:
-    image: node:22-alpine
+    image: node:26-alpine
     command: ["node", "/srv/server.mjs"]
     volumes:
       - ./fakeverse/server.mjs:/srv/server.mjs:ro

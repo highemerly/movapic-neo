@@ -54,8 +54,12 @@ export function parseServerHostname(server: string): string | null {
   // ":443" は既定ポートとして URL から落ちるため上の判定を通る。入力そのものがホスト名として
   // 解釈できること（ASCII 化した結果が URL のホスト名と一致すること）で確かめる。
   if (domainToASCII(normalized) !== url.hostname) return null;
-  // 不正な punycode（xn--zz 等）は Unicode に戻せず空になる
-  return domainToUnicode(url.hostname) || null;
+  // 不正な punycode（xn--zz 等）は弾く。Unicode に戻せたラベルは xn-- で始まらないので、残っていれば不正。
+  // pitfall: Node 22 までは URL パーサー（ada 2.x）が不正な punycode で例外を投げ、domainToUnicode も空を
+  // 返していた。Node 24 以降（ada 4）はどちらもそのまま受け付けて返すため、空かどうかでは判定できない。
+  const unicode = domainToUnicode(url.hostname);
+  if (unicode === "" || unicode.split(".").some((label) => label.startsWith("xn--"))) return null;
+  return unicode;
 }
 
 /**

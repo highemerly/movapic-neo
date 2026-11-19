@@ -155,6 +155,9 @@ describe("POST /api/v1/generate: 画像処理エラーのマッピング", () =>
   it("処理が22秒を超えると withTimeout が発火して 504（実タイムアウト配線）", async () => {
     mockRender.mockImplementation(() => new Promise(() => {})); // 永遠に解決しない
     const p = POST(makeReq());
+    // compute が呼ばれた＝withTimeout の setTimeout が登録された後で時計を進める。Node 26 では本文の読み取り
+    // （formData/arrayBuffer）が microtask だけでは終わらず、先に進めるとタイマーの登録が後になって発火しない。
+    await vi.waitFor(() => expect(mockRender).toHaveBeenCalled());
     await vi.advanceTimersByTimeAsync(22000);
     const res = await p;
     expect(res.status).toBe(504);

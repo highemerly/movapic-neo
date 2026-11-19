@@ -8,7 +8,6 @@
  * - dedup は jobKey=mention:statusId で担保されるため、両経路の二重受信は安全。
  *
  * worker-front（と dev all-in-one）の常駐プロセスでのみ起動する。
- * Node 22 のグローバル WebSocket（undici）を使うため追加依存は不要。
  */
 
 import WebSocket, { type RawData } from "ws";
