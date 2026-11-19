@@ -1,6 +1,6 @@
 {
   $schema: 'https://docs.renovatebot.com/renovate-schema.json',
-  // docker:pinDigests: node:22-alpine を digest で固定する。タグのままだと Alpine の更新（apk の
+  // docker:pinDigests: node:26-alpine を digest で固定する。タグのままだと Alpine の更新（apk の
   // vips/libheif の版が変わる）がリリース時のビルドで無言で入る。固定すると digest 更新が PR になり、
   // golden（deps ステージで sharp を system libvips にソースビルドする）を通してから取り込める。
   extends: ['config:recommended', 'docker:pinDigests'],
@@ -37,7 +37,7 @@
     {
       // package.json の範囲（^x.y.z）の下限も上げる。範囲内の更新でも PR になり、
       // package.json を見れば実際に入っている版が分かる状態を保つ。
-      // npm に限る（Docker の node:22-alpine や setup-node の 22 まで 22.x.y に固定されるため）。
+      // npm に限る（Docker の node:26-alpine や setup-node の 26 まで 26.x.y に固定されるため）。
       matchManagers: ['npm'],
       rangeStrategy: 'bump',
     },
@@ -55,10 +55,11 @@
       dependencyDashboardApproval: true,
     },
     {
-      // Node のメジャーは Dockerfile（node:22-alpine）・CI（setup-node）・.tool-versions・@types/node を
-      // 揃えて上げる必要があるため1つの PR にまとめる。
+      // Node のメジャーは Dockerfile（node:26-alpine）・CI（setup-node）・.tool-versions・@types/node を
+      // 揃えて上げる必要があるため1つの PR にまとめる。e2e/compose.yml（偽 Fediverse の node:26-alpine）は
+      // Renovate の対象外にしているので、この PR には入らない。手で揃える。
       // undici も同じ。SSRF ガード（src/lib/security/ssrf.ts）は Node 組み込みの fetch に undici の Agent を
-      // 渡しており、メジャーが Node 組み込みの undici（Node 22 は 6）と違うと全部の通信が失敗する。
+      // 渡しており、メジャーが Node 組み込みの undici（Node 26 は 8）と違うと全部の通信が失敗する。
       matchDepNames: ['node', '@types/node', 'undici'],
       matchUpdateTypes: ['major'],
       groupName: 'Node.js major',

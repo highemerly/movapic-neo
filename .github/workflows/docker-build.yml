@@ -120,7 +120,7 @@ jobs:
         uses: actions/setup-node@v7
         with:
           # 型の除去（scripts/release-notes.ts を素の node で動かす）に 22.18 以上が要る
-          node-version: 22
+          node-version: 26
 
       - name: Generate in-app release notes
         env:

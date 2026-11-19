@@ -15,7 +15,7 @@
 
 ## 必要な環境
 
-- Node.js 20以上
+- Node.js 26（版は [.tool-versions](../.tool-versions)）
 - Docker / Docker Compose
 - S3互換オブジェクトストレージ（AWS S3 / MinIO など）
 - Cloudflareアカウント（Email Routing・Workers用。メール投稿機能を使う場合）
