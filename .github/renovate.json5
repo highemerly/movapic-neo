@@ -85,11 +85,13 @@
       enabled: false,
     },
     {
-      // マイナー・パッチは CI（ci-result＝unit・lint・型・golden・E2E）が緑なら自動でマージする。
+      // マイナー・パッチ・digest は CI（ci-result＝unit・lint・型・golden・E2E）が緑なら自動でマージする。
       // E2E は本物の Postgres・S3（versitygw）と偽の Mastodon/Misskey へのログイン・投稿まで通す。
-      // メジャー（承認制）・digest・lockfile の一括更新は semver の上げ方ではなく影響が広いので手でマージする。
+      // digest（node:26-alpine）は、Dockerfile の変更で golden と E2E が本番と同じイメージをビルドして走る。
+      // digest が変わると apk の層のキャッシュも外れて vips/libheif がその時点の版に入れ替わるが、golden が描画を確かめる。
+      // メジャー（承認制）・lockfile の一括更新は手でマージする（lockfile は間接依存がまとめて動き、除外している依存も含みうるため）。
       // マージしても main に入るだけで、本番へはリリース（Tag a release）とデプロイ PR のマージを経る。
-      matchUpdateTypes: ['minor', 'patch'],
+      matchUpdateTypes: ['minor', 'patch', 'digest'],
       automerge: true,
     },
     {

@@ -36,7 +36,7 @@ gh api -X PUT repos/highemerly/movapic-neo/rulesets/<id> --input .github/ruleset
   - sharp の 0.35 以降（Alpine の libvips が 8.18.3 以上になるまでソースビルドできない）
 - Node のメジャーは Dockerfile・CI・`.tool-versions`・`@types/node` が1つの PR にまとまる。
 - 対象外: [docker-compose.yml](../docker-compose.yml)（本番の共有 Postgres に合わせて手で上げる）・[workers/](../workers/)（CI が無く手動デプロイ）。
-- `node:26-alpine` は digest 固定。Alpine や Node のパッチ更新は digest 更新の PR として来る（apk の vips/libheif の版が変わり得るので golden を必ず見る）。
+- `node:26-alpine` は digest 固定。Alpine や Node のパッチ更新は digest 更新の PR として来て、CI が緑なら自動でマージされる（apk の vips/libheif の版が変わり得るが、golden が本番と同じイメージで描画を確かめる）。
 
 ### 自動マージ
 Renovate が自分の PR に GitHub の auto-merge を付け、必須チェック `ci-result` が緑になった時点で squash マージされる。自動マージされた PR は assign されない（失敗したときだけ assign される）ので、**「Assigned to you」に残った PR だけを見ればよい**。マージされても main に入るだけで、本番へはリリース（Tag a release）とデプロイ PR のマージを経る。
@@ -49,13 +49,14 @@ Renovate が自分の PR に GitHub の auto-merge を付け、必須チェッ�
 | 描画系 | skia-canvas・sharp のパッチ | 自動（golden が見ている） |
 | E2E か本物を通す unit で確かめているもの | `@aws-sdk/*`・pg・jose・nanoid・mailparser・emojibase・tailwind-merge | 自動 |
 | ブランチの CI で動く Actions | checks.yml・golden.yml・e2e.yml・ci.yml の中の Actions | 自動 |
+| ベースイメージ | `node:26-alpine` の digest | 自動（golden と E2E が本番と同じイメージで走る） |
 | 見た目・操作 | next・react・tailwindcss・radix-ui・lucide-react・sonner・next-themes・class-variance-authority・tw-animate-css・shadcn | 手動。手元で画面を見る |
 | ジョブ・Bot | graphile-worker・ws | 手動。変更履歴を読み、手元で Bot・メール投稿・定期ジョブを動かす |
 | DB | prisma のグループ | 手動。本番の共有 DB に効きクエリも多い（E2E は migrate deploy と投稿の書き込みまで） |
 | EXIF の読み取り | exifr | 手動。位置情報を含む写真で投稿して確かめる（本物の画像を通すテストが無い） |
 | 0.x のもの | graphile-worker・next-themes・class-variance-authority・jpeg-js・sharp のマイナー | 手動。0.x はマイナーでも互換を崩すことが多いのに Renovate はメジャー扱いしない |
 | タグ時にしか動かない Actions | docker-build.yml・tag-release.yml の中の Actions | 手動。PR の CI では何も走らず `ci-result` がスキップのまま緑になる。マージ後、次のリリースの docker-build.yml のログを見る |
-| メジャー・`node:26-alpine` の digest・lockfile の一括更新 | | 手動。digest は golden の `vips-dev` の版を見る |
+| メジャー・lockfile の一括更新 | | 手動 |
 
 - 1つの PR に手動の依存が1つでも入っていれば、その PR は自動ではマージされない（next と eslint-config-next のようにまとまる PR は手動の側に倒れる）。
 - 0.x の依存を足したら、[renovate.json5](../.github/renovate.json5) の除外にも足す。CI が見ていない種類の依存を足したときも同じ。
@@ -83,7 +84,7 @@ Dependabot alerts を有効にしてあり（Dependabot security updates・versi
 ### 承認待ち（メジャー）の片付け方
 - 着手するときに Dashboard のチェックを入れる → PR が作られる。一度に多く承認せず1つずつ。
 - CI が落ちたら、その Renovate のブランチ（`renovate/...`）に直接コミットを足して直す。人のコミットが入ったブランチは Renovate が以後書き換えない。
-- sharp 0.35 は、`node:26-alpine` の digest 更新 PR の golden ログで `vips-dev` の版が 8.18.3 以上になっていたら承認する（それまでは承認してもソースビルドが失敗する）。
+- sharp 0.35 は、`node:26-alpine` の digest 更新 PR（自動でマージされるので、マージ済みの PR から探す）の golden ログで `vips-dev` の版が 8.18.3 以上になっていたら承認する（それまでは承認してもソースビルドが失敗する）。
 
 ### その他
 - 今は要らない更新: PR を閉じる（その版は作り直されない。次の版が出れば再び PR になる）。恒久的に止めるなら renovate.json5 にルールを足す。
